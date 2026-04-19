@@ -1,0 +1,126 @@
+<p style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 2px">
+    Gestão de alunos</p>
+<p style="font-size:20px;font-weight:600;margin:0 0 16px">Cadastro</p>
+
+<details {% if not alunos %}open{% endif %}>
+    <summary>➕ Novo aluno</summary>
+    <div class="config-panel" style="margin-top:8px">
+        <form hx-post="/alunos/novo" hx-target="#tab-alunos" hx-swap="innerHTML">
+            <div class="form-grid">
+                <div class="campo">
+                    <label>Nome *</label>
+                    <input type="text" name="nome" required placeholder="Nome do aluno">
+                </div>
+                <div class="campo">
+                    <label>Nível</label>
+                    <select name="nivel">
+                        <option value="iniciante">Iniciante</option>
+                        <option value="intermediario" selected>Intermediário</option>
+                        <option value="avancado">Avançado</option>
+                    </select>
+                </div>
+                <div class="campo">
+                    <label>Objetivo</label>
+                    <select name="objetivo">
+                        <option>hipertrofia</option><option>forca</option><option>resistencia</option>
+                        <option>emagrecimento</option><option>condicionamento</option><option>reabilitacao</option>
+                    </select>
+                </div>
+                <div class="campo">
+                    <label>Restrições (vírgula)</label>
+                    <input type="text" name="restricoes" placeholder="ex: ombro direito, joelho">
+                </div>
+            </div>
+            <div class="campo" style="margin-bottom:12px">
+                <label>Observações</label>
+                <textarea name="obs" rows="2" style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:13px"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%">Salvar aluno</button>
+        </form>
+    </div>
+</details>
+
+<hr class="thin" style="margin:16px 0">
+
+{% if not alunos %}
+<div style="text-align:center;padding:40px 20px;color:#9ca3af">
+    <div style="font-size:40px;margin-bottom:8px">👥</div>
+    <div style="font-size:14px">Nenhum aluno cadastrado ainda.</div>
+</div>
+{% else %}
+<p class="meta-count">{{ alunos|length }} aluno(s)</p>
+
+{% for aluno in alunos %}
+<div class="aluno-card" id="aluno-{{ loop.index0 }}">
+    <div class="aluno-card-info">
+        <div class="aluno-card-nome">{{ aluno.nome }}</div>
+        <div class="aluno-card-meta">
+            <b>Nível:</b> {{ aluno.get('nivel', '—') }} ·
+            <b>Objetivo:</b> {{ aluno.get('objetivo', '—') }} ·
+            <b>Restrições:</b> {{ aluno.get('restricoes', [])|join(', ') or '—' }}
+        </div>
+        {% if aluno.get('obs') %}
+        <div class="aluno-card-obs"><b>Obs:</b> {{ aluno.obs }}</div>
+        {% endif %}
+    </div>
+    <div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="btn-ghost" title="Editar"
+                onclick="editarAluno({{ loop.index0 }}, {{ aluno | tojson | e }})">✏️</button>
+        <button class="btn-ghost" title="Remover"
+                hx-delete="/alunos/{{ loop.index0 }}/deletar"
+                hx-target="#tab-alunos" hx-swap="innerHTML"
+                hx-confirm="Remover {{ aluno.nome }}?">🗑</button>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Edit modal (hidden, shown by JS) -->
+<div id="edit-aluno-form" style="display:none">
+    <div class="config-panel" style="margin-top:8px;border-color:#e85d04">
+        <p style="font-size:13px;font-weight:600;color:#e85d04;margin-bottom:8px">✏️ Editando aluno</p>
+        <form id="form-edit-aluno" hx-target="#tab-alunos" hx-swap="innerHTML">
+            <div class="form-grid">
+                <div class="campo"><label>Nome *</label><input type="text" name="nome" id="edit-nome" required></div>
+                <div class="campo"><label>Nível</label>
+                    <select name="nivel" id="edit-nivel">
+                        <option value="iniciante">Iniciante</option>
+                        <option value="intermediario">Intermediário</option>
+                        <option value="avancado">Avançado</option>
+                    </select>
+                </div>
+                <div class="campo"><label>Objetivo</label>
+                    <select name="objetivo" id="edit-obj">
+                        <option>hipertrofia</option><option>forca</option><option>resistencia</option>
+                        <option>emagrecimento</option><option>condicionamento</option><option>reabilitacao</option>
+                    </select>
+                </div>
+                <div class="campo"><label>Restrições</label><input type="text" name="restricoes" id="edit-rest"></div>
+            </div>
+            <div class="campo" style="margin-bottom:12px">
+                <label>Observações</label>
+                <textarea name="obs" id="edit-obs" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:13px"></textarea>
+            </div>
+            <div style="display:flex;gap:8px">
+                <button type="submit" class="btn btn-primary" style="flex:1">💾 Salvar</button>
+                <button type="button" class="btn" onclick="document.getElementById('edit-aluno-form').style.display='none'" style="flex:1">✕ Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function editarAluno(i, aluno) {
+    document.getElementById('edit-nome').value = aluno.nome;
+    document.getElementById('edit-nivel').value = aluno.nivel || 'intermediario';
+    document.getElementById('edit-obj').value = aluno.objetivo || 'hipertrofia';
+    document.getElementById('edit-rest').value = (aluno.restricoes || []).join(', ');
+    document.getElementById('edit-obs').value = aluno.obs || '';
+    document.getElementById('form-edit-aluno').setAttribute('hx-post', '/alunos/' + i + '/editar');
+    htmx.process(document.getElementById('form-edit-aluno'));
+    const form = document.getElementById('edit-aluno-form');
+    form.style.display = '';
+    const card = document.getElementById('aluno-' + i);
+    card.parentNode.insertBefore(form, card.nextSibling);
+}
+</script>

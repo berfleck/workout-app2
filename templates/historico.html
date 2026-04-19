@@ -1,0 +1,45 @@
+<p style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 2px">
+    Registros salvos</p>
+<p style="font-size:20px;font-weight:600;margin:0 0 16px">Histórico de treinos</p>
+
+{% if not historico %}
+<div style="text-align:center;padding:60px 20px;color:#9ca3af">
+    <div style="font-size:40px;margin-bottom:12px">📋</div>
+    <div style="font-size:15px;font-weight:500;color:#374151">Nenhum treino salvo ainda</div>
+    <div style="font-size:13px;margin-top:6px">Gere um treino e clique em <b>💾 Salvar no histórico</b> para registrá-lo aqui.</div>
+</div>
+{% else %}
+<p class="meta-count">{{ historico|length }} registro(s)</p>
+
+{% for reg in historico %}
+<div class="hist-card">
+    <div class="hist-titulo">{{ reg.etiqueta }}</div>
+    <div class="hist-meta">
+        <b>Aluno/Turma:</b> {{ reg.get('aluno', '—') }} ·
+        <b>Data:</b> {{ reg.get('data', '—') }} ·
+        <b>{{ reg.get('n_treinos', reg.get('sessoes', [])|length) }} treino(s)</b>
+    </div>
+    <div class="hist-acoes">
+        <details style="margin:0">
+            <summary style="font-size:12px;padding:4px 0">👁 Ver treinos</summary>
+            <div hx-get="/historico/{{ reg.id }}/ver" hx-trigger="revealed" hx-swap="innerHTML"
+                 style="margin-top:8px">
+                <span class="spinner"></span> Carregando...
+            </div>
+        </details>
+        <button class="btn btn-sm"
+                hx-post="/historico/{{ reg.id }}/carregar"
+                hx-target="#resultado"
+                onclick="showTab('treinos'); document.querySelector('[onclick*=treinos]').classList.add('active')">
+            ↩ Carregar
+        </button>
+        <button class="btn btn-sm btn-danger"
+                hx-delete="/historico/{{ reg.id }}/apagar"
+                hx-target="#tab-historico" hx-swap="innerHTML"
+                hx-confirm="Apagar este registro?">
+            🗑 Apagar
+        </button>
+    </div>
+</div>
+{% endfor %}
+{% endif %}

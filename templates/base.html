@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BF Treinamento</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'DM Sans', sans-serif; background: #f9fafb; color: #111827; line-height: 1.5; }
+        .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+        /* Header */
+        .app-header { display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 8px; }
+        .app-header img { height: 48px; }
+        .app-header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+        .app-header p { font-size: 13px; color: #9ca3af; margin-top: 2px; }
+
+        /* Nav tabs */
+        .nav-tabs { display: flex; gap: 0; border-bottom: 1px solid #e5e7eb; margin-bottom: 24px; }
+        .nav-tab { padding: 10px 20px; font-size: 14px; font-weight: 500; color: #9ca3af; text-decoration: none; border-bottom: 2px solid transparent; transition: all 0.15s; cursor: pointer; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
+        .nav-tab:hover { color: #111827; }
+        .nav-tab.active { color: #111827; border-bottom-color: #e85d04; }
+
+        /* Panels */
+        .config-panel { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; margin-bottom: 20px; }
+        .config-title { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+
+        /* Grids */
+        .grupo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; margin-bottom: 20px; }
+        .grupo-grid label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; cursor: pointer; transition: all 0.15s; user-select: none; }
+        .grupo-grid label:hover { border-color: #e85d04; background: #fff7ed; }
+        .grupo-grid input[type="checkbox"] { accent-color: #e85d04; width: 16px; height: 16px; }
+        .grupo-grid input[type="checkbox"]:checked + span { font-weight: 600; color: #e85d04; }
+
+        .opcoes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .campo { display: flex; flex-direction: column; gap: 4px; }
+        .campo label, .campo-label { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+        .campo select, .campo input[type="text"], .campo input[type="number"], .campo textarea {
+            width: 100%; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 13px; font-family: inherit; background: white; }
+        .campo select:focus, .campo input:focus, .campo textarea:focus { outline: none; border-color: #e85d04; box-shadow: 0 0 0 3px rgba(232,93,4,0.1); }
+        .campo input[type="range"] { width: 100%; padding: 0; margin: 8px 0; accent-color: #e85d04; }
+        .range-row { display: flex; align-items: center; gap: 10px; }
+        .range-value { font-size: 13px; font-weight: 600; color: #e85d04; min-width: 20px; text-align: center; }
+
+        /* Buttons */
+        .btn { padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; border: 1px solid #e5e7eb; background: white; color: #374151; transition: all 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .btn:hover { border-color: #d1d5db; background: #f9fafb; }
+        .btn-primary { background: #e85d04; color: white; border: none; }
+        .btn-primary:hover { background: #d4520a; }
+        .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
+        .btn-ghost { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 4px 8px; font-size: 16px; border-radius: 6px; transition: all 0.15s; font-family: inherit; }
+        .btn-ghost:hover { background: #f3f4f6; color: #e85d04; }
+        .btn-danger { color: #dc2626; border-color: #fecaca; }
+        .btn-danger:hover { background: #fef2f2; }
+        .botoes-acao { display: flex; gap: 10px; margin-top: 8px; }
+
+        /* Treino card */
+        .treino-card { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; margin-bottom: 16px; }
+        .treino-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+        .treino-titulo { font-size: 14px; font-weight: 700; }
+        .treino-tipo { font-size: 11px; color: #9ca3af; }
+        .treino-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        /* Blocos & exercícios */
+        .bloco-label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; margin: 14px 0 6px; }
+        .bloco-header { display: flex; align-items: center; gap: 6px; }
+        .exercicio { display: flex; align-items: center; gap: 12px; padding: 8px 0 8px 12px; border-left: 3px solid #e85d04; margin-bottom: 4px; }
+        .exercicio-info { flex: 1; min-width: 0; }
+        .exercicio-nome { font-size: 14px; font-weight: 600; }
+        .exercicio-meta { font-size: 11px; color: #9ca3af; margin-top: 1px; }
+        .prescr-badge { display: inline-block; background: #fff3e6; color: #e85d04; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 700; margin-left: 6px; }
+        .exercicio-acoes { display: flex; gap: 2px; flex-shrink: 0; }
+        hr.thin { border: none; border-top: 1px solid #f3f4f6; margin: 8px 0; }
+
+        /* Prescription inline */
+        .prescricao-form { display: flex; gap: 8px; align-items: center; padding: 4px 0 4px 12px; flex-wrap: wrap; }
+        .prescricao-form input, .prescricao-form select { width: 70px; padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; font-family: inherit; }
+        .prescricao-form .prescr-label { font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* Sub panel (substituição) */
+        .sub-panel { background: #fffbf5; border: 1px solid #fed7aa; border-radius: 10px; padding: 14px 18px; margin: 8px 0; }
+        .add-panel { background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 14px 18px; margin: 8px 0; }
+        .novo-panel { background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 10px; padding: 14px 18px; margin: 8px 0; }
+        .mover-panel { background: #f5f3ff; border: 1px solid #c4b5fd; border-radius: 10px; padding: 14px 18px; margin: 8px 0; }
+        .panel-title { font-size: 12px; font-weight: 700; margin: 0 0 8px 0; }
+        .panel-title-sub { color: #92400e; }
+        .panel-title-add { color: #166534; }
+        .panel-title-novo { color: #075985; }
+        .panel-title-mover { color: #5b21b6; }
+
+        /* Exercise search results */
+        .ex-option { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.1s; }
+        .ex-option:hover { background: #f3f4f6; }
+        .ex-option input[type="radio"] { accent-color: #e85d04; }
+        .ex-option-meta { font-size: 11px; color: #9ca3af; margin-left: auto; }
+        .meta-count { font-size: 11px; color: #9ca3af; margin: 4px 0; }
+        .filtros-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
+        .filtros-grid input, .filtros-grid select { width: 100%; padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; font-family: inherit; }
+
+        /* Hierarchy UI */
+        .regiao-header { background: #fff7ed; border-left: 3px solid #e85d04; padding: 5px 10px; margin: 4px 0 6px; border-radius: 0 4px 4px 0; }
+        .regiao-header span { font-size: 11px; font-weight: 700; color: #c2410c; text-transform: uppercase; letter-spacing: 0.06em; }
+        .hier-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+        .hier-indent-1 { padding-left: 16px; }
+        .hier-indent-2 { padding-left: 32px; }
+        .hier-toggle { font-size: 11px; color: #e85d04; cursor: pointer; background: none; border: none; font-family: inherit; padding: 2px 6px; border-radius: 4px; }
+        .hier-toggle:hover { background: #fff7ed; }
+
+        /* Demandas sliders */
+        .demandas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin: 12px 0; }
+
+        /* Aluno card */
+        .aluno-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+        .aluno-card-info { flex: 1; }
+        .aluno-card-nome { font-size: 15px; font-weight: 600; }
+        .aluno-card-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+        .aluno-card-obs { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+
+        /* Historico card */
+        .hist-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 18px; margin-bottom: 8px; }
+        .hist-titulo { font-size: 15px; font-weight: 600; }
+        .hist-meta { font-size: 12px; color: #6b7280; margin-top: 4px; }
+        .hist-acoes { display: flex; gap: 6px; margin-top: 8px; }
+
+        /* Feedback */
+        .aviso { text-align: center; color: #9ca3af; font-size: 14px; padding: 40px 0; }
+        .sucesso { color: #166534; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500; }
+        .erro { color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500; }
+        .separador { display: flex; align-items: center; gap: 12px; margin: 24px 0; font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; }
+        .separador::before, .separador::after { content: ''; flex: 1; border-top: 1px solid #e5e7eb; }
+
+        /* HTMX */
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline-block; }
+        .htmx-request .htmx-hide { display: none; }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #e85d04; border-radius: 50%; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Template buttons */
+        .template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 12px; }
+        .template-btn { padding: 10px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: white; font-size: 13px; font-family: inherit; cursor: pointer; text-align: left; transition: all 0.15s; }
+        .template-btn:hover { border-color: #e85d04; background: #fff7ed; }
+
+        /* Collapsible */
+        details { margin-bottom: 8px; }
+        details summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #374151; padding: 8px 0; list-style: none; }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before { content: '▸ '; color: #e85d04; }
+        details[open] summary::before { content: '▾ '; }
+
+        /* Tabs content */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Checkbox inline */
+        .check-inline { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+        .check-inline input { accent-color: #e85d04; }
+
+        /* Form grid */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="app-header">
+            <img src="/static/logo.png" alt="BF">
+            <div>
+                <h1>BF Treinamento</h1>
+                <p>Gerador de sessões personalizadas</p>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab {% if active_tab == 'treinos' or not active_tab %}active{% endif %}"
+                    onclick="showTab('treinos')">🏋️ Treinos</button>
+            <button class="nav-tab {% if active_tab == 'alunos' %}active{% endif %}"
+                    hx-get="/alunos" hx-target="#tab-alunos" hx-swap="innerHTML"
+                    onclick="showTab('alunos')">👥 Alunos</button>
+            <button class="nav-tab {% if active_tab == 'historico' %}active{% endif %}"
+                    hx-get="/historico" hx-target="#tab-historico" hx-swap="innerHTML"
+                    onclick="showTab('historico')">📋 Histórico</button>
+        </div>
+
+        <div id="tab-treinos" class="tab-content active">{% block treinos %}{% endblock %}</div>
+        <div id="tab-alunos" class="tab-content">{% block alunos %}{% endblock %}</div>
+        <div id="tab-historico" class="tab-content">{% block historico %}{% endblock %}</div>
+    </div>
+
+    <script>
+    function showTab(name) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + name).classList.add('active');
+        event.target.classList.add('active');
+    }
+    </script>
+</body>
+</html>

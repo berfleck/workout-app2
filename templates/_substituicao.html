@@ -1,0 +1,11 @@
+<p class="meta-count">{{ cands|length }} exercício(s)</p>
+{% for e in cands %}
+<label class="ex-option">
+    <input type="radio" name="exercicio_escolhido" value="{{ e.nome }}">
+    <span>{{ e.nome }}</span>
+    <span class="ex-option-meta">{{ e.purpose }} · {{ e.eq_primario }}</span>
+</label>
+{% endfor %}
+{% if not cands %}
+<p class="meta-count">Nenhum exercício encontrado.</p>
+{% endif %}

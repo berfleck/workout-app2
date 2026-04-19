@@ -1,0 +1,26 @@
+<div class="separador">{{ sessoes|length }} treino{{ 's' if sessoes|length > 1 else '' }} gerado{{ 's' if sessoes|length > 1 else '' }}</div>
+
+<!-- Salvar no histórico -->
+<details>
+    <summary>💾 Salvar no histórico</summary>
+    <div style="display:flex;gap:8px;align-items:center;margin:8px 0">
+        <input type="text" name="etiqueta" placeholder="Etiqueta (ex: Turma manhã — semana 1)"
+               style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit" id="hist-etiqueta">
+        <button type="button" class="btn btn-sm btn-primary"
+                hx-post="/historico/salvar"
+                hx-include="#hist-etiqueta, #sel-aluno"
+                hx-target="#hist-feedback"
+                hx-vals='js:{"aluno": document.getElementById("sel-aluno")?.value || ""}'>
+            💾 Salvar
+        </button>
+    </div>
+    <div id="hist-feedback"></div>
+</details>
+
+{% for sessao in sessoes %}
+<div id="treino-{{ loop.index0 }}">
+    {% with idx=loop.index0, modo="visualizar" %}
+    {% include "_treino_card.html" %}
+    {% endwith %}
+</div>
+{% endfor %}

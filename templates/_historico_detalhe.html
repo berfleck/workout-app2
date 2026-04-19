@@ -1,0 +1,23 @@
+{% for sessao in sessoes %}
+<div style="margin-bottom:12px">
+    <p style="font-size:11px;font-weight:700;color:#e85d04;text-transform:uppercase;letter-spacing:0.08em;margin:10px 0 6px">
+        Treino {{ loop.index }} — {% for p in sessao.tipo.split(' + ') if p %}{{ padroes_labels.get(p, p) }}{% if not loop.last %} · {% endif %}{% endfor %}
+    </p>
+    {% for bloco in sessao.blocos %}
+    <p class="bloco-label">Bloco {{ bloco.label }}</p>
+    {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
+    <div class="exercicio">
+        <div class="exercicio-info">
+            <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
+                {% if ex.series or ex.reps %}
+                <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
+                {% endif %}
+            </span>
+            <div class="exercicio-meta">{{ ex.purpose }} · 🔧 {{ ex.eq_primario }}</div>
+        </div>
+    </div>
+    {% endfor %}
+    <hr class="thin">
+    {% endfor %}
+</div>
+{% endfor %}

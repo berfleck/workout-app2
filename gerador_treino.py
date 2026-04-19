@@ -1,0 +1,1223 @@
+"""
+Gerador de Treinos — lógica central
+Lê o banco de exercícios (.xlsx) e gera sessões respeitando as regras definidas.
+
+Uso:
+    python gerador_treino.py
+"""
+
+import math
+import pandas as pd
+import random
+from dataclasses import dataclass, field
+from typing import Optional
+
+# ---------------------------------------------------------------------------
+# Constantes
+# ---------------------------------------------------------------------------
+
+XLSX_PATH = "banco_exercicios.xlsx"
+
+# ---------------------------------------------------------------------------
+# Hierarquia: Região → Subregião → Padrão
+# ---------------------------------------------------------------------------
+
+# Mapeamento PADRÃO → SUBREGIÃO (todo padrão pertence a uma e só uma subregião)
+PADRAO_PARA_SUBREGIAO = {
+    # Membros inferiores
+    "squat":          "perna_anterior",
+    "hinge":          "perna_posterior",
+    "knee_flexion":   "perna_posterior",
+    "abduction":      "perna_posterior",
+    "adduction":      "adutores",
+    "flexao_plantar": "panturrilha",
+    # Membros superiores
+    "empurrar_compostos": "peito",
+    "empurrar_isolados":  "peito",
+    "remadas":            "costas",
+    "puxadas":            "costas",
+    "ombro_composto":     "ombro",
+    "ombro_isolado":      "ombro",
+    "posterior_ombro":    "ombro",
+    "biceps":             "bracos",
+    "triceps":            "bracos",
+    # Outros
+    "core_isometrico": "core",
+    "core_dinamico":   "core",
+    "cardio":          "cardio",
+}
+
+# Mapeamento SUBREGIÃO → REGIÃO
+SUBREGIAO_PARA_REGIAO = {
+    "perna_anterior":  "lower",
+    "perna_posterior": "lower",
+    "adutores":        "lower",
+    "panturrilha":     "lower",
+    "peito":  "upper",
+    "costas": "upper",
+    "ombro":  "upper",
+    "bracos": "upper",
+    "core":   "core",
+    "cardio": "cardio",
+}
+
+# Inverso: REGIÃO → lista de SUBREGIÕES, SUBREGIÃO → lista de PADRÕES
+# (gerados automaticamente para garantir consistência)
+REGIAO_PARA_SUBREGIOES: dict[str, list[str]] = {}
+for sub, reg in SUBREGIAO_PARA_REGIAO.items():
+    REGIAO_PARA_SUBREGIOES.setdefault(reg, []).append(sub)
+
+SUBREGIAO_PARA_PADROES: dict[str, list[str]] = {}
+for pad, sub in PADRAO_PARA_SUBREGIAO.items():
+    SUBREGIAO_PARA_PADROES.setdefault(sub, []).append(pad)
+
+
+# Padrões considerados "compostos" para fins de PRIORIDADE de seleção
+# (não confundir com o campo `purpose` do banco, que é por exercício individual).
+# Quando o usuário pede N exercícios de um escopo, o app preenche primeiro
+# garantindo 1 de cada padrão composto, depois cicla pelos isolados.
+PADROES_COMPOSTOS = {
+    "squat", "hinge",
+    "empurrar_compostos", "remadas", "puxadas", "ombro_composto",
+}
+
+# Proporção mínima de compostos em demandas de nível "regiao".
+# Ex: 0.6 = ao menos 60% dos exercícios serão compostos.
+# Só se aplica quando o escopo tem tanto compostos quanto isolados.
+PROPORCAO_COMPOSTOS = 0.6
+
+# Agrupamento funcional push/pull para evitar pares agonistas em super séries.
+# Exercícios do mesmo grupo compartilham musculatura primária ou sinergista relevante:
+#   push → peito, ombro anterior/lateral, tríceps
+#   pull → costas, ombro posterior, bíceps
+# Membros inferiores e core têm grupos próprios.
+GRUPO_MUSCULAR_PADRAO: dict[str, str] = {
+    # Upper — push
+    "empurrar_compostos": "push",
+    "empurrar_isolados":  "push",
+    "ombro_composto":     "push",
+    "ombro_isolado":      "push",
+    "triceps":            "push",
+    # Upper — pull
+    "remadas":         "pull",
+    "puxadas":         "pull",
+    "posterior_ombro": "pull",
+    "biceps":          "pull",
+    # Lower — anterior
+    "squat":        "quad",
+    "knee_flexion": "hamstring",
+    # Lower — posterior
+    "hinge":     "hamstring",
+    "abduction": "glute",
+    # Lower — outros
+    "adduction":      "addutor",
+    "flexao_plantar": "calf",
+    # Core / cardio
+    "core_isometrico": "core",
+    "core_dinamico":   "core",
+    "cardio":          "cardio",
+}
+
+
+def expandir_para_padroes(
+    regioes: list[str] | None = None,
+    subregioes: list[str] | None = None,
+    padroes: list[str] | None = None,
+) -> list[str]:
+    """
+    Expande seleções de qualquer nível da hierarquia para uma lista plana
+    de padrões, sem duplicatas, mantendo a ordem.
+
+    Lógica de "marcar pai = atalho" (Comportamento A):
+    - Se padroes específicos foram passados, eles têm prioridade absoluta
+    - Subregioes expandem para todos os seus padrões
+    - Regioes expandem para todos os padrões de todas as suas subregiões
+    - Combinações são unidas (set union) preservando ordem de inserção
+    """
+    resultado: list[str] = []
+    seen: set[str] = set()
+
+    def add(p: str):
+        if p not in seen:
+            seen.add(p)
+            resultado.append(p)
+
+    for r in (regioes or []):
+        for sub in REGIAO_PARA_SUBREGIOES.get(r, []):
+            for pad in SUBREGIAO_PARA_PADROES.get(sub, []):
+                add(pad)
+    for sub in (subregioes or []):
+        for pad in SUBREGIAO_PARA_PADROES.get(sub, []):
+            add(pad)
+    for pad in (padroes or []):
+        add(pad)
+
+    return resultado
+
+
+# Padrões disponíveis e defaults de exercícios por padrão (usado no modo livre)
+EXERCICIOS_POR_PADRAO = {p: 1 for p in PADRAO_PARA_SUBREGIAO}
+
+# Templates: lista de padrões
+TEMPLATES = {
+    "Full Body": [
+        "remadas", "puxadas",
+        "empurrar_compostos", "ombro_composto",
+        "squat", "hinge", "abduction", "adduction", "core_isometrico",
+    ],
+    "Full Body + Braços": [
+        "remadas", "puxadas",
+        "empurrar_compostos", "ombro_composto",
+        "squat", "hinge", "abduction", "adduction", "core_isometrico",
+        "biceps", "triceps",
+    ],
+    "Empurrar + Posterior": [
+        "empurrar_compostos", "empurrar_isolados", "ombro_composto",
+        "hinge", "knee_flexion", "abduction",
+        "core_isometrico", "triceps",
+    ],
+    "Puxar + Anterior": [
+        "remadas", "puxadas", "posterior_ombro",
+        "squat", "adduction",
+        "core_dinamico", "biceps",
+    ],
+}
+
+# EPP padrão por template (quantos exercícios cada categoria inicia por padrão)
+TEMPLATE_EPP = {
+    "Full Body": {
+        "remadas": 1, "puxadas": 1,
+        "empurrar_compostos": 1, "ombro_composto": 1,
+        "squat": 1, "hinge": 1, "abduction": 1, "adduction": 1, "core_isometrico": 1,
+    },
+    "Full Body + Braços": {
+        "remadas": 1, "puxadas": 1,
+        "empurrar_compostos": 1, "ombro_composto": 1,
+        "squat": 1, "hinge": 1, "abduction": 1, "adduction": 1, "core_isometrico": 1,
+        "biceps": 1, "triceps": 1,
+    },
+    "Empurrar + Posterior": {
+        "empurrar_compostos": 2, "empurrar_isolados": 1, "ombro_composto": 2,
+        "hinge": 2, "knee_flexion": 1, "abduction": 1,
+        "core_isometrico": 2, "triceps": 1,
+    },
+    "Puxar + Anterior": {
+        "remadas": 2, "puxadas": 2, "posterior_ombro": 1,
+        "squat": 2, "adduction": 1,
+        "core_dinamico": 2, "biceps": 1,
+    },
+}
+
+# Não parear dois exercícios com fadiga >= este valor no mesmo bloco
+FADIGA_MAX_PAR = 4
+
+# Tamanho padrão dos blocos (super séries)
+TAMANHO_BLOCO_PADRAO = 2
+
+
+# ---------------------------------------------------------------------------
+# Estruturas de dados
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Exercicio:
+    nome: str
+    variacao_de: Optional[str]
+    eq_primario: str
+    eq_secundario: Optional[str]
+    regiao: str
+    padrao: str
+    purpose: str
+    unilateral: str
+    complexidade: int
+    fadiga: int
+    circuito: str
+    similaridade: str
+    musculo_primario: str
+    obs: Optional[str]
+    # Prescrição (definida pelo personal na UI, não vem do banco)
+    series: Optional[int] = None
+    reps: Optional[str] = None   # ex: "8-12", "10", "12-15"
+    rir: Optional[int] = None    # Reps In Reserve 0-4
+
+
+@dataclass
+class SuperSerie:
+    label: str
+    ex1: Exercicio
+    ex2: Optional[Exercicio]
+    ex3: Optional[Exercicio] = None
+
+
+@dataclass
+class Sessao:
+    tipo: str
+    blocos: list[SuperSerie] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Carregamento do banco
+# ---------------------------------------------------------------------------
+
+def _str(val) -> str:
+    if val is None:
+        return ""
+    try:
+        if math.isnan(float(val)):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    return str(val).strip()
+
+
+_EQ_FIXES = {
+    "Apoio":           "Sem equipamento",
+    "Apoio ajoelhado": "Sem equipamento",
+    "Apoio elevado":   "Sem equipamento",
+    "Remada trx":      "TRX",
+}
+
+
+def carregar_banco(path: str) -> list[Exercicio]:
+    df = pd.read_excel(path, sheet_name="Exercícios")
+    df = df.where(pd.notna(df), None)
+    exercicios = []
+    for _, row in df.iterrows():
+        nome = _str(row.get("nome"))
+        if not nome:
+            continue
+        eq_pri = _str(row.get("eq_primario")) or _EQ_FIXES.get(nome, "")
+        exercicios.append(Exercicio(
+            nome=nome,
+            variacao_de=_str(row.get("variacao_de")) or None,
+            eq_primario=eq_pri,
+            eq_secundario=_str(row.get("eq_secundario")) or None,
+            regiao=_str(row.get("regiao")),
+            padrao=_str(row.get("padrao")),
+            purpose=_str(row.get("purpose")),
+            unilateral=_str(row.get("unilateral")),
+            complexidade=int(row.get("complexidade") if row.get("complexidade") and not (isinstance(row.get("complexidade"), float) and math.isnan(row.get("complexidade"))) else 1),
+            fadiga=int(row.get("fadiga") if row.get("fadiga") and not (isinstance(row.get("fadiga"), float) and math.isnan(row.get("fadiga"))) else 1),
+            circuito=_str(row.get("circuito")) or "não",
+            similaridade=_str(row.get("similaridade")),
+            musculo_primario=_str(row.get("musculo_primario")),
+            obs=_str(row.get("obs")) or None,
+        ))
+    return exercicios
+
+
+# ---------------------------------------------------------------------------
+# Filtros
+# ---------------------------------------------------------------------------
+
+def filtrar_por_padrao(banco: list[Exercicio], padrao: str) -> list[Exercicio]:
+    return [e for e in banco if e.padrao == padrao]
+
+
+def filtrar_por_equipamentos(
+    banco: list[Exercicio],
+    equipamentos_bloqueados: list[str],
+) -> list[Exercicio]:
+    if not equipamentos_bloqueados:
+        return banco
+    return [e for e in banco if e.eq_primario not in equipamentos_bloqueados]
+
+
+def filtrar_por_complexidade(
+    banco: list[Exercicio],
+    max_complexidade: int,
+) -> list[Exercicio]:
+    return [e for e in banco if e.complexidade <= max_complexidade]
+
+
+# ---------------------------------------------------------------------------
+# Ordenação: compostos antes de todo o resto
+# ---------------------------------------------------------------------------
+
+def ordenar_compostos_primeiro(exercicios: list[Exercicio]) -> list[Exercicio]:
+    """
+    Compostos vêm primeiro. Dentro de cada grupo (compound vs resto),
+    ordena por fadiga decrescente para os mais pesados abrirem o bloco.
+    """
+    compostos = [e for e in exercicios if e.purpose == "compound"]
+    resto     = [e for e in exercicios if e.purpose != "compound"]
+    compostos.sort(key=lambda e: e.fadiga, reverse=True)
+    resto.sort(key=lambda e: e.fadiga, reverse=True)
+    return compostos + resto
+
+
+# ---------------------------------------------------------------------------
+# Regra de similaridade
+# ---------------------------------------------------------------------------
+
+def selecionar_sem_repeticao_similaridade(
+    candidatos: list[Exercicio],
+    similaridades_usadas: set[str],
+    variacao_pais_usados: set[str],
+    n: int,
+) -> list[Exercicio]:
+    """
+    Seleciona até n exercícios evitando repetir grupos de similaridade.
+    Se não houver candidatos suficientes respeitando a regra, relaxa:
+    permite repetir grupos de similaridade para completar n exercícios,
+    mas nunca repete o mesmo exercício.
+    """
+    nomes_usados: set[str] = set()
+
+    def _selecionar(pool, respeitar_sim):
+        selecionados = []
+        sims_desta_selecao = set()
+        random.shuffle(pool)
+        for e in pool:
+            if e.nome in nomes_usados:
+                continue
+            sim_ok = (not respeitar_sim) or (
+                e.similaridade not in similaridades_usadas
+                and e.similaridade not in sims_desta_selecao
+            )
+            var_ok = e.variacao_de is None or e.variacao_de not in variacao_pais_usados
+            if sim_ok and var_ok:
+                selecionados.append(e)
+                sims_desta_selecao.add(e.similaridade)
+                nomes_usados.add(e.nome)
+            if len(selecionados) >= n:
+                break
+        return selecionados
+
+    # Tentativa 1: respeitar similaridade
+    resultado = _selecionar(list(candidatos), respeitar_sim=True)
+
+    # Se não completou n, relaxar regra de similaridade
+    if len(resultado) < n:
+        restantes = [e for e in candidatos if e.nome not in nomes_usados]
+        resultado += _selecionar(restantes, respeitar_sim=False)
+
+    return resultado[:n]
+
+
+# ---------------------------------------------------------------------------
+# Ordenamento de blocos
+# ---------------------------------------------------------------------------
+
+# Padrões de braço isolado recebem peso mínimo no score de bloco.
+# Todos os outros isolados recebem peso intermediário.
+_PADROES_BRACO = {"biceps", "triceps"}
+
+
+def _score_exercicio(e: Exercicio) -> float:
+    """
+    Pontuação de um exercício para fins de ordenamento de blocos.
+    Quanto maior, mais cedo o bloco deve aparecer no treino.
+    """
+    if e.purpose == "compound":
+        return float(e.fadiga)          # peso total (1–5)
+    if e.padrao in _PADROES_BRACO:
+        return e.fadiga * 0.1           # isolado de braço → prioridade mínima
+    return e.fadiga * 0.5               # isolado de grupo grande → prioridade média
+
+
+def ordenar_blocos(blocos: list[tuple]) -> list[tuple]:
+    """
+    Reordena blocos do treino por prioridade decrescente.
+
+    Critério: soma dos scores dos exercícios do bloco (ver _score_exercicio).
+    Resultado típico:
+      1º — bloco com 2 compostos pesados
+      2º — bloco com 1 composto + 1 isolado de grupo grande
+      último — bloco com 1 composto + 1 isolado de braço
+    """
+    return sorted(blocos, key=lambda b: sum(_score_exercicio(e) for e in b), reverse=True)
+
+
+# ---------------------------------------------------------------------------
+# Pareamento em super séries
+# ---------------------------------------------------------------------------
+
+def pode_adicionar_ao_bloco(bloco_atual: list, candidato: Exercicio, tamanho_bloco: int) -> bool:
+    """Verifica se o candidato pode entrar no bloco respeitando a regra de fadiga."""
+    max_alta_fadiga = 1 if tamanho_bloco <= 2 else 2
+    alta_fadiga_no_bloco = sum(1 for e in bloco_atual if e.fadiga >= FADIGA_MAX_PAR)
+    if candidato.fadiga >= FADIGA_MAX_PAR and alta_fadiga_no_bloco >= max_alta_fadiga:
+        return False
+    return True
+
+
+def _buscar_candidato(
+    exercicios: list[Exercicio],
+    usados: list[bool],
+    bloco_atual: list[Exercicio],
+    regioes: set[str],
+    padroes: set[str],
+    tamanho: int,
+    evitar_unilateral: bool = False,
+    evitar_agonistas: bool = False,
+) -> int | None:
+    """
+    Retorna o índice do melhor candidato para entrar no bloco, ou None.
+
+    Prioridades geográficas (P1 > P2 > P3 > P4):
+      P1: região diferente E padrão diferente
+      P2: região diferente
+      P3: padrão diferente
+      P4: qualquer válido
+
+    Dentro de cada prioridade, sub-preferências qualitativas (melhor → pior):
+      1. Não-agonista E contrasta purpose  (ex: pull âncora → push isolation parceiro)
+      2. Não-agonista                      (evita agonistas mesmo sem contraste de purpose)
+      3. Contrasta purpose                 (compound↔isolation, mesmo que agonista)
+      4. Sem restrição adicional           (fallback)
+
+    "Não-agonista": o candidato não pertence ao mesmo grupo push/pull do âncora.
+    "Contrasta purpose": compound↔isolation.
+    Se evitar_agonistas=False, a regra de agonistas é ignorada.
+    Se evitar_unilateral=True e já há um unilateral no bloco, candidatos unilaterais
+    são ignorados (mas usados no último fallback se necessário).
+    """
+    n = len(exercicios)
+    ja_tem_uni = evitar_unilateral and any(e.unilateral == "unilateral" for e in bloco_atual)
+    anchor_purpose = bloco_atual[0].purpose if bloco_atual else None
+
+    # Grupos musculares já presentes no bloco (para evitar agonistas)
+    grupos_no_bloco: set[str] = set()
+    if evitar_agonistas:
+        for e in bloco_atual:
+            g = GRUPO_MUSCULAR_PADRAO.get(e.padrao)
+            if g:
+                grupos_no_bloco.add(g)
+
+    def aceita(j: int) -> bool:
+        if usados[j]:
+            return False
+        if not pode_adicionar_ao_bloco(bloco_atual, exercicios[j], tamanho):
+            return False
+        if ja_tem_uni and exercicios[j].unilateral == "unilateral":
+            return False
+        return True
+
+    def nao_agonista(j: int) -> bool:
+        if not evitar_agonistas:
+            return True
+        g = GRUPO_MUSCULAR_PADRAO.get(exercicios[j].padrao)
+        return g not in grupos_no_bloco
+
+    def contrasta(j: int) -> bool:
+        return anchor_purpose is not None and exercicios[j].purpose != anchor_purpose
+
+    def _primeiro(geo_fn, extra_fn) -> int | None:
+        for j in range(n):
+            if aceita(j) and geo_fn(j) and extra_fn(j):
+                return j
+        return None
+
+    # Prioridades geográficas
+    p1 = lambda j: exercicios[j].regiao not in regioes and exercicios[j].padrao not in padroes
+    p2 = lambda j: exercicios[j].regiao not in regioes
+    p3 = lambda j: exercicios[j].padrao not in padroes
+    p4 = lambda j: True
+
+    # Sub-preferências qualitativas
+    sub1 = lambda j: nao_agonista(j) and contrasta(j)
+    sub2 = lambda j: nao_agonista(j)
+    sub3 = lambda j: contrasta(j)
+    sub4 = lambda j: True
+
+    for geo in [p1, p2, p3, p4]:
+        for sub in [sub1, sub2, sub3, sub4]:
+            r = _primeiro(geo, sub)
+            if r is not None:
+                return r
+    return None
+
+
+def montar_blocos(
+    exercicios: list[Exercicio],
+    tamanho: int = 2,
+    evitar_agonistas: bool = False,
+) -> list[tuple]:
+    """
+    Monta blocos de tamanho configurável (1, 2 ou 3).
+    Prioriza regiões E padrões diferentes dentro do bloco para distribuir
+    categorias uniformemente (ex: não colocar 2 squats no mesmo bloco).
+    Em blocos de 2 exercícios, tenta evitar dois exercícios unilaterais juntos.
+    Se evitar_agonistas=True, evita parear exercícios do mesmo grupo push/pull.
+    O último bloco pode ter menos exercícios se não houver suficientes.
+    Retorna lista de tuplas de tamanho variável.
+    """
+    if not exercicios:
+        return []
+
+    usados = [False] * len(exercicios)
+    blocos = []
+
+    i = 0
+    while i < len(exercicios):
+        if usados[i]:
+            i += 1
+            continue
+
+        bloco_atual = [exercicios[i]]
+        usados[i] = True
+        regioes_no_bloco = {exercicios[i].regiao}
+        padroes_no_bloco = {exercicios[i].padrao}
+
+        while len(bloco_atual) < tamanho:
+            melhor = None
+
+            # Para blocos de 2: primeira passagem evitando 2 unilaterais
+            if tamanho <= 2:
+                melhor = _buscar_candidato(
+                    exercicios, usados, bloco_atual,
+                    regioes_no_bloco, padroes_no_bloco, tamanho,
+                    evitar_unilateral=True,
+                    evitar_agonistas=evitar_agonistas,
+                )
+
+            # Fallback (ou blocos de 3): sem restrição de unilateral
+            if melhor is None:
+                melhor = _buscar_candidato(
+                    exercicios, usados, bloco_atual,
+                    regioes_no_bloco, padroes_no_bloco, tamanho,
+                    evitar_unilateral=False,
+                    evitar_agonistas=evitar_agonistas,
+                )
+
+            if melhor is None:
+                break
+
+            bloco_atual.append(exercicios[melhor])
+            regioes_no_bloco.add(exercicios[melhor].regiao)
+            padroes_no_bloco.add(exercicios[melhor].padrao)
+            usados[melhor] = True
+
+        blocos.append(tuple(bloco_atual))
+        i += 1
+
+    return blocos
+
+
+# ---------------------------------------------------------------------------
+# Substituição pontual de exercício
+# ---------------------------------------------------------------------------
+
+def substituir_exercicio(
+    sessao: Sessao,
+    nome_atual: str,
+    banco: list[Exercicio],
+    equipamentos_bloqueados: Optional[list[str]] = None,
+    max_complexidade: int = 5,
+) -> Sessao:
+    """
+    Substitui um exercício específico na sessão por outro do mesmo padrão
+    e grupo de similaridade diferente dos já usados.
+
+    Args:
+        sessao: sessão atual
+        nome_atual: nome do exercício a substituir
+        banco: banco completo de exercícios
+        equipamentos_bloqueados: equipamentos indisponíveis
+        max_complexidade: complexidade máxima permitida
+
+    Returns:
+        Sessao atualizada com o exercício substituído
+    """
+    eq_bloq = equipamentos_bloqueados or []
+
+    # Encontrar o exercício a substituir e seu contexto
+    exercicio_alvo = None
+    bloco_idx = None
+    posicao = None  # "ex1" ou "ex2"
+
+    for i, bloco in enumerate(sessao.blocos):
+        if bloco.ex1.nome == nome_atual:
+            exercicio_alvo = bloco.ex1
+            bloco_idx = i
+            posicao = "ex1"
+            break
+        if bloco.ex2 and bloco.ex2.nome == nome_atual:
+            exercicio_alvo = bloco.ex2
+            bloco_idx = i
+            posicao = "ex2"
+            break
+        if bloco.ex3 and bloco.ex3.nome == nome_atual:
+            exercicio_alvo = bloco.ex3
+            bloco_idx = i
+            posicao = "ex3"
+            break
+
+    if exercicio_alvo is None:
+        print(f"  [!] Exercício '{nome_atual}' não encontrado na sessão.")
+        return sessao
+
+    # Similaridades já em uso (excluindo o exercício alvo)
+    sims_em_uso = set()
+    for i, bloco in enumerate(sessao.blocos):
+        if bloco.ex1.nome != nome_atual:
+            sims_em_uso.add(bloco.ex1.similaridade)
+        if bloco.ex2 and bloco.ex2.nome != nome_atual:
+            sims_em_uso.add(bloco.ex2.similaridade)
+        if bloco.ex3 and bloco.ex3.nome != nome_atual:
+            sims_em_uso.add(bloco.ex3.similaridade)
+
+    # Nomes já em uso na sessão
+    nomes_em_uso = set()
+    for bloco in sessao.blocos:
+        nomes_em_uso.add(bloco.ex1.nome)
+        if bloco.ex2:
+            nomes_em_uso.add(bloco.ex2.nome)
+        if bloco.ex3:
+            nomes_em_uso.add(bloco.ex3.nome)
+    nomes_em_uso.discard(nome_atual)
+
+    # Buscar substituto: mesmo padrão, similaridade não usada
+    candidatos = filtrar_por_padrao(banco, exercicio_alvo.padrao)
+    candidatos = filtrar_por_equipamentos(candidatos, eq_bloq)
+    candidatos = filtrar_por_complexidade(candidatos, max_complexidade)
+    candidatos = [
+        e for e in candidatos
+        if e.nome not in nomes_em_uso
+        and e.similaridade not in sims_em_uso
+    ]
+
+    if not candidatos:
+        # Relaxa regra de similaridade se não encontrar nada
+        candidatos = filtrar_por_padrao(banco, exercicio_alvo.padrao)
+        candidatos = filtrar_por_equipamentos(candidatos, eq_bloq)
+        candidatos = filtrar_por_complexidade(candidatos, max_complexidade)
+        candidatos = [e for e in candidatos if e.nome not in nomes_em_uso]
+
+    if not candidatos:
+        print(f"  [!] Nenhum substituto encontrado para '{nome_atual}'.")
+        return sessao
+
+    substituto = random.choice(candidatos)
+
+    # Aplicar substituição
+    import copy
+    nova_sessao = copy.deepcopy(sessao)
+    bloco = nova_sessao.blocos[bloco_idx]
+    if posicao == "ex1":
+        bloco.ex1 = substituto
+    elif posicao == "ex2":
+        bloco.ex2 = substituto
+    else:
+        bloco.ex3 = substituto
+
+    print(f"  [✓] '{nome_atual}' substituído por '{substituto.nome}'")
+    return nova_sessao
+
+
+# ---------------------------------------------------------------------------
+# Geração da sessão
+# ---------------------------------------------------------------------------
+
+def gerar_sessao(
+    banco: list[Exercicio],
+    padroes: list[str],
+    exercicios_por_padrao: Optional[dict] = None,
+    equipamentos_bloqueados: Optional[list[str]] = None,
+    max_complexidade: int = 5,
+    variacao_pais_usados: Optional[set] = None,
+    exercicios_travados: Optional[list[Exercicio]] = None,
+    tamanho_bloco: int = 2,
+    evitar_agonistas: bool = False,
+) -> Sessao:
+    epp      = exercicios_por_padrao or EXERCICIOS_POR_PADRAO
+    eq_bloq  = equipamentos_bloqueados or []
+    var_pais = variacao_pais_usados or set()
+    travados = exercicios_travados or []
+
+    similaridades_usadas: set[str] = set()
+    todos_selecionados: list[Exercicio] = []
+
+    # Exercícios travados entram primeiro
+    for e in travados:
+        todos_selecionados.append(e)
+        similaridades_usadas.add(e.similaridade)
+
+    # Selecionar por padrão
+    nomes_travados = {e.nome for e in travados}
+    for padrao in padroes:
+        n_spec = epp.get(padrao, 1)
+
+        # n_spec pode ser int (padrão) ou dict {"bilateral": n, "unilateral": n}
+        if isinstance(n_spec, dict):
+            sub_specs = [(lat, qt) for lat, qt in n_spec.items() if qt > 0]
+        else:
+            sub_specs = [(None, n_spec)]
+
+        for lateralidade, n in sub_specs:
+            candidatos = filtrar_por_padrao(banco, padrao)
+            candidatos = filtrar_por_equipamentos(candidatos, eq_bloq)
+            candidatos = filtrar_por_complexidade(candidatos, max_complexidade)
+            candidatos = [e for e in candidatos if e.nome not in nomes_travados]
+            if lateralidade:
+                candidatos = [e for e in candidatos if e.unilateral == lateralidade]
+
+            selecionados = selecionar_sem_repeticao_similaridade(
+                candidatos, similaridades_usadas, var_pais, n
+            )
+            for e in selecionados:
+                similaridades_usadas.add(e.similaridade)
+            todos_selecionados.extend(selecionados)
+
+    # Ordenar: compostos primeiro, depois o resto
+    todos_selecionados = ordenar_compostos_primeiro(todos_selecionados)
+
+    # Montar e ordenar blocos
+    grupos = ordenar_blocos(montar_blocos(todos_selecionados, tamanho=tamanho_bloco, evitar_agonistas=evitar_agonistas))
+
+    # Criar SuperSeries
+    labels = "ABCDEFGHIJKLMNOP"
+    blocos = []
+    for i, grupo in enumerate(grupos):
+        label = labels[i] if i < len(labels) else str(i + 1)
+        ex1 = grupo[0]
+        ex2 = grupo[1] if len(grupo) > 1 else None
+        ex3 = grupo[2] if len(grupo) > 2 else None
+        blocos.append(SuperSerie(label=label, ex1=ex1, ex2=ex2, ex3=ex3))
+
+    tipo = " + ".join(padroes)
+    return Sessao(tipo=tipo, blocos=blocos)
+
+
+# ---------------------------------------------------------------------------
+# Geração por DEMANDAS (Opção C: 1 de cada padrão antes de repetir,
+# priorizando compostos)
+# ---------------------------------------------------------------------------
+
+def _padroes_de_escopo(
+    nivel: str, escopo: str
+) -> list[str]:
+    """Retorna a lista de padrões pertencentes a um escopo (regiao/subregiao/padrao)."""
+    if nivel == "padrao":
+        return [escopo]
+    if nivel == "subregiao":
+        return list(SUBREGIAO_PARA_PADROES.get(escopo, []))
+    if nivel == "regiao":
+        pads: list[str] = []
+        for sub in REGIAO_PARA_SUBREGIOES.get(escopo, []):
+            pads.extend(SUBREGIAO_PARA_PADROES.get(sub, []))
+        return pads
+    return []
+
+
+def _ordenar_padroes_por_prioridade(padroes: list[str]) -> list[str]:
+    """
+    Compostos primeiro, depois isolados. Dentro de cada grupo, ordem aleatória
+    para evitar viés determinístico (ex: bíceps sempre antes de tríceps).
+    """
+    compostos = [p for p in padroes if p in PADROES_COMPOSTOS]
+    isolados  = [p for p in padroes if p not in PADROES_COMPOSTOS]
+    random.shuffle(compostos)
+    random.shuffle(isolados)
+    return compostos + isolados
+
+
+def gerar_sessao_por_demandas(
+    banco: list[Exercicio],
+    demandas: list[tuple[str, str, int]],
+    equipamentos_bloqueados: Optional[list[str]] = None,
+    max_complexidade: int = 5,
+    variacao_pais_usados: Optional[set] = None,
+    exercicios_travados: Optional[list[Exercicio]] = None,
+    tamanho_bloco: int = 2,
+    evitar_agonistas: bool = False,
+    lateralidade_por_padrao: Optional[dict] = None,
+) -> Sessao:
+    """
+    Gera uma sessão a partir de uma lista de DEMANDAS hierárquicas.
+
+    demandas: lista de tuplas (nivel, escopo, quantidade), onde:
+      - nivel  = "regiao" | "subregiao" | "padrao"
+      - escopo = nome do nível (ex: "upper", "peito", "remadas")
+      - quantidade = quantos exercícios pegar desse escopo
+
+    Algoritmo (Opção C):
+      Para cada demanda, lista todos os padrões pertencentes ao escopo,
+      ordena (compostos primeiro), e cicla pegando 1 exercício de cada
+      padrão até atingir a quantidade pedida. Se um padrão não tem mais
+      candidatos disponíveis, pula para o próximo.
+
+    Exemplo:
+      demandas=[("regiao", "upper", 6)]
+      → padrões de upper = [empurrar_compostos, remadas, puxadas (compostos),
+                            empurrar_isolados, ombro_composto, ombro_isolado,
+                            posterior_ombro, biceps, triceps]
+      → reordenado: [empurrar_compostos, remadas, puxadas, ombro_composto,
+                     empurrar_isolados, ombro_isolado, posterior_ombro,
+                     biceps, triceps]
+      → 6 exercícios = 1º de cada um dos 6 primeiros padrões disponíveis
+    """
+    eq_bloq  = equipamentos_bloqueados or []
+    var_pais = variacao_pais_usados or set()
+    travados = exercicios_travados or []
+
+    similaridades_usadas: set[str] = set()
+    nomes_usados: set[str] = set()
+    todos_selecionados: list[Exercicio] = []
+
+    # Travados entram primeiro
+    for e in travados:
+        todos_selecionados.append(e)
+        similaridades_usadas.add(e.similaridade)
+        nomes_usados.add(e.nome)
+
+    lat_map = lateralidade_por_padrao or {}
+
+    # Helper interno para selecionar N exercícios ciclando pelos padrões
+    def _selecionar_ciclando(
+        padroes_ciclo: list[str], qtd: int,
+        filtros_lateralidade: Optional[dict[str, str]] = None,
+    ) -> int:
+        """Cicla pelos padrões pegando 1 por vez. Retorna quantos selecionou."""
+        # Pré-calcular candidatos por padrão
+        candidatos_por_padrao: dict[str, list[Exercicio]] = {}
+        for p in padroes_ciclo:
+            cands = filtrar_por_padrao(banco, p)
+            cands = filtrar_por_equipamentos(cands, eq_bloq)
+            cands = filtrar_por_complexidade(cands, max_complexidade)
+            cands = [e for e in cands if e.nome not in nomes_usados]
+            if filtros_lateralidade and p in filtros_lateralidade:
+                lat = filtros_lateralidade[p]
+                cands = [e for e in cands if e.unilateral == lat]
+            candidatos_por_padrao[p] = cands
+
+        selecionados = 0
+        loop_sem_progresso = 0
+
+        while selecionados < qtd:
+            progresso = False
+            for p in padroes_ciclo:
+                if selecionados >= qtd:
+                    break
+
+                cands = candidatos_por_padrao[p]
+                disponiveis = [
+                    e for e in cands
+                    if e.similaridade not in similaridades_usadas
+                    and e.nome not in nomes_usados
+                    and (not e.variacao_de or e.variacao_de not in var_pais)
+                    and (not e.nome or e.nome not in var_pais)
+                ]
+                if not disponiveis:
+                    disponiveis = [
+                        e for e in cands
+                        if e.nome not in nomes_usados
+                        and (not e.variacao_de or e.variacao_de not in var_pais)
+                        and (not e.nome or e.nome not in var_pais)
+                    ]
+                if not disponiveis:
+                    continue
+
+                escolhido = random.choice(disponiveis)
+                todos_selecionados.append(escolhido)
+                similaridades_usadas.add(escolhido.similaridade)
+                nomes_usados.add(escolhido.nome)
+                if escolhido.variacao_de:
+                    var_pais.add(escolhido.variacao_de)
+                var_pais.add(escolhido.nome)
+                selecionados += 1
+                progresso = True
+
+            if not progresso:
+                loop_sem_progresso += 1
+                if loop_sem_progresso >= 2:
+                    break
+        return selecionados
+
+    # Resolver cada demanda
+    rotulos_demandas: list[str] = []
+
+    for nivel, escopo, qtd in demandas:
+        if qtd <= 0:
+            continue
+        rotulos_demandas.append(f"{escopo}({qtd})")
+
+        # Lateralidade: quando o escopo tem refinamento bilateral/unilateral explícito
+        if escopo in lat_map:
+            padroes_esc = _padroes_de_escopo(nivel, escopo)
+            for lat, qt in lat_map[escopo].items():
+                if qt > 0:
+                    filtros = {p: lat for p in padroes_esc}
+                    _selecionar_ciclando(padroes_esc, qt, filtros_lateralidade=filtros)
+            continue
+
+        padroes = _padroes_de_escopo(nivel, escopo)
+        if not padroes:
+            continue
+
+        if nivel == "regiao":
+            # ── Regra de proporção: ao menos 60% compostos ────────────────
+            compostos = [p for p in padroes if p in PADROES_COMPOSTOS]
+            isolados  = [p for p in padroes if p not in PADROES_COMPOSTOS]
+            random.shuffle(compostos)
+            random.shuffle(isolados)
+
+            if compostos and isolados:
+                import math
+                min_compostos = math.ceil(qtd * PROPORCAO_COMPOSTOS)
+                # Não pedir mais compostos do que o total
+                min_compostos = min(min_compostos, qtd)
+                max_isolados  = qtd - min_compostos
+
+                # Fase 1: preencher compostos ciclando
+                n_comp = _selecionar_ciclando(compostos, min_compostos)
+                # Fase 2: preencher isolados ciclando
+                n_iso = _selecionar_ciclando(isolados, max_isolados)
+                # Fase 3: se sobrou espaço (isolados esgotaram), preenche com mais compostos
+                faltam = qtd - n_comp - n_iso
+                if faltam > 0:
+                    _selecionar_ciclando(compostos, faltam)
+            else:
+                # Só compostos ou só isolados — cicla normalmente
+                padroes_ord = _ordenar_padroes_por_prioridade(padroes)
+                _selecionar_ciclando(padroes_ord, qtd)
+        else:
+            # ── Subregião / Padrão: sem proporção forçada, Opção C pura ──
+            padroes_ord = _ordenar_padroes_por_prioridade(padroes)
+            _selecionar_ciclando(padroes_ord, qtd)
+
+    # Ordenar: compostos primeiro (dentro do conjunto final)
+    todos_selecionados = ordenar_compostos_primeiro(todos_selecionados)
+
+    # Montar e ordenar blocos
+    grupos = ordenar_blocos(montar_blocos(todos_selecionados, tamanho=tamanho_bloco, evitar_agonistas=evitar_agonistas))
+
+    labels = "ABCDEFGHIJKLMNOP"
+    blocos = []
+    for i, grupo in enumerate(grupos):
+        label = labels[i] if i < len(labels) else str(i + 1)
+        ex1 = grupo[0]
+        ex2 = grupo[1] if len(grupo) > 1 else None
+        ex3 = grupo[2] if len(grupo) > 2 else None
+        blocos.append(SuperSerie(label=label, ex1=ex1, ex2=ex2, ex3=ex3))
+
+    tipo = " + ".join(rotulos_demandas) if rotulos_demandas else "Sessão"
+    return Sessao(tipo=tipo, blocos=blocos)
+
+
+# ---------------------------------------------------------------------------
+# Geração de múltiplos treinos com compartilhamento de estado de similaridade
+# ---------------------------------------------------------------------------
+
+def gerar_multiplos_treinos(
+    banco: list[Exercicio],
+    configs: list[dict],
+    variar_entre_treinos: bool = True,
+) -> list[Sessao]:
+    """
+    Gera N sessões de treino evitando repetição de exercícios entre elas.
+
+    Args:
+        banco: banco completo de exercícios
+        configs: lista de dicts, um por treino, com chaves:
+            - padroes: list[str]
+            - exercicios_por_padrao: dict
+            - max_complexidade: int
+            - tamanho_bloco: int
+            - exercicios_travados: list[Exercicio] (opcional)
+            - equipamentos_bloqueados: list[str] (opcional)
+        variar_entre_treinos: se True, similaridades usadas num treino
+            não se repetem nos seguintes (mais variação).
+            Se False, só os nomes exatos são bloqueados entre treinos.
+
+    Returns:
+        Lista de Sessao na mesma ordem de configs.
+    """
+    # Conjuntos globais compartilhados entre treinos
+    nomes_globais: set[str] = set()       # nomes exatos bloqueados
+    sims_globais: set[str] = set()        # grupos de similaridade bloqueados
+    variacao_pais_globais: set[str] = set()  # nomes usados → bloqueia variações deles
+
+    sessoes = []
+    for cfg in configs:
+        demandas      = cfg.get("demandas")  # lista de (nivel, escopo, qtd)
+        padroes       = cfg.get("padroes", [])
+        epp           = cfg.get("exercicios_por_padrao", {p: 1 for p in padroes})
+        max_cx        = cfg.get("max_complexidade", 5)
+        tam_bloco     = cfg.get("tamanho_bloco", 2)
+        travados      = cfg.get("exercicios_travados", [])
+        eq_bloq       = cfg.get("equipamentos_bloqueados", [])
+        evit_agon     = cfg.get("evitar_agonistas", False)
+        lat_padrao    = cfg.get("lateralidade_por_padrao")
+
+        # Bloqueia nomes já usados em treinos anteriores
+        banco_filtrado = [e for e in banco if e.nome not in nomes_globais]
+
+        if demandas:
+            sessao = gerar_sessao_por_demandas(
+                banco_filtrado,
+                demandas=demandas,
+                equipamentos_bloqueados=eq_bloq,
+                max_complexidade=max_cx,
+                exercicios_travados=travados,
+                tamanho_bloco=tam_bloco,
+                variacao_pais_usados=variacao_pais_globais,
+                evitar_agonistas=evit_agon,
+                lateralidade_por_padrao=lat_padrao,
+            )
+        else:
+            sessao = gerar_sessao(
+                banco_filtrado,
+                padroes,
+                exercicios_por_padrao=epp,
+                equipamentos_bloqueados=eq_bloq,
+                max_complexidade=max_cx,
+                exercicios_travados=travados,
+                tamanho_bloco=tam_bloco,
+                variacao_pais_usados=variacao_pais_globais,
+                evitar_agonistas=evit_agon,
+            )
+
+        # Registra o que foi usado para os próximos treinos
+        for bloco in sessao.blocos:
+            for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
+                if ex:
+                    nomes_globais.add(ex.nome)
+                    # Bloqueia variações deste exercício nos treinos seguintes
+                    variacao_pais_globais.add(ex.nome)
+                    # Se é uma variação, bloqueia também o exercício pai (bloqueio bidirecional)
+                    if ex.variacao_de:
+                        nomes_globais.add(ex.variacao_de)
+                    if variar_entre_treinos:
+                        sims_globais.add(ex.similaridade)
+
+        sessoes.append(sessao)
+
+    return sessoes
+
+def imprimir_sessao(sessao: Sessao):
+    print("=" * 60)
+    print(f"  SESSÃO: {sessao.tipo}")
+    print("=" * 60)
+    for bloco in sessao.blocos:
+        print(f"\n  Bloco {bloco.label}")
+        exercicios = [e for e in [bloco.ex1, bloco.ex2, bloco.ex3] if e]
+        for i, ex in enumerate(exercicios, 1):
+            eq = ex.eq_primario + (f" + {ex.eq_secundario}" if ex.eq_secundario else "")
+            print(f"  {bloco.label}{i} — {ex.nome}  [{ex.purpose} | fd:{ex.fadiga} | cx:{ex.complexidade}]")
+            print(f"       Equip: {eq}" + (f"  |  {ex.obs}" if ex.obs else ""))
+    print()
+
+
+# ---------------------------------------------------------------------------
+# Demo
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Busca filtrada de substitutos (escolha manual)
+# ---------------------------------------------------------------------------
+
+def buscar_substitutos(
+    sessao: Sessao,
+    nome_atual: str,
+    banco: list[Exercicio],
+    padrao: Optional[str] = None,
+    regiao: Optional[str] = None,
+    purpose: Optional[str] = None,
+    unilateral: Optional[str] = None,
+    similaridade: Optional[str] = None,
+    max_complexidade: int = 5,
+    max_fadiga: int = 5,
+    equipamentos_bloqueados: Optional[list[str]] = None,
+    ignorar_similaridade_usada: bool = False,
+) -> list[Exercicio]:
+    """
+    Retorna lista de candidatos filtrados para substituir um exercício na sessão.
+    Use após buscar_substitutos() e passe a escolha para substituir_exercicio_por().
+    """
+    eq_bloq = equipamentos_bloqueados or []
+
+    nomes_em_uso = set()
+    sims_em_uso = set()
+    for bloco in sessao.blocos:
+        for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
+            if ex and ex.nome != nome_atual:
+                nomes_em_uso.add(ex.nome)
+                sims_em_uso.add(ex.similaridade)
+
+    candidatos = list(banco)
+    if padrao:
+        candidatos = [e for e in candidatos if e.padrao == padrao]
+    if regiao:
+        candidatos = [e for e in candidatos if e.regiao == regiao]
+    if purpose:
+        candidatos = [e for e in candidatos if e.purpose == purpose]
+    if unilateral:
+        candidatos = [e for e in candidatos if e.unilateral == unilateral]
+    if similaridade:
+        candidatos = [e for e in candidatos if e.similaridade == similaridade]
+    if eq_bloq:
+        candidatos = [e for e in candidatos if e.eq_primario not in eq_bloq]
+
+    candidatos = [e for e in candidatos if e.complexidade <= max_complexidade]
+    candidatos = [e for e in candidatos if e.fadiga <= max_fadiga]
+    candidatos = [e for e in candidatos if e.nome not in nomes_em_uso]
+    if not ignorar_similaridade_usada:
+        candidatos = [e for e in candidatos if e.similaridade not in sims_em_uso]
+
+    candidatos.sort(key=lambda e: (e.purpose != "compound", e.fadiga * -1, e.nome))
+    return candidatos
+
+
+def substituir_exercicio_por(
+    sessao: Sessao,
+    nome_atual: str,
+    nome_substituto: str,
+    banco: list[Exercicio],
+) -> Sessao:
+    """Substitui nome_atual por nome_substituto na sessão."""
+    import copy
+    substituto = next((e for e in banco if e.nome == nome_substituto), None)
+    if substituto is None:
+        return sessao
+
+    nova_sessao = copy.deepcopy(sessao)
+    for bloco in nova_sessao.blocos:
+        if bloco.ex1 and bloco.ex1.nome == nome_atual:
+            bloco.ex1 = substituto
+            return nova_sessao
+        if bloco.ex2 and bloco.ex2.nome == nome_atual:
+            bloco.ex2 = substituto
+            return nova_sessao
+        if bloco.ex3 and bloco.ex3.nome == nome_atual:
+            bloco.ex3 = substituto
+            return nova_sessao
+    return sessao
+
+
+def listar_candidatos(candidatos: list[Exercicio]):
+    """Imprime a lista de candidatos para debug no terminal."""
+    if not candidatos:
+        print("  Nenhum candidato encontrado com esses filtros.")
+        return
+    print(f"  {len(candidatos)} candidato(s) encontrado(s):\n")
+    for i, e in enumerate(candidatos, 1):
+        eq = e.eq_primario + (f" + {e.eq_secundario}" if e.eq_secundario else "")
+        print(f"  {i:2}. {e.nome}")
+        print(f"       [{e.purpose} | {e.padrao} | {e.unilateral} | fd:{e.fadiga} | cx:{e.complexidade}]")
+        print(f"       Equip: {eq}" + (f"  |  {e.obs}" if e.obs else ""))
+
+
+# ---------------------------------------------------------------------------
+# Demo
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    random.seed()
+    banco = carregar_banco(XLSX_PATH)
+    print(f"Banco carregado: {len(banco)} exercícios\n")
+
+    print(">>> Full Body")
+    sessao = gerar_sessao(banco, TEMPLATES["Full Body"])
+    imprimir_sessao(sessao)
+
+    print(">>> Empurrar + Posterior, iniciante (cx ≤ 3)")
+    sessao = gerar_sessao(banco, TEMPLATES["Empurrar + Posterior"], max_complexidade=3)
+    imprimir_sessao(sessao)
+
+    print(">>> Expansão hierárquica: Membros superiores + só hinge nas pernas")
+    padroes = expandir_para_padroes(regioes=["upper"], padroes=["hinge"])
+    print(f"  Padrões expandidos: {padroes}")
+    sessao = gerar_sessao(banco, padroes)
+    imprimir_sessao(sessao)

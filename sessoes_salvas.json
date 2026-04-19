@@ -1,0 +1,133 @@
+[
+  {
+    "tipo": "ombro_composto(1) + ombro_isolado(1) + costas(2) + lower(1) + core(1)",
+    "blocos": [
+      {
+        "label": "A",
+        "ex1": {
+          "nome": "Barra fixa",
+          "variacao_de": "Barra",
+          "eq_primario": "Barra fixa (crossover)",
+          "eq_secundario": null,
+          "regiao": "upper",
+          "padrao": "puxadas",
+          "purpose": "compound",
+          "unilateral": "bilateral",
+          "complexidade": 4,
+          "fadiga": 4,
+          "circuito": "sim",
+          "similaridade": "vertical_pull_compound",
+          "musculo_primario": "dorsal, bíceps",
+          "obs": null,
+          "series": null,
+          "reps": null,
+          "rir": null
+        },
+        "ex2": {
+          "nome": "Glute bridge com faixa",
+          "variacao_de": null,
+          "eq_primario": "Glute band",
+          "eq_secundario": "Colchonete",
+          "regiao": "lower",
+          "padrao": "hinge",
+          "purpose": "isolation",
+          "unilateral": "bilateral",
+          "complexidade": 1,
+          "fadiga": 2,
+          "circuito": "sim",
+          "similaridade": "glute_isolation",
+          "musculo_primario": "glúteos",
+          "obs": null,
+          "series": null,
+          "reps": null,
+          "rir": null
+        },
+        "ex3": null
+      },
+      {
+        "label": "B",
+        "ex1": {
+          "nome": "Desenvolvimento Smith",
+          "variacao_de": "Desenvolvimento",
+          "eq_primario": "Barra Smith (crossover)",
+          "eq_secundario": null,
+          "regiao": "upper",
+          "padrao": "ombro_composto",
+          "purpose": "compound",
+          "unilateral": "bilateral",
+          "complexidade": 2,
+          "fadiga": 3,
+          "circuito": "não",
+          "similaridade": "vertical_press_compound",
+          "musculo_primario": "deltóide, tríceps",
+          "obs": null,
+          "series": null,
+          "reps": null,
+          "rir": null
+        },
+        "ex2": {
+          "nome": "Dead bug",
+          "variacao_de": "Dead bug",
+          "eq_primario": "Colchonete",
+          "eq_secundario": null,
+          "regiao": "core",
+          "padrao": "core_isometrico",
+          "purpose": "stability",
+          "unilateral": "unilateral",
+          "complexidade": 2,
+          "fadiga": 2,
+          "circuito": "não",
+          "similaridade": "core_antiextension",
+          "musculo_primario": "core anterior",
+          "obs": null,
+          "series": null,
+          "reps": null,
+          "rir": null
+        },
+        "ex3": null
+      },
+      {
+        "label": "C",
+        "ex1": {
+          "nome": "Remada landmine",
+          "variacao_de": "Remada horizontal",
+          "eq_primario": "Barra landmine",
+          "eq_secundario": "Suporte remada landmine",
+          "regiao": "upper",
+          "padrao": "remadas",
+          "purpose": "compound",
+          "unilateral": "unilateral",
+          "complexidade": 3,
+          "fadiga": 3,
+          "circuito": "não",
+          "similaridade": "horizontal_pull_compound",
+          "musculo_primario": "dorsal, romboides",
+          "obs": null,
+          "series": null,
+          "reps": null,
+          "rir": null
+        },
+        "ex2": {
+          "nome": "Elevação lateral sentado",
+          "variacao_de": "Elevação lateral",
+          "eq_primario": "Halteres",
+          "eq_secundario": "Banco reto",
+          "regiao": "upper",
+          "padrao": "ombro_isolado",
+          "purpose": "isolation",
+          "unilateral": "bilateral",
+          "complexidade": 2,
+          "fadiga": 2,
+          "circuito": "sim",
+          "similaridade": "shoulder_isolation",
+          "musculo_primario": "deltóide lateral",
+          "obs": null,
+          "series": null,
+          "reps": null,
+          "rir": null
+        },
+        "ex3": null
+      }
+    ]
+  }
+]

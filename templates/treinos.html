@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+{% block treinos %}
+
+<form id="form-config" hx-post="/gerar" hx-target="#resultado" hx-indicator="#loading">
+
+<div class="config-panel">
+    <p class="config-title">Configurações gerais</p>
+    <div class="opcoes-grid">
+        <div class="campo">
+            <label>Nº de treinos</label>
+            <select name="n_treinos" id="n_treinos">
+                {% for i in range(1, 6) %}<option value="{{ i }}">{{ i }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="campo">
+            <label>Exerc. por bloco</label>
+            <select name="tamanho_bloco">
+                <option value="1">1 (séries simples)</option>
+                <option value="2" selected>2 (super séries)</option>
+                <option value="3">3 (tri-sets)</option>
+            </select>
+        </div>
+        <div class="campo">
+            <label>Complexidade máx.</label>
+            <div class="range-row">
+                <input type="range" name="max_complexidade" min="1" max="5" step="1" value="5"
+                       oninput="document.getElementById('val-cx').textContent=this.value">
+                <span class="range-value" id="val-cx">5</span>
+            </div>
+        </div>
+        <div class="campo">
+            <label>Aluno (PNG)</label>
+            <select name="aluno" id="sel-aluno">
+                <option value="">Selecionar aluno...</option>
+                {% for a in alunos %}<option value="{{ a.nome }}">{{ a.nome }}</option>{% endfor %}
+            </select>
+        </div>
+    </div>
+    <div style="display:flex; gap:16px; flex-wrap:wrap">
+        <label class="check-inline"><input type="checkbox" name="variar_entre"> Evitar similaridade entre treinos</label>
+        <label class="check-inline"><input type="checkbox" name="evitar_agonistas" checked> Evitar agonistas no bloco</label>
+    </div>
+</div>
+
+<!-- Modo seleção -->
+<div class="config-panel">
+    <div style="display:flex; gap:12px; margin-bottom:16px">
+        <button type="button" class="btn btn-sm" id="btn-modo-hier" onclick="setModo('hierarquia')" style="background:#e85d04;color:white;border:none">Hierarquia</button>
+        <button type="button" class="btn btn-sm" id="btn-modo-tmpl" onclick="setModo('template')">Template</button>
+    </div>
+    <input type="hidden" name="modo" id="input-modo" value="hierarquia">
+
+    <!-- MODO HIERARQUIA -->
+    <div id="modo-hierarquia">
+        <p style="font-size:11px;color:#9ca3af;margin:0 0 10px">
+            Marque um grupo e defina quantos exercícios. Use ▸ para refinar em subgrupos.</p>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px">
+        {% for regiao in regioes %}
+            {% if regiao in ['core', 'cardio'] and loop.index == 3 %}<div>{% endif %}
+            {% if regiao == 'upper' %}<div>{% endif %}
+            {% if regiao == 'lower' %}<div>{% endif %}
+
+            <div class="regiao-header"><span>{{ regioes_labels[regiao] }}</span></div>
+
+            <div class="hier-row">
+                <label class="check-inline">
+                    <input type="checkbox" class="reg-chk" data-regiao="{{ regiao }}"
+                           onchange="updateDemandas()">
+                    <span>Todos os grupos</span>
+                </label>
+            </div>
+
+            <div id="subs-{{ regiao }}" style="display:none">
+            {% for subregiao in subregioes.get(regiao, []) %}
+                {% set pads = padroes_ordem.get(subregiao, []) %}
+                <div class="hier-indent-1 hier-row">
+                    <label class="check-inline">
+                        <input type="checkbox" class="sub-chk" data-subregiao="{{ subregiao }}"
+                               data-regiao="{{ regiao }}" onchange="updateDemandas()">
+                        <span>{{ subregioes_labels[subregiao] }}</span>
+                    </label>
+                    {% if pads|length > 1 %}
+                    <button type="button" class="hier-toggle" onclick="togglePads('{{ subregiao }}')">▸</button>
+                    {% endif %}
+                </div>
+                {% if pads|length > 1 %}
+                <div id="pads-{{ subregiao }}" style="display:none">
+                {% for pad in pads %}
+                    <div class="hier-indent-2 hier-row">
+                        <label class="check-inline">
+                            <input type="checkbox" class="pad-chk" data-padrao="{{ pad }}"
+                                   data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}"
+                                   onchange="updateDemandas()">
+                            <span>{{ padroes_labels.get(pad, pad) }}</span>
+                        </label>
+                    </div>
+                {% endfor %}
+                </div>
+                {% endif %}
+            {% endfor %}
+            </div>
+
+            <button type="button" class="hier-toggle" onclick="toggleSubs('{{ regiao }}')"
+                    id="toggle-{{ regiao }}">▸ refinar</button>
+
+            {% if regiao == 'upper' %}</div>{% endif %}
+            {% if regiao == 'lower' %}</div>{% endif %}
+            {% if regiao == 'cardio' %}</div>{% endif %}
+        {% endfor %}
+        </div>
+
+        <!-- Demandas (populated by JS) -->
+        <div id="demandas-container"></div>
+        <div id="demandas-hidden-inputs"></div>
+        <!-- Lateralidade squat (populated by JS when squat is selected) -->
+        <div id="lateralidade-container"></div>
+    </div>
+
+    <!-- MODO TEMPLATE -->
+    <div id="modo-template" style="display:none">
+        <p class="config-title">Escolha um template</p>
+        <div class="template-grid">
+            {% for tmpl in templates %}
+            <button type="button" class="template-btn" onclick="selectTemplate('{{ tmpl }}')">{{ tmpl }}</button>
+            {% endfor %}
+        </div>
+        <input type="hidden" name="template_0" id="input-template" value="">
+        <div id="template-epp"></div>
+    </div>
+</div>
+
+<!-- Botões -->
+<div class="botoes-acao" style="margin-bottom:20px">
+    <button type="submit" class="btn btn-primary" hx-indicator="#loading">
+        <span class="htmx-hide">▶ Gerar treinos</span>
+        <span class="htmx-indicator"><span class="spinner"></span> Gerando...</span>
+    </button>
+    <button type="reset" class="btn" onclick="resetAll()">↺ Resetar</button>
+</div>
+</form>
+
+<div id="loading" class="htmx-indicator" style="text-align:center;padding:20px">
+    <span class="spinner" style="width:24px;height:24px"></span>
+    <p style="color:#9ca3af;font-size:13px;margin-top:8px">Gerando treinos...</p>
+</div>
+
+<!-- Resultado -->
+<div id="resultado">
+{% if sessoes %}
+    {% include "_resultado.html" %}
+{% else %}
+    <div style="text-align:center; padding:60px 20px; color:#9ca3af">
+        <div style="font-size:52px; margin-bottom:16px">🏋️</div>
+        <div style="font-size:18px; font-weight:600; color:#374151">Configure e gere seu primeiro treino</div>
+        <div style="font-size:14px; margin-top:8px">Use o painel acima para definir as categorias e clique em <strong>Gerar treinos</strong></div>
+    </div>
+{% endif %}
+</div>
+
+<script>
+// Templates EPP data
+const TEMPLATE_EPP = {{ template_epp | tojson }};
+const PADROES_LABELS = {{ padroes_labels | tojson }};
+
+function setModo(modo) {
+    document.getElementById('input-modo').value = modo;
+    document.getElementById('modo-hierarquia').style.display = modo === 'hierarquia' ? '' : 'none';
+    document.getElementById('modo-template').style.display = modo === 'template' ? '' : 'none';
+    const bh = document.getElementById('btn-modo-hier');
+    const bt = document.getElementById('btn-modo-tmpl');
+    if (modo === 'hierarquia') {
+        bh.style.background='#e85d04'; bh.style.color='white'; bh.style.border='none';
+        bt.style.background=''; bt.style.color=''; bt.style.border='';
+    } else {
+        bt.style.background='#e85d04'; bt.style.color='white'; bt.style.border='none';
+        bh.style.background=''; bh.style.color=''; bh.style.border='';
+    }
+}
+
+function toggleSubs(regiao) {
+    const el = document.getElementById('subs-' + regiao);
+    el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function togglePads(sub) {
+    const el = document.getElementById('pads-' + sub);
+    el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function selectTemplate(nome) {
+    document.getElementById('input-template').value = nome;
+    const epp = TEMPLATE_EPP[nome] || {};
+    let html = '<p class="config-title" style="margin-top:12px">Exercícios por categoria</p><div class="demandas-grid">';
+    for (const [p, val] of Object.entries(epp)) {
+        const label = PADROES_LABELS[p] || p;
+        html += `<div class="campo">
+            <label>${label}</label>
+            <div class="range-row">
+                <input type="range" name="epp_0_${p}" min="0" max="5" step="1" value="${val}"
+                       oninput="this.nextElementSibling.textContent=this.value">
+                <span class="range-value">${val}</span>
+            </div>
+        </div>`;
+    }
+    html += '</div>';
+    document.getElementById('template-epp').innerHTML = html;
+    // Lateralidade para template com squat
+    if ('squat' in epp) {
+        html += `<details style="margin:12px 0">
+            <summary style="font-size:13px;font-weight:600;padding:8px 0">Lateralidade — Agachamento</summary>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+                <div class="campo">
+                    <label>Bilateral</label>
+                    <div class="range-row">
+                        <input type="range" name="squat_bi_0" min="0" max="6" step="1" value="0"
+                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal()">
+                        <span class="range-value">0</span>
+                    </div>
+                </div>
+                <div class="campo">
+                    <label>Unilateral</label>
+                    <div class="range-row">
+                        <input type="range" name="squat_uni_0" min="0" max="6" step="1" value="0"
+                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal()">
+                        <span class="range-value">0</span>
+                    </div>
+                </div>
+            </div>
+            <p id="lat-aviso" style="font-size:11px;color:#9ca3af;margin-top:4px"></p>
+        </details>`;
+        document.getElementById('template-epp').innerHTML = html;
+    }
+    // Highlight selected
+    document.querySelectorAll('.template-btn').forEach(b => {
+        b.style.borderColor = b.textContent.trim() === nome ? '#e85d04' : '';
+        b.style.background = b.textContent.trim() === nome ? '#fff7ed' : '';
+    });
+}
+
+function updateDemandas() {
+    // Resolve Comportamento A
+    const demandas = [];
+    const padsMarcados = {};
+    const subsMarcadas = {};
+
+    document.querySelectorAll('.pad-chk:checked').forEach(chk => {
+        const sub = chk.dataset.subregiao;
+        if (!padsMarcados[sub]) padsMarcados[sub] = [];
+        padsMarcados[sub].push(chk.dataset.padrao);
+    });
+
+    document.querySelectorAll('.sub-chk:checked').forEach(chk => {
+        const reg = chk.dataset.regiao;
+        const sub = chk.dataset.subregiao;
+        if (!subsMarcadas[reg]) subsMarcadas[reg] = [];
+        // Sub vira demanda só se não tem padrões específicos
+        if (!padsMarcados[sub] || padsMarcados[sub].length === 0) {
+            subsMarcadas[reg].push(sub);
+        }
+    });
+
+    // Padrões individuais
+    for (const [sub, pads] of Object.entries(padsMarcados)) {
+        for (const p of pads) {
+            demandas.push({nivel: 'padrao', escopo: p, label: PADROES_LABELS[p] || p, default: 1});
+        }
+    }
+
+    // Subregiões
+    const SUBREGIOES_LABELS = {{ subregioes_labels | tojson }};
+    for (const [reg, subs] of Object.entries(subsMarcadas)) {
+        for (const sub of subs) {
+            demandas.push({nivel: 'subregiao', escopo: sub, label: SUBREGIOES_LABELS[sub] || sub, default: 2});
+        }
+    }
+
+    // Regiões: só se não tem subs nem pads marcados
+    const REGIOES_LABELS = {{ regioes_labels | tojson }};
+    document.querySelectorAll('.reg-chk:checked').forEach(chk => {
+        const reg = chk.dataset.regiao;
+        const temSubs = subsMarcadas[reg] && subsMarcadas[reg].length > 0;
+        const temPads = Object.keys(padsMarcados).some(sub => {
+            const subChk = document.querySelector(`.sub-chk[data-subregiao="${sub}"][data-regiao="${reg}"]`);
+            return subChk && padsMarcados[sub] && padsMarcados[sub].length > 0;
+        });
+        if (!temSubs && !temPads) {
+            demandas.push({nivel: 'regiao', escopo: reg, label: REGIOES_LABELS[reg] || reg, default: 6});
+        }
+    });
+
+    // Render sliders
+    let html = '';
+    let hidden = '';
+    if (demandas.length > 0) {
+        html = '<p style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.07em;margin:14px 0 4px">Quantos exercícios de cada grupo</p><div class="demandas-grid">';
+        demandas.forEach((d, i) => {
+            const existingInput = document.querySelector(`input[name="dem_qtd_0_${i}"]`);
+            const val = existingInput ? existingInput.value : d.default;
+            html += `<div class="campo">
+                <label>${d.label}</label>
+                <div class="range-row">
+                    <input type="range" name="dem_qtd_0_${i}" min="0" max="12" step="1" value="${val}"
+                           oninput="this.nextElementSibling.textContent=this.value">
+                    <span class="range-value">${val}</span>
+                </div>
+            </div>`;
+            hidden += `<input type="hidden" name="dem_nivel_0_${i}" value="${d.nivel}">`;
+            hidden += `<input type="hidden" name="dem_escopo_0_${i}" value="${d.escopo}">`;
+        });
+        html += '</div>';
+    }
+    document.getElementById('demandas-container').innerHTML = html;
+    document.getElementById('demandas-hidden-inputs').innerHTML = hidden;
+
+    // Lateralidade: mostra quando squat ou perna_anterior está nas demandas
+    let latHtml = '';
+    const temSquat = demandas.some(d =>
+        (d.nivel === 'padrao' && d.escopo === 'squat') ||
+        (d.nivel === 'subregiao' && d.escopo === 'perna_anterior')
+    );
+    if (temSquat) {
+        latHtml = `<details style="margin:12px 0">
+            <summary style="font-size:13px;font-weight:600;padding:8px 0">Lateralidade — Agachamento</summary>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+                <div class="campo">
+                    <label>Bilateral</label>
+                    <div class="range-row">
+                        <input type="range" name="squat_bi_0" min="0" max="6" step="1" value="0"
+                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal()">
+                        <span class="range-value">0</span>
+                    </div>
+                </div>
+                <div class="campo">
+                    <label>Unilateral</label>
+                    <div class="range-row">
+                        <input type="range" name="squat_uni_0" min="0" max="6" step="1" value="0"
+                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal()">
+                        <span class="range-value">0</span>
+                    </div>
+                </div>
+            </div>
+            <p id="lat-aviso" style="font-size:11px;color:#9ca3af;margin-top:4px"></p>
+        </details>`;
+    }
+    document.getElementById('lateralidade-container').innerHTML = latHtml;
+}
+
+function checkLatTotal() {
+    const biInput = document.querySelector('input[name="squat_bi_0"]');
+    const uniInput = document.querySelector('input[name="squat_uni_0"]');
+    const aviso = document.getElementById('lat-aviso');
+    if (!biInput || !uniInput || !aviso) return;
+    const bi = parseInt(biInput.value);
+    const uni = parseInt(uniInput.value);
+    if (bi === 0 && uni === 0) {
+        aviso.textContent = 'Sem filtro de lateralidade (padrão)';
+    } else {
+        aviso.textContent = `${bi} bilateral + ${uni} unilateral = ${bi + uni} exercício(s)`;
+    }
+}
+
+function resetAll() {
+    document.querySelectorAll('.reg-chk, .sub-chk, .pad-chk').forEach(c => c.checked = false);
+    document.getElementById('demandas-container').innerHTML = '';
+    document.getElementById('demandas-hidden-inputs').innerHTML = '';
+    document.getElementById('template-epp').innerHTML = '';
+    document.getElementById('input-template').value = '';
+    document.querySelectorAll('.template-btn').forEach(b => { b.style.borderColor = ''; b.style.background = ''; });
+    document.getElementById('lateralidade-container').innerHTML = '';
+}
+</script>
+
+{% endblock %}
