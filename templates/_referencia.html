@@ -1,0 +1,75 @@
+{% if ref_sessoes %}
+<div class="ref-panel">
+    <div class="ref-header">
+        <div>
+            <span class="ref-titulo">📌 Referência</span>
+            <span class="ref-meta">{{ ref_meta.etiqueta }} · {{ ref_meta.aluno }} · {{ ref_meta.data }}</span>
+        </div>
+        <div style="display:flex;gap:6px">
+            <button class="btn btn-sm"
+                    hx-post="/referencia/clonar"
+                    hx-target="#resultado"
+                    hx-swap="innerHTML">📋 Clonar para edição</button>
+            <button class="btn btn-sm"
+                    hx-post="/referencia/limpar"
+                    hx-target="#ref-container"
+                    hx-swap="innerHTML">✕ Fechar</button>
+        </div>
+    </div>
+
+    {% for sessao in ref_sessoes %}
+    {% set ref_t_idx = loop.index0 %}
+    <details {% if ref_sessoes|length == 1 %}open{% endif %}>
+        <summary style="font-size:13px;padding:6px 0;cursor:pointer">
+            Treino {{ loop.index }}
+            {% set padroes_lista = sessao.tipo.split(' + ') %}
+            {% if padroes_lista %}
+             — {% for p in padroes_lista if p %}{{ padroes_labels.get(p, p) }}{% if not loop.last %} · {% endif %}{% endfor %}
+            {% endif %}
+        </summary>
+        {% for bloco in sessao.blocos %}
+        {% set bloco_idx = loop.index0 %}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">
+            <p class="bloco-label" style="margin:0">Bloco {{ bloco.label }}</p>
+            {% if n_sessoes_ativas is defined and n_sessoes_ativas > 0 %}
+            <span class="copiar-bloco-wrap">
+                {% if n_sessoes_ativas == 1 %}
+                <button class="btn-ghost ref-copiar-btn"
+                        hx-post="/referencia/copiar-bloco/{{ ref_t_idx }}/{{ bloco_idx }}/para/0"
+                        hx-target="#treino-0"
+                        hx-swap="innerHTML"
+                        title="Copiar bloco para Treino 1">➡ Copiar</button>
+                {% else %}
+                <span style="display:inline-flex;align-items:center;gap:4px">
+                    <select id="dest-{{ ref_t_idx }}-{{ bloco_idx }}"
+                            style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;color:#374151">
+                        {% for i in range(n_sessoes_ativas) %}
+                        <option value="{{ i }}">Treino {{ i + 1 }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn-ghost ref-copiar-btn"
+                            onclick="copiarBloco({{ ref_t_idx }}, {{ bloco_idx }}, document.getElementById('dest-{{ ref_t_idx }}-{{ bloco_idx }}').value)"
+                            title="Copiar bloco para treino ativo">➡ Copiar</button>
+                </span>
+                {% endif %}
+            </span>
+            {% endif %}
+        </div>
+        {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
+        <div class="exercicio ref-exercicio">
+            <div class="exercicio-info">
+                <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
+                    {% if ex.series or ex.reps %}
+                    <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
+                    {% endif %}
+                </span>
+                <div class="exercicio-meta">{{ ex.purpose }} · 🔧 {{ ex.eq_primario }}</div>
+            </div>
+        </div>
+        {% endfor %}
+        <hr class="thin">
+        {% endfor %}
+    </details>
+    {% endfor %}
+</div>
+{% endif %}

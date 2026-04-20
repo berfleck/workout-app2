@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block treinos %}
 
+{% set MAX_TREINOS = 5 %}
+
 <form id="form-config" hx-post="/gerar" hx-target="#resultado" hx-indicator="#loading">
 
 <div class="config-panel">
@@ -8,8 +10,8 @@
     <div class="opcoes-grid">
         <div class="campo">
             <label>Nº de treinos</label>
-            <select name="n_treinos" id="n_treinos">
-                {% for i in range(1, 6) %}<option value="{{ i }}">{{ i }}</option>{% endfor %}
+            <select name="n_treinos" id="n_treinos" onchange="onChangeNTreinos()">
+                {% for i in range(1, MAX_TREINOS + 1) %}<option value="{{ i }}">{{ i }}</option>{% endfor %}
             </select>
         </div>
         <div class="campo">
@@ -42,16 +44,44 @@
     </div>
 </div>
 
-<!-- Modo seleção -->
-<div class="config-panel">
-    <div style="display:flex; gap:12px; margin-bottom:16px">
-        <button type="button" class="btn btn-sm" id="btn-modo-hier" onclick="setModo('hierarquia')" style="background:#e85d04;color:white;border:none">Hierarquia</button>
-        <button type="button" class="btn btn-sm" id="btn-modo-tmpl" onclick="setModo('template')">Template</button>
+<!-- Barra de abas dos treinos -->
+<div class="tabs-treino" id="tabs-treino-bar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    {% for t in range(MAX_TREINOS) %}
+    <button type="button" class="btn btn-sm tab-treino-btn" data-t="{{ t }}"
+            onclick="showTreino({{ t }})"
+            id="tab-btn-{{ t }}"
+            style="{% if t > 0 %}display:none;{% endif %}{% if t == 0 %}background:#e85d04;color:white;border:none{% endif %}">
+        Treino {{ t + 1 }}
+    </button>
+    {% endfor %}
+</div>
+
+{% for t in range(MAX_TREINOS) %}
+<div class="tab-treino config-panel" id="tab-{{ t }}" data-t="{{ t }}" {% if t > 0 %}style="display:none"{% endif %}>
+
+    <!-- Cabeçalho da aba: copiar de outro treino -->
+    <div class="copiar-bar" id="copiar-bar-{{ t }}" style="display:none; gap:8px; align-items:center; margin-bottom:12px; font-size:13px">
+        <span style="color:#6b7280">📋 Copiar config de</span>
+        <select id="copiar-src-{{ t }}" style="padding:4px 8px">
+            {% for s in range(MAX_TREINOS) %}{% if s != t %}
+            <option value="{{ s }}">Treino {{ s + 1 }}</option>
+            {% endif %}{% endfor %}
+        </select>
+        <button type="button" class="btn btn-sm" onclick="copiarConfigTreino(parseInt(document.getElementById('copiar-src-{{ t }}').value), {{ t }})">Aplicar</button>
     </div>
-    <input type="hidden" name="modo" id="input-modo" value="hierarquia">
+
+    <!-- Seletor de modo -->
+    <div style="display:flex; gap:12px; margin-bottom:16px">
+        <button type="button" class="btn btn-sm btn-modo-hier" id="btn-modo-hier-{{ t }}"
+                onclick="setModo({{ t }}, 'hierarquia')"
+                style="background:#e85d04;color:white;border:none">Hierarquia</button>
+        <button type="button" class="btn btn-sm btn-modo-tmpl" id="btn-modo-tmpl-{{ t }}"
+                onclick="setModo({{ t }}, 'template')">Template</button>
+    </div>
+    <input type="hidden" name="modo_{{ t }}" id="input-modo-{{ t }}" value="hierarquia">
 
     <!-- MODO HIERARQUIA -->
-    <div id="modo-hierarquia">
+    <div id="modo-hierarquia-{{ t }}" class="modo-hierarquia-bloco">
         <p style="font-size:11px;color:#9ca3af;margin:0 0 10px">
             Marque um grupo e defina quantos exercícios. Use ▸ para refinar em subgrupos.</p>
 
@@ -66,32 +96,32 @@
             <div class="hier-row">
                 <label class="check-inline">
                     <input type="checkbox" class="reg-chk" data-regiao="{{ regiao }}"
-                           onchange="updateDemandas()">
+                           onchange="updateDemandas({{ t }})">
                     <span>Todos os grupos</span>
                 </label>
             </div>
 
-            <div id="subs-{{ regiao }}" style="display:none">
+            <div id="subs-{{ t }}-{{ regiao }}" style="display:none">
             {% for subregiao in subregioes.get(regiao, []) %}
                 {% set pads = padroes_ordem.get(subregiao, []) %}
                 <div class="hier-indent-1 hier-row">
                     <label class="check-inline">
                         <input type="checkbox" class="sub-chk" data-subregiao="{{ subregiao }}"
-                               data-regiao="{{ regiao }}" onchange="updateDemandas()">
+                               data-regiao="{{ regiao }}" onchange="updateDemandas({{ t }})">
                         <span>{{ subregioes_labels[subregiao] }}</span>
                     </label>
                     {% if pads|length > 1 %}
-                    <button type="button" class="hier-toggle" onclick="togglePads('{{ subregiao }}')">▸</button>
+                    <button type="button" class="hier-toggle" onclick="togglePads({{ t }}, '{{ subregiao }}')">▸</button>
                     {% endif %}
                 </div>
                 {% if pads|length > 1 %}
-                <div id="pads-{{ subregiao }}" style="display:none">
+                <div id="pads-{{ t }}-{{ subregiao }}" style="display:none">
                 {% for pad in pads %}
                     <div class="hier-indent-2 hier-row">
                         <label class="check-inline">
                             <input type="checkbox" class="pad-chk" data-padrao="{{ pad }}"
                                    data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}"
-                                   onchange="updateDemandas()">
+                                   onchange="updateDemandas({{ t }})">
                             <span>{{ padroes_labels.get(pad, pad) }}</span>
                         </label>
                     </div>
@@ -101,8 +131,8 @@
             {% endfor %}
             </div>
 
-            <button type="button" class="hier-toggle" onclick="toggleSubs('{{ regiao }}')"
-                    id="toggle-{{ regiao }}">▸ refinar</button>
+            <button type="button" class="hier-toggle" onclick="toggleSubs({{ t }}, '{{ regiao }}')"
+                    id="toggle-{{ t }}-{{ regiao }}">▸ refinar</button>
 
             {% if regiao == 'upper' %}</div>{% endif %}
             {% if regiao == 'lower' %}</div>{% endif %}
@@ -110,25 +140,24 @@
         {% endfor %}
         </div>
 
-        <!-- Demandas (populated by JS) -->
-        <div id="demandas-container"></div>
-        <div id="demandas-hidden-inputs"></div>
-        <!-- Lateralidade squat (populated by JS when squat is selected) -->
-        <div id="lateralidade-container"></div>
+        <div id="demandas-container-{{ t }}"></div>
+        <div id="demandas-hidden-inputs-{{ t }}"></div>
+        <div id="lateralidade-container-{{ t }}"></div>
     </div>
 
     <!-- MODO TEMPLATE -->
-    <div id="modo-template" style="display:none">
+    <div id="modo-template-{{ t }}" class="modo-template-bloco" style="display:none">
         <p class="config-title">Escolha um template</p>
         <div class="template-grid">
             {% for tmpl in templates %}
-            <button type="button" class="template-btn" onclick="selectTemplate('{{ tmpl }}')">{{ tmpl }}</button>
+            <button type="button" class="template-btn" onclick="selectTemplate({{ t }}, '{{ tmpl }}')">{{ tmpl }}</button>
             {% endfor %}
         </div>
-        <input type="hidden" name="template_0" id="input-template" value="">
-        <div id="template-epp"></div>
+        <input type="hidden" name="template_{{ t }}" id="input-template-{{ t }}" value="">
+        <div id="template-epp-{{ t }}"></div>
     </div>
 </div>
+{% endfor %}
 
 <!-- Botões -->
 <div class="botoes-acao" style="margin-bottom:20px">
@@ -136,7 +165,7 @@
         <span class="htmx-hide">▶ Gerar treinos</span>
         <span class="htmx-indicator"><span class="spinner"></span> Gerando...</span>
     </button>
-    <button type="reset" class="btn" onclick="resetAll()">↺ Resetar</button>
+    <button type="button" class="btn" onclick="resetAll()">↺ Resetar tudo</button>
 </div>
 </form>
 
@@ -145,7 +174,12 @@
     <p style="color:#9ca3af;font-size:13px;margin-top:8px">Gerando treinos...</p>
 </div>
 
-<!-- Resultado -->
+<div id="ref-container">
+    {% if ref_sessoes %}
+        {% include "_referencia.html" %}
+    {% endif %}
+</div>
+
 <div id="resultado">
 {% if sessoes %}
     {% include "_resultado.html" %}
@@ -159,16 +193,66 @@
 </div>
 
 <script>
-// Templates EPP data
 const TEMPLATE_EPP = {{ template_epp | tojson }};
 const PADROES_LABELS = {{ padroes_labels | tojson }};
+const SUBREGIOES_LABELS_JS = {{ subregioes_labels | tojson }};
+const REGIOES_LABELS_JS = {{ regioes_labels | tojson }};
+const MAX_TREINOS = {{ MAX_TREINOS }};
 
-function setModo(modo) {
-    document.getElementById('input-modo').value = modo;
-    document.getElementById('modo-hierarquia').style.display = modo === 'hierarquia' ? '' : 'none';
-    document.getElementById('modo-template').style.display = modo === 'template' ? '' : 'none';
-    const bh = document.getElementById('btn-modo-hier');
-    const bt = document.getElementById('btn-modo-tmpl');
+function tabEl(t) { return document.getElementById('tab-' + t); }
+function qs(t, sel) { return tabEl(t).querySelector(sel); }
+function qsa(t, sel) { return tabEl(t).querySelectorAll(sel); }
+
+function showTreino(t) {
+    document.querySelectorAll('.tab-treino').forEach(el => {
+        el.style.display = (parseInt(el.dataset.t) === t) ? '' : 'none';
+    });
+    document.querySelectorAll('.tab-treino-btn').forEach(b => {
+        const on = parseInt(b.dataset.t) === t;
+        b.style.background = on ? '#e85d04' : '';
+        b.style.color = on ? 'white' : '';
+        b.style.border = on ? 'none' : '';
+    });
+}
+
+function onChangeNTreinos() {
+    const n = parseInt(document.getElementById('n_treinos').value);
+    for (let t = 0; t < MAX_TREINOS; t++) {
+        const btn = document.getElementById('tab-btn-' + t);
+        btn.style.display = (t < n) ? '' : 'none';
+    }
+    // Se o tab ativo deixou de ser válido, vai pro tab 0
+    const activeVisible = Array.from(document.querySelectorAll('.tab-treino'))
+        .some(el => el.style.display !== 'none' && parseInt(el.dataset.t) < n);
+    if (!activeVisible) showTreino(0);
+    // Mostra/esconde barra "Copiar de" conforme n > 1
+    for (let t = 0; t < MAX_TREINOS; t++) {
+        const bar = document.getElementById('copiar-bar-' + t);
+        if (bar) bar.style.display = (n > 1 && t < n) ? 'flex' : 'none';
+        // Oculta options de treinos inexistentes
+        const sel = document.getElementById('copiar-src-' + t);
+        if (sel) {
+            Array.from(sel.options).forEach(opt => {
+                const v = parseInt(opt.value);
+                opt.style.display = (v < n) ? '' : 'none';
+                if (v >= n && opt.selected) opt.selected = false;
+            });
+            // Seleciona primeiro válido se necessário
+            if (sel.selectedIndex === -1 || parseInt(sel.value) >= n) {
+                for (const opt of sel.options) {
+                    if (parseInt(opt.value) < n) { opt.selected = true; break; }
+                }
+            }
+        }
+    }
+}
+
+function setModo(t, modo) {
+    qs(t, '#input-modo-' + t).value = modo;
+    qs(t, '#modo-hierarquia-' + t).style.display = modo === 'hierarquia' ? '' : 'none';
+    qs(t, '#modo-template-' + t).style.display = modo === 'template' ? '' : 'none';
+    const bh = qs(t, '#btn-modo-hier-' + t);
+    const bt = qs(t, '#btn-modo-tmpl-' + t);
     if (modo === 'hierarquia') {
         bh.style.background='#e85d04'; bh.style.color='white'; bh.style.border='none';
         bt.style.background=''; bt.style.color=''; bt.style.border='';
@@ -178,18 +262,18 @@ function setModo(modo) {
     }
 }
 
-function toggleSubs(regiao) {
-    const el = document.getElementById('subs-' + regiao);
+function toggleSubs(t, regiao) {
+    const el = document.getElementById('subs-' + t + '-' + regiao);
     el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
-function togglePads(sub) {
-    const el = document.getElementById('pads-' + sub);
+function togglePads(t, sub) {
+    const el = document.getElementById('pads-' + t + '-' + sub);
     el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
-function selectTemplate(nome) {
-    document.getElementById('input-template').value = nome;
+function selectTemplate(t, nome) {
+    qs(t, '#input-template-' + t).value = nome;
     const epp = TEMPLATE_EPP[nome] || {};
     let html = '<p class="config-title" style="margin-top:12px">Exercícios por categoria</p><div class="demandas-grid">';
     for (const [p, val] of Object.entries(epp)) {
@@ -197,15 +281,13 @@ function selectTemplate(nome) {
         html += `<div class="campo">
             <label>${label}</label>
             <div class="range-row">
-                <input type="range" name="epp_0_${p}" min="0" max="5" step="1" value="${val}"
+                <input type="range" name="epp_${t}_${p}" min="0" max="5" step="1" value="${val}"
                        oninput="this.nextElementSibling.textContent=this.value">
                 <span class="range-value">${val}</span>
             </div>
         </div>`;
     }
     html += '</div>';
-    document.getElementById('template-epp').innerHTML = html;
-    // Lateralidade para template com squat
     if ('squat' in epp) {
         html += `<details style="margin:12px 0">
             <summary style="font-size:13px;font-weight:600;padding:8px 0">Lateralidade — Agachamento</summary>
@@ -213,107 +295,97 @@ function selectTemplate(nome) {
                 <div class="campo">
                     <label>Bilateral</label>
                     <div class="range-row">
-                        <input type="range" name="squat_bi_0" min="0" max="6" step="1" value="0"
-                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal()">
+                        <input type="range" name="squat_bi_${t}" min="0" max="6" step="1" value="0"
+                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal(${t})">
                         <span class="range-value">0</span>
                     </div>
                 </div>
                 <div class="campo">
                     <label>Unilateral</label>
                     <div class="range-row">
-                        <input type="range" name="squat_uni_0" min="0" max="6" step="1" value="0"
-                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal()">
+                        <input type="range" name="squat_uni_${t}" min="0" max="6" step="1" value="0"
+                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal(${t})">
                         <span class="range-value">0</span>
                     </div>
                 </div>
             </div>
-            <p id="lat-aviso" style="font-size:11px;color:#9ca3af;margin-top:4px"></p>
+            <p id="lat-aviso-${t}" style="font-size:11px;color:#9ca3af;margin-top:4px"></p>
         </details>`;
-        document.getElementById('template-epp').innerHTML = html;
     }
-    // Highlight selected
-    document.querySelectorAll('.template-btn').forEach(b => {
+    qs(t, '#template-epp-' + t).innerHTML = html;
+    qsa(t, '.template-btn').forEach(b => {
         b.style.borderColor = b.textContent.trim() === nome ? '#e85d04' : '';
         b.style.background = b.textContent.trim() === nome ? '#fff7ed' : '';
     });
 }
 
-function updateDemandas() {
-    // Resolve Comportamento A
+function updateDemandas(t) {
     const demandas = [];
     const padsMarcados = {};
     const subsMarcadas = {};
 
-    document.querySelectorAll('.pad-chk:checked').forEach(chk => {
+    qsa(t, '.pad-chk:checked').forEach(chk => {
         const sub = chk.dataset.subregiao;
         if (!padsMarcados[sub]) padsMarcados[sub] = [];
         padsMarcados[sub].push(chk.dataset.padrao);
     });
 
-    document.querySelectorAll('.sub-chk:checked').forEach(chk => {
+    qsa(t, '.sub-chk:checked').forEach(chk => {
         const reg = chk.dataset.regiao;
         const sub = chk.dataset.subregiao;
         if (!subsMarcadas[reg]) subsMarcadas[reg] = [];
-        // Sub vira demanda só se não tem padrões específicos
         if (!padsMarcados[sub] || padsMarcados[sub].length === 0) {
             subsMarcadas[reg].push(sub);
         }
     });
 
-    // Padrões individuais
     for (const [sub, pads] of Object.entries(padsMarcados)) {
         for (const p of pads) {
             demandas.push({nivel: 'padrao', escopo: p, label: PADROES_LABELS[p] || p, default: 1});
         }
     }
 
-    // Subregiões
-    const SUBREGIOES_LABELS = {{ subregioes_labels | tojson }};
     for (const [reg, subs] of Object.entries(subsMarcadas)) {
         for (const sub of subs) {
-            demandas.push({nivel: 'subregiao', escopo: sub, label: SUBREGIOES_LABELS[sub] || sub, default: 2});
+            demandas.push({nivel: 'subregiao', escopo: sub, label: SUBREGIOES_LABELS_JS[sub] || sub, default: 2});
         }
     }
 
-    // Regiões: só se não tem subs nem pads marcados
-    const REGIOES_LABELS = {{ regioes_labels | tojson }};
-    document.querySelectorAll('.reg-chk:checked').forEach(chk => {
+    qsa(t, '.reg-chk:checked').forEach(chk => {
         const reg = chk.dataset.regiao;
         const temSubs = subsMarcadas[reg] && subsMarcadas[reg].length > 0;
         const temPads = Object.keys(padsMarcados).some(sub => {
-            const subChk = document.querySelector(`.sub-chk[data-subregiao="${sub}"][data-regiao="${reg}"]`);
+            const subChk = qs(t, `.sub-chk[data-subregiao="${sub}"][data-regiao="${reg}"]`);
             return subChk && padsMarcados[sub] && padsMarcados[sub].length > 0;
         });
         if (!temSubs && !temPads) {
-            demandas.push({nivel: 'regiao', escopo: reg, label: REGIOES_LABELS[reg] || reg, default: 6});
+            demandas.push({nivel: 'regiao', escopo: reg, label: REGIOES_LABELS_JS[reg] || reg, default: 6});
         }
     });
 
-    // Render sliders
     let html = '';
     let hidden = '';
     if (demandas.length > 0) {
         html = '<p style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.07em;margin:14px 0 4px">Quantos exercícios de cada grupo</p><div class="demandas-grid">';
         demandas.forEach((d, i) => {
-            const existingInput = document.querySelector(`input[name="dem_qtd_0_${i}"]`);
-            const val = existingInput ? existingInput.value : d.default;
+            const existing = qs(t, `input[name="dem_qtd_${t}_${i}"]`);
+            const val = existing ? existing.value : d.default;
             html += `<div class="campo">
                 <label>${d.label}</label>
                 <div class="range-row">
-                    <input type="range" name="dem_qtd_0_${i}" min="0" max="12" step="1" value="${val}"
+                    <input type="range" name="dem_qtd_${t}_${i}" min="0" max="12" step="1" value="${val}"
                            oninput="this.nextElementSibling.textContent=this.value">
                     <span class="range-value">${val}</span>
                 </div>
             </div>`;
-            hidden += `<input type="hidden" name="dem_nivel_0_${i}" value="${d.nivel}">`;
-            hidden += `<input type="hidden" name="dem_escopo_0_${i}" value="${d.escopo}">`;
+            hidden += `<input type="hidden" name="dem_nivel_${t}_${i}" value="${d.nivel}">`;
+            hidden += `<input type="hidden" name="dem_escopo_${t}_${i}" value="${d.escopo}">`;
         });
         html += '</div>';
     }
-    document.getElementById('demandas-container').innerHTML = html;
-    document.getElementById('demandas-hidden-inputs').innerHTML = hidden;
+    qs(t, '#demandas-container-' + t).innerHTML = html;
+    qs(t, '#demandas-hidden-inputs-' + t).innerHTML = hidden;
 
-    // Lateralidade: mostra quando squat ou perna_anterior está nas demandas
     let latHtml = '';
     const temSquat = demandas.some(d =>
         (d.nivel === 'padrao' && d.escopo === 'squat') ||
@@ -326,30 +398,30 @@ function updateDemandas() {
                 <div class="campo">
                     <label>Bilateral</label>
                     <div class="range-row">
-                        <input type="range" name="squat_bi_0" min="0" max="6" step="1" value="0"
-                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal()">
+                        <input type="range" name="squat_bi_${t}" min="0" max="6" step="1" value="0"
+                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal(${t})">
                         <span class="range-value">0</span>
                     </div>
                 </div>
                 <div class="campo">
                     <label>Unilateral</label>
                     <div class="range-row">
-                        <input type="range" name="squat_uni_0" min="0" max="6" step="1" value="0"
-                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal()">
+                        <input type="range" name="squat_uni_${t}" min="0" max="6" step="1" value="0"
+                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal(${t})">
                         <span class="range-value">0</span>
                     </div>
                 </div>
             </div>
-            <p id="lat-aviso" style="font-size:11px;color:#9ca3af;margin-top:4px"></p>
+            <p id="lat-aviso-${t}" style="font-size:11px;color:#9ca3af;margin-top:4px"></p>
         </details>`;
     }
-    document.getElementById('lateralidade-container').innerHTML = latHtml;
+    qs(t, '#lateralidade-container-' + t).innerHTML = latHtml;
 }
 
-function checkLatTotal() {
-    const biInput = document.querySelector('input[name="squat_bi_0"]');
-    const uniInput = document.querySelector('input[name="squat_uni_0"]');
-    const aviso = document.getElementById('lat-aviso');
+function checkLatTotal(t) {
+    const biInput = qs(t, `input[name="squat_bi_${t}"]`);
+    const uniInput = qs(t, `input[name="squat_uni_${t}"]`);
+    const aviso = document.getElementById('lat-aviso-' + t);
     if (!biInput || !uniInput || !aviso) return;
     const bi = parseInt(biInput.value);
     const uni = parseInt(uniInput.value);
@@ -360,15 +432,104 @@ function checkLatTotal() {
     }
 }
 
-function resetAll() {
-    document.querySelectorAll('.reg-chk, .sub-chk, .pad-chk').forEach(c => c.checked = false);
-    document.getElementById('demandas-container').innerHTML = '';
-    document.getElementById('demandas-hidden-inputs').innerHTML = '';
-    document.getElementById('template-epp').innerHTML = '';
-    document.getElementById('input-template').value = '';
-    document.querySelectorAll('.template-btn').forEach(b => { b.style.borderColor = ''; b.style.background = ''; });
-    document.getElementById('lateralidade-container').innerHTML = '';
+function resetTreino(t) {
+    qsa(t, '.reg-chk, .sub-chk, .pad-chk').forEach(c => c.checked = false);
+    qs(t, '#demandas-container-' + t).innerHTML = '';
+    qs(t, '#demandas-hidden-inputs-' + t).innerHTML = '';
+    qs(t, '#template-epp-' + t).innerHTML = '';
+    qs(t, '#input-template-' + t).value = '';
+    qsa(t, '.template-btn').forEach(b => { b.style.borderColor = ''; b.style.background = ''; });
+    qs(t, '#lateralidade-container-' + t).innerHTML = '';
+    qsa(t, '[id^="subs-' + t + '-"]').forEach(el => el.style.display = 'none');
+    qsa(t, '[id^="pads-' + t + '-"]').forEach(el => el.style.display = 'none');
+    setModo(t, 'hierarquia');
 }
+
+function resetAll() {
+    for (let t = 0; t < MAX_TREINOS; t++) resetTreino(t);
+}
+
+function copiarConfigTreino(src, dest) {
+    if (src === dest) return;
+    resetTreino(dest);
+
+    // 1. Modo
+    const modoSrc = qs(src, '#input-modo-' + src).value;
+    setModo(dest, modoSrc);
+
+    if (modoSrc === 'template') {
+        const tmplNome = qs(src, '#input-template-' + src).value;
+        if (tmplNome) {
+            selectTemplate(dest, tmplNome);
+            // Copiar valores dos sliders EPP
+            qsa(src, `input[name^="epp_${src}_"]`).forEach(inp => {
+                const pad = inp.name.substring(('epp_' + src + '_').length);
+                const target = qs(dest, `input[name="epp_${dest}_${pad}"]`);
+                if (target) {
+                    target.value = inp.value;
+                    if (target.nextElementSibling) target.nextElementSibling.textContent = inp.value;
+                }
+            });
+            // Lateralidade
+            ['bi', 'uni'].forEach(k => {
+                const s = qs(src, `input[name="squat_${k}_${src}"]`);
+                const d = qs(dest, `input[name="squat_${k}_${dest}"]`);
+                if (s && d) {
+                    d.value = s.value;
+                    if (d.nextElementSibling) d.nextElementSibling.textContent = s.value;
+                }
+            });
+        }
+    } else {
+        // Hierarquia: copiar checkboxes e estado de toggle
+        qsa(src, '.reg-chk, .sub-chk, .pad-chk').forEach(srcChk => {
+            let selector = '';
+            if (srcChk.classList.contains('reg-chk')) {
+                selector = `.reg-chk[data-regiao="${srcChk.dataset.regiao}"]`;
+            } else if (srcChk.classList.contains('sub-chk')) {
+                selector = `.sub-chk[data-subregiao="${srcChk.dataset.subregiao}"]`;
+            } else {
+                selector = `.pad-chk[data-padrao="${srcChk.dataset.padrao}"]`;
+            }
+            const destChk = qs(dest, selector);
+            if (destChk) destChk.checked = srcChk.checked;
+        });
+        // Copiar estados de expansão (subs/pads visíveis)
+        qsa(src, '[id^="subs-' + src + '-"]').forEach(srcEl => {
+            const regiao = srcEl.id.substring(('subs-' + src + '-').length);
+            const destEl = document.getElementById('subs-' + dest + '-' + regiao);
+            if (destEl) destEl.style.display = srcEl.style.display;
+        });
+        qsa(src, '[id^="pads-' + src + '-"]').forEach(srcEl => {
+            const sub = srcEl.id.substring(('pads-' + src + '-').length);
+            const destEl = document.getElementById('pads-' + dest + '-' + sub);
+            if (destEl) destEl.style.display = srcEl.style.display;
+        });
+        updateDemandas(dest);
+        // Copiar valores dos sliders de demandas (índice por índice)
+        qsa(src, `input[name^="dem_qtd_${src}_"]`).forEach(inp => {
+            const i = inp.name.substring(('dem_qtd_' + src + '_').length);
+            const target = qs(dest, `input[name="dem_qtd_${dest}_${i}"]`);
+            if (target) {
+                target.value = inp.value;
+                if (target.nextElementSibling) target.nextElementSibling.textContent = inp.value;
+            }
+        });
+        // Lateralidade
+        ['bi', 'uni'].forEach(k => {
+            const s = qs(src, `input[name="squat_${k}_${src}"]`);
+            const d = qs(dest, `input[name="squat_${k}_${dest}"]`);
+            if (s && d) {
+                d.value = s.value;
+                if (d.nextElementSibling) d.nextElementSibling.textContent = s.value;
+            }
+        });
+        checkLatTotal(dest);
+    }
+}
+
+// Init
+onChangeNTreinos();
 </script>
 
 {% endblock %}

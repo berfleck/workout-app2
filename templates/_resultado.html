@@ -1,5 +1,33 @@
 <div class="separador">{{ sessoes|length }} treino{{ 's' if sessoes|length > 1 else '' }} gerado{{ 's' if sessoes|length > 1 else '' }}</div>
 
+<!-- Fixar como referência -->
+<div style="margin-bottom:8px">
+    <button class="btn btn-sm"
+            hx-post="/referencia/carregar-ativo"
+            hx-target="#ref-container"
+            hx-swap="innerHTML">📌 Fixar como referência</button>
+</div>
+
+<!-- Comparar com referência -->
+{% if tem_referencia %}
+<details style="margin-bottom:8px">
+    <summary style="font-size:12px;cursor:pointer">🔍 Comparar com referência</summary>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">
+        {% for sessao in sessoes %}
+        {% if loop.index0 < n_ref_sessoes %}
+        <button class="btn btn-sm"
+                hx-get="/comparar/{{ loop.index0 }}/{{ loop.index0 }}"
+                hx-target="#comparacao-result"
+                hx-swap="innerHTML">
+            Treino {{ loop.index }} vs Ref {{ loop.index }}
+        </button>
+        {% endif %}
+        {% endfor %}
+    </div>
+    <div id="comparacao-result" style="margin-top:12px"></div>
+</details>
+{% endif %}
+
 <!-- Salvar no histórico -->
 <details>
     <summary>💾 Salvar no histórico</summary>

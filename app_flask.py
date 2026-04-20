@@ -33,6 +33,8 @@ SESSOES_PATH   = Path("sessoes_salvas.json")
 # Estado em memória
 sessoes_ativas: list[Sessao] = []
 configs_geradas: list[dict] = []
+referencia_ativa: list[Sessao] = []
+referencia_meta: dict = {}
 
 PADROES_LABELS = {
     "squat": "Agachamento", "hinge": "Extensão de quadril",
@@ -102,7 +104,7 @@ def filtrar_banco(texto="", padrao=None, purpose=None, unilateral=None,
     if texto.strip():
         txt_norm = _normalizar(texto.strip())
         resultado = [e for e in resultado if txt_norm in _normalizar(e.nome)]
-    resultado.sort(key=lambda e: (e.purpose != "compound", e.nome))
+    resultado.sort(key=lambda e: e.nome)
     return resultado
 
 def _exercicio_to_dict(ex):
@@ -184,6 +186,8 @@ def index():
         subregiao_para_padroes=SUBREGIAO_PARA_PADROES,
         alunos=carregar_alunos(),
         sessoes=sessoes_ativas,
+        ref_sessoes=referencia_ativa,
+        ref_meta=referencia_meta,
     )
 
 # ══════════════════════════════════════════════════════════════
@@ -193,7 +197,6 @@ def index():
 @app.route("/gerar", methods=["POST"])
 def gerar():
     global sessoes_ativas, configs_geradas
-    modo = request.form.get("modo", "hierarquia")
     n_treinos = int(request.form.get("n_treinos", 1))
     max_cx = int(request.form.get("max_complexidade", 5))
     tam_bloco = int(request.form.get("tamanho_bloco", 2))
@@ -206,8 +209,9 @@ def gerar():
         cfg = {"max_complexidade": max_cx, "tamanho_bloco": tam_bloco,
                "equipamentos_bloqueados": [], "evitar_agonistas": evitar_agon}
 
+        modo = request.form.get(f"modo_{t}", "hierarquia")
         if modo == "template":
-            tmpl_nome = request.form.get(f"template_{t}", request.form.get("template_0", ""))
+            tmpl_nome = request.form.get(f"template_{t}", "")
             padroes = TEMPLATES.get(tmpl_nome, [])
             epp = dict(TEMPLATE_EPP.get(tmpl_nome, {}))
             # Read EPP sliders
@@ -273,12 +277,30 @@ def gerar():
     if vazios:
         return f"<p class='aviso'>Selecione categorias no(s) Treino(s) {', '.join(str(x) for x in vazios)}.</p>"
 
-    sessoes_ativas = gerar_multiplos_treinos(banco, all_configs, variar_entre_treinos=variar)
+    banco_gerar = list(banco)
+    if referencia_ativa:
+        nomes_ref = set()
+        pais_ref = set()
+        for s in referencia_ativa:
+            for bloco in s.blocos:
+                for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
+                    if ex:
+                        nomes_ref.add(ex.nome)
+                        if ex.variacao_de:
+                            pais_ref.add(ex.variacao_de)
+        banco_gerar = [e for e in banco_gerar
+                       if e.nome not in nomes_ref
+                       and e.nome not in pais_ref
+                       and (e.variacao_de is None or e.variacao_de not in nomes_ref)]
+
+    sessoes_ativas = gerar_multiplos_treinos(banco_gerar, all_configs, variar_entre_treinos=variar)
     configs_geradas = all_configs
     salvar_sessoes_disco()
 
     return render_template("_resultado.html", sessoes=sessoes_ativas,
-                           padroes_labels=PADROES_LABELS, alunos=carregar_alunos())
+                           padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
+                           tem_referencia=bool(referencia_ativa),
+                           n_ref_sessoes=len(referencia_ativa))
 
 # ══════════════════════════════════════════════════════════════
 # ROTAS — AÇÕES POR TREINO
@@ -323,6 +345,21 @@ def treino_regerar(t):
     banco_regen = [e for e in banco if e.nome not in nomes_outros
                    and e.nome not in pais_dos_outros
                    and (e.variacao_de is None or e.variacao_de not in nomes_outros)]
+    # Block exercises from reference (same logic as /gerar)
+    if referencia_ativa:
+        nomes_ref = set()
+        pais_ref = set()
+        for s in referencia_ativa:
+            for bloco in s.blocos:
+                for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
+                    if ex:
+                        nomes_ref.add(ex.nome)
+                        if ex.variacao_de:
+                            pais_ref.add(ex.variacao_de)
+        banco_regen = [e for e in banco_regen
+                       if e.nome not in nomes_ref
+                       and e.nome not in pais_ref
+                       and (e.variacao_de is None or e.variacao_de not in nomes_ref)]
 
     if cfg_r.get("demandas"):
         nova = gerar_sessao_por_demandas(banco_regen, demandas=cfg_r["demandas"],
@@ -350,7 +387,13 @@ def treino_regerar(t):
 def treino_substituir(t, nome_ex):
     global sessoes_ativas
     if t >= len(sessoes_ativas): return "", 404
-    sessoes_ativas[t] = substituir_exercicio(sessoes_ativas[t], nome_ex, banco)
+    banco_subst = banco
+    if referencia_ativa:
+        nomes_ref = {ex.nome for s in referencia_ativa for b in s.blocos
+                     for ex in [b.ex1, b.ex2, b.ex3] if ex}
+        banco_sem_ref = [e for e in banco if e.nome not in nomes_ref]
+        banco_subst = banco_sem_ref if banco_sem_ref else banco
+    sessoes_ativas[t] = substituir_exercicio(sessoes_ativas[t], nome_ex, banco_subst)
     salvar_sessoes_disco()
     return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
                            modo="editar", padroes_labels=PADROES_LABELS,
@@ -391,11 +434,15 @@ def buscar_subs(t, nome_ex):
                           musculo=musculo or None, max_cx=5)
     cands = [e for e in cands if e.nome not in nomes_em_uso and e.nome != nome_ex]
 
+    nomes_ref = {ex.nome for s in referencia_ativa for b in s.blocos
+                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if referencia_ativa else set()
+
     return render_template("_substituicao.html", cands=cands[:50], nome_ex=nome_ex, idx=t,
                            padroes_labels=PADROES_LABELS,
                            todos_padroes=sorted(PADROES_LABELS.keys()),
                            todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+                           todos_musculos=todos_musculos,
+                           nomes_ref=nomes_ref)
 
 # ── Bloco operations ──────────────────────────────────────────
 
@@ -487,6 +534,33 @@ def exercicio_mover(t, bi, ei, dest_label):
                            todos_equipamentos=todos_equipamentos,
                            todos_musculos=todos_musculos)
 
+@app.route("/treino/<int:t>/exercicio/<int:bi>/<int:ei>/destacar", methods=["POST"])
+def exercicio_destacar(t, bi, ei):
+    """Remove exercise from its block and create a new block with it at the end."""
+    global sessoes_ativas
+    if t >= len(sessoes_ativas): return "", 404
+    labels = "ABCDEFGHIJKLMNOP"
+    bloco = sessoes_ativas[t].blocos[bi]
+    ex = [bloco.ex1, bloco.ex2, bloco.ex3][ei]
+    if ex is None: return "", 400
+    if ei == 0: bloco.ex1 = bloco.ex2; bloco.ex2 = bloco.ex3; bloco.ex3 = None
+    elif ei == 1: bloco.ex2 = bloco.ex3; bloco.ex3 = None
+    else: bloco.ex3 = None
+    if not any([bloco.ex1, bloco.ex2, bloco.ex3]):
+        sessoes_ativas[t].blocos.pop(bi)
+    for j, b in enumerate(sessoes_ativas[t].blocos):
+        b.label = labels[j] if j < len(labels) else str(j + 1)
+    n = len(sessoes_ativas[t].blocos)
+    lbl = labels[n] if n < len(labels) else str(n + 1)
+    sessoes_ativas[t].blocos.append(SuperSerie(label=lbl, ex1=ex, ex2=None, ex3=None))
+    salvar_sessoes_disco()
+    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
+                           modo="editar", padroes_labels=PADROES_LABELS,
+                           alunos=carregar_alunos(),
+                           todos_padroes=sorted(PADROES_LABELS.keys()),
+                           todos_equipamentos=todos_equipamentos,
+                           todos_musculos=todos_musculos)
+
 @app.route("/treino/<int:t>/bloco/<int:bi>/adicionar/<nome_ex>", methods=["POST"])
 def bloco_adicionar_exercicio(t, bi, nome_ex):
     global sessoes_ativas
@@ -559,11 +633,17 @@ def buscar_exercicios():
                           musculo=musculo or None)
     cands = [e for e in cands if e.nome not in excluir]
 
+    nomes_ref = {ex.nome for s in referencia_ativa for b in s.blocos
+                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if referencia_ativa else set()
+
     html = f"<p class='meta-count'>{len(cands)} exercício(s)</p>"
-    for e in cands[:50]:
-        html += (f'<label class="ex-option">'
+    for e in cands:
+        na_ref = e.nome in nomes_ref
+        badge = ' <span class="ref-badge">REF</span>' if na_ref else ''
+        style = ' style="opacity:0.6"' if na_ref else ''
+        html += (f'<label class="ex-option"{style}>'
                  f'<input type="radio" name="exercicio_escolhido" value="{e.nome}">'
-                 f'<span>{e.nome}</span>'
+                 f'<span>{e.nome}{badge}</span>'
                  f'<span class="ex-option-meta">{e.purpose} · {e.eq_primario}</span>'
                  f'</label>')
     if not cands:
@@ -634,7 +714,105 @@ def historico_carregar(reg_id):
     configs_geradas = []
     salvar_sessoes_disco()
     return render_template("_resultado.html", sessoes=sessoes_ativas,
-                           padroes_labels=PADROES_LABELS, alunos=carregar_alunos())
+                           padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
+                           tem_referencia=bool(referencia_ativa),
+                           n_ref_sessoes=len(referencia_ativa))
+
+# ══════════════════════════════════════════════════════════════
+# ROTAS — REFERÊNCIA
+# ══════════════════════════════════════════════════════════════
+
+@app.route("/referencia/carregar/<reg_id>", methods=["POST"])
+def referencia_carregar(reg_id):
+    global referencia_ativa, referencia_meta
+    historico = carregar_historico()
+    reg = next((r for r in historico if r["id"] == reg_id), None)
+    if not reg:
+        return "Registro não encontrado", 404
+    referencia_ativa = [_dict_to_sessao(s) for s in reg["sessoes"]]
+    referencia_meta = {
+        "etiqueta": reg.get("etiqueta", ""),
+        "aluno": reg.get("aluno", "—"),
+        "data": reg.get("data", "—"),
+        "id": reg_id,
+    }
+    return render_template("_referencia.html",
+                           ref_sessoes=referencia_ativa,
+                           ref_meta=referencia_meta,
+                           padroes_labels=PADROES_LABELS,
+                           n_sessoes_ativas=len(sessoes_ativas))
+
+@app.route("/referencia/carregar-ativo", methods=["POST"])
+def referencia_carregar_ativo():
+    global referencia_ativa, referencia_meta
+    if not sessoes_ativas:
+        return '<p class="aviso">Nenhum treino ativo para usar como referência.</p>'
+    referencia_ativa = copy.deepcopy(sessoes_ativas)
+    referencia_meta = {
+        "etiqueta": "Sessão atual",
+        "aluno": "—",
+        "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+    }
+    return render_template("_referencia.html",
+                           ref_sessoes=referencia_ativa,
+                           ref_meta=referencia_meta,
+                           padroes_labels=PADROES_LABELS,
+                           n_sessoes_ativas=len(sessoes_ativas))
+
+@app.route("/referencia/clonar", methods=["POST"])
+def referencia_clonar():
+    global sessoes_ativas, configs_geradas
+    if not referencia_ativa:
+        return '<p class="aviso">Nenhuma referência carregada.</p>'
+    sessoes_ativas = copy.deepcopy(referencia_ativa)
+    configs_geradas = []
+    salvar_sessoes_disco()
+    return render_template("_resultado.html", sessoes=sessoes_ativas,
+                           padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
+                           tem_referencia=True, n_ref_sessoes=len(referencia_ativa))
+
+@app.route("/referencia/limpar", methods=["POST"])
+def referencia_limpar():
+    global referencia_ativa, referencia_meta
+    referencia_ativa = []
+    referencia_meta = {}
+    return ""
+
+@app.route("/referencia/copiar-bloco/<int:ref_t>/<int:ref_bi>/para/<int:dest_t>", methods=["POST"])
+def referencia_copiar_bloco(ref_t, ref_bi, dest_t):
+    global sessoes_ativas
+    if ref_t >= len(referencia_ativa) or dest_t >= len(sessoes_ativas):
+        return "", 404
+    bloco_ref = referencia_ativa[ref_t].blocos[ref_bi]
+    bloco_novo = copy.deepcopy(bloco_ref)
+    labels = "ABCDEFGHIJKLMNOP"
+    n = len(sessoes_ativas[dest_t].blocos)
+    bloco_novo.label = labels[n] if n < len(labels) else str(n + 1)
+    sessoes_ativas[dest_t].blocos.append(bloco_novo)
+    salvar_sessoes_disco()
+    return render_template("_treino_card.html", sessao=sessoes_ativas[dest_t], idx=dest_t,
+                           modo="editar", padroes_labels=PADROES_LABELS,
+                           alunos=carregar_alunos(),
+                           todos_padroes=sorted(PADROES_LABELS.keys()),
+                           todos_equipamentos=todos_equipamentos,
+                           todos_musculos=todos_musculos)
+
+@app.route("/comparar/<int:ref_t>/<int:ativo_t>")
+def comparar_treinos(ref_t, ativo_t):
+    if ref_t >= len(referencia_ativa) or ativo_t >= len(sessoes_ativas):
+        return "", 404
+    ref = referencia_ativa[ref_t]
+    ativo = sessoes_ativas[ativo_t]
+    nomes_ref = {ex.nome for b in ref.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
+    nomes_ativo = {ex.nome for b in ativo.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
+    mantidos = nomes_ref & nomes_ativo
+    removidos = nomes_ref - nomes_ativo
+    adicionados = nomes_ativo - nomes_ref
+    return render_template("_comparacao.html",
+                           ref=ref, ativo=ativo,
+                           ref_idx=ref_t, ativo_idx=ativo_t,
+                           mantidos=mantidos, removidos=removidos, adicionados=adicionados,
+                           padroes_labels=PADROES_LABELS)
 
 @app.route("/historico/<reg_id>/ver")
 def historico_ver(reg_id):

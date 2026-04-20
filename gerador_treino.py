@@ -407,24 +407,23 @@ _PADROES_BRACO = {"biceps", "triceps"}
 def _score_exercicio(e: Exercicio) -> float:
     """
     Pontuação de um exercício para fins de ordenamento de blocos.
-    Quanto maior, mais cedo o bloco deve aparecer no treino.
+    Compostos recebem base 10 + fadiga (11–15) para garantir que qualquer bloco
+    com 2 compostos pontue acima de qualquer bloco com apenas 1 composto.
     """
     if e.purpose == "compound":
-        return float(e.fadiga)          # peso total (1–5)
+        return 10.0 + float(e.fadiga)   # 11–15: composto
     if e.padrao in _PADROES_BRACO:
-        return e.fadiga * 0.1           # isolado de braço → prioridade mínima
-    return e.fadiga * 0.5               # isolado de grupo grande → prioridade média
+        return e.fadiga * 0.1           # 0.1–0.5: isolado de braço
+    return e.fadiga * 0.5               # 0.5–2.5: isolado de grupo grande
 
 
 def ordenar_blocos(blocos: list[tuple]) -> list[tuple]:
     """
-    Reordena blocos do treino por prioridade decrescente.
-
-    Critério: soma dos scores dos exercícios do bloco (ver _score_exercicio).
+    Reordena blocos por prioridade decrescente (soma dos scores).
     Resultado típico:
-      1º — bloco com 2 compostos pesados
-      2º — bloco com 1 composto + 1 isolado de grupo grande
-      último — bloco com 1 composto + 1 isolado de braço
+      1º/2º — blocos com 2 compostos (score 22–30)
+      3º    — bloco com 1 composto + 1 isolado (score 11.5–17.5)
+      último — blocos só com isolados ou isolados de braço
     """
     return sorted(blocos, key=lambda b: sum(_score_exercicio(e) for e in b), reverse=True)
 
@@ -462,13 +461,14 @@ def _buscar_candidato(
       P4: qualquer válido
 
     Dentro de cada prioridade, sub-preferências qualitativas (melhor → pior):
-      1. Não-agonista E contrasta purpose  (ex: pull âncora → push isolation parceiro)
-      2. Não-agonista                      (evita agonistas mesmo sem contraste de purpose)
-      3. Contrasta purpose                 (compound↔isolation, mesmo que agonista)
-      4. Sem restrição adicional           (fallback)
+      1. Não-agonista E preferido (parceiro composto)
+      2. Não-agonista
+      3. Preferido (parceiro composto)
+      4. Sem restrição adicional (fallback)
 
     "Não-agonista": o candidato não pertence ao mesmo grupo push/pull do âncora.
-    "Contrasta purpose": compound↔isolation.
+    "Preferido": candidato com purpose == "compound" — compostos procuram parceiros
+    compostos para formar blocos pesados; isolados também buscam compostos como parceiros.
     Se evitar_agonistas=False, a regra de agonistas é ignorada.
     Se evitar_unilateral=True e já há um unilateral no bloco, candidatos unilaterais
     são ignorados (mas usados no último fallback se necessário).
@@ -500,8 +500,11 @@ def _buscar_candidato(
         g = GRUPO_MUSCULAR_PADRAO.get(exercicios[j].padrao)
         return g not in grupos_no_bloco
 
-    def contrasta(j: int) -> bool:
-        return anchor_purpose is not None and exercicios[j].purpose != anchor_purpose
+    def preferido(j: int) -> bool:
+        # Compostos são sempre o parceiro ideal, independente do purpose do âncora.
+        # Para âncora composta: forma blocos compound+compound (mais pesados primeiro).
+        # Para âncora isolada: puxa um composto para o bloco (superset equilibrado).
+        return exercicios[j].purpose == "compound"
 
     def _primeiro(geo_fn, extra_fn) -> int | None:
         for j in range(n):
@@ -516,9 +519,9 @@ def _buscar_candidato(
     p4 = lambda j: True
 
     # Sub-preferências qualitativas
-    sub1 = lambda j: nao_agonista(j) and contrasta(j)
+    sub1 = lambda j: nao_agonista(j) and preferido(j)
     sub2 = lambda j: nao_agonista(j)
-    sub3 = lambda j: contrasta(j)
+    sub3 = lambda j: preferido(j)
     sub4 = lambda j: True
 
     for geo in [p1, p2, p3, p4]:

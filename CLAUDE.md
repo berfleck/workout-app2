@@ -6,81 +6,56 @@ Contexto permanente para o Claude Code. Atualizar sempre que houver decisões de
 
 ## Visão geral
 
-App Flask + HTMX (Python) para personal trainer gerar, editar e exportar sessões de treino personalizadas. Roda localmente, sem servidor, sem nuvem. Todos os dados persistem em arquivos locais (JSON + XLSX).
+App Flask + HTMX (Python) para personal trainer gerar, editar e exportar sessões de treino personalizadas. Roda localmente, sem servidor, sem nuvem. Dados persistem em arquivos locais (JSON + XLSX).
 
-**Migrado de Streamlit para Flask + HTMX** em abril/2026 para ganhar controle total sobre a interface, eliminar o rerun do script inteiro a cada interação, e permitir adição futura de JavaScript para funcionalidades como drag-and-drop, filtros instantâneos e comparação visual de treinos.
+**Stack:** Flask backend + templates Jinja2 + HTMX para requisições parciais sem reload. Cada ação do usuário faz um POST/GET e o servidor devolve apenas o trecho de HTML afetado.
 
 ---
 
 ## Estrutura de arquivos
 
 ```
-app_flask.py              — Backend Flask: todas as rotas (~530 linhas)
-gerador_treino.py         — Lógica de geração de treinos (~1070 linhas, inalterado da versão Streamlit)
-gerar_imagem.py           — Exportação de PNG (fontes DejaVu embutidas, inalterado)
+app_flask.py              — Backend Flask: todas as rotas
+gerador_treino.py         — Lógica de geração de treinos (inalterado da versão Streamlit)
+gerar_imagem.py           — Exportação de PNG (Pillow + fontes DejaVu embutidas)
 banco_exercicios.xlsx     — Banco de dados de exercícios (aba "Exercícios")
-requirements.txt          — Dependências Python (flask, pandas, openpyxl, pillow)
-DejaVuSans.ttf            — Fonte para geração de imagem
-DejaVuSans-Bold.ttf       — Fonte bold para geração de imagem
+requirements.txt          — flask, pandas, openpyxl, pillow
 
-static/
-  logo.png                — Logo usada nos PNGs exportados
+static/logo.png           — Logo usada nos PNGs exportados
 
 templates/
-  base.html               — Layout base: CSS completo, navegação por abas, HTMX
-  treinos.html             — Aba Treinos: config (hierarquia + template), resultado
-  _resultado.html          — Partial HTMX: lista de treinos gerados
-  _treino_card.html        — Partial HTMX: card de 1 treino (modo visualizar e editar)
-  _substituicao.html       — Partial HTMX: lista de exercícios para substituição/adição
-  _historico_detalhe.html  — Partial HTMX: exercícios de um registro do histórico
-  alunos.html              — Aba Alunos: CRUD completo
-  historico.html           — Aba Histórico: listar, ver, carregar, apagar
+  base.html               — Layout base: CSS completo, SortableJS CDN, navegação por abas
+  treinos.html            — Aba Treinos: config (hierarquia + template), resultado
+  _resultado.html         — Partial: lista de treinos gerados
+  _treino_card.html       — Partial: card de 1 treino (modo visualizar e editar)
+  _substituicao.html      — Partial: lista de exercícios para substituição/adição
+  _historico_detalhe.html — Partial: exercícios de um registro do histórico
+  _referencia.html        — Partial: painel de referência read-only (borda azul/índigo)
+  _comparacao.html        — Partial: diff visual lado a lado (ref vs ativo)
+  alunos.html             — Aba Alunos: CRUD completo
+  historico.html          — Aba Histórico: listar, ver, carregar, apagar
 
-Gerados automaticamente pelo app:
-  alunos.json              — Cadastro de alunos
-  sessoes_salvas.json      — Snapshot das sessões ativas
-  historico_treinos.json   — Histórico salvo pelo usuário
+Gerados automaticamente:
+  alunos.json / sessoes_salvas.json / historico_treinos.json
 ```
 
 ---
 
-## Arquitetura Flask + HTMX
+## Estado do servidor
 
-### Como funciona (para quem vem do Streamlit)
-
-No Streamlit, cada clique reroda o script inteiro (1700 linhas). No Flask + HTMX:
-
-1. O **backend** (`app_flask.py`) define **rotas** — cada URL faz uma coisa específica
-2. Os **templates** (pasta `templates/`) são HTML com marcações Jinja2 (`{% for %}`, `{{ variavel }}`)
-3. O **HTMX** (biblioteca JavaScript incluída no `base.html`) faz requisições ao servidor e substitui pedaços da página sem recarregar tudo
-
-**Exemplo concreto:** quando o usuário clica "↺" para substituir um exercício:
-- O botão tem `hx-post="/treino/0/substituir/NomeDoExercicio"` e `hx-target="#treino-0"`
-- O HTMX manda um POST para essa rota
-- O Flask processa (chama `substituir_exercicio()` do `gerador_treino.py`)
-- Retorna o HTML do card atualizado (`_treino_card.html`)
-- O HTMX injeta esse HTML no lugar do card antigo — só aquele pedaço atualiza
-
-### Templates parciais (partials)
-
-Arquivos que começam com `_` são **partials** — não são páginas completas, são pedaços de HTML que o HTMX injeta dentro da página. Exemplo:
-- `_resultado.html` → injetado na div `#resultado` quando o usuário gera treinos
-- `_treino_card.html` → injetado na div `#treino-0` quando substitui/regera/edita
-
-### Estado
-
-- **Sessões ativas:** variável global `sessoes_ativas` no `app_flask.py` (lista de `Sessao`)
-- **Configs geradas:** variável global `configs_geradas` (para regerar com mesma config)
-- **Persistência:** salvo em `sessoes_salvas.json` a cada modificação via `salvar_sessoes_disco()`
-- **Sem session_state:** não existe o conceito de `st.session_state`. O estado da UI é gerenciado pelo DOM (HTML na página) e pelo servidor
+- `sessoes_ativas` — lista de `Sessao` (variável global em `app_flask.py`)
+- `configs_geradas` — config usada para regerar com mesma seleção
+- `referencia_ativa` — lista de `Sessao` carregada como referência read-only (não persiste em disco)
+- `referencia_meta` — dict `{"etiqueta", "aluno", "data", "id"}` da referência ativa
+- Persistência: `salvar_sessoes_disco()` salva em `sessoes_salvas.json` a cada modificação
 
 ---
 
-## Estruturas de dados principais (inalteradas)
+## Estruturas de dados
 
 ### `Exercicio` (dataclass)
 Campos do banco: `nome`, `variacao_de`, `eq_primario`, `eq_secundario`, `regiao`, `subregiao`, `padrao`, `purpose`, `unilateral`, `complexidade` (1-5), `fadiga` (1-5), `circuito`, `similaridade`, `musculo_primario`, `obs`
-Campos de prescrição (definidos na UI): `series`, `reps` (str, ex: "8-12"), `rir` (0-4)
+Campos de prescrição: `series`, `reps` (str, ex: "8-12"), `rir` (0-4)
 
 ### `SuperSerie` (dataclass)
 `label` (A/B/C...), `ex1`, `ex2` (opcional), `ex3` (opcional)
@@ -93,76 +68,69 @@ Campos de prescrição (definidos na UI): `series`, `reps` (str, ex: "8-12"), `r
 ## Rotas do Flask (`app_flask.py`)
 
 ### Páginas
-
 | Rota | Método | O que faz |
 |------|--------|-----------|
 | `/` | GET | Página principal (aba Treinos) |
-| `/alunos` | GET | Aba Alunos (HTMX injeta no tab) |
-| `/historico` | GET | Aba Histórico (HTMX injeta no tab) |
+| `/alunos` | GET | Aba Alunos |
+| `/historico` | GET | Aba Histórico |
 
-### Geração de treinos
-
+### Geração
 | Rota | Método | O que faz |
 |------|--------|-----------|
 | `/gerar` | POST | Gera treinos (hierarquia ou template). Retorna `_resultado.html` |
 
-Parâmetros do form:
-- `modo` = "hierarquia" ou "template"
-- `n_treinos`, `max_complexidade`, `tamanho_bloco`
-- `variar_entre` (checkbox), `evitar_agonistas` (checkbox)
-- Hierarquia: `dem_nivel_0_N`, `dem_escopo_0_N`, `dem_qtd_0_N` (N = índice da demanda)
-- Template: `template_0` (nome), `epp_0_PADRAO` (sliders)
-- Lateralidade: `squat_bi_0`, `squat_uni_0`
-- Exercícios fixos: `fixos_0` (nomes separados por vírgula)
+Parâmetros: `modo`, `n_treinos`, `max_complexidade`, `tamanho_bloco`, `variar_entre`, `evitar_agonistas`, demandas (`dem_nivel_0_N` / `dem_escopo_0_N` / `dem_qtd_0_N`), EPP (`epp_0_PADRAO`), lateralidade squat (`squat_bi_0` / `squat_uni_0`), exercícios fixos (`fixos_0`).
 
 ### Ações por treino
-
 | Rota | Método | O que faz |
 |------|--------|-----------|
-| `/treino/<t>/visualizar` | GET | Retorna card modo visualizar |
-| `/treino/<t>/editar` | GET | Retorna card modo editar |
+| `/treino/<t>/visualizar` | GET | Card modo visualizar |
+| `/treino/<t>/editar` | GET | Card modo editar |
 | `/treino/<t>/regerar` | POST | Regera treino respeitando os outros |
 | `/treino/<t>/substituir/<nome>` | POST | Substitui exercício aleatoriamente |
 | `/treino/<t>/substituir-por/<atual>/<novo>` | POST | Substitui por exercício específico |
 | `/treino/<t>/prescricao/<bi>/<ei>` | POST | Salva séries/reps/RIR |
 | `/treino/<t>/bloco/<bi>/mover/<up\|down>` | POST | Reordena bloco |
 | `/treino/<t>/bloco/<bi>/deletar` | POST | Remove bloco |
-| `/treino/<t>/bloco/<bi>/adicionar/<nome>` | POST | Adiciona exercício a bloco |
-| `/treino/<t>/novo-bloco/<nome>` | POST | Cria bloco novo com exercício |
+| `/treino/<t>/bloco/<bi>/adicionar/<nome>` | POST | Adiciona exercício a bloco existente |
+| `/treino/<t>/novo-bloco/<nome>` | POST | Cria novo bloco com exercício |
 | `/treino/<t>/exercicio/remover/<bi>/<ei>` | POST | Remove exercício |
-| `/buscar-exercicios` | GET | Busca exercícios com filtros (retorna HTML de radio buttons) |
+| `/treino/<t>/exercicio/mover/<bi>/<ei>/<dest_label>` | POST | Move exercício para outro bloco (usado pelo drag-and-drop) |
+| `/treino/<t>/exercicio/<bi>/<ei>/destacar` | POST | Remove do bloco e cria novo bloco isolado (drop zone) |
+| `/buscar-exercicios` | GET | Busca com filtros; retorna HTML de radio buttons |
 
 ### Downloads
-
 | Rota | Método | O que faz |
 |------|--------|-----------|
-| `/treino/<t>/png/<aluno>` | GET | Download PNG de 1 treino |
+| `/treino/<t>/png/<aluno>` | GET | Download PNG |
 | `/treinos/zip/<aluno>` | GET | Download ZIP de todos os treinos |
 
-### Alunos
+### Referência
+| Rota | Método | O que faz |
+|------|--------|-----------|
+| `/referencia/carregar/<reg_id>` | POST | Carrega sessões de um registro do histórico para `referencia_ativa`. Retorna `_referencia.html` |
+| `/referencia/carregar-ativo` | POST | Copia `sessoes_ativas` → `referencia_ativa`. Retorna `_referencia.html` |
+| `/referencia/limpar` | POST | Limpa `referencia_ativa`. Retorna string vazia (limpa `#ref-container`) |
+| `/referencia/clonar` | POST | `deepcopy` de `referencia_ativa` → `sessoes_ativas`. Retorna `_resultado.html` |
+| `/referencia/copiar-bloco/<ref_t>/<ref_bi>/para/<dest_t>` | POST | Copia bloco da referência para o final do treino ativo. Retorna `_treino_card.html` em modo editar |
+| `/comparar/<ref_t>/<ativo_t>` | GET | Diff de exercícios entre ref e ativo. Retorna `_comparacao.html` |
 
+### Alunos / Histórico
 | Rota | Método | O que faz |
 |------|--------|-----------|
 | `/alunos/novo` | POST | Cria aluno |
 | `/alunos/<i>/editar` | POST | Edita aluno |
 | `/alunos/<i>/deletar` | DELETE | Remove aluno |
-
-### Histórico
-
-| Rota | Método | O que faz |
-|------|--------|-----------|
-| `/historico/salvar` | POST | Salva sessões ativas no histórico |
-| `/historico/<id>/ver` | GET | Mostra exercícios de um registro |
-| `/historico/<id>/carregar` | POST | Carrega registro para edição |
+| `/historico/salvar` | POST | Salva sessões ativas |
+| `/historico/<id>/ver` | GET | Exercícios de um registro |
+| `/historico/<id>/carregar` | POST | Carrega para edição |
 | `/historico/<id>/apagar` | DELETE | Remove registro |
 
 ---
 
-## Lógica de geração (`gerador_treino.py`) — inalterada
+## Lógica de geração (`gerador_treino.py`)
 
-### Hierarquia de classificação dos exercícios
-
-Três níveis. Cada exercício pertence a UM padrão; padrão deriva subregião e região via mapeamento canônico.
+### Hierarquia de classificação
 
 | Região | Subregiões | Padrões |
 |---|---|---|
@@ -179,124 +147,103 @@ Três níveis. Cada exercício pertence a UM padrão; padrão deriva subregião 
 
 ### Dois modos de geração
 
-**1. `gerar_sessao()` (modo legado, usado por Templates)**
-Recebe lista plana de padrões + `exercicios_por_padrao` (EPP).
+**`gerar_sessao()`** (modo legado, Templates): recebe lista de padrões + EPP (int ou dict de lateralidade por padrão).
 
-**2. `gerar_sessao_por_demandas()` (modo principal, usado pelo modo Hierarquia)**
-Recebe lista de demandas `[(nivel, escopo, quantidade)]`. Para demandas de nível "regiao", aplica regra de proporção 60% compostos.
-
-### Lateralidade — Agachamento
-EPP aceita dois formatos: `int` (ex: `{"squat": 2}`) ou `dict` de lateralidade (ex: `{"squat": {"bilateral": 1, "unilateral": 1}}`). Quando dict, o gerador filtra candidatos pela coluna `unilateral` do banco.
+**`gerar_sessao_por_demandas()`** (modo principal, Hierarquia): recebe `[(nivel, escopo, quantidade)]`. Demandas de região aplicam proporção mínima 60% compostos (`PROPORCAO_COMPOSTOS = 0.6`).
 
 ### Fluxo de geração
-1. Seleciona exercícios por padrão respeitando similaridade
-2. Ordena compostos primeiro por fadiga decrescente
-3. Monta blocos evitando agonistas, regiões iguais, e fadiga excessiva
-4. Ordena blocos por peso (compostos pesados primeiro, isolados de braço por último)
-5. `gerar_multiplos_treinos()` — 3 camadas de bloqueio entre treinos: nomes, variações (bidirecional), similaridade
+1. Seleciona exercícios por padrão respeitando similaridade (`selecionar_sem_repeticao_similaridade`)
+2. `ordenar_compostos_primeiro()` — compostos por fadiga desc, depois isolados por fadiga desc
+3. `montar_blocos()` — compostos buscam parceiros compostos primeiro (`preferido = purpose == "compound"`); geo-diversidade (P1: região E padrão diferentes) tem prioridade sobre qualidade de pareamento
+4. `ordenar_blocos()` — score: composto = `10 + fadiga` (11–15); isolado grupo grande = `fadiga × 0.5`; isolado braço = `fadiga × 0.1`. Garante que 2 compostos sempre precedem 1 composto + isolado
+5. `gerar_multiplos_treinos()` — 3 camadas de bloqueio entre treinos: nomes exatos, variações via `variacao_de` (bidirecional), similaridade (opcional)
 
 ---
 
 ## Funcionalidades implementadas
 
-### Aba Treinos
-- **Modo Hierarquia** (3 níveis expansíveis: Região → Subregião → Padrão)
-  - Comportamento A: marcar pai = atalho; filhos específicos substituem o pai
-  - 1 slider por checkbox marcado
-  - Lateralidade squat (bilateral/unilateral) quando squat está selecionado
-- **Modo Template**: templates pré-definidos com sliders EPP + lateralidade squat
-- Configurações gerais: nº de treinos, exerc./bloco, complexidade máx., aluno PNG
-- Checkboxes: evitar similaridade entre treinos, evitar agonistas no bloco
-- **Resultado**: cards por treino com visualizar/editar/regerar/PNG
-- **Modo Editar**: substituir (aleatório), remover exercício, reordenar blocos (↑↓), deletar bloco, adicionar exercício a bloco, criar novo bloco, edição de prescrição inline (séries × reps × RIR)
-- Salvar no histórico com etiqueta
-- Download PNG e ZIP
+### Aba Treinos — Modo Editar
+- Substituir exercício (aleatório ↺) ou remover (✕)
+- Prescrição inline (séries × reps · RIR) diretamente na linha do exercício — badge exibido só no modo visualizar
+- **Drag-and-drop** (SortableJS): arrastar exercício entre blocos; soltar na drop zone cria novo bloco isolado
+- Reordenar blocos (↑↓), deletar bloco (🗑)
+- Adicionar exercício a bloco existente, criar novo bloco via painel de busca
 
-### Aba Alunos
-- CRUD completo: nome, nível, objetivo, restrições, observações
-- Edição inline com formulário que aparece abaixo do card
-- Dados persistidos em `alunos.json`
+### Aba Treinos — Configuração
+- **Modo Hierarquia**: 3 níveis (Região → Subregião → Padrão), 1 slider por escopo selecionado
+- **Modo Template**: sliders EPP por padrão
+- Lateralidade squat (bilateral/unilateral)
+- Exercícios fixos por treino (backend suporta `fixos_0`; UI ainda não implementada)
+- Download PNG por treino, ZIP de todos os treinos
 
-### Aba Histórico
-- Lista registros com data, aluno, nº de treinos
-- Ver treinos de um registro (lazy load via HTMX)
-- Carregar registro para edição na aba Treinos
-- Apagar registro
+### Aba Alunos / Histórico
+- CRUD alunos com edição inline
+- Histórico: ver, carregar para edição, apagar
 
 ---
 
 ## Decisões técnicas e convenções
 
-- **Framework:** Flask + HTMX (migrado de Streamlit em abril/2026)
-- **Persistência:** JSON puro (sem banco de dados por enquanto — ver Roadmap)
-- **Exportação:** PNG gerado via Pillow com fontes DejaVu embutidas
-- **Estado do servidor:** variáveis globais `sessoes_ativas` e `configs_geradas` no `app_flask.py`
-- **CSS:** todo centralizado no `base.html` dentro de `<style>` (~200 linhas)
-- **JavaScript:** mínimo necessário — funções para alternar modos, montar demandas dinamicamente, e lateralidade. HTMX cuida de toda a comunicação com o servidor
-- **Cores:** laranja primário `#e85d04`, fundo cinza claro `#f9fafb`
-- **Fonte UI:** DM Sans (Google Fonts via CDN)
-- **HTMX:** versão 2.0.4 via CDN (unpkg.com)
-- **Sem sidebar:** layout max-width 960px centralizado
+- **CSS:** centralizado em `base.html` dentro de `<style>`
+- **JavaScript:** mínimo — `showTab`, montagem de demandas, lateralidade, SortableJS init. HTMX faz toda comunicação servidor
+- **SortableJS 1.15.3** via CDN em `base.html`. A função `initSortable(t)` no final de `_treino_card.html` inicializa as zonas sortáveis — roda na carga inicial e re-roda após cada swap HTMX (scripts em HTML swapped executam automaticamente no HTMX 2.x)
+- **`hx-include`** exige atributo `name` nos inputs/selects para serializar corretamente — sem `name`, o valor não é enviado ao servidor
+- **`/buscar-exercicios`**: resultados ordenados alfabeticamente, sem limite de quantidade; container com `max-height: 240px; overflow-y: auto`
+- **Cores:** laranja `#e85d04`, fundo `#f9fafb`
+- **Fonte UI:** DM Sans (Google Fonts)
+- **HTMX:** 2.0.4 via unpkg.com
 
 ### Convenções de templates
-- Arquivos com `_` no início são **partials** (pedaços injetados pelo HTMX)
-- `treinos.html` estende `base.html` via `{% extends %}` / `{% block %}`
-- `alunos.html` e `historico.html` são carregados via HTMX dentro das divs de abas
-
-### Atributos HTMX mais usados
-- `hx-get="/rota"` — faz GET quando clicado
-- `hx-post="/rota"` — faz POST quando clicado
-- `hx-delete="/rota"` — faz DELETE
-- `hx-target="#id"` — onde injetar a resposta
-- `hx-swap="innerHTML"` — substitui o conteúdo interno do target
-- `hx-trigger="load"` — dispara automaticamente ao carregar
-- `hx-confirm="Texto"` — mostra confirmação antes de executar
-- `hx-indicator="#id"` — mostra elemento enquanto carrega
-- `hx-include="#id"` — inclui valores de outros elementos no request
+- Arquivos com `_` são **partials** injetados pelo HTMX
+- `treinos.html` estende `base.html` via `{% extends %}`
+- `alunos.html` e `historico.html` carregados via HTMX nas divs de abas
 
 ---
 
-## Roadmap / Funcionalidades futuras
+## Roadmap
 
-### Melhorias de UI (curto prazo)
-- Exercícios fixos: o backend suporta (`fixos_0` no form), mas a UI de busca/fixar ainda não foi criada nos templates
-- Mover exercício entre blocos: o backend suporta (`/treino/<t>/exercicio/mover/...`), mas falta botão na UI do modo editar
-- Substituição por escolha manual: o backend suporta (`/substituir-por/`), mas o painel de busca com filtros e radio buttons no modo editar ainda não está conectado (hoje só faz substituição aleatória pelo botão ↺)
-- Download ZIP: rota existe, falta botão na UI quando há múltiplos treinos e aluno selecionado
+### Funcionalidades implementadas — Copiar Bloco + Diff Visual (Fase 3)
+- No painel de referência, cada bloco tem botão "➡ Copiar": 1 treino ativo → botão direto; múltiplos → select + botão. Usa `copiarBloco(refT, blocoIdx, destT)` definida em `base.html` via `htmx.ajax`
+- `/referencia/copiar-bloco/<ref_t>/<ref_bi>/para/<dest_t>` (POST): deepcopy do bloco + append ao treino ativo; retorna `_treino_card.html` em modo editar
+- `/comparar/<ref_t>/<ativo_t>` (GET): compara nomes de exercícios; retorna `_comparacao.html` com sets `mantidos`, `removidos`, `adicionados`
+- `_comparacao.html`: grid 2 colunas, exercícios coloridos (vermelho = removido da ref, verde = adicionado no ativo)
+- `_resultado.html`: seção "🔍 Comparar com referência" (visível só quando `tem_referencia`); botões por par de treino limitados por `n_ref_sessoes`
+- `n_sessoes_ativas` passado ao `_referencia.html`; `n_ref_sessoes` passado ao `_resultado.html` por todas as rotas que o renderizam
+
+### Funcionalidades implementadas — Bloqueio por Referência (Fase 2)
+- `/gerar`: filtra `banco` removendo exercícios (e variações via `variacao_de`) presentes na `referencia_ativa` antes de chamar `gerar_multiplos_treinos`
+- `/treino/<t>/regerar`: aplica o mesmo filtro de referência somado ao filtro de outros treinos
+- `/treino/<t>/substituir/<nome>`: tenta substituição preferindo exercícios fora da referência; fallback para banco completo se filtrado estiver vazio
+- `/buscar-exercicios`: exercícios da referência recebem badge "REF" com opacidade reduzida (não bloqueados — usuário pode escolher)
+- `/treino/<t>/buscar-substitutos/<nome>`: mesma lógica de badge REF via `nomes_ref` passado ao `_substituicao.html`
+
+### Funcionalidades implementadas — Painel de Referência (Fase 1)
+- Histórico → botão "📌 Referência" carrega treino em painel read-only acima do resultado (aba Treinos)
+- Painel de referência: borda índigo, colapsável por treino, mostra exercícios com prescrição/purpose/equip
+- Botão "📌 Fixar como referência" em `_resultado.html`: copia sessão atual para referência antes de gerar novos
+- Botão "📋 Clonar para edição": copia referência para `sessoes_ativas` prontos para edição
+- Botão "✕ Fechar": limpa painel
+- `#ref-container` sempre presente no DOM em `treinos.html` (permite injeção HTMX cross-tab do histórico)
+- `_resultado.html` recebe `tem_referencia=bool(referencia_ativa)` (usado nas Fases 2/3)
+
+### Curto prazo
+- UI de exercícios fixos (backend já suporta `exercicios_travados`)
+- Substituição manual por escolha: backend suporta `/substituir-por/`, falta painel conectado na UI
+- Download ZIP: rota existe, falta botão na UI
 - Restauração de sessão após reinício do servidor (ler `sessoes_salvas.json` no startup)
 
-### Periodização e histórico por aluno (próxima grande feature)
-- Alunos como entidade central (abrir aluno → ver histórico → gerar próximo treino)
+### Próxima grande feature — Periodização por aluno
+- Alunos como entidade central (histórico → gerar próximo treino)
 - Histórico vinculado ao aluno (não só etiqueta livre)
 - Geração inteligente: evitar exercícios dos últimos N treinos
 - Lista de exercícios pausados por aluno
-
-### Migração para SQLite (decisão pendente)
-- SQLite facilita consultas de histórico por aluno
-- Ainda é arquivo único na pasta do projeto
-- Recomendado implementar junto com a feature de periodização
-
-### Possibilidades com JavaScript (médio prazo)
-- Drag-and-drop para reordenar blocos (SortableJS)
-- Filtros instantâneos no browser sem request ao servidor
-- Comparar treinos lado a lado com destaque de diferenças
-- Gráficos de distribuição muscular (Chart.js)
-- Animações de transição ao substituir exercícios
+- **Decisão pendente:** continuar com JSON ou migrar para SQLite (recomendado para queries de histórico)
 
 ---
 
 ## Como rodar
 
 ```bash
-cd flask_completo
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
-
-pip install -r requirements.txt
 python app_flask.py
 ```
-
-Acesse `http://localhost:5000` no navegador.
+Acesse `http://localhost:5000`.

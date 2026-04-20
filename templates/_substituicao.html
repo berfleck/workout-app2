@@ -1,8 +1,9 @@
 <p class="meta-count">{{ cands|length }} exercício(s)</p>
 {% for e in cands %}
-<label class="ex-option">
+{% set na_ref = nomes_ref is defined and e.nome in nomes_ref %}
+<label class="ex-option" {% if na_ref %}style="opacity:0.6"{% endif %}>
     <input type="radio" name="exercicio_escolhido" value="{{ e.nome }}">
-    <span>{{ e.nome }}</span>
+    <span>{{ e.nome }}{% if na_ref %} <span class="ref-badge">REF</span>{% endif %}</span>
     <span class="ex-option-meta">{{ e.purpose }} · {{ e.eq_primario }}</span>
 </label>
 {% endfor %}
