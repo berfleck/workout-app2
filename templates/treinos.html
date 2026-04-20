@@ -104,18 +104,37 @@
             <div id="subs-{{ t }}-{{ regiao }}" style="display:none">
             {% for subregiao in subregioes.get(regiao, []) %}
                 {% set pads = padroes_ordem.get(subregiao, []) %}
+                {% set tem_refinamento = pads|length > 1 or subregiao == 'perna_anterior' %}
                 <div class="hier-indent-1 hier-row">
                     <label class="check-inline">
                         <input type="checkbox" class="sub-chk" data-subregiao="{{ subregiao }}"
                                data-regiao="{{ regiao }}" onchange="updateDemandas({{ t }})">
                         <span>{{ subregioes_labels[subregiao] }}</span>
                     </label>
-                    {% if pads|length > 1 %}
+                    {% if tem_refinamento %}
                     <button type="button" class="hier-toggle" onclick="togglePads({{ t }}, '{{ subregiao }}')">▸</button>
                     {% endif %}
                 </div>
-                {% if pads|length > 1 %}
+                {% if tem_refinamento %}
                 <div id="pads-{{ t }}-{{ subregiao }}" style="display:none">
+                {% if subregiao == 'perna_anterior' %}
+                    <div class="hier-indent-2 hier-row">
+                        <label class="check-inline">
+                            <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="bilateral"
+                                   data-subregiao="perna_anterior" data-regiao="lower"
+                                   onchange="updateDemandas({{ t }})">
+                            <span>Agachamento bilateral</span>
+                        </label>
+                    </div>
+                    <div class="hier-indent-2 hier-row">
+                        <label class="check-inline">
+                            <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="unilateral"
+                                   data-subregiao="perna_anterior" data-regiao="lower"
+                                   onchange="updateDemandas({{ t }})">
+                            <span>Agachamento unilateral</span>
+                        </label>
+                    </div>
+                {% else %}
                 {% for pad in pads %}
                     <div class="hier-indent-2 hier-row">
                         <label class="check-inline">
@@ -126,6 +145,7 @@
                         </label>
                     </div>
                 {% endfor %}
+                {% endif %}
                 </div>
                 {% endif %}
             {% endfor %}
@@ -319,10 +339,43 @@ function selectTemplate(t, nome) {
     });
 }
 
+function capturarValoresAtuais(t) {
+    // Preserva valores por chave nivel:escopo:lat (não por índice)
+    const prev = {};
+    qsa(t, `input[name^="dem_qtd_${t}_"]`).forEach(inp => {
+        const i = inp.name.substring(('dem_qtd_' + t + '_').length);
+        const nivelInp = qs(t, `input[name="dem_nivel_${t}_${i}"]`);
+        const escopoInp = qs(t, `input[name="dem_escopo_${t}_${i}"]`);
+        if (nivelInp && escopoInp) {
+            prev[`${nivelInp.value}:${escopoInp.value}`] = inp.value;
+        }
+    });
+    const biInp = qs(t, `input[name="squat_bi_${t}"]`);
+    const uniInp = qs(t, `input[name="squat_uni_${t}"]`);
+    // Apenas sliders visíveis (type=range) preservam valor — hidden "0" não deve sobrescrever default
+    if (biInp && biInp.type === 'range') prev['__squat_bi'] = biInp.value;
+    if (uniInp && uniInp.type === 'range') prev['__squat_uni'] = uniInp.value;
+    return prev;
+}
+
 function updateDemandas(t) {
+    const prev = capturarValoresAtuais(t);
+
     const demandas = [];
     const padsMarcados = {};
     const subsMarcadas = {};
+    // Lateralidade refinamento: { padrao: [{lat, subregiao}] }
+    const latsMarcadas = {};
+    const latsPorSubregiao = {};
+
+    qsa(t, '.lat-chk:checked').forEach(chk => {
+        const pad = chk.dataset.padrao;
+        const sub = chk.dataset.subregiao;
+        const lat = chk.dataset.lat;
+        if (!latsMarcadas[pad]) latsMarcadas[pad] = [];
+        latsMarcadas[pad].push(lat);
+        if (!latsPorSubregiao[sub]) latsPorSubregiao[sub] = true;
+    });
 
     qsa(t, '.pad-chk:checked').forEach(chk => {
         const sub = chk.dataset.subregiao;
@@ -334,20 +387,31 @@ function updateDemandas(t) {
         const reg = chk.dataset.regiao;
         const sub = chk.dataset.subregiao;
         if (!subsMarcadas[reg]) subsMarcadas[reg] = [];
-        if (!padsMarcados[sub] || padsMarcados[sub].length === 0) {
+        const temPad = padsMarcados[sub] && padsMarcados[sub].length > 0;
+        const temLat = !!latsPorSubregiao[sub];
+        if (!temPad && !temLat) {
             subsMarcadas[reg].push(sub);
         }
     });
 
+    // Demandas de padrão (normais)
     for (const [sub, pads] of Object.entries(padsMarcados)) {
         for (const p of pads) {
             demandas.push({nivel: 'padrao', escopo: p, label: PADROES_LABELS[p] || p, default: 1});
         }
     }
+    // Demandas vindas de refinamento lateralidade (uma por padrão, mesmo que 2 lats)
+    for (const [pad, lats] of Object.entries(latsMarcadas)) {
+        demandas.push({
+            nivel: 'padrao', escopo: pad,
+            label: PADROES_LABELS[pad] || pad,
+            default: 1, lats: lats
+        });
+    }
 
     for (const [reg, subs] of Object.entries(subsMarcadas)) {
         for (const sub of subs) {
-            demandas.push({nivel: 'subregiao', escopo: sub, label: SUBREGIOES_LABELS_JS[sub] || sub, default: 2});
+            demandas.push({nivel: 'subregiao', escopo: sub, label: SUBREGIOES_LABELS_JS[sub] || sub, default: 1});
         }
     }
 
@@ -358,8 +422,12 @@ function updateDemandas(t) {
             const subChk = qs(t, `.sub-chk[data-subregiao="${sub}"][data-regiao="${reg}"]`);
             return subChk && padsMarcados[sub] && padsMarcados[sub].length > 0;
         });
-        if (!temSubs && !temPads) {
-            demandas.push({nivel: 'regiao', escopo: reg, label: REGIOES_LABELS_JS[reg] || reg, default: 6});
+        const temLats = Object.keys(latsPorSubregiao).some(sub => {
+            const subChk = qs(t, `.sub-chk[data-subregiao="${sub}"][data-regiao="${reg}"]`);
+            return !!subChk;
+        });
+        if (!temSubs && !temPads && !temLats) {
+            demandas.push({nivel: 'regiao', escopo: reg, label: REGIOES_LABELS_JS[reg] || reg, default: 1});
         }
     });
 
@@ -368,54 +436,68 @@ function updateDemandas(t) {
     if (demandas.length > 0) {
         html = '<p style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.07em;margin:14px 0 4px">Quantos exercícios de cada grupo</p><div class="demandas-grid">';
         demandas.forEach((d, i) => {
-            const existing = qs(t, `input[name="dem_qtd_${t}_${i}"]`);
-            const val = existing ? existing.value : d.default;
-            html += `<div class="campo">
-                <label>${d.label}</label>
-                <div class="range-row">
-                    <input type="range" name="dem_qtd_${t}_${i}" min="0" max="12" step="1" value="${val}"
-                           oninput="this.nextElementSibling.textContent=this.value">
-                    <span class="range-value">${val}</span>
-                </div>
-            </div>`;
-            hidden += `<input type="hidden" name="dem_nivel_${t}_${i}" value="${d.nivel}">`;
-            hidden += `<input type="hidden" name="dem_escopo_${t}_${i}" value="${d.escopo}">`;
+            const key = `${d.nivel}:${d.escopo}`;
+
+            if (d.lats) {
+                // Demanda de squat via lateralidade: 1 ou 2 sliders por lat
+                const biActive = d.lats.includes('bilateral');
+                const uniActive = d.lats.includes('unilateral');
+                const biVal = biActive ? (prev['__squat_bi'] !== undefined ? prev['__squat_bi'] : d.default) : 0;
+                const uniVal = uniActive ? (prev['__squat_uni'] !== undefined ? prev['__squat_uni'] : d.default) : 0;
+                const total = parseInt(biVal) + parseInt(uniVal);
+                if (biActive) {
+                    html += `<div class="campo">
+                        <label>Agachamento bilateral</label>
+                        <div class="range-row">
+                            <input type="range" name="squat_bi_${t}" min="0" max="8" step="1" value="${biVal}"
+                                   oninput="this.nextElementSibling.textContent=this.value; updateSquatTotal(${t}, ${i})">
+                            <span class="range-value">${biVal}</span>
+                        </div>
+                    </div>`;
+                } else {
+                    hidden += `<input type="hidden" name="squat_bi_${t}" value="0">`;
+                }
+                if (uniActive) {
+                    html += `<div class="campo">
+                        <label>Agachamento unilateral</label>
+                        <div class="range-row">
+                            <input type="range" name="squat_uni_${t}" min="0" max="8" step="1" value="${uniVal}"
+                                   oninput="this.nextElementSibling.textContent=this.value; updateSquatTotal(${t}, ${i})">
+                            <span class="range-value">${uniVal}</span>
+                        </div>
+                    </div>`;
+                } else {
+                    hidden += `<input type="hidden" name="squat_uni_${t}" value="0">`;
+                }
+                hidden += `<input type="hidden" name="dem_nivel_${t}_${i}" value="${d.nivel}">`;
+                hidden += `<input type="hidden" name="dem_escopo_${t}_${i}" value="${d.escopo}">`;
+                hidden += `<input type="hidden" name="dem_qtd_${t}_${i}" value="${total}">`;
+            } else {
+                const val = (prev[key] !== undefined) ? prev[key] : d.default;
+                html += `<div class="campo">
+                    <label>${d.label}</label>
+                    <div class="range-row">
+                        <input type="range" name="dem_qtd_${t}_${i}" min="0" max="12" step="1" value="${val}"
+                               oninput="this.nextElementSibling.textContent=this.value">
+                        <span class="range-value">${val}</span>
+                    </div>
+                </div>`;
+                hidden += `<input type="hidden" name="dem_nivel_${t}_${i}" value="${d.nivel}">`;
+                hidden += `<input type="hidden" name="dem_escopo_${t}_${i}" value="${d.escopo}">`;
+            }
         });
         html += '</div>';
     }
     qs(t, '#demandas-container-' + t).innerHTML = html;
     qs(t, '#demandas-hidden-inputs-' + t).innerHTML = hidden;
+    qs(t, '#lateralidade-container-' + t).innerHTML = '';
+}
 
-    let latHtml = '';
-    const temSquat = demandas.some(d =>
-        (d.nivel === 'padrao' && d.escopo === 'squat') ||
-        (d.nivel === 'subregiao' && d.escopo === 'perna_anterior')
-    );
-    if (temSquat) {
-        latHtml = `<details style="margin:12px 0">
-            <summary style="font-size:13px;font-weight:600;padding:8px 0">Lateralidade — Agachamento</summary>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
-                <div class="campo">
-                    <label>Bilateral</label>
-                    <div class="range-row">
-                        <input type="range" name="squat_bi_${t}" min="0" max="6" step="1" value="0"
-                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal(${t})">
-                        <span class="range-value">0</span>
-                    </div>
-                </div>
-                <div class="campo">
-                    <label>Unilateral</label>
-                    <div class="range-row">
-                        <input type="range" name="squat_uni_${t}" min="0" max="6" step="1" value="0"
-                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal(${t})">
-                        <span class="range-value">0</span>
-                    </div>
-                </div>
-            </div>
-            <p id="lat-aviso-${t}" style="font-size:11px;color:#9ca3af;margin-top:4px"></p>
-        </details>`;
-    }
-    qs(t, '#lateralidade-container-' + t).innerHTML = latHtml;
+function updateSquatTotal(t, i) {
+    const bi = parseInt((qs(t, `input[name="squat_bi_${t}"]`) || {}).value) || 0;
+    const uni = parseInt((qs(t, `input[name="squat_uni_${t}"]`) || {}).value) || 0;
+    const hidden = qs(t, `input[name="dem_qtd_${t}_${i}"]`);
+    if (hidden) hidden.value = bi + uni;
 }
 
 function checkLatTotal(t) {
@@ -433,7 +515,7 @@ function checkLatTotal(t) {
 }
 
 function resetTreino(t) {
-    qsa(t, '.reg-chk, .sub-chk, .pad-chk').forEach(c => c.checked = false);
+    qsa(t, '.reg-chk, .sub-chk, .pad-chk, .lat-chk').forEach(c => c.checked = false);
     qs(t, '#demandas-container-' + t).innerHTML = '';
     qs(t, '#demandas-hidden-inputs-' + t).innerHTML = '';
     qs(t, '#template-epp-' + t).innerHTML = '';
@@ -482,12 +564,14 @@ function copiarConfigTreino(src, dest) {
         }
     } else {
         // Hierarquia: copiar checkboxes e estado de toggle
-        qsa(src, '.reg-chk, .sub-chk, .pad-chk').forEach(srcChk => {
+        qsa(src, '.reg-chk, .sub-chk, .pad-chk, .lat-chk').forEach(srcChk => {
             let selector = '';
             if (srcChk.classList.contains('reg-chk')) {
                 selector = `.reg-chk[data-regiao="${srcChk.dataset.regiao}"]`;
             } else if (srcChk.classList.contains('sub-chk')) {
                 selector = `.sub-chk[data-subregiao="${srcChk.dataset.subregiao}"]`;
+            } else if (srcChk.classList.contains('lat-chk')) {
+                selector = `.lat-chk[data-padrao="${srcChk.dataset.padrao}"][data-lat="${srcChk.dataset.lat}"]`;
             } else {
                 selector = `.pad-chk[data-padrao="${srcChk.dataset.padrao}"]`;
             }
