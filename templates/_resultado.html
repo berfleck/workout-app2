@@ -45,6 +45,7 @@
     <div id="hist-feedback"></div>
 </details>
 
+<div class="resultado-grid" data-n="{{ sessoes|length }}">
 {% for sessao in sessoes %}
 <div id="treino-{{ loop.index0 }}">
     {% with idx=loop.index0, modo="visualizar" %}
@@ -52,3 +53,4 @@
     {% endwith %}
 </div>
 {% endfor %}
+</div>

@@ -59,10 +59,12 @@
 
         /* Treino card */
         .treino-card { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; margin-bottom: 16px; }
-        .treino-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+        .treino-header { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 12px; gap: 6px; }
+        .treino-titulo-linha { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; }
         .treino-titulo { font-size: 14px; font-weight: 700; }
         .treino-tipo { font-size: 11px; color: #9ca3af; }
-        .treino-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+        .treino-acoes { display: flex; gap: 4px; flex-wrap: wrap; }
+        .btn.btn-icon { padding: 4px 8px; font-size: 13px; line-height: 1; min-width: 0; }
 
         /* Blocos & exercícios */
         .bloco-label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; margin: 14px 0 6px; }
@@ -74,6 +76,20 @@
         .prescr-badge { display: inline-block; background: #fff3e6; color: #e85d04; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 700; margin-left: 6px; }
         .exercicio-acoes { display: flex; gap: 2px; flex-shrink: 0; }
         hr.thin { border: none; border-top: 1px solid #f3f4f6; margin: 8px 0; }
+
+        /* Layout lado a lado dos treinos (dentro do container; stack em mobile) */
+        .resultado-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; align-items: start; }
+        .resultado-grid[data-n="1"] { grid-template-columns: 1fr; }
+        .resultado-grid .treino-card { margin-bottom: 0; }
+
+        /* Foco de edição: card em editar estoura o container (tela cheia);
+           visualizar fica colapsado, empilhado abaixo */
+        .resultado-grid.focando-edicao { display: block; }
+        .resultado-grid.focando-edicao .treino-card { margin-bottom: 10px; }
+        .resultado-grid.focando-edicao .treino-card.modo-editar { width: 100%; }
+        .resultado-grid.focando-edicao .treino-card.modo-visualizar { padding: 10px 14px; opacity: 0.7; }
+        .resultado-grid.focando-edicao .treino-card.modo-visualizar > *:not(.treino-header) { display: none; }
+        .resultado-grid.focando-edicao .treino-card.modo-visualizar .treino-header { margin-bottom: 0; }
 
         /* Modo visualizar — compacto (sem meta, espaçamento reduzido) */
         .treino-card.modo-visualizar { padding: 14px 18px; margin-bottom: 10px; }
@@ -244,6 +260,15 @@
         document.getElementById('tab-' + name).classList.add('active');
         event.target.classList.add('active');
     }
+
+    function atualizarFocoEdicao() {
+        document.querySelectorAll('.resultado-grid').forEach(grid => {
+            const temEditar = grid.querySelector('.treino-card.modo-editar');
+            grid.classList.toggle('focando-edicao', !!temEditar);
+        });
+    }
+    document.body.addEventListener('htmx:afterSwap', atualizarFocoEdicao);
+    document.addEventListener('DOMContentLoaded', atualizarFocoEdicao);
     </script>
 </body>
 </html>

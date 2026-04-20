@@ -170,11 +170,18 @@ Parâmetros: `modo`, `n_treinos`, `max_complexidade`, `tamanho_bloco`, `variar_e
 - Adicionar exercício a bloco existente, criar novo bloco via painel de busca
 
 ### Aba Treinos — Configuração
-- **Modo Hierarquia**: 3 níveis (Região → Subregião → Padrão), 1 slider por escopo selecionado
+- **Abas por treino** (até `MAX_TREINOS=5`): cada treino tem sua própria config independente; campos sufixo `_{t}_`; botão "📋 Copiar config de Treino X → Aplicar" clona modo/checkboxes/sliders entre abas
+- **Modo Hierarquia**: 3 níveis (Região → Subregião → Padrão), 1 slider por escopo, default **1**. Valores preservados por chave `nivel:escopo` quando demandas são re-renderizadas (evita reset ao adicionar nova categoria)
 - **Modo Template**: sliders EPP por padrão
-- Lateralidade squat (bilateral/unilateral)
-- Exercícios fixos por treino (backend suporta `fixos_0`; UI ainda não implementada)
+- **Lateralidade squat** integrada como refinamento de `perna_anterior` (checkboxes `.lat-chk` "Agachamento bilateral/unilateral"): gera uma demanda `(padrao, squat, bi+uni)` + hidden `squat_bi_{t}` / `squat_uni_{t}`. No modo Template continua como expander separado
+- Exercícios fixos por treino (backend suporta `fixos_{t}`; UI ainda não implementada)
 - Download PNG por treino, ZIP de todos os treinos
+
+### Aba Treinos — Layout do resultado
+- Treinos renderizados em **grid lado a lado** (`.resultado-grid`, `auto-fit minmax(280px, 1fr)`), dentro do container 960px; quebra para stack em telas estreitas
+- **Modo visualizar compacto**: classe `.treino-card.modo-visualizar` remove meta (purpose/equip/lateralidade/fadiga/obs), reduz paddings e margens. Meta só aparece em modo editar
+- **Foco de edição**: quando qualquer card entra em `modo-editar`, o grid recebe `.focando-edicao` (listener `htmx:afterSwap` em `base.html`); card editado ocupa 100% do container e os demais colapsam mostrando só o `.treino-header`
+- Header do card: ações em ícones (`btn-icon`: 🔄 ✏️ ⬇) acima do título "Treino N · padrões"
 
 ### Aba Alunos / Histórico
 - CRUD alunos com edição inline

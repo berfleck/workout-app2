@@ -1,22 +1,20 @@
 <div class="treino-card modo-{{ modo }}">
     <div class="treino-header">
-        <div>
+        <div class="treino-acoes">
+            {% if modo == 'visualizar' %}
+            <button class="btn btn-sm btn-icon" title="Regerar" hx-post="/treino/{{ idx }}/regerar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">🔄</button>
+            <button class="btn btn-sm btn-icon" title="Editar" hx-get="/treino/{{ idx }}/editar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">✏️</button>
+            {% else %}
+            <button class="btn btn-sm btn-icon" title="Visualizar" hx-get="/treino/{{ idx }}/visualizar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">👁</button>
+            {% endif %}
+            <a class="btn btn-sm btn-icon" title="Baixar PNG" href="/treino/{{ idx }}/png/Aluno" id="dl-png-{{ idx }}"
+               onclick="this.href='/treino/{{ idx }}/png/'+(document.getElementById('sel-aluno')?.value||'Aluno')">⬇</a>
+        </div>
+        <div class="treino-titulo-linha">
             <span class="treino-titulo">Treino {{ idx + 1 }}</span>
             <span class="treino-tipo">
                 · {% for p in sessao.tipo.split(' + ') if p %}{{ padroes_labels.get(p, p) }}{% if not loop.last %} · {% endif %}{% endfor %}
             </span>
-        </div>
-        <div class="treino-acoes">
-            {% if modo == 'visualizar' %}
-            <button class="btn btn-sm" hx-post="/treino/{{ idx }}/regerar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">🔄 Regerar</button>
-            <button class="btn btn-sm" hx-get="/treino/{{ idx }}/editar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">✏️ Editar</button>
-            {% else %}
-            <button class="btn btn-sm" hx-get="/treino/{{ idx }}/visualizar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">👁 Visualizar</button>
-            {% endif %}
-            {% set aluno_nome = request.args.get('aluno', '') if request else '' %}
-            <a class="btn btn-sm" href="/treino/{{ idx }}/png/Aluno" id="dl-png-{{ idx }}"
-               onclick="this.href='/treino/{{ idx }}/png/'+(document.getElementById('sel-aluno')?.value||'Aluno')">
-                ⬇ PNG</a>
         </div>
     </div>
 
