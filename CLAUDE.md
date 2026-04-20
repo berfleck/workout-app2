@@ -45,8 +45,7 @@ Gerados automaticamente:
 
 - `sessoes_ativas` — lista de `Sessao` (variável global em `app_flask.py`)
 - `configs_geradas` — config usada para regerar com mesma seleção
-- `referencia_ativa` — lista de `Sessao` carregada como referência read-only (não persiste em disco)
-- `referencia_meta` — dict `{"etiqueta", "aluno", "data", "id"}` da referência ativa
+- `referencias` — lista de dicts, cada item = um treino fixado como referência: `{"sessao": Sessao, "origem": {"etiqueta","aluno","data","reg_id","treino_idx"}, "id_ref": str}`. Não persiste em disco. Múltiplas refs podem acumular (de sessões distintas). Helpers: `_ref_sessoes()` e `_novo_id_ref()`.
 - Persistência: `salvar_sessoes_disco()` salva em `sessoes_salvas.json` a cada modificação
 
 ---
@@ -106,14 +105,16 @@ Parâmetros: `modo`, `n_treinos`, `max_complexidade`, `tamanho_bloco`, `variar_e
 | `/treinos/zip/<aluno>` | GET | Download ZIP de todos os treinos |
 
 ### Referência
+Modelo atual = lista `referencias` com **acúmulo granular** (1 treino por vez).
 | Rota | Método | O que faz |
 |------|--------|-----------|
-| `/referencia/carregar/<reg_id>` | POST | Carrega sessões de um registro do histórico para `referencia_ativa`. Retorna `_referencia.html` |
-| `/referencia/carregar-ativo` | POST | Copia `sessoes_ativas` → `referencia_ativa`. Retorna `_referencia.html` |
-| `/referencia/limpar` | POST | Limpa `referencia_ativa`. Retorna string vazia (limpa `#ref-container`) |
-| `/referencia/clonar` | POST | `deepcopy` de `referencia_ativa` → `sessoes_ativas`. Retorna `_resultado.html` |
-| `/referencia/copiar-bloco/<ref_t>/<ref_bi>/para/<dest_t>` | POST | Copia bloco da referência para o final do treino ativo. Retorna `_treino_card.html` em modo editar |
-| `/comparar/<ref_t>/<ativo_t>` | GET | Diff de exercícios entre ref e ativo. Retorna `_comparacao.html` |
+| `/referencia/fixar/<reg_id>/<treino_idx>` | POST | Fixa 1 treino específico de um registro do histórico. Acumula em `referencias`. Retorna `_referencia.html` |
+| `/referencia/fixar-ativo/<treino_idx>` | POST | Fixa 1 treino ativo como referência. Acumula |
+| `/referencia/remover/<id_ref>` | POST | Remove 1 item específico por `id_ref` |
+| `/referencia/limpar` | POST | Limpa **todas** as referências |
+| `/referencia/clonar/<id_ref>` | POST | Clona 1 item para `sessoes_ativas` (substitui) |
+| `/referencia/copiar-bloco/<ref_t>/<ref_bi>/para/<dest_t>` | POST | `ref_t` é índice em `referencias`. Copia bloco para o treino ativo |
+| `/comparar/<ref_t>/<ativo_t>` | GET | Compara qualquer par ref×ativo (índices arbitrários). Retorna `_comparacao.html` |
 
 ### Alunos / Histórico
 | Rota | Método | O que faz |
@@ -209,29 +210,15 @@ Parâmetros: `modo`, `n_treinos`, `max_complexidade`, `tamanho_bloco`, `variar_e
 
 ## Roadmap
 
-### Funcionalidades implementadas — Copiar Bloco + Diff Visual (Fase 3)
-- No painel de referência, cada bloco tem botão "➡ Copiar": 1 treino ativo → botão direto; múltiplos → select + botão. Usa `copiarBloco(refT, blocoIdx, destT)` definida em `base.html` via `htmx.ajax`
-- `/referencia/copiar-bloco/<ref_t>/<ref_bi>/para/<dest_t>` (POST): deepcopy do bloco + append ao treino ativo; retorna `_treino_card.html` em modo editar
-- `/comparar/<ref_t>/<ativo_t>` (GET): compara nomes de exercícios; retorna `_comparacao.html` com sets `mantidos`, `removidos`, `adicionados`
-- `_comparacao.html`: grid 2 colunas, exercícios coloridos (vermelho = removido da ref, verde = adicionado no ativo)
-- `_resultado.html`: seção "🔍 Comparar com referência" (visível só quando `tem_referencia`); botões por par de treino limitados por `n_ref_sessoes`
-- `n_sessoes_ativas` passado ao `_referencia.html`; `n_ref_sessoes` passado ao `_resultado.html` por todas as rotas que o renderizam
-
-### Funcionalidades implementadas — Bloqueio por Referência (Fase 2)
-- `/gerar`: filtra `banco` removendo exercícios (e variações via `variacao_de`) presentes na `referencia_ativa` antes de chamar `gerar_multiplos_treinos`
-- `/treino/<t>/regerar`: aplica o mesmo filtro de referência somado ao filtro de outros treinos
-- `/treino/<t>/substituir/<nome>`: tenta substituição preferindo exercícios fora da referência; fallback para banco completo se filtrado estiver vazio
-- `/buscar-exercicios`: exercícios da referência recebem badge "REF" com opacidade reduzida (não bloqueados — usuário pode escolher)
-- `/treino/<t>/buscar-substitutos/<nome>`: mesma lógica de badge REF via `nomes_ref` passado ao `_substituicao.html`
-
-### Funcionalidades implementadas — Painel de Referência (Fase 1)
-- Histórico → botão "📌 Referência" carrega treino em painel read-only acima do resultado (aba Treinos)
-- Painel de referência: borda índigo, colapsável por treino, mostra exercícios com prescrição/purpose/equip
-- Botão "📌 Fixar como referência" em `_resultado.html`: copia sessão atual para referência antes de gerar novos
-- Botão "📋 Clonar para edição": copia referência para `sessoes_ativas` prontos para edição
-- Botão "✕ Fechar": limpa painel
-- `#ref-container` sempre presente no DOM em `treinos.html` (permite injeção HTMX cross-tab do histórico)
-- `_resultado.html` recebe `tem_referencia=bool(referencia_ativa)` (usado nas Fases 2/3)
+### Funcionalidades implementadas — Referência e Comparação
+- **Acúmulo granular**: usuário fixa 1 treino por vez (botão `📌 Fixar` em `_historico_detalhe.html` por treino; botões `📌 T1/T2/...` em `_resultado.html` para fixar treinos ativos). Múltiplas referências de sessões distintas podem coexistir.
+- **Painel slim colapsado** (`_referencia.html`): barra fina sempre visível (`.ref-bar`) com `<details>` **fechado por padrão**; cada item tem cabeçalho com origem + botões `📋 Clonar` e `✕ Remover este`; blocos/exercícios ficam em `<details>` aninhado. Botão `Limpar todas` separado do remover individual.
+- **Comparação qualquer-par**: `_resultado.html` usa 2 dropdowns (`#cmp-ativo`, `#cmp-ref`) + botão que chama JS `compararTreinos()` em `base.html`. Permite comparar qualquer treino ativo com qualquer referência (não mais restrito a índices iguais).
+- **Diff visual** (`_comparacao.html`): grid 2 colunas; `diff-removido` (vermelho) na coluna de referência, `diff-adicionado` (verde) na coluna ativa.
+- **Copiar bloco**: mantido (`➡ Copiar` com select de destino quando há múltiplos treinos ativos); usa `copiarBloco()` em `base.html` via `htmx.ajax`.
+- **Bloqueio na geração**: `/gerar`, `/treino/<t>/regerar`, `/treino/<t>/substituir` filtram banco removendo exercícios (e variações via `variacao_de`) da união de todas as `referencias`.
+- **Badge REF**: `/buscar-exercicios` e `/treino/<t>/buscar-substitutos/<nome>` marcam exercícios presentes na referência com opacidade reduzida (não bloqueia escolha).
+- `#ref-container` sempre presente no DOM em `treinos.html` (permite injeção HTMX cross-tab do histórico).
 
 ### Curto prazo
 - UI de exercícios fixos (backend já suporta `exercicios_travados`)

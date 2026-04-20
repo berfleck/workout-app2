@@ -3,7 +3,7 @@ BF Treinamento — Versão Flask + HTMX (completa)
 """
 
 from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify
-import random, json, copy, io, zipfile, unicodedata
+import random, json, copy, io, zipfile, unicodedata, secrets
 from pathlib import Path
 from datetime import datetime
 from gerador_treino import (
@@ -33,8 +33,14 @@ SESSOES_PATH   = Path("sessoes_salvas.json")
 # Estado em memória
 sessoes_ativas: list[Sessao] = []
 configs_geradas: list[dict] = []
-referencia_ativa: list[Sessao] = []
-referencia_meta: dict = {}
+# referencias: cada item = {"sessao": Sessao, "origem": {...}, "id_ref": str}
+referencias: list[dict] = []
+
+def _ref_sessoes():
+    return [r["sessao"] for r in referencias]
+
+def _novo_id_ref():
+    return secrets.token_hex(4)
 
 PADROES_LABELS = {
     "squat": "Agachamento", "hinge": "Extensão de quadril",
@@ -186,8 +192,8 @@ def index():
         subregiao_para_padroes=SUBREGIAO_PARA_PADROES,
         alunos=carregar_alunos(),
         sessoes=sessoes_ativas,
-        ref_sessoes=referencia_ativa,
-        ref_meta=referencia_meta,
+        referencias=referencias,
+        tem_referencia=bool(referencias),
     )
 
 # ══════════════════════════════════════════════════════════════
@@ -278,10 +284,11 @@ def gerar():
         return f"<p class='aviso'>Selecione categorias no(s) Treino(s) {', '.join(str(x) for x in vazios)}.</p>"
 
     banco_gerar = list(banco)
-    if referencia_ativa:
+    ref_sessoes = _ref_sessoes()
+    if ref_sessoes:
         nomes_ref = set()
         pais_ref = set()
-        for s in referencia_ativa:
+        for s in ref_sessoes:
             for bloco in s.blocos:
                 for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
                     if ex:
@@ -299,8 +306,8 @@ def gerar():
 
     return render_template("_resultado.html", sessoes=sessoes_ativas,
                            padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           tem_referencia=bool(referencia_ativa),
-                           n_ref_sessoes=len(referencia_ativa))
+                           tem_referencia=bool(referencias),
+                           referencias=referencias)
 
 # ══════════════════════════════════════════════════════════════
 # ROTAS — AÇÕES POR TREINO
@@ -346,10 +353,11 @@ def treino_regerar(t):
                    and e.nome not in pais_dos_outros
                    and (e.variacao_de is None or e.variacao_de not in nomes_outros)]
     # Block exercises from reference (same logic as /gerar)
-    if referencia_ativa:
+    ref_sessoes = _ref_sessoes()
+    if ref_sessoes:
         nomes_ref = set()
         pais_ref = set()
-        for s in referencia_ativa:
+        for s in ref_sessoes:
             for bloco in s.blocos:
                 for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
                     if ex:
@@ -388,8 +396,9 @@ def treino_substituir(t, nome_ex):
     global sessoes_ativas
     if t >= len(sessoes_ativas): return "", 404
     banco_subst = banco
-    if referencia_ativa:
-        nomes_ref = {ex.nome for s in referencia_ativa for b in s.blocos
+    ref_sessoes = _ref_sessoes()
+    if ref_sessoes:
+        nomes_ref = {ex.nome for s in ref_sessoes for b in s.blocos
                      for ex in [b.ex1, b.ex2, b.ex3] if ex}
         banco_sem_ref = [e for e in banco if e.nome not in nomes_ref]
         banco_subst = banco_sem_ref if banco_sem_ref else banco
@@ -434,8 +443,9 @@ def buscar_subs(t, nome_ex):
                           musculo=musculo or None, max_cx=5)
     cands = [e for e in cands if e.nome not in nomes_em_uso and e.nome != nome_ex]
 
-    nomes_ref = {ex.nome for s in referencia_ativa for b in s.blocos
-                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if referencia_ativa else set()
+    ref_sessoes = _ref_sessoes()
+    nomes_ref = {ex.nome for s in ref_sessoes for b in s.blocos
+                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if ref_sessoes else set()
 
     return render_template("_substituicao.html", cands=cands[:50], nome_ex=nome_ex, idx=t,
                            padroes_labels=PADROES_LABELS,
@@ -633,8 +643,9 @@ def buscar_exercicios():
                           musculo=musculo or None)
     cands = [e for e in cands if e.nome not in excluir]
 
-    nomes_ref = {ex.nome for s in referencia_ativa for b in s.blocos
-                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if referencia_ativa else set()
+    ref_sessoes = _ref_sessoes()
+    nomes_ref = {ex.nome for s in ref_sessoes for b in s.blocos
+                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if ref_sessoes else set()
 
     html = f"<p class='meta-count'>{len(cands)} exercício(s)</p>"
     for e in cands:
@@ -715,75 +726,94 @@ def historico_carregar(reg_id):
     salvar_sessoes_disco()
     return render_template("_resultado.html", sessoes=sessoes_ativas,
                            padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           tem_referencia=bool(referencia_ativa),
-                           n_ref_sessoes=len(referencia_ativa))
+                           tem_referencia=bool(referencias),
+                           referencias=referencias)
 
 # ══════════════════════════════════════════════════════════════
 # ROTAS — REFERÊNCIA
 # ══════════════════════════════════════════════════════════════
 
-@app.route("/referencia/carregar/<reg_id>", methods=["POST"])
-def referencia_carregar(reg_id):
-    global referencia_ativa, referencia_meta
+def _render_referencia():
+    return render_template("_referencia.html",
+                           referencias=referencias,
+                           padroes_labels=PADROES_LABELS,
+                           n_sessoes_ativas=len(sessoes_ativas))
+
+@app.route("/referencia/fixar/<reg_id>/<int:treino_idx>", methods=["POST"])
+def referencia_fixar(reg_id, treino_idx):
+    """Fixa UM treino específico de um registro do histórico como referência."""
     historico = carregar_historico()
     reg = next((r for r in historico if r["id"] == reg_id), None)
     if not reg:
         return "Registro não encontrado", 404
-    referencia_ativa = [_dict_to_sessao(s) for s in reg["sessoes"]]
-    referencia_meta = {
-        "etiqueta": reg.get("etiqueta", ""),
-        "aluno": reg.get("aluno", "—"),
-        "data": reg.get("data", "—"),
-        "id": reg_id,
-    }
-    return render_template("_referencia.html",
-                           ref_sessoes=referencia_ativa,
-                           ref_meta=referencia_meta,
-                           padroes_labels=PADROES_LABELS,
-                           n_sessoes_ativas=len(sessoes_ativas))
+    if treino_idx >= len(reg["sessoes"]):
+        return "Treino não encontrado", 404
+    sessao = _dict_to_sessao(reg["sessoes"][treino_idx])
+    referencias.append({
+        "sessao": sessao,
+        "origem": {
+            "etiqueta": reg.get("etiqueta", ""),
+            "aluno": reg.get("aluno", "—"),
+            "data": reg.get("data", "—"),
+            "reg_id": reg_id,
+            "treino_idx": treino_idx,
+        },
+        "id_ref": _novo_id_ref(),
+    })
+    return _render_referencia()
 
-@app.route("/referencia/carregar-ativo", methods=["POST"])
-def referencia_carregar_ativo():
-    global referencia_ativa, referencia_meta
-    if not sessoes_ativas:
-        return '<p class="aviso">Nenhum treino ativo para usar como referência.</p>'
-    referencia_ativa = copy.deepcopy(sessoes_ativas)
-    referencia_meta = {
-        "etiqueta": "Sessão atual",
-        "aluno": "—",
-        "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-    }
-    return render_template("_referencia.html",
-                           ref_sessoes=referencia_ativa,
-                           ref_meta=referencia_meta,
-                           padroes_labels=PADROES_LABELS,
-                           n_sessoes_ativas=len(sessoes_ativas))
+@app.route("/referencia/fixar-ativo/<int:treino_idx>", methods=["POST"])
+def referencia_fixar_ativo(treino_idx):
+    """Fixa UM treino ativo como referência."""
+    if treino_idx >= len(sessoes_ativas):
+        return "Treino não encontrado", 404
+    referencias.append({
+        "sessao": copy.deepcopy(sessoes_ativas[treino_idx]),
+        "origem": {
+            "etiqueta": "Sessão atual",
+            "aluno": "—",
+            "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "reg_id": None,
+            "treino_idx": treino_idx,
+        },
+        "id_ref": _novo_id_ref(),
+    })
+    return _render_referencia()
 
-@app.route("/referencia/clonar", methods=["POST"])
-def referencia_clonar():
+@app.route("/referencia/remover/<id_ref>", methods=["POST"])
+def referencia_remover(id_ref):
+    """Remove um item específico da lista de referências."""
+    global referencias
+    referencias = [r for r in referencias if r["id_ref"] != id_ref]
+    return _render_referencia()
+
+@app.route("/referencia/limpar", methods=["POST"])
+def referencia_limpar():
+    """Limpa TODAS as referências."""
+    global referencias
+    referencias = []
+    return ""
+
+@app.route("/referencia/clonar/<id_ref>", methods=["POST"])
+def referencia_clonar(id_ref):
+    """Clona 1 item da referência para sessoes_ativas (substituindo)."""
     global sessoes_ativas, configs_geradas
-    if not referencia_ativa:
-        return '<p class="aviso">Nenhuma referência carregada.</p>'
-    sessoes_ativas = copy.deepcopy(referencia_ativa)
+    item = next((r for r in referencias if r["id_ref"] == id_ref), None)
+    if not item:
+        return '<p class="aviso">Referência não encontrada.</p>'
+    sessoes_ativas = [copy.deepcopy(item["sessao"])]
     configs_geradas = []
     salvar_sessoes_disco()
     return render_template("_resultado.html", sessoes=sessoes_ativas,
                            padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           tem_referencia=True, n_ref_sessoes=len(referencia_ativa))
-
-@app.route("/referencia/limpar", methods=["POST"])
-def referencia_limpar():
-    global referencia_ativa, referencia_meta
-    referencia_ativa = []
-    referencia_meta = {}
-    return ""
+                           tem_referencia=bool(referencias), referencias=referencias)
 
 @app.route("/referencia/copiar-bloco/<int:ref_t>/<int:ref_bi>/para/<int:dest_t>", methods=["POST"])
 def referencia_copiar_bloco(ref_t, ref_bi, dest_t):
     global sessoes_ativas
-    if ref_t >= len(referencia_ativa) or dest_t >= len(sessoes_ativas):
+    if ref_t >= len(referencias) or dest_t >= len(sessoes_ativas):
         return "", 404
-    bloco_ref = referencia_ativa[ref_t].blocos[ref_bi]
+    bloco_ref = referencias[ref_t]["sessao"].blocos[ref_bi]
     bloco_novo = copy.deepcopy(bloco_ref)
     labels = "ABCDEFGHIJKLMNOP"
     n = len(sessoes_ativas[dest_t].blocos)
@@ -799,9 +829,9 @@ def referencia_copiar_bloco(ref_t, ref_bi, dest_t):
 
 @app.route("/comparar/<int:ref_t>/<int:ativo_t>")
 def comparar_treinos(ref_t, ativo_t):
-    if ref_t >= len(referencia_ativa) or ativo_t >= len(sessoes_ativas):
+    if ref_t >= len(referencias) or ativo_t >= len(sessoes_ativas):
         return "", 404
-    ref = referencia_ativa[ref_t]
+    ref = referencias[ref_t]["sessao"]
     ativo = sessoes_ativas[ativo_t]
     nomes_ref = {ex.nome for b in ref.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
     nomes_ativo = {ex.nome for b in ativo.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
@@ -811,6 +841,7 @@ def comparar_treinos(ref_t, ativo_t):
     return render_template("_comparacao.html",
                            ref=ref, ativo=ativo,
                            ref_idx=ref_t, ativo_idx=ativo_t,
+                           ref_origem=referencias[ref_t]["origem"],
                            mantidos=mantidos, removidos=removidos, adicionados=adicionados,
                            padroes_labels=PADROES_LABELS)
 
@@ -821,7 +852,7 @@ def historico_ver(reg_id):
     if not reg: return "Registro não encontrado", 404
     sessoes_reg = [_dict_to_sessao(s) for s in reg["sessoes"]]
     return render_template("_historico_detalhe.html", sessoes=sessoes_reg,
-                           padroes_labels=PADROES_LABELS)
+                           padroes_labels=PADROES_LABELS, reg_id=reg_id)
 
 @app.route("/historico/<reg_id>/apagar", methods=["DELETE"])
 def historico_apagar(reg_id):
@@ -882,5 +913,5 @@ def aluno_deletar(i):
 
 if __name__ == "__main__":
     print(f"✓ Banco carregado: {len(banco)} exercícios")
-    print(f"✓ Acesse: http://localhost:5000")
-    app.run(debug=True, port=5000)
+    print(f"✓ Acesse: http://localhost:5001 (ou do celular: use o IP da máquina na rede)")
+    app.run(debug=True, host="0.0.0.0", port=5001)

@@ -1,28 +1,37 @@
 <div class="separador">{{ sessoes|length }} treino{{ 's' if sessoes|length > 1 else '' }} gerado{{ 's' if sessoes|length > 1 else '' }}</div>
 
-<!-- Fixar como referência -->
-<div style="margin-bottom:8px">
+<!-- Fixar treino ativo como referência -->
+<div class="fixar-ativo-wrap" style="margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:12px;color:#6b7280">Fixar como referência:</span>
+    {% for sessao in sessoes %}
     <button class="btn btn-sm"
-            hx-post="/referencia/carregar-ativo"
+            hx-post="/referencia/fixar-ativo/{{ loop.index0 }}"
             hx-target="#ref-container"
-            hx-swap="innerHTML">📌 Fixar como referência</button>
+            hx-swap="innerHTML"
+            title="Fixar Treino {{ loop.index }} como referência">📌 T{{ loop.index }}</button>
+    {% endfor %}
 </div>
 
 <!-- Comparar com referência -->
 {% if tem_referencia %}
 <details style="margin-bottom:8px">
     <summary style="font-size:12px;cursor:pointer">🔍 Comparar com referência</summary>
-    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">
-        {% for sessao in sessoes %}
-        {% if loop.index0 < n_ref_sessoes %}
-        <button class="btn btn-sm"
-                hx-get="/comparar/{{ loop.index0 }}/{{ loop.index0 }}"
-                hx-target="#comparacao-result"
-                hx-swap="innerHTML">
-            Treino {{ loop.index }} vs Ref {{ loop.index }}
-        </button>
-        {% endif %}
-        {% endfor %}
+    <div class="compare-controls">
+        <label>Ativo
+            <select id="cmp-ativo" name="ativo_t">
+                {% for sessao in sessoes %}
+                <option value="{{ loop.index0 }}">Treino {{ loop.index }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Referência
+            <select id="cmp-ref" name="ref_t">
+                {% for r in referencias %}
+                <option value="{{ loop.index0 }}">{{ r.origem.aluno }} · T{{ (r.origem.treino_idx or 0) + 1 }} · {{ r.origem.data.split(' ')[0] if r.origem.data else '' }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="btn btn-sm btn-primary" type="button" onclick="compararTreinos()">Comparar</button>
     </div>
     <div id="comparacao-result" style="margin-top:12px"></div>
 </details>
