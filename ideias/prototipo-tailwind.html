@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protótipo — BF Treinamento com Tailwind</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['DM Sans', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            50:  '#fff7ed',
+                            100: '#fff3e6',
+                            500: '#e85d04',
+                            600: '#d4520a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'DM Sans', sans-serif; }
+        /* Acordeão nativo com <details> customizado */
+        details > summary { list-style: none; cursor: pointer; }
+        details > summary::-webkit-details-marker { display: none; }
+        details[open] > summary .chevron { transform: rotate(90deg); }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+
+<!-- Header -->
+<header class="border-b border-gray-200 bg-white sticky top-0 z-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-brand-500 text-white grid place-items-center font-bold text-sm">BF</div>
+        <div class="min-w-0">
+            <h1 class="text-sm sm:text-base font-bold tracking-tight truncate">BF Treinamento</h1>
+            <p class="text-[10px] sm:text-xs text-gray-400 hidden sm:block">Gerador de treinos personalizados</p>
+        </div>
+        <nav class="ml-auto flex gap-1 text-xs sm:text-sm">
+            <button class="px-2 sm:px-3 py-1.5 rounded-md font-medium text-gray-900 bg-gray-100">🏋️<span class="hidden sm:inline"> Treinos</span></button>
+            <button class="px-2 sm:px-3 py-1.5 rounded-md font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100">👥<span class="hidden sm:inline"> Alunos</span></button>
+            <button class="px-2 sm:px-3 py-1.5 rounded-md font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100">📚<span class="hidden sm:inline"> Histórico</span></button>
+        </nav>
+    </div>
+</header>
+
+<!-- Layout responsivo: 1 coluna (mobile) → 12 colunas (lg) -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 pb-24 lg:pb-6">
+
+    <!-- SIDEBAR ESQUERDA: aluno + histórico + ação primária -->
+    <aside class="lg:col-span-3 space-y-4 order-1">
+
+        <!-- Aluno selector -->
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Aluno / Turma</label>
+            <select class="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10">
+                <option>Maria Silva</option>
+                <option>João Pereira</option>
+                <option>Turma Hipertrofia</option>
+            </select>
+
+            <div class="mt-3 flex items-center gap-2 text-xs">
+                <span class="text-gray-500">Evitar exerc. dos últimos</span>
+                <select class="px-1.5 py-0.5 border border-gray-200 rounded text-xs">
+                    <option>1 período</option><option>2</option><option>3</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Histórico do aluno (compacto) -->
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3">
+                <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Histórico · Maria</label>
+                <span class="text-[10px] text-gray-400">3 registros</span>
+            </div>
+            <ul class="space-y-1.5">
+                <li class="group flex items-center justify-between text-xs rounded-md hover:bg-gray-50 px-2 py-1.5">
+                    <div>
+                        <div class="font-medium text-gray-800">Semana 3 · hipertrofia</div>
+                        <div class="text-gray-400 text-[10px]">15/04 · 3 treinos</div>
+                    </div>
+                    <div class="hidden group-hover:flex gap-1">
+                        <button class="text-gray-400 hover:text-brand-500" title="Carregar config">⚙</button>
+                        <button class="text-gray-400 hover:text-brand-500" title="Fixar ref">📌</button>
+                    </div>
+                </li>
+                <li class="group flex items-center justify-between text-xs rounded-md hover:bg-gray-50 px-2 py-1.5">
+                    <div>
+                        <div class="font-medium text-gray-800">Semana 2 · força</div>
+                        <div class="text-gray-400 text-[10px]">08/04 · 3 treinos</div>
+                    </div>
+                </li>
+                <li class="group flex items-center justify-between text-xs rounded-md hover:bg-gray-50 px-2 py-1.5">
+                    <div>
+                        <div class="font-medium text-gray-800">Avaliação inicial</div>
+                        <div class="text-gray-400 text-[10px]">01/04 · 2 treinos</div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Ação primária — só visível no desktop (em mobile vira barra fixa no fim da página) -->
+        <div class="hidden lg:block sticky top-20">
+            <button class="w-full px-6 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 transition">
+                ▶ Gerar treinos
+            </button>
+            <p class="text-[11px] text-gray-400 mt-2 text-center">3 treinos · modo hierarquia</p>
+        </div>
+    </aside>
+
+    <!-- MAIN: configuração dos treinos -->
+    <main class="lg:col-span-6 space-y-4 order-2">
+
+        <!-- Configurações gerais (COLAPSÁVEL) -->
+        <details class="bg-white border border-gray-200 rounded-xl overflow-hidden" >
+            <summary class="flex items-center justify-between px-5 py-3 hover:bg-gray-50">
+                <div class="flex items-center gap-2">
+                    <span class="chevron text-gray-400 text-xs transition-transform">▶</span>
+                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Configurações gerais</span>
+                </div>
+                <span class="text-xs text-gray-400">3 treinos · 2/bloco · compl. 5</span>
+            </summary>
+            <div class="px-5 pb-5 pt-1 grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nº de treinos</label>
+                    <select class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                        <option>1</option><option>2</option><option selected>3</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Exerc. por bloco</label>
+                    <select class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                        <option>1</option><option selected>2 (super séries)</option><option>3</option>
+                    </select>
+                </div>
+                <div class="col-span-2 flex flex-wrap gap-4 pt-2">
+                    <label class="inline-flex items-center gap-2 text-sm">
+                        <input type="checkbox" class="accent-brand-500"> Evitar similaridade entre treinos
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked class="accent-brand-500"> Evitar agonistas no bloco
+                    </label>
+                </div>
+            </div>
+        </details>
+
+        <!-- Tabs de treino (estilo shadcn) -->
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="flex border-b border-gray-200 bg-gray-50 px-2 pt-2">
+                <button class="px-4 py-2 text-sm font-medium rounded-t-lg bg-white border-x border-t border-gray-200 -mb-px text-gray-900">
+                    Treino 1
+                </button>
+                <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900">
+                    Treino 2
+                </button>
+                <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900">
+                    Treino 3
+                </button>
+                <button class="ml-auto px-2 py-2 text-sm text-gray-400 hover:text-brand-500" title="Copiar config de outro treino">📋</button>
+            </div>
+
+            <div class="p-5 space-y-4">
+
+                <!-- Seletor de modo (mais sutil) -->
+                <div class="inline-flex p-1 bg-gray-100 rounded-lg text-xs">
+                    <button class="px-3 py-1 rounded-md bg-white shadow-sm font-semibold">Hierarquia</button>
+                    <button class="px-3 py-1 rounded-md text-gray-500 hover:text-gray-900">Template</button>
+                </div>
+
+                <!-- HIERARQUIA em acordeões, não em 3 colunas abertas -->
+                <div class="space-y-2">
+
+                    <!-- Upper body -->
+                    <details class="border border-gray-200 rounded-lg overflow-hidden" open>
+                        <summary class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
+                            <div class="flex items-center gap-2">
+                                <span class="chevron text-gray-400 text-xs transition-transform">▶</span>
+                                <span class="font-semibold text-sm">Membros superiores</span>
+                                <span class="text-xs bg-brand-100 text-brand-500 px-2 py-0.5 rounded-full font-medium">4 exerc.</span>
+                            </div>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-500" onclick="event.stopPropagation()">
+                                <input type="checkbox" checked class="accent-brand-500">
+                                Todos
+                            </label>
+                        </summary>
+                        <div class="px-4 pb-3 pt-1 space-y-2">
+                            <!-- Slider da região inteira -->
+                            <div class="flex items-center gap-3 text-sm">
+                                <span class="text-gray-600 w-24">Quantidade</span>
+                                <input type="range" min="1" max="12" value="4" class="flex-1 accent-brand-500">
+                                <span class="w-6 text-right font-semibold text-brand-500">4</span>
+                            </div>
+
+                            <!-- Refinamento em subregiões (colapsado por default) -->
+                            <details class="pt-1">
+                                <summary class="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1">
+                                    <span class="chevron transition-transform">▸</span> Refinar por subregião
+                                </summary>
+                                <div class="mt-2 pl-4 space-y-1.5 text-sm">
+                                    <label class="flex items-center gap-2 py-1"><input type="checkbox" class="accent-brand-500"> Peito</label>
+                                    <label class="flex items-center gap-2 py-1"><input type="checkbox" class="accent-brand-500"> Costas</label>
+                                    <label class="flex items-center gap-2 py-1"><input type="checkbox" class="accent-brand-500"> Ombro</label>
+                                    <label class="flex items-center gap-2 py-1"><input type="checkbox" class="accent-brand-500"> Braços</label>
+                                </div>
+                            </details>
+                        </div>
+                    </details>
+
+                    <!-- Lower body -->
+                    <details class="border border-gray-200 rounded-lg overflow-hidden">
+                        <summary class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
+                            <div class="flex items-center gap-2">
+                                <span class="chevron text-gray-400 text-xs transition-transform">▶</span>
+                                <span class="font-semibold text-sm">Membros inferiores</span>
+                            </div>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-500" onclick="event.stopPropagation()">
+                                <input type="checkbox" class="accent-brand-500">
+                                Todos
+                            </label>
+                        </summary>
+                    </details>
+
+                    <!-- Core -->
+                    <details class="border border-gray-200 rounded-lg overflow-hidden">
+                        <summary class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
+                            <div class="flex items-center gap-2">
+                                <span class="chevron text-gray-400 text-xs transition-transform">▶</span>
+                                <span class="font-semibold text-sm">Core</span>
+                            </div>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-500" onclick="event.stopPropagation()">
+                                <input type="checkbox" class="accent-brand-500">
+                                Todos
+                            </label>
+                        </summary>
+                    </details>
+
+                    <!-- Cardio -->
+                    <details class="border border-gray-200 rounded-lg overflow-hidden">
+                        <summary class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
+                            <div class="flex items-center gap-2">
+                                <span class="chevron text-gray-400 text-xs transition-transform">▶</span>
+                                <span class="font-semibold text-sm">Cardio</span>
+                            </div>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-500" onclick="event.stopPropagation()">
+                                <input type="checkbox" class="accent-brand-500">
+                                Todos
+                            </label>
+                        </summary>
+                    </details>
+                </div>
+
+                <!-- Exercícios fixos (colapsado) -->
+                <details class="border-t border-gray-100 pt-3">
+                    <summary class="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1">
+                        <span class="chevron transition-transform">▸</span> 📌 Exercícios fixos (0)
+                    </summary>
+                    <div class="mt-2 text-xs text-gray-400 italic">
+                        Clique para buscar até 3 exercícios que devem aparecer neste treino.
+                    </div>
+                </details>
+            </div>
+        </div>
+    </main>
+
+    <!-- SIDEBAR DIREITA: referências (vai pro fim em mobile) -->
+    <aside class="lg:col-span-3 space-y-4 order-3">
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3">
+                <label class="text-[11px] font-bold text-blue-700 uppercase tracking-wider">📌 Referências</label>
+                <button class="text-[10px] text-blue-600 hover:underline">Limpar</button>
+            </div>
+
+            <div class="space-y-2">
+                <!-- Ref 1 -->
+                <div class="bg-white border border-blue-100 rounded-lg p-2.5 text-xs">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-semibold text-blue-900">Semana 3 · T1</span>
+                        <div class="flex gap-1">
+                            <button class="text-gray-400 hover:text-brand-500" title="Clonar">📋</button>
+                            <button class="text-gray-400 hover:text-red-500" title="Remover">✕</button>
+                        </div>
+                    </div>
+                    <div class="text-gray-500 text-[10px]">15/04 · hipertrofia</div>
+                    <details class="mt-1">
+                        <summary class="text-[10px] text-gray-500">6 exercícios</summary>
+                        <ul class="mt-1 pl-3 text-[11px] text-gray-700 space-y-0.5">
+                            <li>• Supino reto halteres</li>
+                            <li>• Remada curvada</li>
+                            <li>• Desenvolvimento Arnold</li>
+                        </ul>
+                    </details>
+                </div>
+
+                <!-- Ref 2 -->
+                <div class="bg-white border border-blue-100 rounded-lg p-2.5 text-xs">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-semibold text-blue-900">Semana 3 · T2</span>
+                        <div class="flex gap-1">
+                            <button class="text-gray-400 hover:text-brand-500" title="Clonar">📋</button>
+                            <button class="text-gray-400 hover:text-red-500" title="Remover">✕</button>
+                        </div>
+                    </div>
+                    <div class="text-gray-500 text-[10px]">15/04 · hipertrofia</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card informativo -->
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Dicas</p>
+            <p class="text-xs text-gray-600 leading-relaxed">
+                Ao gerar, exercícios marcados como <span class="inline-block bg-blue-100 text-blue-700 px-1.5 rounded text-[10px] font-semibold">REF</span> serão evitados.
+                Novos exercícios ganharão badge <span class="inline-block bg-green-100 text-green-700 px-1.5 rounded text-[10px] font-semibold">novo</span>.
+            </p>
+        </div>
+    </aside>
+</div>
+
+<!-- Comparação antes/depois (texto explicativo no final, só pra orientar) -->
+<div class="max-w-7xl mx-auto px-6 pb-12">
+    <hr class="my-8 border-gray-200">
+    <div class="grid grid-cols-2 gap-6 text-sm">
+        <div>
+            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">O que mudou vs. seu app atual</p>
+            <ul class="space-y-1.5 text-gray-700">
+                <li>• <b>3 colunas</b> em vez de 1 (960px): aluno+histórico à esquerda, config no meio, refs à direita</li>
+                <li>• <b>Configurações gerais colapsada</b> (abre só quando precisa ajustar)</li>
+                <li>• <b>Hierarquia em acordeões</b>, não 3 colunas de checkboxes sempre abertas</li>
+                <li>• <b>Tabs visuais</b> de treino (estilo nativo) em vez de botões com background hardcoded</li>
+                <li>• <b>Refs sempre visíveis</b> à direita, não enfiadas dentro do fluxo da config</li>
+                <li>• <b>Botão "Gerar" sticky</b> na sidebar — não precisa rolar</li>
+            </ul>
+        </div>
+        <div>
+            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Custo real</p>
+            <ul class="space-y-1.5 text-gray-700">
+                <li>• <b>Tailwind via CDN</b>: 1 linha no <code class="bg-gray-100 px-1 rounded">base.html</code>, zero build step</li>
+                <li>• <b>Remove ~300 linhas de CSS</b> do <code class="bg-gray-100 px-1 rounded">base.html</code></li>
+                <li>• <b>Não mexe no backend</b>: Flask, rotas, HTMX, lógica de geração — tudo intacto</li>
+                <li>• <b>Prazo honesto para chegar neste layout</b>: 3-5 dias de refactor de templates</li>
+                <li>• <b>Este protótipo é estático</b>: os botões não fazem nada — é só visual</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- MOBILE: barra fixa de ação no rodapé (some em telas >= lg) -->
+<div class="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 p-3 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
+    <button class="w-full px-6 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 transition">
+        ▶ Gerar 3 treinos
+    </button>
+</div>
+
+</body>
+</html>
