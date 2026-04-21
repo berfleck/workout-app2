@@ -51,7 +51,7 @@
 <p class="meta-count">{{ alunos|length }} aluno(s)</p>
 
 {% for aluno in alunos %}
-<div class="aluno-card" id="aluno-{{ loop.index0 }}">
+<div class="aluno-card" id="aluno-{{ aluno.id }}">
     <div class="aluno-card-info">
         <div class="aluno-card-nome">{{ aluno.nome }}</div>
         <div class="aluno-card-meta">
@@ -65,9 +65,9 @@
     </div>
     <div style="display:flex;gap:4px;flex-shrink:0">
         <button class="btn-ghost" title="Editar"
-                onclick="editarAluno({{ loop.index0 }}, {{ aluno | tojson | e }})">✏️</button>
+                onclick='editarAluno({{ aluno.id }}, {{ aluno | tojson }})'>✏️</button>
         <button class="btn-ghost" title="Remover"
-                hx-delete="/alunos/{{ loop.index0 }}/deletar"
+                hx-delete="/alunos/{{ aluno.id }}/deletar"
                 hx-target="#tab-alunos" hx-swap="innerHTML"
                 hx-confirm="Remover {{ aluno.nome }}?">🗑</button>
     </div>

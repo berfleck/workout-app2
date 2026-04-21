@@ -3,7 +3,7 @@ BF Treinamento — Versão Flask + HTMX (completa)
 """
 
 from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify
-import random, json, copy, io, zipfile, unicodedata
+import random, json, copy, io, zipfile, unicodedata, secrets
 from pathlib import Path
 from datetime import datetime
 from gerador_treino import (
@@ -16,6 +16,12 @@ from gerador_treino import (
     Exercicio, Sessao, SuperSerie,
 )
 from gerar_imagem import gerar_png
+from database import (
+    init_db, migrar_json_para_sqlite,
+    carregar_alunos, salvar_aluno, editar_aluno, deletar_aluno,
+    carregar_historico, carregar_registro, salvar_historico_registro, deletar_historico,
+    buscar_historico_por_aluno, nomes_unicos_historico,
+)
 
 app = Flask(__name__)
 app.secret_key = "bf-treinamento-dev"
@@ -26,15 +32,29 @@ app.secret_key = "bf-treinamento-dev"
 
 banco = carregar_banco("banco_exercicios.xlsx")
 
-ALUNOS_PATH   = Path("alunos.json")
-HISTORICO_PATH = Path("historico_treinos.json")
-SESSOES_PATH   = Path("sessoes_salvas.json")
+SESSOES_PATH = Path("sessoes_salvas.json")
 
 # Estado em memória
 sessoes_ativas: list[Sessao] = []
 configs_geradas: list[dict] = []
-referencia_ativa: list[Sessao] = []
-referencia_meta: dict = {}
+opcoes_globais: dict = {}
+# referencias: cada item = {"sessao": Sessao, "origem": {...}, "id_ref": str}
+referencias: list[dict] = []
+
+def _ref_sessoes():
+    return [r["sessao"] for r in referencias]
+
+def _nomes_ref_set():
+    nomes = set()
+    for r in referencias:
+        for bloco in r["sessao"].blocos:
+            for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
+                if ex:
+                    nomes.add(ex.nome)
+    return nomes
+
+def _novo_id_ref():
+    return secrets.token_hex(4)
 
 PADROES_LABELS = {
     "squat": "Agachamento", "hinge": "Extensão de quadril",
@@ -143,6 +163,28 @@ def _dict_to_sessao(d):
             ex3=_dict_to_exercicio(b["ex3"]) if b.get("ex3") else None))
     return Sessao(tipo=d["tipo"], blocos=blocos)
 
+def _configs_to_serializable(configs):
+    result = []
+    for cfg in configs:
+        c = dict(cfg)
+        if "exercicios_travados" in c:
+            c["exercicios_travados"] = [_exercicio_to_dict(e) for e in c["exercicios_travados"]]
+        result.append(c)
+    return result
+
+def _configs_from_serializable(configs):
+    if not configs:
+        return []
+    result = []
+    for c in configs:
+        cfg = dict(c)
+        if "exercicios_travados" in cfg:
+            cfg["exercicios_travados"] = [_dict_to_exercicio(e) for e in cfg["exercicios_travados"]]
+        if cfg.get("demandas"):
+            cfg["demandas"] = [tuple(d) for d in cfg["demandas"]]
+        result.append(cfg)
+    return result
+
 def salvar_sessoes_disco():
     try:
         data = [_sessao_to_dict(s) for s in sessoes_ativas]
@@ -150,25 +192,16 @@ def salvar_sessoes_disco():
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception: pass
 
-def carregar_alunos():
-    if not ALUNOS_PATH.exists(): return []
+def carregar_sessoes_disco():
+    if not SESSOES_PATH.exists():
+        return []
     try:
-        with open(ALUNOS_PATH, encoding="utf-8") as f: return json.load(f)
-    except: return []
+        with open(SESSOES_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return [_dict_to_sessao(d) for d in data]
+    except Exception:
+        return []
 
-def salvar_alunos(lista):
-    with open(ALUNOS_PATH, "w", encoding="utf-8") as f:
-        json.dump(lista, f, ensure_ascii=False, indent=2)
-
-def carregar_historico():
-    if not HISTORICO_PATH.exists(): return []
-    try:
-        with open(HISTORICO_PATH, encoding="utf-8") as f: return json.load(f)
-    except: return []
-
-def salvar_historico(hist):
-    with open(HISTORICO_PATH, "w", encoding="utf-8") as f:
-        json.dump(hist, f, ensure_ascii=False, indent=2)
 
 # ══════════════════════════════════════════════════════════════
 # ROTAS — PÁGINA PRINCIPAL
@@ -176,6 +209,9 @@ def salvar_historico(hist):
 
 @app.route("/")
 def index():
+    alunos = carregar_alunos()
+    nomes_alunos = {a["nome"] for a in alunos}
+    nomes_hist = [n for n in nomes_unicos_historico() if n not in nomes_alunos]
     return render_template("treinos.html",
         templates=list(TEMPLATES.keys()),
         template_epp=TEMPLATE_EPP,
@@ -184,10 +220,11 @@ def index():
         subregioes=ORDEM_SUBREGIOES, subregioes_labels=SUBREGIOES_LABELS,
         padroes_ordem=ORDEM_PADROES, padroes_labels=PADROES_LABELS,
         subregiao_para_padroes=SUBREGIAO_PARA_PADROES,
-        alunos=carregar_alunos(),
+        alunos=alunos,
+        nomes_hist=nomes_hist,
         sessoes=sessoes_ativas,
-        ref_sessoes=referencia_ativa,
-        ref_meta=referencia_meta,
+        referencias=referencias,
+        tem_referencia=bool(referencias),
     )
 
 # ══════════════════════════════════════════════════════════════
@@ -196,7 +233,7 @@ def index():
 
 @app.route("/gerar", methods=["POST"])
 def gerar():
-    global sessoes_ativas, configs_geradas
+    global sessoes_ativas, configs_geradas, opcoes_globais
     n_treinos = int(request.form.get("n_treinos", 1))
     max_cx = int(request.form.get("max_complexidade", 5))
     tam_bloco = int(request.form.get("tamanho_bloco", 2))
@@ -210,8 +247,10 @@ def gerar():
                "equipamentos_bloqueados": [], "evitar_agonistas": evitar_agon}
 
         modo = request.form.get(f"modo_{t}", "hierarquia")
+        cfg["modo"] = modo
         if modo == "template":
             tmpl_nome = request.form.get(f"template_{t}", "")
+            cfg["template_nome"] = tmpl_nome
             padroes = TEMPLATES.get(tmpl_nome, [])
             epp = dict(TEMPLATE_EPP.get(tmpl_nome, {}))
             # Read EPP sliders
@@ -278,10 +317,13 @@ def gerar():
         return f"<p class='aviso'>Selecione categorias no(s) Treino(s) {', '.join(str(x) for x in vazios)}.</p>"
 
     banco_gerar = list(banco)
-    if referencia_ativa:
+
+    # Bloqueio por referências manuais
+    ref_sessoes = _ref_sessoes()
+    if ref_sessoes:
         nomes_ref = set()
         pais_ref = set()
-        for s in referencia_ativa:
+        for s in ref_sessoes:
             for bloco in s.blocos:
                 for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
                     if ex:
@@ -293,14 +335,74 @@ def gerar():
                        and e.nome not in pais_ref
                        and (e.variacao_de is None or e.variacao_de not in nomes_ref)]
 
+    # Bloqueio por histórico do aluno
+    aluno_nome = request.form.get("aluno", "").strip()
+    evitar_ultimos = int(request.form.get("evitar_ultimos", 0))
+    n_bloqueados_hist = 0
+    if aluno_nome and evitar_ultimos > 0:
+        registros_aluno = buscar_historico_por_aluno(aluno_nome)[:evitar_ultimos]
+        nomes_hist = set()
+        pais_hist = set()
+        for reg_resumo in registros_aluno:
+            reg_full = carregar_registro(reg_resumo["id"])
+            if not reg_full:
+                continue
+            for sess_dict in reg_full["sessoes"]:
+                for bloco in sess_dict["blocos"]:
+                    for key in ("ex1", "ex2", "ex3"):
+                        ex = bloco.get(key)
+                        if ex:
+                            nomes_hist.add(ex["nome"])
+                            if ex.get("variacao_de"):
+                                pais_hist.add(ex["variacao_de"])
+        banco_antes = len(banco_gerar)
+        banco_gerar = [e for e in banco_gerar
+                       if e.nome not in nomes_hist
+                       and e.nome not in pais_hist
+                       and (e.variacao_de is None or e.variacao_de not in nomes_hist)]
+        n_bloqueados_hist = banco_antes - len(banco_gerar)
+
     sessoes_ativas = gerar_multiplos_treinos(banco_gerar, all_configs, variar_entre_treinos=variar)
     configs_geradas = all_configs
+    opcoes_globais = {
+        "n_treinos": n_treinos,
+        "max_complexidade": max_cx,
+        "tamanho_bloco": tam_bloco,
+        "variar_entre": variar,
+        "evitar_agonistas": evitar_agon,
+    }
     salvar_sessoes_disco()
+
+    # Auto-fixar referências do último período do aluno (Etapa 4)
+    auto_ref_etiqueta = None
+    if aluno_nome and evitar_ultimos > 0:
+        registros_aluno = buscar_historico_por_aluno(aluno_nome)
+        if registros_aluno:
+            ultimo_reg = carregar_registro(registros_aluno[0]["id"])
+            if ultimo_reg:
+                # Limpa refs anteriores e carrega do último registro
+                referencias.clear()
+                for ti, sess_dict in enumerate(ultimo_reg["sessoes"]):
+                    sessao_ref = _dict_to_sessao(sess_dict)
+                    referencias.append({
+                        "sessao": sessao_ref,
+                        "origem": {
+                            "etiqueta": ultimo_reg.get("etiqueta", ""),
+                            "aluno": ultimo_reg.get("aluno", "—"),
+                            "data": ultimo_reg.get("data_salvo", "—"),
+                            "reg_id": ultimo_reg["id"],
+                            "treino_idx": ti,
+                        },
+                        "id_ref": _novo_id_ref(),
+                    })
+                auto_ref_etiqueta = ultimo_reg.get("etiqueta") or ultimo_reg.get("data_salvo", "")
 
     return render_template("_resultado.html", sessoes=sessoes_ativas,
                            padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           tem_referencia=bool(referencia_ativa),
-                           n_ref_sessoes=len(referencia_ativa))
+                           tem_referencia=bool(referencias),
+                           referencias=referencias,
+                           auto_ref_etiqueta=auto_ref_etiqueta,
+                           nomes_ref=_nomes_ref_set())
 
 # ══════════════════════════════════════════════════════════════
 # ROTAS — AÇÕES POR TREINO
@@ -310,7 +412,8 @@ def gerar():
 def treino_visualizar(t):
     if t >= len(sessoes_ativas): return "Treino não encontrado", 404
     return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="visualizar", padroes_labels=PADROES_LABELS, alunos=carregar_alunos())
+                           modo="visualizar", padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
+                           nomes_ref=_nomes_ref_set())
 
 @app.route("/treino/<int:t>/editar")
 def treino_editar(t):
@@ -346,10 +449,11 @@ def treino_regerar(t):
                    and e.nome not in pais_dos_outros
                    and (e.variacao_de is None or e.variacao_de not in nomes_outros)]
     # Block exercises from reference (same logic as /gerar)
-    if referencia_ativa:
+    ref_sessoes = _ref_sessoes()
+    if ref_sessoes:
         nomes_ref = set()
         pais_ref = set()
-        for s in referencia_ativa:
+        for s in ref_sessoes:
             for bloco in s.blocos:
                 for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
                     if ex:
@@ -381,15 +485,17 @@ def treino_regerar(t):
     sessoes_ativas[t] = nova
     salvar_sessoes_disco()
     return render_template("_treino_card.html", sessao=nova, idx=t,
-                           modo="visualizar", padroes_labels=PADROES_LABELS, alunos=carregar_alunos())
+                           modo="visualizar", padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
+                           nomes_ref=_nomes_ref_set())
 
 @app.route("/treino/<int:t>/substituir/<nome_ex>", methods=["POST"])
 def treino_substituir(t, nome_ex):
     global sessoes_ativas
     if t >= len(sessoes_ativas): return "", 404
     banco_subst = banco
-    if referencia_ativa:
-        nomes_ref = {ex.nome for s in referencia_ativa for b in s.blocos
+    ref_sessoes = _ref_sessoes()
+    if ref_sessoes:
+        nomes_ref = {ex.nome for s in ref_sessoes for b in s.blocos
                      for ex in [b.ex1, b.ex2, b.ex3] if ex}
         banco_sem_ref = [e for e in banco if e.nome not in nomes_ref]
         banco_subst = banco_sem_ref if banco_sem_ref else banco
@@ -434,8 +540,9 @@ def buscar_subs(t, nome_ex):
                           musculo=musculo or None, max_cx=5)
     cands = [e for e in cands if e.nome not in nomes_em_uso and e.nome != nome_ex]
 
-    nomes_ref = {ex.nome for s in referencia_ativa for b in s.blocos
-                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if referencia_ativa else set()
+    ref_sessoes = _ref_sessoes()
+    nomes_ref = {ex.nome for s in ref_sessoes for b in s.blocos
+                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if ref_sessoes else set()
 
     return render_template("_substituicao.html", cands=cands[:50], nome_ex=nome_ex, idx=t,
                            padroes_labels=PADROES_LABELS,
@@ -633,8 +740,9 @@ def buscar_exercicios():
                           musculo=musculo or None)
     cands = [e for e in cands if e.nome not in excluir]
 
-    nomes_ref = {ex.nome for s in referencia_ativa for b in s.blocos
-                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if referencia_ativa else set()
+    ref_sessoes = _ref_sessoes()
+    nomes_ref = {ex.nome for s in ref_sessoes for b in s.blocos
+                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if ref_sessoes else set()
 
     html = f"<p class='meta-count'>{len(cands)} exercício(s)</p>"
     for e in cands:
@@ -687,103 +795,163 @@ def historico_page():
     return render_template("historico.html", historico=carregar_historico(),
                            padroes_labels=PADROES_LABELS)
 
+@app.route("/aluno-historico")
+def aluno_historico():
+    nome = request.args.get("nome", "").strip()
+    if not nome:
+        return ""
+    registros = buscar_historico_por_aluno(nome)
+    return render_template("_historico_aluno.html", registros=registros,
+                           padroes_labels=PADROES_LABELS)
+
+@app.route("/historico/<reg_id>/configs")
+def historico_configs(reg_id):
+    reg = carregar_registro(reg_id)
+    if not reg:
+        return jsonify({"error": "Registro nao encontrado"}), 404
+    cfg_data = reg.get("configs")
+    if not cfg_data:
+        return jsonify({"error": "Sem configs salvas neste registro"}), 404
+    if isinstance(cfg_data, list):
+        cfg_data = {"globals": {}, "treinos": cfg_data}
+    return jsonify(cfg_data)
+
 @app.route("/historico/salvar", methods=["POST"])
 def historico_salvar():
     aluno = request.form.get("aluno", "")
     etiqueta = request.form.get("etiqueta", "").strip() or f"{len(sessoes_ativas)} treino(s)"
-    historico = carregar_historico()
-    registro = {
-        "id": datetime.now().strftime("%Y%m%d_%H%M%S"),
-        "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-        "aluno": aluno or "—",
-        "etiqueta": etiqueta,
-        "n_treinos": len(sessoes_ativas),
-        "sessoes": [_sessao_to_dict(s) for s in sessoes_ativas],
-    }
-    historico.insert(0, registro)
-    salvar_historico(historico)
+    configs_serial = None
+    if configs_geradas:
+        configs_serial = {"globals": opcoes_globais, "treinos": _configs_to_serializable(configs_geradas)}
+    salvar_historico_registro(
+        reg_id=datetime.now().strftime("%Y%m%d_%H%M%S_") + secrets.token_hex(2),
+        data_salvo=datetime.now().strftime("%d/%m/%Y %H:%M"),
+        aluno=aluno or "—",
+        etiqueta=etiqueta,
+        n_treinos=len(sessoes_ativas),
+        sessoes=[_sessao_to_dict(s) for s in sessoes_ativas],
+        configs=configs_serial,
+    )
     return '<p class="sucesso">Salvo no histórico!</p>'
 
 @app.route("/historico/<reg_id>/carregar", methods=["POST"])
 def historico_carregar(reg_id):
-    global sessoes_ativas, configs_geradas
-    historico = carregar_historico()
-    reg = next((r for r in historico if r["id"] == reg_id), None)
+    global sessoes_ativas, configs_geradas, opcoes_globais
+    reg = carregar_registro(reg_id)
     if not reg: return "Registro não encontrado", 404
     sessoes_ativas = [_dict_to_sessao(s) for s in reg["sessoes"]]
-    configs_geradas = []
+    cfg_data = reg.get("configs")
+    if cfg_data and isinstance(cfg_data, dict) and "treinos" in cfg_data:
+        configs_geradas = _configs_from_serializable(cfg_data["treinos"])
+        opcoes_globais = cfg_data.get("globals", {})
+    else:
+        configs_geradas = []
+        opcoes_globais = {}
     salvar_sessoes_disco()
     return render_template("_resultado.html", sessoes=sessoes_ativas,
                            padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           tem_referencia=bool(referencia_ativa),
-                           n_ref_sessoes=len(referencia_ativa))
+                           tem_referencia=bool(referencias),
+                           referencias=referencias)
 
 # ══════════════════════════════════════════════════════════════
 # ROTAS — REFERÊNCIA
 # ══════════════════════════════════════════════════════════════
 
-@app.route("/referencia/carregar/<reg_id>", methods=["POST"])
-def referencia_carregar(reg_id):
-    global referencia_ativa, referencia_meta
-    historico = carregar_historico()
-    reg = next((r for r in historico if r["id"] == reg_id), None)
+def _render_referencia():
+    return render_template("_referencia.html",
+                           referencias=referencias,
+                           padroes_labels=PADROES_LABELS,
+                           n_sessoes_ativas=len(sessoes_ativas))
+
+@app.route("/referencia/lista")
+def referencia_lista():
+    """Retorna lista resumida das referências (para atualizar dropdown de comparação)."""
+    return jsonify([{
+        "idx": i,
+        "aluno": r["origem"]["aluno"],
+        "treino_idx": r["origem"].get("treino_idx", 0),
+        "data": (r["origem"].get("data", "") or "").split(" ")[0],
+    } for i, r in enumerate(referencias)])
+
+@app.route("/referencia/render")
+def referencia_render():
+    """Retorna HTML do painel de referência (usado pelo auto-ref após gerar)."""
+    return _render_referencia()
+
+@app.route("/referencia/fixar/<reg_id>/<int:treino_idx>", methods=["POST"])
+def referencia_fixar(reg_id, treino_idx):
+    """Fixa UM treino específico de um registro do histórico como referência."""
+    reg = carregar_registro(reg_id)
     if not reg:
         return "Registro não encontrado", 404
-    referencia_ativa = [_dict_to_sessao(s) for s in reg["sessoes"]]
-    referencia_meta = {
-        "etiqueta": reg.get("etiqueta", ""),
-        "aluno": reg.get("aluno", "—"),
-        "data": reg.get("data", "—"),
-        "id": reg_id,
-    }
-    return render_template("_referencia.html",
-                           ref_sessoes=referencia_ativa,
-                           ref_meta=referencia_meta,
-                           padroes_labels=PADROES_LABELS,
-                           n_sessoes_ativas=len(sessoes_ativas))
+    if treino_idx >= len(reg["sessoes"]):
+        return "Treino não encontrado", 404
+    sessao = _dict_to_sessao(reg["sessoes"][treino_idx])
+    referencias.append({
+        "sessao": sessao,
+        "origem": {
+            "etiqueta": reg.get("etiqueta", ""),
+            "aluno": reg.get("aluno", "—"),
+            "data": reg.get("data", "—"),
+            "reg_id": reg_id,
+            "treino_idx": treino_idx,
+        },
+        "id_ref": _novo_id_ref(),
+    })
+    return _render_referencia()
 
-@app.route("/referencia/carregar-ativo", methods=["POST"])
-def referencia_carregar_ativo():
-    global referencia_ativa, referencia_meta
-    if not sessoes_ativas:
-        return '<p class="aviso">Nenhum treino ativo para usar como referência.</p>'
-    referencia_ativa = copy.deepcopy(sessoes_ativas)
-    referencia_meta = {
-        "etiqueta": "Sessão atual",
-        "aluno": "—",
-        "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-    }
-    return render_template("_referencia.html",
-                           ref_sessoes=referencia_ativa,
-                           ref_meta=referencia_meta,
-                           padroes_labels=PADROES_LABELS,
-                           n_sessoes_ativas=len(sessoes_ativas))
+@app.route("/referencia/fixar-ativo/<int:treino_idx>", methods=["POST"])
+def referencia_fixar_ativo(treino_idx):
+    """Fixa UM treino ativo como referência."""
+    if treino_idx >= len(sessoes_ativas):
+        return "Treino não encontrado", 404
+    referencias.append({
+        "sessao": copy.deepcopy(sessoes_ativas[treino_idx]),
+        "origem": {
+            "etiqueta": "Sessão atual",
+            "aluno": "—",
+            "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "reg_id": None,
+            "treino_idx": treino_idx,
+        },
+        "id_ref": _novo_id_ref(),
+    })
+    return _render_referencia()
 
-@app.route("/referencia/clonar", methods=["POST"])
-def referencia_clonar():
+@app.route("/referencia/remover/<id_ref>", methods=["POST"])
+def referencia_remover(id_ref):
+    """Remove um item específico da lista de referências."""
+    global referencias
+    referencias = [r for r in referencias if r["id_ref"] != id_ref]
+    return _render_referencia()
+
+@app.route("/referencia/limpar", methods=["POST"])
+def referencia_limpar():
+    """Limpa TODAS as referências."""
+    global referencias
+    referencias = []
+    return ""
+
+@app.route("/referencia/clonar/<id_ref>", methods=["POST"])
+def referencia_clonar(id_ref):
+    """Clona 1 item da referência para sessoes_ativas (substituindo)."""
     global sessoes_ativas, configs_geradas
-    if not referencia_ativa:
-        return '<p class="aviso">Nenhuma referência carregada.</p>'
-    sessoes_ativas = copy.deepcopy(referencia_ativa)
+    item = next((r for r in referencias if r["id_ref"] == id_ref), None)
+    if not item:
+        return '<p class="aviso">Referência não encontrada.</p>'
+    sessoes_ativas = [copy.deepcopy(item["sessao"])]
     configs_geradas = []
     salvar_sessoes_disco()
     return render_template("_resultado.html", sessoes=sessoes_ativas,
                            padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           tem_referencia=True, n_ref_sessoes=len(referencia_ativa))
-
-@app.route("/referencia/limpar", methods=["POST"])
-def referencia_limpar():
-    global referencia_ativa, referencia_meta
-    referencia_ativa = []
-    referencia_meta = {}
-    return ""
+                           tem_referencia=bool(referencias), referencias=referencias)
 
 @app.route("/referencia/copiar-bloco/<int:ref_t>/<int:ref_bi>/para/<int:dest_t>", methods=["POST"])
 def referencia_copiar_bloco(ref_t, ref_bi, dest_t):
     global sessoes_ativas
-    if ref_t >= len(referencia_ativa) or dest_t >= len(sessoes_ativas):
+    if ref_t >= len(referencias) or dest_t >= len(sessoes_ativas):
         return "", 404
-    bloco_ref = referencia_ativa[ref_t].blocos[ref_bi]
+    bloco_ref = referencias[ref_t]["sessao"].blocos[ref_bi]
     bloco_novo = copy.deepcopy(bloco_ref)
     labels = "ABCDEFGHIJKLMNOP"
     n = len(sessoes_ativas[dest_t].blocos)
@@ -799,9 +967,9 @@ def referencia_copiar_bloco(ref_t, ref_bi, dest_t):
 
 @app.route("/comparar/<int:ref_t>/<int:ativo_t>")
 def comparar_treinos(ref_t, ativo_t):
-    if ref_t >= len(referencia_ativa) or ativo_t >= len(sessoes_ativas):
+    if ref_t >= len(referencias) or ativo_t >= len(sessoes_ativas):
         return "", 404
-    ref = referencia_ativa[ref_t]
+    ref = referencias[ref_t]["sessao"]
     ativo = sessoes_ativas[ativo_t]
     nomes_ref = {ex.nome for b in ref.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
     nomes_ativo = {ex.nome for b in ativo.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
@@ -811,23 +979,22 @@ def comparar_treinos(ref_t, ativo_t):
     return render_template("_comparacao.html",
                            ref=ref, ativo=ativo,
                            ref_idx=ref_t, ativo_idx=ativo_t,
+                           ref_origem=referencias[ref_t]["origem"],
                            mantidos=mantidos, removidos=removidos, adicionados=adicionados,
                            padroes_labels=PADROES_LABELS)
 
 @app.route("/historico/<reg_id>/ver")
 def historico_ver(reg_id):
-    historico = carregar_historico()
-    reg = next((r for r in historico if r["id"] == reg_id), None)
+    reg = carregar_registro(reg_id)
     if not reg: return "Registro não encontrado", 404
     sessoes_reg = [_dict_to_sessao(s) for s in reg["sessoes"]]
     return render_template("_historico_detalhe.html", sessoes=sessoes_reg,
-                           padroes_labels=PADROES_LABELS)
+                           padroes_labels=PADROES_LABELS, reg_id=reg_id)
 
 @app.route("/historico/<reg_id>/apagar", methods=["DELETE"])
 def historico_apagar(reg_id):
-    historico = [r for r in carregar_historico() if r["id"] != reg_id]
-    salvar_historico(historico)
-    return render_template("historico.html", historico=historico, padroes_labels=PADROES_LABELS)
+    deletar_historico(reg_id)
+    return render_template("historico.html", historico=carregar_historico(), padroes_labels=PADROES_LABELS)
 
 # ══════════════════════════════════════════════════════════════
 # ROTAS — ALUNOS
@@ -845,42 +1012,46 @@ def aluno_novo():
         return '<p class="erro">Nome é obrigatório.</p>'
     if any(a["nome"].lower() == nome.lower() for a in alunos):
         return f'<p class="erro">Já existe \'{nome}\'.</p>'
-    alunos.append({
-        "nome": nome,
-        "nivel": request.form.get("nivel", "intermediario"),
-        "objetivo": request.form.get("objetivo", "hipertrofia"),
-        "restricoes": [r.strip() for r in request.form.get("restricoes", "").split(",") if r.strip()],
-        "obs": request.form.get("obs", "").strip(),
-    })
-    salvar_alunos(alunos)
-    return render_template("alunos.html", alunos=alunos)
+    salvar_aluno(
+        nome=nome,
+        nivel=request.form.get("nivel", "intermediario"),
+        objetivo=request.form.get("objetivo", "hipertrofia"),
+        restricoes=[r.strip() for r in request.form.get("restricoes", "").split(",") if r.strip()],
+        obs=request.form.get("obs", "").strip(),
+    )
+    return render_template("alunos.html", alunos=carregar_alunos())
 
 @app.route("/alunos/<int:i>/editar", methods=["POST"])
 def aluno_editar(i):
     alunos = carregar_alunos()
-    if i >= len(alunos): return "", 404
+    aluno = next((a for a in alunos if a["id"] == i), None)
+    if not aluno: return "", 404
     nome = request.form.get("nome", "").strip()
     if not nome: return '<p class="erro">Nome obrigatório.</p>'
-    alunos[i] = {
-        "nome": nome,
-        "nivel": request.form.get("nivel", "intermediario"),
-        "objetivo": request.form.get("objetivo", "hipertrofia"),
-        "restricoes": [r.strip() for r in request.form.get("restricoes", "").split(",") if r.strip()],
-        "obs": request.form.get("obs", "").strip(),
-    }
-    salvar_alunos(alunos)
-    return render_template("alunos.html", alunos=alunos)
+    editar_aluno(
+        aluno_id=i,
+        nome=nome,
+        nivel=request.form.get("nivel", "intermediario"),
+        objetivo=request.form.get("objetivo", "hipertrofia"),
+        restricoes=[r.strip() for r in request.form.get("restricoes", "").split(",") if r.strip()],
+        obs=request.form.get("obs", "").strip(),
+    )
+    return render_template("alunos.html", alunos=carregar_alunos())
 
 @app.route("/alunos/<int:i>/deletar", methods=["DELETE"])
 def aluno_deletar(i):
-    alunos = carregar_alunos()
-    if i < len(alunos): alunos.pop(i)
-    salvar_alunos(alunos)
-    return render_template("alunos.html", alunos=alunos)
+    deletar_aluno(i)
+    return render_template("alunos.html", alunos=carregar_alunos())
 
 # ══════════════════════════════════════════════════════════════
 
+init_db()
+migrar_json_para_sqlite()
+sessoes_ativas = carregar_sessoes_disco()
+
 if __name__ == "__main__":
-    print(f"✓ Banco carregado: {len(banco)} exercícios")
-    print(f"✓ Acesse: http://localhost:5000")
-    app.run(debug=True, port=5000)
+    if sessoes_ativas:
+        print(f"  Restauradas {len(sessoes_ativas)} sessoes ativas")
+    print(f"[OK] Banco carregado: {len(banco)} exercicios")
+    print(f"[OK] Acesse: http://localhost:5001 (ou do celular: use o IP da maquina na rede)")
+    app.run(debug=True, host="0.0.0.0", port=5001)

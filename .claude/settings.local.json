@@ -4,7 +4,18 @@
       "Bash(python -c \"import app_flask; print\\('OK'\\)\")",
       "Bash(python -c ' *)",
       "Bash(python -c \"import ast; ast.parse\\(open\\('app_flask.py',encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
-      "Bash(python -c \"from jinja2 import Environment, FileSystemLoader; env = Environment\\(loader=FileSystemLoader\\('templates'\\)\\); env.get_template\\('treinos.html'\\); print\\('OK'\\)\")"
+      "Bash(python -c \"from jinja2 import Environment, FileSystemLoader; env = Environment\\(loader=FileSystemLoader\\('templates'\\)\\); env.get_template\\('treinos.html'\\); print\\('OK'\\)\")",
+      "Bash(python *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5001/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5001/alunos)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5001/historico)",
+      "Bash(curl -s http://localhost:5001/alunos)",
+      "Bash(curl -s http://localhost:5001/historico)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5001/historico/20260420_111048/ver)",
+      "Bash(curl *)",
+      "Bash(pkill -f \"python app_flask.py\")",
+      "Bash(start *)",
+      "Bash(grep -n \"^[a-z_]*\\\\s*=\\\\s*\\\\[\\\\]$\\\\|^[a-z_]*\\\\s*=\\\\s*{}\\\\s*$\\\\|^global \" \"G:/My Drive/Projeto Workout App/App Flask HTMX 2/app_flask.py\")"
     ]
   }
 }
