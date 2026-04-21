@@ -1,0 +1,18 @@
+vamos criar um plano de alerações no app baseado nesse exemplo e nas sugestões aqui citadas:
+- personal criou 3 treinos para um aluno (ou uma turma que faz o mesmo treino juntos) realizar no mês
+- no mês seguinte ele abre o app e deseja criar novos treinos para esse aluno/turma.
+- o que seria bom estar disponível para o personal? reflita e ajude a sugerir soluções. 
+
+minha opinião:
+acredito que ele tenha que poder selecionar o aluno/turma para que o app identifique quem é e possa acessar o histórico. depois, poderia dar algumas alternativas, como:
+carregar(escolher) aquele aluno/turma para que o app saiba de quem se trata e possa ler o histórico de treinos. o app então pode permitir carregar a configuração dos treinos passados, que devem estar salvos junto dos treinos no banco de dados. no caso do exemplo que criei nesta mensagem, o personal pode carregar os treinos do mês passado (treino 1, 2 e 3). as configurações desses treinos devem ser carregadas no gerador de treinos (categorias e quantos exercícios em cada slider de categoria para cada treino 1, 2 e 3). assim, o personal pode simplesmente clicar em gerar treinos e obter 3 treinos similares aos do mês passado. o app deve tentar evitar repetir exercícios identicos (e exercícios de mesma "variação de" da coluna do banco de exercícios, que são exercícios quase iguais), mas pode repetir se não encontrar boas alternativas. o personal pode também alterar algum slider ou categoria para gerar treinos diferentes dos treinos do mês passado. idealmente seria bom poder comparar de forma rápida e compacta visualmente os treinos gerados nesse mês com os treinos do mês passado. essa comparação pode ser uma novidade e pode ser basear na ideia de cores que você criou no comparador de treinos. o período "mês" é apenas um exemplo, os treinos podem ter outra periodicidade, como 2 semanas ou 3 meses, o que importa é terem sido gerados e agrupados como bloco de treinos. 
+
+- avalie a hipótese de, se necessário, migrar para SQL ou outro banco de dados.
+
+- faça perguntas para esclarecer tudo que achar necessário e depois crie o plano de implementação (que pode ser inteira ou gradual, em etapas, como você achar melhor)
+
+
+
+
+
+

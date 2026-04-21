@@ -56,6 +56,11 @@
                         {% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}
                     </span>
                     {% endif %}
+                    {% if modo != 'editar' and nomes_ref is defined and nomes_ref %}
+                        {% if ex.nome not in nomes_ref %}
+                        <span class="badge-novo">novo</span>
+                        {% endif %}
+                    {% endif %}
                 </span>
                 {% if modo == 'editar' %}
                 <div class="exercicio-meta">

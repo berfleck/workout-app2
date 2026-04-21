@@ -9,11 +9,7 @@
                 {% endfor %}
             </span>
             <button type="button" class="ref-bar-limpar"
-                    hx-post="/referencia/limpar"
-                    hx-target="#ref-container"
-                    hx-swap="innerHTML"
-                    hx-confirm="Remover todas as referências?"
-                    onclick="event.preventDefault();event.stopPropagation();"
+                    onclick="event.stopPropagation(); if(confirm('Remover todas as referencias?')){ fetch('/referencia/limpar',{method:'POST'}).then(()=>{ document.getElementById('ref-container').innerHTML=''; atualizarComparador(); }); }"
                     title="Limpar todas">Limpar todas</button>
         </summary>
 

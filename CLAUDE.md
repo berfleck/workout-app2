@@ -6,7 +6,7 @@ Contexto permanente para o Claude Code. Atualizar sempre que houver decisões de
 
 ## Visão geral
 
-App Flask + HTMX (Python) para personal trainer gerar, editar e exportar sessões de treino personalizadas. Roda localmente, sem servidor, sem nuvem. Dados persistem em arquivos locais (JSON + XLSX).
+App Flask + HTMX (Python) para personal trainer gerar, editar e exportar sessões de treino personalizadas. Roda localmente, sem servidor, sem nuvem. Dados persistem em SQLite (`bf_treinamento.db`) + XLSX.
 
 **Stack:** Flask backend + templates Jinja2 + HTMX para requisições parciais sem reload. Cada ação do usuário faz um POST/GET e o servidor devolve apenas o trecho de HTML afetado.
 
@@ -16,6 +16,7 @@ App Flask + HTMX (Python) para personal trainer gerar, editar e exportar sessõe
 
 ```
 app_flask.py              — Backend Flask: todas as rotas
+database.py               — Persistência SQLite (CRUD alunos + histórico)
 gerador_treino.py         — Lógica de geração de treinos (inalterado da versão Streamlit)
 gerar_imagem.py           — Exportação de PNG (Pillow + fontes DejaVu embutidas)
 banco_exercicios.xlsx     — Banco de dados de exercícios (aba "Exercícios")
@@ -25,10 +26,11 @@ static/logo.png           — Logo usada nos PNGs exportados
 
 templates/
   base.html               — Layout base: CSS completo, SortableJS CDN, navegação por abas
-  treinos.html            — Aba Treinos: config (hierarquia + template), resultado
-  _resultado.html         — Partial: lista de treinos gerados
+  treinos.html            — Aba Treinos: config (hierarquia + template), resultado, painel histórico do aluno
+  _resultado.html         — Partial: lista de treinos gerados (com auto-ref badge e badge "novo")
   _treino_card.html       — Partial: card de 1 treino (modo visualizar e editar)
   _substituicao.html      — Partial: lista de exercícios para substituição/adição
+  _historico_aluno.html   — Partial: histórico filtrado por aluno (com "Carregar config" e "Fixar ref")
   _historico_detalhe.html — Partial: exercícios de um registro do histórico
   _referencia.html        — Partial: painel de referência read-only (borda azul/índigo)
   _comparacao.html        — Partial: diff visual lado a lado (ref vs ativo)
@@ -36,7 +38,8 @@ templates/
   historico.html          — Aba Histórico: listar, ver, carregar, apagar
 
 Gerados automaticamente:
-  alunos.json / sessoes_salvas.json / historico_treinos.json
+  bf_treinamento.db       — SQLite (alunos + histórico com configs)
+  sessoes_salvas.json     — Snapshot das sessões ativas
 ```
 
 ---
@@ -44,9 +47,10 @@ Gerados automaticamente:
 ## Estado do servidor
 
 - `sessoes_ativas` — lista de `Sessao` (variável global em `app_flask.py`)
-- `configs_geradas` — config usada para regerar com mesma seleção
-- `referencias` — lista de dicts, cada item = um treino fixado como referência: `{"sessao": Sessao, "origem": {"etiqueta","aluno","data","reg_id","treino_idx"}, "id_ref": str}`. Não persiste em disco. Múltiplas refs podem acumular (de sessões distintas). Helpers: `_ref_sessoes()` e `_novo_id_ref()`.
-- Persistência: `salvar_sessoes_disco()` salva em `sessoes_salvas.json` a cada modificação
+- `configs_geradas` — config usada para regerar com mesma seleção. Salva no histórico junto das sessões
+- `opcoes_globais` — dict com `n_treinos`, `max_complexidade`, `tamanho_bloco`, `variar_entre`, `evitar_agonistas`
+- `referencias` — lista de dicts, cada item = um treino fixado como referência: `{"sessao": Sessao, "origem": {"etiqueta","aluno","data","reg_id","treino_idx"}, "id_ref": str}`. Não persiste em disco. Múltiplas refs podem acumular (de sessões distintas). Auto-preenchidas ao gerar para aluno com histórico. Helpers: `_ref_sessoes()`, `_novo_id_ref()`, `_nomes_ref_set()`.
+- Persistência: `salvar_sessoes_disco()` salva em `sessoes_salvas.json` a cada modificação; startup restaura automaticamente
 
 ---
 
@@ -61,6 +65,11 @@ Campos de prescrição: `series`, `reps` (str, ex: "8-12"), `rir` (0-4)
 
 ### `Sessao` (dataclass)
 `tipo` (string de padrões concatenados), `blocos` (lista de SuperSerie)
+
+### SQLite (`bf_treinamento.db` via `database.py`)
+- `alunos` (id INTEGER PK, nome, nivel, objetivo, restricoes JSON, obs)
+- `historico` (id TEXT PK, data_salvo, aluno, etiqueta, n_treinos, sessoes JSON, configs JSON)
+- Migração automática de JSONs antigos no startup (`migrar_json_para_sqlite`)
 
 ---
 
@@ -78,7 +87,7 @@ Campos de prescrição: `series`, `reps` (str, ex: "8-12"), `rir` (0-4)
 |------|--------|-----------|
 | `/gerar` | POST | Gera treinos (hierarquia ou template). Retorna `_resultado.html` |
 
-Parâmetros: `modo`, `n_treinos`, `max_complexidade`, `tamanho_bloco`, `variar_entre`, `evitar_agonistas`, demandas (`dem_nivel_0_N` / `dem_escopo_0_N` / `dem_qtd_0_N`), EPP (`epp_0_PADRAO`), lateralidade squat (`squat_bi_0` / `squat_uni_0`), exercícios fixos (`fixos_0`).
+Parâmetros: `modo`, `n_treinos`, `max_complexidade`, `tamanho_bloco`, `variar_entre`, `evitar_agonistas`, `aluno`, `evitar_ultimos` (0-3), demandas (`dem_nivel_0_N` / `dem_escopo_0_N` / `dem_qtd_0_N`), EPP (`epp_0_PADRAO`), lateralidade squat (`squat_bi_0` / `squat_uni_0`), exercícios fixos (`fixos_0`). Quando `aluno` + `evitar_ultimos > 0`: bloqueia exercícios do histórico + auto-fixa referências do último período.
 
 ### Ações por treino
 | Rota | Método | O que faz |
@@ -114,6 +123,8 @@ Modelo atual = lista `referencias` com **acúmulo granular** (1 treino por vez).
 | `/referencia/limpar` | POST | Limpa **todas** as referências |
 | `/referencia/clonar/<id_ref>` | POST | Clona 1 item para `sessoes_ativas` (substitui) |
 | `/referencia/copiar-bloco/<ref_t>/<ref_bi>/para/<dest_t>` | POST | `ref_t` é índice em `referencias`. Copia bloco para o treino ativo |
+| `/referencia/lista` | GET | JSON resumido das referências (para dropdown de comparação) |
+| `/referencia/render` | GET | HTML do painel de referência (usado pelo auto-ref após gerar) |
 | `/comparar/<ref_t>/<ativo_t>` | GET | Compara qualquer par ref×ativo (índices arbitrários). Retorna `_comparacao.html` |
 
 ### Alunos / Histórico
@@ -126,6 +137,8 @@ Modelo atual = lista `referencias` com **acúmulo granular** (1 treino por vez).
 | `/historico/<id>/ver` | GET | Exercícios de um registro |
 | `/historico/<id>/carregar` | POST | Carrega para edição |
 | `/historico/<id>/apagar` | DELETE | Remove registro |
+| `/historico/<id>/configs` | GET | JSON das configs salvas (globals + treinos) |
+| `/aluno-historico?nome=X` | GET | Retorna `_historico_aluno.html` filtrado por aluno |
 
 ---
 
@@ -185,8 +198,18 @@ Modelo atual = lista `referencias` com **acúmulo granular** (1 treino por vez).
 - Header do card: ações em ícones (`btn-icon`: 🔄 ✏️ ⬇) acima do título "Treino N · padrões"
 
 ### Aba Alunos / Histórico
-- CRUD alunos com edição inline
-- Histórico: ver, carregar para edição, apagar
+- CRUD alunos com edição inline (SQLite via `database.py`)
+- Histórico: ver, carregar para edição, apagar. Configs salvas junto (`{globals, treinos}`)
+
+### Periodização por aluno
+- **Seletor de aluno** no topo da aba Treinos — dropdown com alunos cadastrados + nomes do histórico
+- **Painel de histórico do aluno** (`_historico_aluno.html`): ao selecionar aluno, mostra registros filtrados com botões "Carregar config" e "Fixar ref"
+- **Carregar config**: lê configs do registro via `/historico/<id>/configs`, JS `aplicarConfigs()` reconstrói formulário inteiro (modo, checkboxes, sliders, demandas)
+- **Bloqueio por histórico**: select "Evitar exerc. dos últimos N períodos" (0=desativado, 1-3). Filtra banco removendo exercícios + variações dos últimos N registros do aluno
+- **Auto-ref ao gerar**: quando aluno tem histórico e bloqueio ativo, `/gerar` auto-fixa sessões do último registro como `referencias`. Badge azul "Comparando com período anterior: [etiqueta]" em `_resultado.html`
+- **Badge "novo"**: exercícios que não existiam na referência recebem badge verde "novo" no modo visualizar (`_treino_card.html`)
+- **Comparação automática**: seção de comparação abre automaticamente quando há auto-ref; dropdowns pré-populados
+- O personal pode remover referências manualmente (fluxo existente inalterado)
 
 ---
 
@@ -224,14 +247,7 @@ Modelo atual = lista `referencias` com **acúmulo granular** (1 treino por vez).
 - UI de exercícios fixos (backend já suporta `exercicios_travados`)
 - Substituição manual por escolha: backend suporta `/substituir-por/`, falta painel conectado na UI
 - Download ZIP: rota existe, falta botão na UI
-- Restauração de sessão após reinício do servidor (ler `sessoes_salvas.json` no startup)
-
-### Próxima grande feature — Periodização por aluno
-- Alunos como entidade central (histórico → gerar próximo treino)
-- Histórico vinculado ao aluno (não só etiqueta livre)
-- Geração inteligente: evitar exercícios dos últimos N treinos
 - Lista de exercícios pausados por aluno
-- **Decisão pendente:** continuar com JSON ou migrar para SQLite (recomendado para queries de histórico)
 
 ---
 

@@ -31,18 +31,33 @@
             </div>
         </div>
         <div class="campo">
-            <label>Aluno (PNG)</label>
-            <select name="aluno" id="sel-aluno">
-                <option value="">Selecionar aluno...</option>
+            <label>Aluno / Turma</label>
+            <select name="aluno" id="sel-aluno" onchange="onAlunoChange(this.value)">
+                <option value="">Selecionar...</option>
                 {% for a in alunos %}<option value="{{ a.nome }}">{{ a.nome }}</option>{% endfor %}
+                {% if nomes_hist %}
+                <option disabled>───</option>
+                {% for n in nomes_hist %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+                {% endif %}
             </select>
         </div>
     </div>
-    <div style="display:flex; gap:16px; flex-wrap:wrap">
+    <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center">
         <label class="check-inline"><input type="checkbox" name="variar_entre"> Evitar similaridade entre treinos</label>
         <label class="check-inline"><input type="checkbox" name="evitar_agonistas" checked> Evitar agonistas no bloco</label>
+        <div id="evitar-hist-wrap" style="display:none; align-items:center; gap:6px; font-size:13px">
+            <span style="color:#6b7280">Evitar exerc. dos ultimos</span>
+            <select name="evitar_ultimos" id="sel-evitar-ultimos" style="padding:2px 6px;font-size:13px">
+                <option value="0">desativado</option>
+                <option value="1" selected>1 periodo</option>
+                <option value="2">2 periodos</option>
+                <option value="3">3 periodos</option>
+            </select>
+        </div>
     </div>
 </div>
+
+<div id="hist-aluno-panel" style="margin-bottom:12px"></div>
 
 <!-- Barra de abas dos treinos -->
 <div class="tabs-treino" id="tabs-treino-bar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
@@ -610,6 +625,196 @@ function copiarConfigTreino(src, dest) {
         });
         checkLatTotal(dest);
     }
+}
+
+// ── Fixar todos os treinos de um registro como referência ──
+async function fixarTodosComoRef(regId, n) {
+    for (let i = 0; i < n; i++) {
+        await fetch('/referencia/fixar/' + regId + '/' + i, {method: 'POST'})
+            .then(r => r.text())
+            .then(html => { document.getElementById('ref-container').innerHTML = html; });
+    }
+    atualizarComparador();
+}
+
+// ── Selecao de aluno: carrega historico ──
+function onAlunoChange(nome) {
+    const panel = document.getElementById('hist-aluno-panel');
+    const evitarWrap = document.getElementById('evitar-hist-wrap');
+    if (!nome) {
+        panel.innerHTML = '';
+        evitarWrap.style.display = 'none';
+        return;
+    }
+    fetch('/aluno-historico?nome=' + encodeURIComponent(nome))
+        .then(r => r.text())
+        .then(html => {
+            panel.innerHTML = html;
+            evitarWrap.style.display = html.trim() ? 'flex' : 'none';
+        })
+        .catch(e => console.error('Erro ao carregar historico:', e));
+}
+
+// ── Carregar config de um registro do histórico ──
+async function carregarConfigDoHistorico(regId) {
+    try {
+        const resp = await fetch('/historico/' + regId + '/configs');
+        if (!resp.ok) {
+            const err = await resp.json();
+            alert(err.error || 'Erro ao carregar configs');
+            return;
+        }
+        const data = await resp.json();
+        aplicarConfigs(data);
+    } catch (e) {
+        alert('Erro de conexao ao carregar configs');
+    }
+}
+
+function aplicarConfigs(data) {
+    const globals = data.globals || {};
+    const treinos = data.treinos || [];
+    if (treinos.length === 0) { alert('Nenhuma config salva neste registro'); return; }
+
+    // Reset tudo primeiro
+    resetAll();
+
+    // Globals
+    const nTreinos = globals.n_treinos || treinos.length;
+    document.getElementById('n_treinos').value = nTreinos;
+    onChangeNTreinos();
+
+    const cxSlider = document.querySelector('input[name="max_complexidade"]');
+    if (cxSlider && globals.max_complexidade) {
+        cxSlider.value = globals.max_complexidade;
+        document.getElementById('val-cx').textContent = globals.max_complexidade;
+    }
+
+    const tamBloco = document.querySelector('select[name="tamanho_bloco"]');
+    if (tamBloco && globals.tamanho_bloco) tamBloco.value = globals.tamanho_bloco;
+
+    const variar = document.querySelector('input[name="variar_entre"]');
+    if (variar) variar.checked = !!globals.variar_entre;
+
+    const agonistas = document.querySelector('input[name="evitar_agonistas"]');
+    if (agonistas) agonistas.checked = globals.evitar_agonistas !== false;
+
+    // Cada treino
+    treinos.forEach((cfg, t) => {
+        if (t >= MAX_TREINOS) return;
+        showTreino(t);
+
+        const modo = cfg.modo || 'hierarquia';
+        setModo(t, modo);
+
+        if (modo === 'template') {
+            const tmpl = cfg.template_nome;
+            if (tmpl) {
+                selectTemplate(t, tmpl);
+                // Set EPP sliders
+                const epp = cfg.exercicios_por_padrao || {};
+                for (const [p, val] of Object.entries(epp)) {
+                    const v = typeof val === 'object' ? Object.values(val).reduce((a,b)=>a+b,0) : val;
+                    const inp = qs(t, `input[name="epp_${t}_${p}"]`);
+                    if (inp) { inp.value = v; if (inp.nextElementSibling) inp.nextElementSibling.textContent = v; }
+                }
+                // Lateralidade squat
+                const lat = cfg.lateralidade_por_padrao || {};
+                if (lat.squat) {
+                    const bi = qs(t, `input[name="squat_bi_${t}"]`);
+                    const uni = qs(t, `input[name="squat_uni_${t}"]`);
+                    if (bi) { bi.value = lat.squat.bilateral || 0; if (bi.nextElementSibling) bi.nextElementSibling.textContent = bi.value; }
+                    if (uni) { uni.value = lat.squat.unilateral || 0; if (uni.nextElementSibling) uni.nextElementSibling.textContent = uni.value; }
+                }
+            }
+        } else {
+            // Hierarquia: marcar checkboxes com base nas demandas
+            const demandas = cfg.demandas || [];
+            demandas.forEach(dem => {
+                const [nivel, escopo, qtd] = dem;
+                if (nivel === 'regiao') {
+                    const chk = qs(t, `.reg-chk[data-regiao="${escopo}"]`);
+                    if (chk) chk.checked = true;
+                } else if (nivel === 'subregiao') {
+                    // Abrir o expander de região pai e marcar o checkbox
+                    const chk = qs(t, `.sub-chk[data-subregiao="${escopo}"]`);
+                    if (chk) {
+                        chk.checked = true;
+                        const regiao = chk.dataset.regiao;
+                        // Abrir expander da região
+                        const subsEl = document.getElementById('subs-' + t + '-' + regiao);
+                        if (subsEl) subsEl.style.display = '';
+                        // Marcar o checkbox pai da região
+                        const regChk = qs(t, `.reg-chk[data-regiao="${regiao}"]`);
+                        if (regChk) regChk.checked = true;
+                    }
+                } else if (nivel === 'padrao') {
+                    // Checar lateralidade squat especial
+                    const lat = cfg.lateralidade_por_padrao || {};
+                    if (escopo === 'squat' && lat.squat) {
+                        // Marcar lat checkboxes
+                        if (lat.squat.bilateral) {
+                            const c = qs(t, '.lat-chk[data-padrao="squat"][data-lat="bilateral"]');
+                            if (c) c.checked = true;
+                        }
+                        if (lat.squat.unilateral) {
+                            const c = qs(t, '.lat-chk[data-padrao="squat"][data-lat="unilateral"]');
+                            if (c) c.checked = true;
+                        }
+                        // Abrir expanders
+                        const subsEl = document.getElementById('subs-' + t + '-lower');
+                        if (subsEl) subsEl.style.display = '';
+                        const padsEl = document.getElementById('pads-' + t + '-perna_anterior');
+                        if (padsEl) padsEl.style.display = '';
+                        const subChk = qs(t, '.sub-chk[data-subregiao="perna_anterior"]');
+                        if (subChk) subChk.checked = true;
+                        const regChk = qs(t, '.reg-chk[data-regiao="lower"]');
+                        if (regChk) regChk.checked = true;
+                    } else {
+                        // Padrao normal
+                        const chk = qs(t, `.pad-chk[data-padrao="${escopo}"]`);
+                        if (chk) {
+                            chk.checked = true;
+                            const subregiao = chk.dataset.subregiao;
+                            const regiao = chk.dataset.regiao;
+                            const subsEl = document.getElementById('subs-' + t + '-' + regiao);
+                            if (subsEl) subsEl.style.display = '';
+                            const padsEl = document.getElementById('pads-' + t + '-' + subregiao);
+                            if (padsEl) padsEl.style.display = '';
+                            const subChk = qs(t, `.sub-chk[data-subregiao="${subregiao}"]`);
+                            if (subChk) subChk.checked = true;
+                            const regChk = qs(t, `.reg-chk[data-regiao="${regiao}"]`);
+                            if (regChk) regChk.checked = true;
+                        }
+                    }
+                }
+            });
+
+            // Trigger updateDemandas para criar sliders
+            updateDemandas(t);
+
+            // Agora setar valores dos sliders criados
+            setTimeout(() => {
+                demandas.forEach((dem, i) => {
+                    const [nivel, escopo, qtd] = dem;
+                    if (escopo === 'squat' && (cfg.lateralidade_por_padrao || {}).squat) {
+                        const lat = cfg.lateralidade_por_padrao.squat;
+                        const bi = qs(t, `input[name="squat_bi_${t}"]`);
+                        const uni = qs(t, `input[name="squat_uni_${t}"]`);
+                        if (bi && lat.bilateral !== undefined) { bi.value = lat.bilateral; if (bi.nextElementSibling) bi.nextElementSibling.textContent = lat.bilateral; }
+                        if (uni && lat.unilateral !== undefined) { uni.value = lat.unilateral; if (uni.nextElementSibling) uni.nextElementSibling.textContent = lat.unilateral; }
+                        updateSquatTotal(t, i);
+                    } else {
+                        const inp = qs(t, `input[name="dem_qtd_${t}_${i}"]`);
+                        if (inp) { inp.value = qtd; if (inp.nextElementSibling) inp.nextElementSibling.textContent = qtd; }
+                    }
+                });
+            }, 50);
+        }
+    });
+
+    // Voltar para tab 0
+    showTreino(0);
 }
 
 // Init

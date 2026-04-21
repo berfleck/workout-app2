@@ -1,5 +1,12 @@
 <div class="separador">{{ sessoes|length }} treino{{ 's' if sessoes|length > 1 else '' }} gerado{{ 's' if sessoes|length > 1 else '' }}</div>
 
+{% if auto_ref_etiqueta %}
+<div class="auto-ref-badge">
+    📌 Comparando com período anterior: <strong>{{ auto_ref_etiqueta }}</strong>
+    <span style="font-size:11px;color:#6b7280">({{ referencias|length }} treino{{ 's' if referencias|length > 1 else '' }} como referência)</span>
+</div>
+{% endif %}
+
 <!-- Fixar treino ativo como referência -->
 <div class="fixar-ativo-wrap" style="margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
     <span style="font-size:12px;color:#6b7280">Fixar como referência:</span>
@@ -12,10 +19,10 @@
     {% endfor %}
 </div>
 
-<!-- Comparar com referência -->
-{% if tem_referencia %}
-<details style="margin-bottom:8px">
-    <summary style="font-size:12px;cursor:pointer">🔍 Comparar com referência</summary>
+<!-- Comparar com referência (atualizado dinamicamente) -->
+<div id="cmp-wrap" style="{% if not tem_referencia %}display:none{% endif %}">
+<details style="margin-bottom:8px" {% if auto_ref_etiqueta %}open{% endif %}>
+    <summary style="font-size:12px;cursor:pointer">Comparar com referencia</summary>
     <div class="compare-controls">
         <label>Ativo
             <select id="cmp-ativo" name="ativo_t">
@@ -24,7 +31,7 @@
                 {% endfor %}
             </select>
         </label>
-        <label>Referência
+        <label>Referencia
             <select id="cmp-ref" name="ref_t">
                 {% for r in referencias %}
                 <option value="{{ loop.index0 }}">{{ r.origem.aluno }} · T{{ (r.origem.treino_idx or 0) + 1 }} · {{ r.origem.data.split(' ')[0] if r.origem.data else '' }}</option>
@@ -35,7 +42,7 @@
     </div>
     <div id="comparacao-result" style="margin-top:12px"></div>
 </details>
-{% endif %}
+</div>
 
 <!-- Salvar no histórico -->
 <details>
@@ -63,3 +70,12 @@
 </div>
 {% endfor %}
 </div>
+
+{% if auto_ref_etiqueta %}
+<script>
+fetch('/referencia/render').then(r=>r.text()).then(html=>{
+    document.getElementById('ref-container').innerHTML = html;
+    if(typeof atualizarComparador === 'function') atualizarComparador();
+});
+</script>
+{% endif %}

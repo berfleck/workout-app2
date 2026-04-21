@@ -1,0 +1,21 @@
+{% if not registros %}
+<p style="font-size:13px;color:#9ca3af;padding:8px 0">Nenhum treino salvo para este aluno.</p>
+{% else %}
+<p style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.07em;margin:0 0 6px">
+    Historico ({{ registros|length }} registro{{ 's' if registros|length > 1 else '' }})</p>
+{% for reg in registros %}
+<div class="hist-aluno-item" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:4px;font-size:13px">
+    <div style="flex:1;min-width:0">
+        <span style="font-weight:600">{{ reg.etiqueta }}</span>
+        <span style="color:#9ca3af;margin-left:6px">{{ reg.data }} · {{ reg.n_treinos }} treino{{ 's' if reg.n_treinos > 1 else '' }}</span>
+    </div>
+    <div style="display:flex;gap:4px;flex-shrink:0">
+        <button type="button" class="btn btn-sm" onclick="carregarConfigDoHistorico('{{ reg.id }}')"
+                title="Carregar config no gerador">Carregar config</button>
+        <button type="button" class="btn btn-sm"
+                onclick="fixarTodosComoRef('{{ reg.id }}', {{ reg.n_treinos }})"
+                title="Fixar todos os treinos como referencia">Fixar ref</button>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
