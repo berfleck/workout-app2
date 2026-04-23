@@ -1,0 +1,44 @@
+{% if not historico %}
+<div class="text-center py-16 text-gray-400">
+    <div class="text-4xl mb-3">📋</div>
+    <div class="text-[15px] font-medium text-gray-700">
+        {% if aluno_filtro or busca %}Nenhum registro encontrado{% else %}Nenhum treino salvo ainda{% endif %}
+    </div>
+    {% if not aluno_filtro and not busca %}
+    <div class="text-sm mt-1.5">Gere um treino e clique em <b>Salvar no histórico</b> para registrá-lo aqui.</div>
+    {% endif %}
+</div>
+{% else %}
+<p class="meta-count">{{ historico|length }} registro(s)</p>
+
+{% set agrupado = {} %}
+{% for reg in historico %}
+    {% set aluno = reg.get('aluno', '—') or '—' %}
+    {% if aluno not in agrupado %}
+        {% set _ = agrupado.update({aluno: []}) %}
+    {% endif %}
+    {% set _ = agrupado[aluno].append(reg) %}
+{% endfor %}
+
+{% if aluno_filtro or agrupado|length == 1 %}
+    {# Sem agrupamento quando já filtrado ou só 1 aluno #}
+    {% for reg in historico %}
+    {% include '_historico_item.html' %}
+    {% endfor %}
+{% else %}
+    {% for aluno, regs in agrupado.items() %}
+    <details class="hist-grupo mb-2" {% if loop.first %}open{% endif %}>
+        <summary class="flex items-center gap-2 cursor-pointer py-2 px-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+            <span class="chevron text-xs text-gray-400 inline-block transition-transform">▶</span>
+            <span class="text-[13px] font-semibold text-gray-700">{{ aluno }}</span>
+            <span class="text-[11px] text-gray-400 ml-auto">{{ regs|length }} registro(s)</span>
+        </summary>
+        <div class="pl-1 mt-1">
+            {% for reg in regs %}
+            {% include '_historico_item.html' %}
+            {% endfor %}
+        </div>
+    </details>
+    {% endfor %}
+{% endif %}
+{% endif %}

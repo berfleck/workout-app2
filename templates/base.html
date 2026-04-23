@@ -5,166 +5,183 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BF Treinamento</title>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'DM Sans', sans-serif; background: #f9fafb; color: #111827; line-height: 1.5; }
-        .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['DM Sans', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            50:  '#fff7ed',
+                            100: '#fff3e6',
+                            500: '#e85d04',
+                            600: '#d4520a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        /* ── Component classes (reusable across templates) ── */
+        .btn { @apply px-4 py-2.5 rounded-lg text-sm font-semibold border border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50 inline-flex items-center gap-1.5 transition cursor-pointer font-[inherit]; }
+        .btn-primary { @apply bg-brand-500 text-white border-transparent hover:bg-brand-600; }
+        .btn-sm { @apply px-3 py-1.5 text-xs rounded-md; }
+        .btn-ghost { @apply bg-transparent border-none text-gray-400 hover:bg-gray-100 hover:text-brand-500 p-1 px-2 rounded-md text-base cursor-pointer transition font-[inherit]; }
+        .btn-danger { @apply text-red-600 border-red-200 hover:bg-red-50; }
+        .btn-icon { @apply p-1 px-2 text-sm leading-none min-w-0; }
 
-        /* Header */
-        .app-header { display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 8px; }
-        .app-header img { height: 48px; }
-        .app-header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-        .app-header p { font-size: 13px; color: #9ca3af; margin-top: 2px; }
+        .treino-card { @apply bg-white border border-gray-200 rounded-xl p-6; }
+        .treino-header { @apply flex flex-col items-start mb-3 gap-1.5; }
+        .treino-titulo { @apply text-sm font-bold; }
+        .treino-tipo { @apply text-[11px] text-gray-400; }
+        .treino-acoes { @apply flex gap-1 flex-wrap; }
 
-        /* Nav tabs */
-        .nav-tabs { display: flex; gap: 0; border-bottom: 1px solid #e5e7eb; margin-bottom: 24px; }
-        .nav-tab { padding: 10px 20px; font-size: 14px; font-weight: 500; color: #9ca3af; text-decoration: none; border-bottom: 2px solid transparent; transition: all 0.15s; cursor: pointer; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
-        .nav-tab:hover { color: #111827; }
-        .nav-tab.active { color: #111827; border-bottom-color: #e85d04; }
+        .bloco-label { @apply text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-3.5 mb-1.5; }
+        .bloco-header { @apply flex items-center gap-1.5; }
+        .exercicio { @apply flex items-center gap-3 py-2 pl-3 border-l-[3px] border-brand-500 mb-1; }
+        .exercicio-info { @apply flex-1 min-w-0; }
+        .exercicio-nome { @apply text-sm font-semibold; }
+        .exercicio-meta { @apply text-[11px] text-gray-400 mt-0.5; }
+        .prescr-badge { @apply inline-block bg-brand-100 text-brand-500 rounded-md px-1.5 py-px text-[11px] font-bold ml-1.5; }
+        .exercicio-acoes { @apply flex gap-0.5 shrink-0; }
+        .badge-novo { @apply inline-block text-[10px] font-semibold text-green-600 bg-green-100 rounded px-1.5 py-px ml-1 align-middle; }
 
-        /* Panels */
-        .config-panel { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; margin-bottom: 20px; }
-        .config-title { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+        .config-panel { @apply bg-white border border-gray-200 rounded-xl p-6 mb-5; }
+        .config-title { @apply text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-4; }
 
-        /* Grids */
-        .grupo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; margin-bottom: 20px; }
-        .grupo-grid label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; cursor: pointer; transition: all 0.15s; user-select: none; }
-        .grupo-grid label:hover { border-color: #e85d04; background: #fff7ed; }
-        .grupo-grid input[type="checkbox"] { accent-color: #e85d04; width: 16px; height: 16px; }
-        .grupo-grid input[type="checkbox"]:checked + span { font-weight: 600; color: #e85d04; }
-
-        .opcoes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
-        .campo { display: flex; flex-direction: column; gap: 4px; }
-        .campo label, .campo-label { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+        .campo { @apply flex flex-col gap-1; }
+        .campo-label { @apply text-[11px] font-semibold text-gray-500 uppercase tracking-wide; }
+        .campo label { @apply text-[11px] font-semibold text-gray-500 uppercase tracking-wide; }
         .campo select, .campo input[type="text"], .campo input[type="number"], .campo textarea {
-            width: 100%; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px;
-            font-size: 13px; font-family: inherit; background: white; }
-        .campo select:focus, .campo input:focus, .campo textarea:focus { outline: none; border-color: #e85d04; box-shadow: 0 0 0 3px rgba(232,93,4,0.1); }
-        .campo input[type="range"] { width: 100%; padding: 0; margin: 8px 0; accent-color: #e85d04; }
-        .range-row { display: flex; align-items: center; gap: 10px; }
-        .range-value { font-size: 13px; font-weight: 600; color: #e85d04; min-width: 20px; text-align: center; }
+            @apply w-full px-2.5 py-2 border border-gray-200 rounded-lg text-sm font-[inherit] bg-white;
+        }
+        .campo select:focus, .campo input:focus, .campo textarea:focus {
+            @apply outline-none border-brand-500 ring-2 ring-brand-500/10;
+        }
+        .campo input[type="range"] { @apply w-full p-0 my-2 accent-brand-500; }
+        .range-row { @apply flex items-center gap-2.5; }
+        .range-value { @apply text-sm font-semibold text-brand-500 min-w-[20px] text-center; }
 
-        /* Buttons */
-        .btn { padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; border: 1px solid #e5e7eb; background: white; color: #374151; transition: all 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
-        .btn:hover { border-color: #d1d5db; background: #f9fafb; }
-        .btn-primary { background: #e85d04; color: white; border: none; }
-        .btn-primary:hover { background: #d4520a; }
-        .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
-        .btn-ghost { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 4px 8px; font-size: 16px; border-radius: 6px; transition: all 0.15s; font-family: inherit; }
-        .btn-ghost:hover { background: #f3f4f6; color: #e85d04; }
-        .btn-danger { color: #dc2626; border-color: #fecaca; }
-        .btn-danger:hover { background: #fef2f2; }
-        .botoes-acao { display: flex; gap: 10px; margin-top: 8px; }
+        .input-field { @apply px-2.5 py-2 border border-gray-200 rounded-lg font-[inherit] bg-white; }
+        .input-field:focus { @apply outline-none border-brand-500 ring-2 ring-brand-500/10; }
 
-        /* Treino card */
-        .treino-card { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; margin-bottom: 16px; }
-        .treino-header { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 12px; gap: 6px; }
-        .treino-titulo-linha { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; }
-        .treino-titulo { font-size: 14px; font-weight: 700; }
-        .treino-tipo { font-size: 11px; color: #9ca3af; }
-        .treino-acoes { display: flex; gap: 4px; flex-wrap: wrap; }
-        .btn.btn-icon { padding: 4px 8px; font-size: 13px; line-height: 1; min-width: 0; }
+        .check-inline { @apply flex items-center gap-1.5 text-sm; }
+        .check-inline input { @apply accent-brand-500; }
 
-        /* Blocos & exercícios */
-        .bloco-label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; margin: 14px 0 6px; }
-        .bloco-header { display: flex; align-items: center; gap: 6px; }
-        .exercicio { display: flex; align-items: center; gap: 12px; padding: 8px 0 8px 12px; border-left: 3px solid #e85d04; margin-bottom: 4px; }
-        .exercicio-info { flex: 1; min-width: 0; }
-        .exercicio-nome { font-size: 14px; font-weight: 600; }
-        .exercicio-meta { font-size: 11px; color: #9ca3af; margin-top: 1px; }
-        .prescr-badge { display: inline-block; background: #fff3e6; color: #e85d04; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 700; margin-left: 6px; }
-        .exercicio-acoes { display: flex; gap: 2px; flex-shrink: 0; }
-        hr.thin { border: none; border-top: 1px solid #f3f4f6; margin: 8px 0; }
+        hr.thin { @apply border-t border-gray-100 my-2; border-bottom: none; border-left: none; border-right: none; }
 
-        /* Layout lado a lado dos treinos (dentro do container; stack em mobile) */
-        .resultado-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; align-items: start; }
-        .resultado-grid[data-n="1"] { grid-template-columns: 1fr; }
-        .resultado-grid .treino-card { margin-bottom: 0; }
+        .meta-count { @apply text-[11px] text-gray-400 my-1; }
 
-        /* Foco de edição: card em editar estoura o container (tela cheia);
-           visualizar fica colapsado, empilhado abaixo */
-        .resultado-grid.focando-edicao { display: block; }
+        .sub-panel { @apply bg-amber-50 border border-orange-200 rounded-xl px-4 py-3.5 my-2; }
+        .add-panel { @apply bg-green-50 border border-green-300 rounded-xl px-4 py-3.5 my-2; }
+        .novo-panel { @apply bg-sky-50 border border-sky-300 rounded-xl px-4 py-3.5 my-2; }
+        .panel-title { @apply text-xs font-bold mb-2; }
+        .panel-title-sub { @apply text-amber-800; }
+        .panel-title-add { @apply text-green-800; }
+        .panel-title-novo { @apply text-sky-800; }
+
+        .filtros-grid { @apply grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2 mb-2.5; }
+        .filtros-grid input, .filtros-grid select { @apply w-full px-2 py-1.5 border border-gray-200 rounded-md text-xs font-[inherit]; }
+
+        .ex-option { @apply flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm transition; }
+        .ex-option:hover { @apply bg-gray-100; }
+        .ex-option input[type="radio"] { @apply accent-brand-500; }
+        .ex-option-meta { @apply text-[11px] text-gray-400 ml-auto; }
+
+        .prescricao-inline { @apply flex items-center gap-1 shrink-0; }
+        .prescricao-inline input { @apply px-1 py-0.5 border border-gray-200 rounded text-xs text-center bg-gray-50 font-[inherit]; }
+        .prescricao-inline input:focus { @apply outline-none border-brand-500 bg-white; }
+        .prescricao-inline input[type="number"] { @apply w-9; }
+        .prescricao-inline input[type="text"] { @apply w-12; }
+        .prescricao-inline .sep { @apply text-[11px] text-gray-400 whitespace-nowrap; }
+
+        .drag-handle { @apply cursor-grab text-gray-300 px-1 text-[15px] select-none shrink-0; }
+        .drag-handle:active { @apply cursor-grabbing; }
+        .novo-bloco-zone { @apply border-2 border-dashed border-gray-300 rounded-lg p-3 mt-2 text-center text-xs text-gray-400 min-h-[44px] flex items-center justify-center transition; }
+
+        .hist-card { @apply bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 mb-2; }
+        .hist-titulo { @apply text-[15px] font-semibold; }
+        .hist-meta { @apply text-xs text-gray-500 mt-1; }
+        .hist-acoes { @apply flex gap-1.5 mt-2 items-center; }
+
+        .aluno-card { @apply bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-2 flex items-center gap-3; }
+        .aluno-card-info { @apply flex-1; }
+        .aluno-card-nome { @apply text-[15px] font-semibold; }
+        .aluno-card-meta { @apply text-xs text-gray-500 mt-0.5; }
+        .aluno-card-obs { @apply text-xs text-gray-400 mt-0.5; }
+
+        .ref-badge { @apply inline-block text-[9px] font-bold text-indigo-600 bg-indigo-100 rounded px-1 align-middle ml-1; }
+
+        .comparacao-panel { @apply bg-white border border-gray-200 rounded-xl p-5 mb-4; }
+        .comparacao-grid { @apply grid grid-cols-1 sm:grid-cols-2 gap-5; }
+
+        .auto-ref-badge { @apply bg-blue-50 border border-blue-300 rounded-lg px-3 py-2 text-xs text-blue-800 mb-2; }
+
+        .sucesso { @apply text-green-800 bg-green-50 border border-green-300 rounded-lg px-4 py-2.5 text-sm font-medium; }
+        .erro { @apply text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm font-medium; }
+
+        .form-grid { @apply grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3; }
+
+        .resultado-grid { @apply grid gap-2.5 items-start; }
+        .resultado-grid:not([data-n="1"]) { @apply grid-cols-[repeat(auto-fit,minmax(280px,1fr))]; }
+
+        .template-grid { @apply grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2 mb-3; }
+        .template-btn { @apply px-4 py-2.5 border border-gray-200 rounded-lg bg-white text-sm font-[inherit] cursor-pointer text-left transition hover:border-brand-500 hover:bg-brand-50; }
+
+        .demandas-grid { @apply grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 my-3; }
+    </style>
+    <style>
+        /* HTMX indicators */
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display: inline-block; }
+        .htmx-request .htmx-hide { display: none; }
+
+        /* Tab content */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Details / accordion */
+        details > summary { list-style: none; cursor: pointer; }
+        details > summary::-webkit-details-marker { display: none; }
+        details[open] > summary .chevron { transform: rotate(90deg); }
+        .chevron { transition: transform 0.2s; }
+
+        /* SortableJS */
+        .sortable-ghost { opacity: 0.35; background: #fff7ed !important; border-radius: 6px; }
+        .sortable-chosen { box-shadow: 0 2px 10px rgba(232,93,4,0.2); }
+        .novo-bloco-zone.drag-over { border-color: #e85d04; background: #fff7ed; color: #e85d04; }
+
+        /* Foco de edição */
+        .resultado-grid.focando-edicao { display: block !important; }
         .resultado-grid.focando-edicao .treino-card { margin-bottom: 10px; }
         .resultado-grid.focando-edicao .treino-card.modo-editar { width: 100%; }
         .resultado-grid.focando-edicao .treino-card.modo-visualizar { padding: 10px 14px; opacity: 0.7; }
         .resultado-grid.focando-edicao .treino-card.modo-visualizar > *:not(.treino-header) { display: none; }
         .resultado-grid.focando-edicao .treino-card.modo-visualizar .treino-header { margin-bottom: 0; }
 
-        /* Modo visualizar — compacto (sem meta, espaçamento reduzido) */
-        .treino-card.modo-visualizar { padding: 14px 18px; margin-bottom: 10px; }
+        /* Diff colors */
+        .diff-removido { background: #fef2f2 !important; border-left-color: #f87171 !important; }
+        .diff-adicionado { background: #f0fdf4 !important; border-left-color: #4ade80 !important; }
+
+        /* Modo visualizar compacto */
+        .treino-card.modo-visualizar { padding: 14px 18px; }
         .treino-card.modo-visualizar .treino-header { margin-bottom: 8px; }
-        .treino-card.modo-visualizar .bloco-label { margin: 8px 0 2px; }
+        .treino-card.modo-visualizar .bloco-label { margin-top: 8px; margin-bottom: 2px; }
         .treino-card.modo-visualizar .exercicio { padding: 3px 0 3px 10px; margin-bottom: 2px; border-left-width: 2px; }
         .treino-card.modo-visualizar .exercicio-nome { font-size: 13px; }
         .treino-card.modo-visualizar hr.thin { margin: 4px 0; }
 
-        /* Prescription inline (edit mode, inside .exercicio row) */
-        .prescricao-inline { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
-        .prescricao-inline input { padding: 3px 4px; border: 1px solid #e5e7eb; border-radius: 5px; font-size: 12px; font-family: inherit; text-align: center; background: #f9fafb; }
-        .prescricao-inline input[type="number"] { width: 36px; }
-        .prescricao-inline input[type="text"] { width: 50px; }
-        .prescricao-inline input:focus { outline: none; border-color: #e85d04; background: white; }
-        .prescricao-inline .sep { font-size: 11px; color: #9ca3af; white-space: nowrap; }
-
-        /* Sub panel (substituição) */
-        .sub-panel { background: #fffbf5; border: 1px solid #fed7aa; border-radius: 10px; padding: 14px 18px; margin: 8px 0; }
-        .add-panel { background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 14px 18px; margin: 8px 0; }
-        .novo-panel { background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 10px; padding: 14px 18px; margin: 8px 0; }
-        .mover-panel { background: #f5f3ff; border: 1px solid #c4b5fd; border-radius: 10px; padding: 14px 18px; margin: 8px 0; }
-        .panel-title { font-size: 12px; font-weight: 700; margin: 0 0 8px 0; }
-        .panel-title-sub { color: #92400e; }
-        .panel-title-add { color: #166534; }
-        .panel-title-novo { color: #075985; }
-        .panel-title-mover { color: #5b21b6; }
-
-        /* Exercise search results */
-        .ex-option { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.1s; }
-        .ex-option:hover { background: #f3f4f6; }
-        .ex-option input[type="radio"] { accent-color: #e85d04; }
-        .ex-option-meta { font-size: 11px; color: #9ca3af; margin-left: auto; }
-        .meta-count { font-size: 11px; color: #9ca3af; margin: 4px 0; }
+        /* Scroll containers */
         [id^="add-results-"], [id^="nb-results-"] { max-height: 240px; overflow-y: auto; }
-        .drag-handle { cursor: grab; color: #d1d5db; padding: 0 4px; font-size: 15px; user-select: none; flex-shrink: 0; }
-        .drag-handle:active { cursor: grabbing; }
-        .sortable-ghost { opacity: 0.35; background: #fff7ed !important; border-radius: 6px; }
-        .sortable-chosen { box-shadow: 0 2px 10px rgba(232,93,4,0.2); }
-        .novo-bloco-zone { border: 2px dashed #d1d5db; border-radius: 8px; padding: 12px; margin-top: 8px; text-align: center; font-size: 12px; color: #9ca3af; min-height: 44px; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s, background 0.15s; }
-        .novo-bloco-zone.drag-over { border-color: #e85d04; background: #fff7ed; color: #e85d04; }
-        .filtros-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
-        .filtros-grid input, .filtros-grid select { width: 100%; padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; font-family: inherit; }
 
-        /* Hierarchy UI */
-        .regiao-header { background: #fff7ed; border-left: 3px solid #e85d04; padding: 5px 10px; margin: 4px 0 6px; border-radius: 0 4px 4px 0; }
-        .regiao-header span { font-size: 11px; font-weight: 700; color: #c2410c; text-transform: uppercase; letter-spacing: 0.06em; }
-        .hier-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
-        .hier-indent-1 { padding-left: 16px; }
-        .hier-indent-2 { padding-left: 32px; }
-        .hier-toggle { font-size: 11px; color: #e85d04; cursor: pointer; background: none; border: none; font-family: inherit; padding: 2px 6px; border-radius: 4px; }
-        .hier-toggle:hover { background: #fff7ed; }
-
-        /* Demandas sliders */
-        .demandas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin: 12px 0; }
-
-        /* Aluno card */
-        .aluno-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
-        .aluno-card-info { flex: 1; }
-        .aluno-card-nome { font-size: 15px; font-weight: 600; }
-        .aluno-card-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
-        .aluno-card-obs { font-size: 12px; color: #9ca3af; margin-top: 2px; }
-
-        /* Historico card */
-        .hist-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 18px; margin-bottom: 8px; }
-        .hist-titulo { font-size: 15px; font-weight: 600; }
-        .hist-meta { font-size: 12px; color: #6b7280; margin-top: 4px; }
-        .hist-acoes { display: flex; gap: 6px; margin-top: 8px; }
-
-        /* Painel de referência (slim) */
-        .ref-panel-slim { margin-bottom: 12px; }
+        /* Referência panel */
         .ref-panel-slim > details { margin-bottom: 0; border: 1px solid #c7d2fe; border-left: 3px solid #6366f1; border-radius: 8px; background: #f8fafc; }
         .ref-panel-slim > details > summary.ref-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 12px; font-weight: 500; color: #374151; list-style: none; }
-        .ref-panel-slim > details > summary.ref-bar::before { content: '▸'; color: #6366f1; font-size: 10px; }
-        .ref-panel-slim > details[open] > summary.ref-bar::before { content: '▾'; }
+        .ref-panel-slim > details > summary.ref-bar::before { content: '\25B8'; color: #6366f1; font-size: 10px; }
+        .ref-panel-slim > details[open] > summary.ref-bar::before { content: '\25BE'; }
         .ref-bar-titulo { font-weight: 700; color: #4f46e5; white-space: nowrap; }
         .ref-bar-resumo { flex: 1; color: #9ca3af; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ref-bar-limpar { font-size: 11px; color: #9ca3af; background: transparent; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-family: inherit; }
@@ -186,150 +203,108 @@
         .ref-exercicio { border-left-color: #a5b4fc !important; opacity: 0.85; }
         .ref-exercicio .exercicio-nome { font-size: 12px; }
         .ref-exercicio .exercicio-meta { font-size: 10px; }
-        .ref-badge { display: inline-block; font-size: 9px; font-weight: 700; color: #4f46e5; background: #e0e7ff; border-radius: 3px; padding: 1px 4px; vertical-align: middle; margin-left: 4px; }
         .ref-copiar-btn { font-size: 11px; color: #6366f1; padding: 2px 8px; border: 1px solid #c7d2fe; border-radius: 6px; background: #eef2ff; cursor: pointer; font-family: inherit; transition: background 0.15s; }
         .ref-copiar-btn:hover { background: #e0e7ff; }
 
-        /* Controles de comparação */
-        .compare-controls { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-        .compare-controls label { display: flex; flex-direction: column; font-size: 11px; color: #6b7280; gap: 2px; }
-        .compare-controls select { font-size: 12px; padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 6px; background: white; font-family: inherit; color: #374151; }
-
-        /* Comparação diff */
-        .comparacao-panel { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 20px; margin-bottom: 16px; }
-        .comparacao-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
-        .comparacao-stats { font-size: 12px; color: #6b7280; }
-        .comparacao-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .diff-removido { background: #fef2f2 !important; border-left-color: #f87171 !important; }
-        .diff-adicionado { background: #f0fdf4 !important; border-left-color: #4ade80 !important; }
-        @media (max-width: 700px) { .comparacao-grid { grid-template-columns: 1fr; } }
-
-        /* Auto-ref badge */
-        .auto-ref-badge { background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #1e40af; margin-bottom: 8px; }
-        .badge-novo { display: inline-block; font-size: 10px; font-weight: 600; color: #16a34a; background: #dcfce7; border-radius: 4px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; }
-
-        /* Feedback */
-        .aviso { text-align: center; color: #9ca3af; font-size: 14px; padding: 40px 0; }
-        .sucesso { color: #166534; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500; }
-        .erro { color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500; }
-        .separador { display: flex; align-items: center; gap: 12px; margin: 24px 0; font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; }
-        .separador::before, .separador::after { content: ''; flex: 1; border-top: 1px solid #e5e7eb; }
-
-        /* HTMX */
-        .htmx-indicator { display: none; }
-        .htmx-request .htmx-indicator { display: inline-block; }
-        .htmx-request .htmx-hide { display: none; }
-        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #e85d04; border-radius: 50%; animation: spin 0.6s linear infinite; }
+        /* Spinner */
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Template buttons */
-        .template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 12px; }
-        .template-btn { padding: 10px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: white; font-size: 13px; font-family: inherit; cursor: pointer; text-align: left; transition: all 0.15s; }
-        .template-btn:hover { border-color: #e85d04; background: #fff7ed; }
-
-        /* Collapsible */
-        details { margin-bottom: 8px; }
-        details summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #374151; padding: 8px 0; list-style: none; }
-        details summary::-webkit-details-marker { display: none; }
-        details summary::before { content: '▸ '; color: #e85d04; }
-        details[open] summary::before { content: '▾ '; }
-
-        /* Tabs content */
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-
-        /* Checkbox inline */
-        .check-inline { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-        .check-inline input { accent-color: #e85d04; }
-
-        /* Form grid */
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-        @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #e85d04; border-radius: 50%; animation: spin 0.6s linear infinite; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="app-header">
-            <img src="/static/logo.png" alt="BF">
-            <div>
-                <h1>BF Treinamento</h1>
-                <p>Gerador de sessões personalizadas</p>
-            </div>
-        </div>
+<body class="bg-gray-50 text-gray-900 antialiased font-sans">
 
-        <div class="nav-tabs">
-            <button class="nav-tab {% if active_tab == 'treinos' or not active_tab %}active{% endif %}"
-                    onclick="showTab('treinos')">🏋️ Treinos</button>
-            <button class="nav-tab {% if active_tab == 'alunos' %}active{% endif %}"
+<!-- Header -->
+<header class="border-b border-gray-200 bg-white sticky top-0 z-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-brand-500 text-white grid place-items-center font-bold text-sm shrink-0">BF</div>
+        <div class="min-w-0">
+            <h1 class="text-sm sm:text-base font-bold tracking-tight truncate">BF Treinamento</h1>
+            <p class="text-[10px] sm:text-xs text-gray-400 hidden sm:block">Gerador de treinos personalizados</p>
+        </div>
+        <nav class="ml-auto flex gap-1 text-xs sm:text-sm">
+            <button class="nav-tab px-2 sm:px-3 py-1.5 rounded-md font-medium transition {% if active_tab == 'treinos' or not active_tab %}bg-gray-100 text-gray-900{% else %}text-gray-500 hover:text-gray-900 hover:bg-gray-100{% endif %}"
+                    onclick="showTab('treinos')">🏋️<span class="hidden sm:inline"> Treinos</span></button>
+            <button class="nav-tab px-2 sm:px-3 py-1.5 rounded-md font-medium transition {% if active_tab == 'alunos' %}bg-gray-100 text-gray-900{% else %}text-gray-500 hover:text-gray-900 hover:bg-gray-100{% endif %}"
                     hx-get="/alunos" hx-target="#tab-alunos" hx-swap="innerHTML"
-                    onclick="showTab('alunos')">👥 Alunos</button>
-            <button class="nav-tab {% if active_tab == 'historico' %}active{% endif %}"
+                    onclick="showTab('alunos')">👥<span class="hidden sm:inline"> Alunos</span></button>
+            <button class="nav-tab px-2 sm:px-3 py-1.5 rounded-md font-medium transition {% if active_tab == 'historico' %}bg-gray-100 text-gray-900{% else %}text-gray-500 hover:text-gray-900 hover:bg-gray-100{% endif %}"
                     hx-get="/historico" hx-target="#tab-historico" hx-swap="innerHTML"
-                    onclick="showTab('historico')">📋 Histórico</button>
-        </div>
-
-        <div id="tab-treinos" class="tab-content active">{% block treinos %}{% endblock %}</div>
-        <div id="tab-alunos" class="tab-content">{% block alunos %}{% endblock %}</div>
-        <div id="tab-historico" class="tab-content">{% block historico %}{% endblock %}</div>
+                    onclick="showTab('historico')">📚<span class="hidden sm:inline"> Histórico</span></button>
+        </nav>
     </div>
+</header>
 
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
-    <script>
-    function copiarBloco(refT, blocoIdx, destT) {
-        htmx.ajax('POST', `/referencia/copiar-bloco/${refT}/${blocoIdx}/para/${destT}`, {
-            target: `#treino-${destT}`,
-            swap: 'innerHTML'
-        });
-    }
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+    <div id="tab-treinos" class="tab-content active">{% block treinos %}{% endblock %}</div>
+    <div id="tab-alunos" class="tab-content">{% block alunos %}{% endblock %}</div>
+    <div id="tab-historico" class="tab-content">{% block historico %}{% endblock %}</div>
+</div>
 
-    function compararTreinos() {
-        const a = document.getElementById('cmp-ativo');
-        const r = document.getElementById('cmp-ref');
-        if (!a || !r) return;
-        htmx.ajax('GET', `/comparar/${r.value}/${a.value}`, {
-            target: '#comparacao-result',
-            swap: 'innerHTML'
-        });
-    }
-
-    function atualizarComparador() {
-        fetch('/referencia/lista').then(r => r.json()).then(refs => {
-            const wrap = document.getElementById('cmp-wrap');
-            if (!wrap) return;
-            if (refs.length === 0) {
-                wrap.style.display = 'none';
-                return;
-            }
-            wrap.style.display = '';
-            const sel = document.getElementById('cmp-ref');
-            if (sel) {
-                sel.innerHTML = refs.map(r =>
-                    `<option value="${r.idx}">${r.aluno} · T${(r.treino_idx||0)+1} · ${r.data}</option>`
-                ).join('');
-            }
-        }).catch(() => {});
-    }
-
-    function showTab(name) {
-        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-        document.getElementById('tab-' + name).classList.add('active');
-        event.target.classList.add('active');
-    }
-
-    function atualizarFocoEdicao() {
-        document.querySelectorAll('.resultado-grid').forEach(grid => {
-            const temEditar = grid.querySelector('.treino-card.modo-editar');
-            grid.classList.toggle('focando-edicao', !!temEditar);
-        });
-    }
-    document.body.addEventListener('htmx:afterSwap', function(evt) {
-        atualizarFocoEdicao();
-        if (evt.detail.target && evt.detail.target.id === 'ref-container') {
-            atualizarComparador();
-        }
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+function copiarBloco(refT, blocoIdx, destT) {
+    htmx.ajax('POST', `/referencia/copiar-bloco/${refT}/${blocoIdx}/para/${destT}`, {
+        target: `#treino-${destT}`,
+        swap: 'innerHTML'
     });
-    document.addEventListener('DOMContentLoaded', atualizarFocoEdicao);
-    </script>
+}
+
+function compararTreinos() {
+    const a = document.getElementById('cmp-ativo');
+    const r = document.getElementById('cmp-ref');
+    if (!a || !r) return;
+    htmx.ajax('GET', `/comparar/${r.value}/${a.value}`, {
+        target: '#comparacao-result',
+        swap: 'innerHTML'
+    });
+}
+
+function atualizarComparador() {
+    fetch('/referencia/lista').then(r => r.json()).then(refs => {
+        const wrap = document.getElementById('cmp-wrap');
+        if (!wrap) return;
+        if (refs.length === 0) {
+            wrap.style.display = 'none';
+            return;
+        }
+        wrap.style.display = '';
+        const sel = document.getElementById('cmp-ref');
+        if (sel) {
+            sel.innerHTML = refs.map(r =>
+                `<option value="${r.idx}">${r.aluno} · T${(r.treino_idx||0)+1} · ${r.data}</option>`
+            ).join('');
+        }
+    }).catch(() => {});
+}
+
+function showTab(name) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    document.querySelectorAll('.nav-tab').forEach(t => {
+        t.classList.remove('bg-gray-100', 'text-gray-900');
+        t.classList.add('text-gray-500');
+    });
+    event.target.closest('.nav-tab').classList.add('bg-gray-100', 'text-gray-900');
+    event.target.closest('.nav-tab').classList.remove('text-gray-500');
+}
+
+function atualizarFocoEdicao() {
+    document.querySelectorAll('.resultado-grid').forEach(grid => {
+        const temEditar = grid.querySelector('.treino-card.modo-editar');
+        grid.classList.toggle('focando-edicao', !!temEditar);
+    });
+}
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    atualizarFocoEdicao();
+    if (evt.detail.target && evt.detail.target.id === 'ref-container') {
+        atualizarComparador();
+        if (typeof syncRefs === 'function') syncRefs();
+    }
+    if (evt.detail.target && evt.detail.target.id === 'resultado') {
+        if (typeof showPanel === 'function') showPanel('resultado');
+    }
+});
+document.addEventListener('DOMContentLoaded', atualizarFocoEdicao);
+</script>
 </body>
 </html>

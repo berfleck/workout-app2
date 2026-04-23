@@ -227,6 +227,7 @@ def index():
         tem_referencia=bool(referencias),
     )
 
+
 # ══════════════════════════════════════════════════════════════
 # ROTAS — GERAÇÃO DE TREINOS
 # ══════════════════════════════════════════════════════════════
@@ -792,8 +793,22 @@ def download_zip(aluno):
 
 @app.route("/historico")
 def historico_page():
-    return render_template("historico.html", historico=carregar_historico(),
-                           padroes_labels=PADROES_LABELS)
+    aluno_filtro = request.args.get("aluno", "").strip()
+    busca = request.args.get("busca", "").strip()
+    registros = carregar_historico()
+    if aluno_filtro:
+        registros = [r for r in registros if r.get("aluno") == aluno_filtro]
+    if busca:
+        busca_lower = busca.lower()
+        registros = [r for r in registros if busca_lower in (r.get("etiqueta") or "").lower()]
+    alunos_historico = nomes_unicos_historico()
+    partial = request.args.get("partial") == "1"
+    tpl = "historico.html" if not partial else "_historico_lista.html"
+    return render_template(tpl, historico=registros,
+                           padroes_labels=PADROES_LABELS,
+                           alunos_historico=alunos_historico,
+                           aluno_filtro=aluno_filtro,
+                           busca=busca)
 
 @app.route("/aluno-historico")
 def aluno_historico():
@@ -994,11 +1009,25 @@ def historico_ver(reg_id):
 @app.route("/historico/<reg_id>/apagar", methods=["DELETE"])
 def historico_apagar(reg_id):
     deletar_historico(reg_id)
-    return render_template("historico.html", historico=carregar_historico(), padroes_labels=PADROES_LABELS)
+    registros = carregar_historico()
+    return render_template("historico.html", historico=registros,
+                           padroes_labels=PADROES_LABELS,
+                           alunos_historico=nomes_unicos_historico(),
+                           aluno_filtro="", busca="")
 
 # ══════════════════════════════════════════════════════════════
 # ROTAS — ALUNOS
 # ══════════════════════════════════════════════════════════════
+
+def _render_alunos_com_dropdown(alunos):
+    """Renderiza alunos.html + dropdown OOB para atualizar sel-aluno na aba treinos."""
+    nomes_alunos = {a["nome"] for a in alunos}
+    nomes_hist = [n for n in nomes_unicos_historico() if n not in nomes_alunos]
+    html = render_template("alunos.html", alunos=alunos)
+    html += render_template("_aluno_dropdown.html",
+                            alunos_dropdown=alunos,
+                            nomes_hist_dropdown=nomes_hist)
+    return html
 
 @app.route("/alunos")
 def alunos_page():
@@ -1019,7 +1048,7 @@ def aluno_novo():
         restricoes=[r.strip() for r in request.form.get("restricoes", "").split(",") if r.strip()],
         obs=request.form.get("obs", "").strip(),
     )
-    return render_template("alunos.html", alunos=carregar_alunos())
+    return _render_alunos_com_dropdown(carregar_alunos())
 
 @app.route("/alunos/<int:i>/editar", methods=["POST"])
 def aluno_editar(i):
@@ -1036,12 +1065,12 @@ def aluno_editar(i):
         restricoes=[r.strip() for r in request.form.get("restricoes", "").split(",") if r.strip()],
         obs=request.form.get("obs", "").strip(),
     )
-    return render_template("alunos.html", alunos=carregar_alunos())
+    return _render_alunos_com_dropdown(carregar_alunos())
 
 @app.route("/alunos/<int:i>/deletar", methods=["DELETE"])
 def aluno_deletar(i):
     deletar_aluno(i)
-    return render_template("alunos.html", alunos=carregar_alunos())
+    return _render_alunos_com_dropdown(carregar_alunos())
 
 # ══════════════════════════════════════════════════════════════
 

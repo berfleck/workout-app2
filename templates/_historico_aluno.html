@@ -1,21 +1,28 @@
 {% if not registros %}
-<p style="font-size:13px;color:#9ca3af;padding:8px 0">Nenhum treino salvo para este aluno.</p>
+<p class="text-sm text-gray-400 py-2">Nenhum treino salvo para este aluno.</p>
 {% else %}
-<p style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.07em;margin:0 0 6px">
-    Historico ({{ registros|length }} registro{{ 's' if registros|length > 1 else '' }})</p>
-{% for reg in registros %}
-<div class="hist-aluno-item" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:4px;font-size:13px">
-    <div style="flex:1;min-width:0">
-        <span style="font-weight:600">{{ reg.etiqueta }}</span>
-        <span style="color:#9ca3af;margin-left:6px">{{ reg.data }} · {{ reg.n_treinos }} treino{{ 's' if reg.n_treinos > 1 else '' }}</span>
+<div class="bg-white border border-gray-200 rounded-xl p-4">
+    <div class="flex items-center justify-between mb-3">
+        <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Histórico</label>
+        <span class="text-[10px] text-gray-400">{{ registros|length }} registro{{ 's' if registros|length > 1 else '' }}</span>
     </div>
-    <div style="display:flex;gap:4px;flex-shrink:0">
-        <button type="button" class="btn btn-sm" onclick="carregarConfigDoHistorico('{{ reg.id }}')"
-                title="Carregar config no gerador">Carregar config</button>
-        <button type="button" class="btn btn-sm"
-                onclick="fixarTodosComoRef('{{ reg.id }}', {{ reg.n_treinos }})"
-                title="Fixar todos os treinos como referencia">Fixar ref</button>
-    </div>
+    <ul class="space-y-1.5">
+    {% for reg in registros %}
+        <li class="group flex items-center justify-between text-xs rounded-md hover:bg-gray-50 px-2 py-1.5">
+            <div class="min-w-0 flex-1">
+                <div class="font-medium text-gray-800 truncate">{{ reg.etiqueta }}</div>
+                <div class="text-gray-400 text-[10px]">{{ reg.data }} · {{ reg.n_treinos }} treino{{ 's' if reg.n_treinos > 1 else '' }}</div>
+            </div>
+            <div class="hidden group-hover:flex gap-1 shrink-0">
+                <button type="button" class="btn btn-sm text-gray-400 hover:text-brand-500"
+                        onclick="carregarConfigDoHistorico('{{ reg.id }}')"
+                        title="Carregar config no gerador">⚙</button>
+                <button type="button" class="btn btn-sm text-gray-400 hover:text-brand-500"
+                        onclick="fixarTodosComoRef('{{ reg.id }}', {{ reg.n_treinos }})"
+                        title="Fixar todos como referência">📌</button>
+            </div>
+        </li>
+    {% endfor %}
+    </ul>
 </div>
-{% endfor %}
 {% endif %}

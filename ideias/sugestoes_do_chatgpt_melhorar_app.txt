@@ -1,0 +1,211 @@
+Beleza — vou te descrever como seria um **editor de treino nível produto bom de verdade**, pensado pro teu caso (rápido de usar no dia a dia de academia).
+
+---
+
+## 🧠 Ideia central
+
+Você sai de:
+
+> “preencher formulário e gerar”
+
+Pra:
+
+> “montar e ajustar treino como se estivesse mexendo em peças”
+
+---
+
+## 🏗️ Estrutura da tela
+
+Imagina isso:
+
+* esquerda: aluno + histórico
+* centro: treino (editor principal)
+* direita: biblioteca / busca / sugestões
+
+O foco vira o **treino em si**, não os controles.
+
+---
+
+## 🎯 1. Editor visual com drag-and-drop
+
+Cada bloco vira um “container”:
+
+```
+Bloco A
+[ Supino ] [ Remada ]
+
+Bloco B
+[ Agachamento ] [ Leg press ]
+```
+
+Você pode:
+
+* arrastar exercício dentro do bloco (reordenar)
+* arrastar entre blocos
+* arrastar da biblioteca → pro treino
+* arrastar pra fora → remover
+
+👉 Isso é o tal do *multi-zona*
+
+---
+
+## ⚡ 2. Adição ultra rápida (sem clique)
+
+Ao invés de:
+
+* clicar botão
+* abrir lista
+* escolher
+
+Você faz:
+
+* aperta `/` ou botão “+”
+* digita: `supino`
+* ↓ ↓ enter
+
+Pronto, exercício entrou.
+
+Isso é tipo:
+
+* autocomplete + teclado
+* fluxo muito mais rápido no uso real
+
+---
+
+## 🔁 3. Substituição inteligente
+
+Clica em um exercício → abre opções:
+
+* 🔄 substituir
+* 📌 fixar
+* ❌ remover
+
+Se clicar “substituir”:
+
+* já sugere exercícios similares (mesma região/padrão)
+
+👉 isso conecta direto com tua lógica de similaridade
+
+---
+
+## 🧬 4. Feedback do sistema (muito importante)
+
+Enquanto você edita, o sistema mostra:
+
+* “⚠️ dois exercícios parecidos no mesmo bloco”
+* “✔️ boa variação em relação ao treino anterior”
+* “⚠️ excesso de anterior de coxa”
+
+👉 teu motor vira **assistente**, não só gerador
+
+---
+
+## 🕒 5. Integração com histórico (fluida)
+
+Na lateral:
+
+* arrasta exercício de treino antigo → pro atual
+* fixa como referência com 1 clique
+* compara rapidamente
+
+Sem navegar de página.
+
+---
+
+## 📱 6. Mobile de verdade
+
+No celular:
+
+* lista vertical
+* blocos como “cards”
+* botão “+ exercício” sempre visível
+* drag simplificado ou substituído por botões
+
+👉 aqui o design do protótipo já ajuda bastante
+
+---
+
+## ⚙️ 7. Configuração vira secundária
+
+Hoje:
+
+> config é o centro
+
+Nesse modelo:
+
+> config vira “ajuste fino”
+
+Exemplo:
+
+* botão “gerar base”
+* depois você só ajusta manualmente
+
+---
+
+## 🧩 8. Geração parcial (muito poderoso)
+
+Em vez de:
+
+* gerar treino inteiro
+
+Você pode:
+
+* regenerar só um bloco
+* regenerar só 1 exercício
+
+👉 isso deixa o fluxo muito mais controlado
+
+---
+
+## 🔥 O grande salto de UX
+
+Hoje teu app é:
+
+> “configurar → gerar → talvez ajustar”
+
+Esse modelo vira:
+
+> “gerar base → editar rápido → refinar com inteligência”
+
+---
+
+## 💡 Insight importante
+
+Teu diferencial não é UI.
+
+É isso aqui:
+
+* regras de fadiga
+* similaridade
+* hierarquia
+
+👉 Esse editor só **expõe melhor essa inteligência**
+
+---
+
+## 🧭 Caminho realista pra chegar nisso
+
+Não tenta fazer tudo agora.
+
+Ordem inteligente:
+
+1. **Tailwind + layout limpo** (o protótipo)
+2. Melhorar fluxo de edição (sem drag ainda)
+3. Adicionar autocomplete decente
+4. Só depois pensar em drag-and-drop
+
+---
+
+## 🧠 Em uma frase
+
+Você está saindo de:
+
+> um gerador de treinos
+
+Pra:
+
+> uma ferramenta de composição de treinos
+
+---
+
+Se quiser, posso te dizer **qual dessas features te daria mais impacto imediato no teu dia a dia como treinador** (não técnico, uso real).

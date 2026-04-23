@@ -1,45 +1,31 @@
-<p style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 2px">
-    Registros salvos</p>
-<p style="font-size:20px;font-weight:600;margin:0 0 16px">Histórico de treinos</p>
+<p class="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">Registros salvos</p>
+<p class="text-xl font-semibold mb-3">Histórico de treinos</p>
 
-{% if not historico %}
-<div style="text-align:center;padding:60px 20px;color:#9ca3af">
-    <div style="font-size:40px;margin-bottom:12px">📋</div>
-    <div style="font-size:15px;font-weight:500;color:#374151">Nenhum treino salvo ainda</div>
-    <div style="font-size:13px;margin-top:6px">Gere um treino e clique em <b>💾 Salvar no histórico</b> para registrá-lo aqui.</div>
-</div>
-{% else %}
-<p class="meta-count">{{ historico|length }} registro(s)</p>
-
-{% for reg in historico %}
-<div class="hist-card">
-    <div class="hist-titulo">{{ reg.etiqueta }}</div>
-    <div class="hist-meta">
-        <b>Aluno/Turma:</b> {{ reg.get('aluno', '—') }} ·
-        <b>Data:</b> {{ reg.get('data', '—') }} ·
-        <b>{{ reg.get('n_treinos', reg.get('sessoes', [])|length) }} treino(s)</b>
+<!-- Filtros -->
+<div class="flex gap-2 mb-4 items-end flex-wrap">
+    <div class="flex-1 min-w-[140px]">
+        <label class="text-[11px] text-gray-500 font-medium block mb-0.5">Aluno / Turma</label>
+        <select name="aluno" class="input-field text-sm w-full"
+                hx-get="/historico" hx-target="#tab-historico" hx-swap="innerHTML"
+                hx-include="[name='busca']"
+                hx-vals='{"partial":"0"}'>
+            <option value="">Todos</option>
+            {% for a in alunos_historico %}
+            <option value="{{ a }}" {% if a == aluno_filtro %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+        </select>
     </div>
-    <div class="hist-acoes">
-        <details style="margin:0">
-            <summary style="font-size:12px;padding:4px 0">👁 Ver treinos</summary>
-            <div hx-get="/historico/{{ reg.id }}/ver" hx-trigger="revealed" hx-swap="innerHTML"
-                 style="margin-top:8px">
-                <span class="spinner"></span> Carregando...
-            </div>
-        </details>
-        <button class="btn btn-sm"
-                hx-post="/historico/{{ reg.id }}/carregar"
-                hx-target="#resultado"
-                onclick="showTab('treinos'); document.querySelector('[onclick*=treinos]').classList.add('active')">
-            ↩ Carregar
-        </button>
-        <button class="btn btn-sm btn-danger"
-                hx-delete="/historico/{{ reg.id }}/apagar"
-                hx-target="#tab-historico" hx-swap="innerHTML"
-                hx-confirm="Apagar este registro?">
-            🗑 Apagar
-        </button>
+    <div class="flex-1 min-w-[140px]">
+        <label class="text-[11px] text-gray-500 font-medium block mb-0.5">Buscar etiqueta</label>
+        <input type="search" name="busca" value="{{ busca }}" placeholder="Ex: Semana 1..."
+               class="input-field text-sm w-full"
+               hx-get="/historico" hx-target="#tab-historico" hx-swap="innerHTML"
+               hx-trigger="input changed delay:300ms, search"
+               hx-include="[name='aluno']">
     </div>
 </div>
-{% endfor %}
-{% endif %}
+
+<!-- Lista de registros -->
+<div id="hist-lista">
+    {% include '_historico_lista.html' %}
+</div>

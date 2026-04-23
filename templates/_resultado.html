@@ -1,15 +1,19 @@
-<div class="separador">{{ sessoes|length }} treino{{ 's' if sessoes|length > 1 else '' }} gerado{{ 's' if sessoes|length > 1 else '' }}</div>
+<div class="flex items-center gap-3 my-6">
+    <div class="flex-1 border-t border-gray-200"></div>
+    <span class="text-[11px] text-gray-400 uppercase tracking-wider">{{ sessoes|length }} treino{{ 's' if sessoes|length > 1 else '' }} gerado{{ 's' if sessoes|length > 1 else '' }}</span>
+    <div class="flex-1 border-t border-gray-200"></div>
+</div>
 
 {% if auto_ref_etiqueta %}
 <div class="auto-ref-badge">
     📌 Comparando com período anterior: <strong>{{ auto_ref_etiqueta }}</strong>
-    <span style="font-size:11px;color:#6b7280">({{ referencias|length }} treino{{ 's' if referencias|length > 1 else '' }} como referência)</span>
+    <span class="text-[11px] text-gray-500">({{ referencias|length }} treino{{ 's' if referencias|length > 1 else '' }} como referência)</span>
 </div>
 {% endif %}
 
 <!-- Fixar treino ativo como referência -->
-<div class="fixar-ativo-wrap" style="margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-    <span style="font-size:12px;color:#6b7280">Fixar como referência:</span>
+<div class="flex gap-1.5 items-center flex-wrap mb-2">
+    <span class="text-xs text-gray-500">Fixar como referência:</span>
     {% for sessao in sessoes %}
     <button class="btn btn-sm"
             hx-post="/referencia/fixar-ativo/{{ loop.index0 }}"
@@ -19,20 +23,20 @@
     {% endfor %}
 </div>
 
-<!-- Comparar com referência (atualizado dinamicamente) -->
-<div id="cmp-wrap" style="{% if not tem_referencia %}display:none{% endif %}">
-<details style="margin-bottom:8px" {% if auto_ref_etiqueta %}open{% endif %}>
-    <summary style="font-size:12px;cursor:pointer">Comparar com referencia</summary>
-    <div class="compare-controls">
-        <label>Ativo
-            <select id="cmp-ativo" name="ativo_t">
+<!-- Comparar com referência -->
+<div id="cmp-wrap" {% if not tem_referencia %}style="display:none"{% endif %}>
+<details class="mb-2" {% if auto_ref_etiqueta %}open{% endif %}>
+    <summary class="text-xs cursor-pointer py-2 font-semibold text-gray-700"><span class="chevron text-gray-400 text-xs">▶</span> Comparar com referência</summary>
+    <div class="flex items-end flex-wrap gap-2 mt-1">
+        <label class="flex flex-col text-[11px] text-gray-500 gap-0.5">Ativo
+            <select id="cmp-ativo" name="ativo_t" class="text-xs px-1.5 py-1 border border-gray-200 rounded-md bg-white text-gray-700">
                 {% for sessao in sessoes %}
                 <option value="{{ loop.index0 }}">Treino {{ loop.index }}</option>
                 {% endfor %}
             </select>
         </label>
-        <label>Referencia
-            <select id="cmp-ref" name="ref_t">
+        <label class="flex flex-col text-[11px] text-gray-500 gap-0.5">Referência
+            <select id="cmp-ref" name="ref_t" class="text-xs px-1.5 py-1 border border-gray-200 rounded-md bg-white text-gray-700">
                 {% for r in referencias %}
                 <option value="{{ loop.index0 }}">{{ r.origem.aluno }} · T{{ (r.origem.treino_idx or 0) + 1 }} · {{ r.origem.data.split(' ')[0] if r.origem.data else '' }}</option>
                 {% endfor %}
@@ -40,16 +44,16 @@
         </label>
         <button class="btn btn-sm btn-primary" type="button" onclick="compararTreinos()">Comparar</button>
     </div>
-    <div id="comparacao-result" style="margin-top:12px"></div>
+    <div id="comparacao-result" class="mt-3"></div>
 </details>
 </div>
 
 <!-- Salvar no histórico -->
-<details>
-    <summary>💾 Salvar no histórico</summary>
-    <div style="display:flex;gap:8px;align-items:center;margin:8px 0">
+<details class="mb-4">
+    <summary class="text-sm font-semibold py-2 cursor-pointer text-gray-700"><span class="chevron text-gray-400 text-xs">▶</span> 💾 Salvar no histórico</summary>
+    <div class="flex gap-2 items-center my-2">
         <input type="text" name="etiqueta" placeholder="Etiqueta (ex: Turma manhã — semana 1)"
-               style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit" id="hist-etiqueta">
+               class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-[inherit]" id="hist-etiqueta">
         <button type="button" class="btn btn-sm btn-primary"
                 hx-post="/historico/salvar"
                 hx-include="#hist-etiqueta, #sel-aluno"
@@ -76,6 +80,14 @@
 fetch('/referencia/render').then(r=>r.text()).then(html=>{
     document.getElementById('ref-container').innerHTML = html;
     if(typeof atualizarComparador === 'function') atualizarComparador();
+    if(typeof syncRefs === 'function') syncRefs();
 });
 </script>
 {% endif %}
+<script>
+(function(){
+    var resumo = document.getElementById('resultado-resumo');
+    if (resumo) resumo.textContent = '{{ sessoes|length }} treino{{ "s" if sessoes|length > 1 else "" }}';
+    if (typeof syncRefs === 'function') syncRefs();
+})();
+</script>

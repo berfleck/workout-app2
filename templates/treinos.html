@@ -3,228 +3,303 @@
 
 {% set MAX_TREINOS = 5 %}
 
-<form id="form-config" hx-post="/gerar" hx-target="#resultado" hx-indicator="#loading">
+<div id="panel-config" class="{% if sessoes %}hidden{% endif %}">
+<form id="form-config" hx-post="/gerar" hx-target="#resultado" hx-indicator="#loading"
+      hx-on::before-request="showPanel('resultado')">
 
-<div class="config-panel">
-    <p class="config-title">Configurações gerais</p>
-    <div class="opcoes-grid">
-        <div class="campo">
-            <label>Nº de treinos</label>
-            <select name="n_treinos" id="n_treinos" onchange="onChangeNTreinos()">
-                {% for i in range(1, MAX_TREINOS + 1) %}<option value="{{ i }}">{{ i }}</option>{% endfor %}
-            </select>
-        </div>
-        <div class="campo">
-            <label>Exerc. por bloco</label>
-            <select name="tamanho_bloco">
-                <option value="1">1 (séries simples)</option>
-                <option value="2" selected>2 (super séries)</option>
-                <option value="3">3 (tri-sets)</option>
-            </select>
-        </div>
-        <div class="campo">
-            <label>Complexidade máx.</label>
-            <div class="range-row">
-                <input type="range" name="max_complexidade" min="1" max="5" step="1" value="5"
-                       oninput="document.getElementById('val-cx').textContent=this.value">
-                <span class="range-value" id="val-cx">5</span>
+<!-- ═══ Layout 3 colunas (lg) / stack (mobile) ═══ -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 pb-24 lg:pb-6">
+
+    <!-- ── SIDEBAR ESQUERDA: aluno + histórico + ação ── -->
+    <aside class="lg:col-span-3 space-y-4 order-1">
+
+        <!-- Aluno selector -->
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Aluno / Turma</label>
+            {% with alunos_dropdown=alunos, nomes_hist_dropdown=nomes_hist %}
+            {% include "_aluno_dropdown.html" %}
+            {% endwith %}
+
+            <div id="evitar-hist-wrap" class="mt-3 items-center gap-2 text-xs hidden">
+                <span class="text-gray-500">Evitar exerc. dos últimos</span>
+                <select name="evitar_ultimos" id="sel-evitar-ultimos"
+                        class="px-1.5 py-0.5 border border-gray-200 rounded text-xs">
+                    <option value="0">desativado</option>
+                    <option value="1" selected>1 período</option>
+                    <option value="2">2 períodos</option>
+                    <option value="3">3 períodos</option>
+                </select>
             </div>
         </div>
-        <div class="campo">
-            <label>Aluno / Turma</label>
-            <select name="aluno" id="sel-aluno" onchange="onAlunoChange(this.value)">
-                <option value="">Selecionar...</option>
-                {% for a in alunos %}<option value="{{ a.nome }}">{{ a.nome }}</option>{% endfor %}
-                {% if nomes_hist %}
-                <option disabled>───</option>
-                {% for n in nomes_hist %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
-                {% endif %}
-            </select>
-        </div>
-    </div>
-    <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center">
-        <label class="check-inline"><input type="checkbox" name="variar_entre"> Evitar similaridade entre treinos</label>
-        <label class="check-inline"><input type="checkbox" name="evitar_agonistas" checked> Evitar agonistas no bloco</label>
-        <div id="evitar-hist-wrap" style="display:none; align-items:center; gap:6px; font-size:13px">
-            <span style="color:#6b7280">Evitar exerc. dos ultimos</span>
-            <select name="evitar_ultimos" id="sel-evitar-ultimos" style="padding:2px 6px;font-size:13px">
-                <option value="0">desativado</option>
-                <option value="1" selected>1 periodo</option>
-                <option value="2">2 periodos</option>
-                <option value="3">3 periodos</option>
-            </select>
-        </div>
-    </div>
-</div>
 
-<div id="hist-aluno-panel" style="margin-bottom:12px"></div>
+        <!-- Histórico do aluno (carregado via HTMX) -->
+        <div id="hist-aluno-panel"></div>
 
-<!-- Barra de abas dos treinos -->
-<div class="tabs-treino" id="tabs-treino-bar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-    {% for t in range(MAX_TREINOS) %}
-    <button type="button" class="btn btn-sm tab-treino-btn" data-t="{{ t }}"
-            onclick="showTreino({{ t }})"
-            id="tab-btn-{{ t }}"
-            style="{% if t > 0 %}display:none;{% endif %}{% if t == 0 %}background:#e85d04;color:white;border:none{% endif %}">
-        Treino {{ t + 1 }}
-    </button>
-    {% endfor %}
-</div>
-
-{% for t in range(MAX_TREINOS) %}
-<div class="tab-treino config-panel" id="tab-{{ t }}" data-t="{{ t }}" {% if t > 0 %}style="display:none"{% endif %}>
-
-    <!-- Cabeçalho da aba: copiar de outro treino -->
-    <div class="copiar-bar" id="copiar-bar-{{ t }}" style="display:none; gap:8px; align-items:center; margin-bottom:12px; font-size:13px">
-        <span style="color:#6b7280">📋 Copiar config de</span>
-        <select id="copiar-src-{{ t }}" style="padding:4px 8px">
-            {% for s in range(MAX_TREINOS) %}{% if s != t %}
-            <option value="{{ s }}">Treino {{ s + 1 }}</option>
-            {% endif %}{% endfor %}
-        </select>
-        <button type="button" class="btn btn-sm" onclick="copiarConfigTreino(parseInt(document.getElementById('copiar-src-{{ t }}').value), {{ t }})">Aplicar</button>
-    </div>
-
-    <!-- Seletor de modo -->
-    <div style="display:flex; gap:12px; margin-bottom:16px">
-        <button type="button" class="btn btn-sm btn-modo-hier" id="btn-modo-hier-{{ t }}"
-                onclick="setModo({{ t }}, 'hierarquia')"
-                style="background:#e85d04;color:white;border:none">Hierarquia</button>
-        <button type="button" class="btn btn-sm btn-modo-tmpl" id="btn-modo-tmpl-{{ t }}"
-                onclick="setModo({{ t }}, 'template')">Template</button>
-    </div>
-    <input type="hidden" name="modo_{{ t }}" id="input-modo-{{ t }}" value="hierarquia">
-
-    <!-- MODO HIERARQUIA -->
-    <div id="modo-hierarquia-{{ t }}" class="modo-hierarquia-bloco">
-        <p style="font-size:11px;color:#9ca3af;margin:0 0 10px">
-            Marque um grupo e defina quantos exercícios. Use ▸ para refinar em subgrupos.</p>
-
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px">
-        {% for regiao in regioes %}
-            {% if regiao in ['core', 'cardio'] and loop.index == 3 %}<div>{% endif %}
-            {% if regiao == 'upper' %}<div>{% endif %}
-            {% if regiao == 'lower' %}<div>{% endif %}
-
-            <div class="regiao-header"><span>{{ regioes_labels[regiao] }}</span></div>
-
-            <div class="hier-row">
-                <label class="check-inline">
-                    <input type="checkbox" class="reg-chk" data-regiao="{{ regiao }}"
-                           onchange="updateDemandas({{ t }})">
-                    <span>Todos os grupos</span>
-                </label>
-            </div>
-
-            <div id="subs-{{ t }}-{{ regiao }}" style="display:none">
-            {% for subregiao in subregioes.get(regiao, []) %}
-                {% set pads = padroes_ordem.get(subregiao, []) %}
-                {% set tem_refinamento = pads|length > 1 or subregiao == 'perna_anterior' %}
-                <div class="hier-indent-1 hier-row">
-                    <label class="check-inline">
-                        <input type="checkbox" class="sub-chk" data-subregiao="{{ subregiao }}"
-                               data-regiao="{{ regiao }}" onchange="updateDemandas({{ t }})">
-                        <span>{{ subregioes_labels[subregiao] }}</span>
-                    </label>
-                    {% if tem_refinamento %}
-                    <button type="button" class="hier-toggle" onclick="togglePads({{ t }}, '{{ subregiao }}')">▸</button>
-                    {% endif %}
+        <!-- Configurações gerais (COLAPSÁVEL) -->
+        <details class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <summary class="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+                <div class="flex items-center gap-2">
+                    <span class="chevron text-gray-400 text-xs">▶</span>
+                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Configurações gerais</span>
                 </div>
-                {% if tem_refinamento %}
-                <div id="pads-{{ t }}-{{ subregiao }}" style="display:none">
-                {% if subregiao == 'perna_anterior' %}
-                    <div class="hier-indent-2 hier-row">
-                        <label class="check-inline">
-                            <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="bilateral"
-                                   data-subregiao="perna_anterior" data-regiao="lower"
-                                   onchange="updateDemandas({{ t }})">
-                            <span>Agachamento bilateral</span>
-                        </label>
+                <span class="text-xs text-gray-400" id="config-resumo"></span>
+            </summary>
+            <div class="px-4 pb-4 pt-1 grid grid-cols-2 gap-4">
+                <div class="campo">
+                    <label>Nº de treinos</label>
+                    <select name="n_treinos" id="n_treinos" onchange="onChangeNTreinos()">
+                        {% for i in range(1, MAX_TREINOS + 1) %}<option value="{{ i }}">{{ i }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="campo">
+                    <label>Exerc. por bloco</label>
+                    <select name="tamanho_bloco">
+                        <option value="1">1 (simples)</option>
+                        <option value="2" selected>2 (super séries)</option>
+                        <option value="3">3 (tri-sets)</option>
+                    </select>
+                </div>
+                <div class="campo col-span-2">
+                    <label>Complexidade máx.</label>
+                    <div class="range-row">
+                        <input type="range" name="max_complexidade" min="1" max="5" step="1" value="5"
+                               oninput="document.getElementById('val-cx').textContent=this.value">
+                        <span class="range-value" id="val-cx">5</span>
                     </div>
-                    <div class="hier-indent-2 hier-row">
-                        <label class="check-inline">
-                            <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="unilateral"
-                                   data-subregiao="perna_anterior" data-regiao="lower"
-                                   onchange="updateDemandas({{ t }})">
-                            <span>Agachamento unilateral</span>
-                        </label>
-                    </div>
-                {% else %}
-                {% for pad in pads %}
-                    <div class="hier-indent-2 hier-row">
-                        <label class="check-inline">
-                            <input type="checkbox" class="pad-chk" data-padrao="{{ pad }}"
-                                   data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}"
-                                   onchange="updateDemandas({{ t }})">
-                            <span>{{ padroes_labels.get(pad, pad) }}</span>
-                        </label>
-                    </div>
+                </div>
+                <div class="col-span-2 flex flex-wrap gap-4 pt-1">
+                    <label class="check-inline"><input type="checkbox" name="variar_entre"> Evitar similaridade</label>
+                    <label class="check-inline"><input type="checkbox" name="evitar_agonistas" checked> Evitar agonistas</label>
+                </div>
+            </div>
+        </details>
+
+        <!-- Botão Gerar — desktop (sticky na sidebar) -->
+        <div class="hidden lg:block sticky top-20 space-y-2">
+            <button type="submit" class="w-full px-6 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer">
+                <span class="htmx-hide">▶ Gerar treinos</span>
+                <span class="htmx-indicator"><span class="spinner"></span> Gerando...</span>
+            </button>
+            <button type="button" id="btn-ver-treinos" class="w-full btn btn-sm justify-center"
+                    onclick="showPanel('resultado')"
+                    {% if not sessoes %}style="display:none"{% endif %}>
+                Ver treinos →
+            </button>
+            <button type="button" class="w-full btn btn-sm justify-center text-gray-400" onclick="resetAll()">↺ Resetar</button>
+        </div>
+    </aside>
+
+    <!-- ── MAIN: configuração dos treinos ── -->
+    <main class="lg:col-span-6 space-y-4 order-2">
+
+        <!-- Tabs de treino (estilo shadcn) -->
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="flex border-b border-gray-200 bg-gray-50 px-2 pt-2" id="tabs-treino-bar">
+                {% for t in range(MAX_TREINOS) %}
+                <button type="button" class="tab-treino-btn {% if t == 0 %}px-4 py-2 text-sm font-medium rounded-t-lg bg-white border-x border-t border-gray-200 -mb-px text-gray-900{% else %}px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900{% endif %}"
+                        data-t="{{ t }}"
+                        onclick="showTreino({{ t }})"
+                        id="tab-btn-{{ t }}"
+                        {% if t > 0 %}style="display:none"{% endif %}>
+                    Treino {{ t + 1 }}
+                </button>
                 {% endfor %}
-                {% endif %}
-                </div>
-                {% endif %}
-            {% endfor %}
+                <button type="button" id="copiar-btn-bar" class="ml-auto px-2 py-2 text-sm text-gray-400 hover:text-brand-500" title="Copiar config de outro treino" style="display:none"
+                        onclick="toggleCopiarBar()">📋</button>
             </div>
 
-            <button type="button" class="hier-toggle" onclick="toggleSubs({{ t }}, '{{ regiao }}')"
-                    id="toggle-{{ t }}-{{ regiao }}">▸ refinar</button>
+            {% for t in range(MAX_TREINOS) %}
+            <div class="tab-treino" id="tab-{{ t }}" data-t="{{ t }}" {% if t > 0 %}style="display:none"{% endif %}>
+                <div class="p-5 space-y-4">
 
-            {% if regiao == 'upper' %}</div>{% endif %}
-            {% if regiao == 'lower' %}</div>{% endif %}
-            {% if regiao == 'cardio' %}</div>{% endif %}
-        {% endfor %}
-        </div>
+                    <!-- Barra copiar config (hidden) -->
+                    <div class="copiar-bar hidden items-center gap-2 text-sm" id="copiar-bar-{{ t }}">
+                        <span class="text-gray-500">📋 Copiar de</span>
+                        <select id="copiar-src-{{ t }}" class="px-2 py-1 border border-gray-200 rounded text-sm">
+                            {% for s in range(MAX_TREINOS) %}{% if s != t %}
+                            <option value="{{ s }}">Treino {{ s + 1 }}</option>
+                            {% endif %}{% endfor %}
+                        </select>
+                        <button type="button" class="btn btn-sm" onclick="copiarConfigTreino(parseInt(document.getElementById('copiar-src-{{ t }}').value), {{ t }})">Aplicar</button>
+                    </div>
 
-        <div id="demandas-container-{{ t }}"></div>
-        <div id="demandas-hidden-inputs-{{ t }}"></div>
-        <div id="lateralidade-container-{{ t }}"></div>
-    </div>
+                    <!-- Seletor de modo -->
+                    <div class="inline-flex p-1 bg-gray-100 rounded-lg text-xs">
+                        <button type="button" id="btn-modo-hier-{{ t }}"
+                                onclick="setModo({{ t }}, 'hierarquia')"
+                                class="px-3 py-1 rounded-md bg-white shadow-sm font-semibold text-sm">Hierarquia</button>
+                        <button type="button" id="btn-modo-tmpl-{{ t }}"
+                                onclick="setModo({{ t }}, 'template')"
+                                class="px-3 py-1 rounded-md text-gray-500 hover:text-gray-900 text-sm">Template</button>
+                    </div>
+                    <input type="hidden" name="modo_{{ t }}" id="input-modo-{{ t }}" value="hierarquia">
 
-    <!-- MODO TEMPLATE -->
-    <div id="modo-template-{{ t }}" class="modo-template-bloco" style="display:none">
-        <p class="config-title">Escolha um template</p>
-        <div class="template-grid">
-            {% for tmpl in templates %}
-            <button type="button" class="template-btn" onclick="selectTemplate({{ t }}, '{{ tmpl }}')">{{ tmpl }}</button>
+                    <!-- MODO HIERARQUIA (acordeões) -->
+                    <div id="modo-hierarquia-{{ t }}" class="modo-hierarquia-bloco">
+                        <p class="text-[11px] text-gray-400 mb-2">
+                            Abra uma região, marque grupos e defina quantos exercícios.</p>
+
+                        <div class="space-y-2">
+                        {% for regiao in regioes %}
+                            <details id="det-{{ t }}-{{ regiao }}" class="border border-gray-200 rounded-lg overflow-hidden">
+                                <summary class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
+                                    <div class="flex items-center gap-2">
+                                        <span class="chevron text-gray-400 text-xs">▶</span>
+                                        <span class="font-semibold text-sm">{{ regioes_labels[regiao] }}</span>
+                                    </div>
+                                    <label class="flex items-center gap-1.5 text-xs text-gray-500" onclick="event.stopPropagation()">
+                                        <input type="checkbox" class="reg-chk accent-brand-500" data-regiao="{{ regiao }}"
+                                               onchange="updateDemandas({{ t }})">
+                                        Todos
+                                    </label>
+                                </summary>
+                                <div class="px-4 pb-3 pt-1 space-y-1">
+                                    {% for subregiao in subregioes.get(regiao, []) %}
+                                        {% set pads = padroes_ordem.get(subregiao, []) %}
+                                        {% set tem_refinamento = pads|length > 1 or subregiao == 'perna_anterior' %}
+                                        <div class="flex items-center gap-2 py-0.5">
+                                            <label class="check-inline">
+                                                <input type="checkbox" class="sub-chk" data-subregiao="{{ subregiao }}"
+                                                       data-regiao="{{ regiao }}" onchange="updateDemandas({{ t }})">
+                                                <span>{{ subregioes_labels[subregiao] }}</span>
+                                            </label>
+                                            {% if tem_refinamento %}
+                                            <button type="button" class="text-xs text-brand-500 hover:bg-brand-50 px-1.5 py-0.5 rounded cursor-pointer"
+                                                    onclick="togglePads({{ t }}, '{{ subregiao }}')">▸</button>
+                                            {% endif %}
+                                        </div>
+                                        {% if tem_refinamento %}
+                                        <div id="pads-{{ t }}-{{ subregiao }}" style="display:none" class="pl-6 space-y-0.5">
+                                        {% if subregiao == 'perna_anterior' %}
+                                            <div class="flex items-center gap-2 py-0.5">
+                                                <label class="check-inline">
+                                                    <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="bilateral"
+                                                           data-subregiao="perna_anterior" data-regiao="lower"
+                                                           onchange="updateDemandas({{ t }})">
+                                                    <span>Agachamento bilateral</span>
+                                                </label>
+                                            </div>
+                                            <div class="flex items-center gap-2 py-0.5">
+                                                <label class="check-inline">
+                                                    <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="unilateral"
+                                                           data-subregiao="perna_anterior" data-regiao="lower"
+                                                           onchange="updateDemandas({{ t }})">
+                                                    <span>Agachamento unilateral</span>
+                                                </label>
+                                            </div>
+                                        {% else %}
+                                        {% for pad in pads %}
+                                            <div class="flex items-center gap-2 py-0.5">
+                                                <label class="check-inline">
+                                                    <input type="checkbox" class="pad-chk" data-padrao="{{ pad }}"
+                                                           data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}"
+                                                           onchange="updateDemandas({{ t }})">
+                                                    <span>{{ padroes_labels.get(pad, pad) }}</span>
+                                                </label>
+                                            </div>
+                                        {% endfor %}
+                                        {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </details>
+                        {% endfor %}
+                        </div>
+
+                        <div id="demandas-container-{{ t }}"></div>
+                        <div id="demandas-hidden-inputs-{{ t }}"></div>
+                        <div id="lateralidade-container-{{ t }}"></div>
+                    </div>
+
+                    <!-- MODO TEMPLATE -->
+                    <div id="modo-template-{{ t }}" class="modo-template-bloco" style="display:none">
+                        <p class="config-title">Escolha um template</p>
+                        <div class="template-grid">
+                            {% for tmpl in templates %}
+                            <button type="button" class="template-btn" onclick="selectTemplate({{ t }}, '{{ tmpl }}')">{{ tmpl }}</button>
+                            {% endfor %}
+                        </div>
+                        <input type="hidden" name="template_{{ t }}" id="input-template-{{ t }}" value="">
+                        <div id="template-epp-{{ t }}"></div>
+                    </div>
+
+                </div>
+            </div>
             {% endfor %}
         </div>
-        <input type="hidden" name="template_{{ t }}" id="input-template-{{ t }}" value="">
-        <div id="template-epp-{{ t }}"></div>
-    </div>
-</div>
-{% endfor %}
+    </main>
 
-<!-- Botões -->
-<div class="botoes-acao" style="margin-bottom:20px">
-    <button type="submit" class="btn btn-primary" hx-indicator="#loading">
-        <span class="htmx-hide">▶ Gerar treinos</span>
-        <span class="htmx-indicator"><span class="spinner"></span> Gerando...</span>
-    </button>
-    <button type="button" class="btn" onclick="resetAll()">↺ Resetar tudo</button>
+    <!-- ── SIDEBAR DIREITA: referências ── -->
+    <aside class="lg:col-span-3 space-y-4 order-3">
+        <div id="ref-container">
+            {% if referencias %}
+                {% include "_referencia.html" %}
+            {% endif %}
+        </div>
+
+        <!-- Dicas -->
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Dicas</p>
+            <p class="text-xs text-gray-600 leading-relaxed">
+                Ao gerar, exercícios marcados como <span class="inline-block bg-indigo-100 text-indigo-700 px-1.5 rounded text-[10px] font-semibold">REF</span> serão evitados.
+                Novos exercícios ganharão badge <span class="inline-block bg-green-100 text-green-700 px-1.5 rounded text-[10px] font-semibold">novo</span>.
+            </p>
+        </div>
+    </aside>
+
 </div>
 </form>
-
-<div id="loading" class="htmx-indicator" style="text-align:center;padding:20px">
-    <span class="spinner" style="width:24px;height:24px"></span>
-    <p style="color:#9ca3af;font-size:13px;margin-top:8px">Gerando treinos...</p>
 </div>
 
-<div id="ref-container">
-    {% if referencias %}
-        {% include "_referencia.html" %}
-    {% endif %}
-</div>
-
-<div id="resultado">
-{% if sessoes %}
-    {% include "_resultado.html" %}
-{% else %}
-    <div style="text-align:center; padding:60px 20px; color:#9ca3af">
-        <div style="font-size:52px; margin-bottom:16px">🏋️</div>
-        <div style="font-size:18px; font-weight:600; color:#374151">Configure e gere seu primeiro treino</div>
-        <div style="font-size:14px; margin-top:8px">Use o painel acima para definir as categorias e clique em <strong>Gerar treinos</strong></div>
+<div id="panel-resultado" class="{% if not sessoes %}hidden{% endif %}">
+    <div class="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3 mb-4">
+        <button type="button" class="btn btn-sm" onclick="showPanel('config')">← Configurar</button>
+        <span id="resultado-resumo" class="text-sm font-semibold text-gray-700">
+            {% if sessoes %}{{ sessoes|length }} treino{{ 's' if sessoes|length > 1 else '' }}{% endif %}
+        </span>
+        <button type="submit" form="form-config" class="btn btn-sm btn-primary">
+            <span class="htmx-hide">▶ Regerar</span>
+            <span class="htmx-indicator"><span class="spinner"></span> Gerando...</span>
+        </button>
     </div>
-{% endif %}
+    <div id="ref-container-resultado"></div>
+    <div id="loading" class="htmx-indicator text-center py-5">
+        <span class="spinner" style="width:24px;height:24px"></span>
+        <p class="text-gray-400 text-sm mt-2">Gerando treinos...</p>
+    </div>
+    <div id="resultado">
+    {% if sessoes %}
+        {% include "_resultado.html" %}
+    {% else %}
+        <div class="text-center py-16 text-gray-400">
+            <div class="text-5xl mb-4">🏋️</div>
+            <div class="text-lg font-semibold text-gray-700">Configure e gere seu primeiro treino</div>
+            <div class="text-sm mt-2">Use o painel acima para definir as categorias e clique em <strong>Gerar treinos</strong></div>
+        </div>
+    {% endif %}
+    </div>
+</div>
+
+<!-- MOBILE: barra fixa (context-aware) -->
+<div id="mobile-bar" class="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 p-3 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
+    <div id="mobile-bar-inner" class="flex gap-2">
+        <button type="submit" form="form-config" id="mobile-btn-gerar"
+                class="flex-1 px-4 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer"
+                {% if sessoes %}style="display:none"{% endif %}>
+            ▶ Gerar treinos
+        </button>
+        <button type="button" id="mobile-btn-config" onclick="showPanel('config')"
+                class="flex-1 px-4 py-3 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer"
+                {% if not sessoes %}style="display:none"{% endif %}>
+            ← Configurar
+        </button>
+        <button type="button" id="mobile-btn-ver" onclick="showPanel('resultado')"
+                class="flex-1 px-4 py-3 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer"
+                style="display:none">
+            Ver treinos →
+        </button>
+    </div>
 </div>
 
 <script>
@@ -244,9 +319,11 @@ function showTreino(t) {
     });
     document.querySelectorAll('.tab-treino-btn').forEach(b => {
         const on = parseInt(b.dataset.t) === t;
-        b.style.background = on ? '#e85d04' : '';
-        b.style.color = on ? 'white' : '';
-        b.style.border = on ? 'none' : '';
+        if (on) {
+            b.className = 'tab-treino-btn px-4 py-2 text-sm font-medium rounded-t-lg bg-white border-x border-t border-gray-200 -mb-px text-gray-900';
+        } else {
+            b.className = 'tab-treino-btn px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900';
+        }
     });
 }
 
@@ -256,15 +333,16 @@ function onChangeNTreinos() {
         const btn = document.getElementById('tab-btn-' + t);
         btn.style.display = (t < n) ? '' : 'none';
     }
-    // Se o tab ativo deixou de ser válido, vai pro tab 0
     const activeVisible = Array.from(document.querySelectorAll('.tab-treino'))
         .some(el => el.style.display !== 'none' && parseInt(el.dataset.t) < n);
     if (!activeVisible) showTreino(0);
-    // Mostra/esconde barra "Copiar de" conforme n > 1
+
+    // Copiar bar visibility
+    const copiarBtn = document.getElementById('copiar-btn-bar');
+    if (copiarBtn) copiarBtn.style.display = (n > 1) ? '' : 'none';
     for (let t = 0; t < MAX_TREINOS; t++) {
         const bar = document.getElementById('copiar-bar-' + t);
         if (bar) bar.style.display = (n > 1 && t < n) ? 'flex' : 'none';
-        // Oculta options de treinos inexistentes
         const sel = document.getElementById('copiar-src-' + t);
         if (sel) {
             Array.from(sel.options).forEach(opt => {
@@ -272,7 +350,6 @@ function onChangeNTreinos() {
                 opt.style.display = (v < n) ? '' : 'none';
                 if (v >= n && opt.selected) opt.selected = false;
             });
-            // Seleciona primeiro válido se necessário
             if (sel.selectedIndex === -1 || parseInt(sel.value) >= n) {
                 for (const opt of sel.options) {
                     if (parseInt(opt.value) < n) { opt.selected = true; break; }
@@ -280,6 +357,14 @@ function onChangeNTreinos() {
             }
         }
     }
+    updateConfigResumo();
+}
+
+function updateConfigResumo() {
+    const n = document.getElementById('n_treinos').value;
+    const cx = document.getElementById('val-cx').textContent;
+    const el = document.getElementById('config-resumo');
+    if (el) el.textContent = `${n} treino${n>1?'s':''} · compl. ${cx}`;
 }
 
 function setModo(t, modo) {
@@ -289,17 +374,12 @@ function setModo(t, modo) {
     const bh = qs(t, '#btn-modo-hier-' + t);
     const bt = qs(t, '#btn-modo-tmpl-' + t);
     if (modo === 'hierarquia') {
-        bh.style.background='#e85d04'; bh.style.color='white'; bh.style.border='none';
-        bt.style.background=''; bt.style.color=''; bt.style.border='';
+        bh.className = 'px-3 py-1 rounded-md bg-white shadow-sm font-semibold text-sm';
+        bt.className = 'px-3 py-1 rounded-md text-gray-500 hover:text-gray-900 text-sm';
     } else {
-        bt.style.background='#e85d04'; bt.style.color='white'; bt.style.border='none';
-        bh.style.background=''; bh.style.color=''; bh.style.border='';
+        bt.className = 'px-3 py-1 rounded-md bg-white shadow-sm font-semibold text-sm';
+        bh.className = 'px-3 py-1 rounded-md text-gray-500 hover:text-gray-900 text-sm';
     }
-}
-
-function toggleSubs(t, regiao) {
-    const el = document.getElementById('subs-' + t + '-' + regiao);
-    el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
 function togglePads(t, sub) {
@@ -307,10 +387,18 @@ function togglePads(t, sub) {
     el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
+function toggleCopiarBar() {
+    const active = document.querySelector('.tab-treino[style=""],.tab-treino:not([style])');
+    if (!active) return;
+    const t = active.dataset.t;
+    const bar = document.getElementById('copiar-bar-' + t);
+    if (bar) bar.style.display = bar.style.display === 'flex' ? 'none' : 'flex';
+}
+
 function selectTemplate(t, nome) {
     qs(t, '#input-template-' + t).value = nome;
     const epp = TEMPLATE_EPP[nome] || {};
-    let html = '<p class="config-title" style="margin-top:12px">Exercícios por categoria</p><div class="demandas-grid">';
+    let html = '<p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mt-3 mb-1">Exercícios por categoria</p><div class="demandas-grid">';
     for (const [p, val] of Object.entries(epp)) {
         const label = PADROES_LABELS[p] || p;
         html += `<div class="campo">
@@ -324,9 +412,9 @@ function selectTemplate(t, nome) {
     }
     html += '</div>';
     if ('squat' in epp) {
-        html += `<details style="margin:12px 0">
-            <summary style="font-size:13px;font-weight:600;padding:8px 0">Lateralidade — Agachamento</summary>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+        html += `<details class="my-3">
+            <summary class="text-sm font-semibold py-2 cursor-pointer"><span class="chevron text-gray-400 text-xs">▶</span> Lateralidade — Agachamento</summary>
+            <div class="grid grid-cols-2 gap-3 mt-2">
                 <div class="campo">
                     <label>Bilateral</label>
                     <div class="range-row">
@@ -344,18 +432,18 @@ function selectTemplate(t, nome) {
                     </div>
                 </div>
             </div>
-            <p id="lat-aviso-${t}" style="font-size:11px;color:#9ca3af;margin-top:4px"></p>
+            <p id="lat-aviso-${t}" class="text-[11px] text-gray-400 mt-1"></p>
         </details>`;
     }
     qs(t, '#template-epp-' + t).innerHTML = html;
     qsa(t, '.template-btn').forEach(b => {
-        b.style.borderColor = b.textContent.trim() === nome ? '#e85d04' : '';
-        b.style.background = b.textContent.trim() === nome ? '#fff7ed' : '';
+        const sel = b.textContent.trim() === nome;
+        b.style.borderColor = sel ? '#e85d04' : '';
+        b.style.background = sel ? '#fff7ed' : '';
     });
 }
 
 function capturarValoresAtuais(t) {
-    // Preserva valores por chave nivel:escopo:lat (não por índice)
     const prev = {};
     qsa(t, `input[name^="dem_qtd_${t}_"]`).forEach(inp => {
         const i = inp.name.substring(('dem_qtd_' + t + '_').length);
@@ -367,7 +455,6 @@ function capturarValoresAtuais(t) {
     });
     const biInp = qs(t, `input[name="squat_bi_${t}"]`);
     const uniInp = qs(t, `input[name="squat_uni_${t}"]`);
-    // Apenas sliders visíveis (type=range) preservam valor — hidden "0" não deve sobrescrever default
     if (biInp && biInp.type === 'range') prev['__squat_bi'] = biInp.value;
     if (uniInp && uniInp.type === 'range') prev['__squat_uni'] = uniInp.value;
     return prev;
@@ -379,7 +466,6 @@ function updateDemandas(t) {
     const demandas = [];
     const padsMarcados = {};
     const subsMarcadas = {};
-    // Lateralidade refinamento: { padrao: [{lat, subregiao}] }
     const latsMarcadas = {};
     const latsPorSubregiao = {};
 
@@ -409,13 +495,11 @@ function updateDemandas(t) {
         }
     });
 
-    // Demandas de padrão (normais)
     for (const [sub, pads] of Object.entries(padsMarcados)) {
         for (const p of pads) {
             demandas.push({nivel: 'padrao', escopo: p, label: PADROES_LABELS[p] || p, default: 1});
         }
     }
-    // Demandas vindas de refinamento lateralidade (uma por padrão, mesmo que 2 lats)
     for (const [pad, lats] of Object.entries(latsMarcadas)) {
         demandas.push({
             nivel: 'padrao', escopo: pad,
@@ -449,12 +533,11 @@ function updateDemandas(t) {
     let html = '';
     let hidden = '';
     if (demandas.length > 0) {
-        html = '<p style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.07em;margin:14px 0 4px">Quantos exercícios de cada grupo</p><div class="demandas-grid">';
+        html = '<p class="text-[11px] text-gray-500 uppercase tracking-wider mt-4 mb-1">Quantos exercícios de cada grupo</p><div class="demandas-grid">';
         demandas.forEach((d, i) => {
             const key = `${d.nivel}:${d.escopo}`;
 
             if (d.lats) {
-                // Demanda de squat via lateralidade: 1 ou 2 sliders por lat
                 const biActive = d.lats.includes('bilateral');
                 const uniActive = d.lats.includes('unilateral');
                 const biVal = biActive ? (prev['__squat_bi'] !== undefined ? prev['__squat_bi'] : d.default) : 0;
@@ -537,7 +620,9 @@ function resetTreino(t) {
     qs(t, '#input-template-' + t).value = '';
     qsa(t, '.template-btn').forEach(b => { b.style.borderColor = ''; b.style.background = ''; });
     qs(t, '#lateralidade-container-' + t).innerHTML = '';
-    qsa(t, '[id^="subs-' + t + '-"]').forEach(el => el.style.display = 'none');
+    // Close all region accordions
+    document.querySelectorAll('[id^="det-' + t + '-"]').forEach(el => el.open = false);
+    // Close all pattern refinements
     qsa(t, '[id^="pads-' + t + '-"]').forEach(el => el.style.display = 'none');
     setModo(t, 'hierarquia');
 }
@@ -550,7 +635,6 @@ function copiarConfigTreino(src, dest) {
     if (src === dest) return;
     resetTreino(dest);
 
-    // 1. Modo
     const modoSrc = qs(src, '#input-modo-' + src).value;
     setModo(dest, modoSrc);
 
@@ -558,7 +642,6 @@ function copiarConfigTreino(src, dest) {
         const tmplNome = qs(src, '#input-template-' + src).value;
         if (tmplNome) {
             selectTemplate(dest, tmplNome);
-            // Copiar valores dos sliders EPP
             qsa(src, `input[name^="epp_${src}_"]`).forEach(inp => {
                 const pad = inp.name.substring(('epp_' + src + '_').length);
                 const target = qs(dest, `input[name="epp_${dest}_${pad}"]`);
@@ -567,7 +650,6 @@ function copiarConfigTreino(src, dest) {
                     if (target.nextElementSibling) target.nextElementSibling.textContent = inp.value;
                 }
             });
-            // Lateralidade
             ['bi', 'uni'].forEach(k => {
                 const s = qs(src, `input[name="squat_${k}_${src}"]`);
                 const d = qs(dest, `input[name="squat_${k}_${dest}"]`);
@@ -578,7 +660,7 @@ function copiarConfigTreino(src, dest) {
             });
         }
     } else {
-        // Hierarquia: copiar checkboxes e estado de toggle
+        // Copy checkboxes
         qsa(src, '.reg-chk, .sub-chk, .pad-chk, .lat-chk').forEach(srcChk => {
             let selector = '';
             if (srcChk.classList.contains('reg-chk')) {
@@ -593,19 +675,19 @@ function copiarConfigTreino(src, dest) {
             const destChk = qs(dest, selector);
             if (destChk) destChk.checked = srcChk.checked;
         });
-        // Copiar estados de expansão (subs/pads visíveis)
-        qsa(src, '[id^="subs-' + src + '-"]').forEach(srcEl => {
-            const regiao = srcEl.id.substring(('subs-' + src + '-').length);
-            const destEl = document.getElementById('subs-' + dest + '-' + regiao);
-            if (destEl) destEl.style.display = srcEl.style.display;
+        // Copy accordion open state
+        document.querySelectorAll('[id^="det-' + src + '-"]').forEach(srcEl => {
+            const regiao = srcEl.id.substring(('det-' + src + '-').length);
+            const destEl = document.getElementById('det-' + dest + '-' + regiao);
+            if (destEl) destEl.open = srcEl.open;
         });
+        // Copy pattern refinement visibility
         qsa(src, '[id^="pads-' + src + '-"]').forEach(srcEl => {
             const sub = srcEl.id.substring(('pads-' + src + '-').length);
             const destEl = document.getElementById('pads-' + dest + '-' + sub);
             if (destEl) destEl.style.display = srcEl.style.display;
         });
         updateDemandas(dest);
-        // Copiar valores dos sliders de demandas (índice por índice)
         qsa(src, `input[name^="dem_qtd_${src}_"]`).forEach(inp => {
             const i = inp.name.substring(('dem_qtd_' + src + '_').length);
             const target = qs(dest, `input[name="dem_qtd_${dest}_${i}"]`);
@@ -614,7 +696,6 @@ function copiarConfigTreino(src, dest) {
                 if (target.nextElementSibling) target.nextElementSibling.textContent = inp.value;
             }
         });
-        // Lateralidade
         ['bi', 'uni'].forEach(k => {
             const s = qs(src, `input[name="squat_${k}_${src}"]`);
             const d = qs(dest, `input[name="squat_${k}_${dest}"]`);
@@ -627,7 +708,6 @@ function copiarConfigTreino(src, dest) {
     }
 }
 
-// ── Fixar todos os treinos de um registro como referência ──
 async function fixarTodosComoRef(regId, n) {
     for (let i = 0; i < n; i++) {
         await fetch('/referencia/fixar/' + regId + '/' + i, {method: 'POST'})
@@ -637,25 +717,32 @@ async function fixarTodosComoRef(regId, n) {
     atualizarComparador();
 }
 
-// ── Selecao de aluno: carrega historico ──
 function onAlunoChange(nome) {
     const panel = document.getElementById('hist-aluno-panel');
     const evitarWrap = document.getElementById('evitar-hist-wrap');
     if (!nome) {
         panel.innerHTML = '';
         evitarWrap.style.display = 'none';
+        evitarWrap.classList.add('hidden');
         return;
     }
     fetch('/aluno-historico?nome=' + encodeURIComponent(nome))
         .then(r => r.text())
         .then(html => {
             panel.innerHTML = html;
-            evitarWrap.style.display = html.trim() ? 'flex' : 'none';
+            if (html.trim()) {
+                evitarWrap.style.display = '';
+                evitarWrap.classList.remove('hidden');
+                evitarWrap.classList.add('flex');
+            } else {
+                evitarWrap.style.display = 'none';
+                evitarWrap.classList.add('hidden');
+                evitarWrap.classList.remove('flex');
+            }
         })
         .catch(e => console.error('Erro ao carregar historico:', e));
 }
 
-// ── Carregar config de um registro do histórico ──
 async function carregarConfigDoHistorico(regId) {
     try {
         const resp = await fetch('/historico/' + regId + '/configs');
@@ -676,10 +763,8 @@ function aplicarConfigs(data) {
     const treinos = data.treinos || [];
     if (treinos.length === 0) { alert('Nenhuma config salva neste registro'); return; }
 
-    // Reset tudo primeiro
     resetAll();
 
-    // Globals
     const nTreinos = globals.n_treinos || treinos.length;
     document.getElementById('n_treinos').value = nTreinos;
     onChangeNTreinos();
@@ -699,7 +784,6 @@ function aplicarConfigs(data) {
     const agonistas = document.querySelector('input[name="evitar_agonistas"]');
     if (agonistas) agonistas.checked = globals.evitar_agonistas !== false;
 
-    // Cada treino
     treinos.forEach((cfg, t) => {
         if (t >= MAX_TREINOS) return;
         showTreino(t);
@@ -711,14 +795,12 @@ function aplicarConfigs(data) {
             const tmpl = cfg.template_nome;
             if (tmpl) {
                 selectTemplate(t, tmpl);
-                // Set EPP sliders
                 const epp = cfg.exercicios_por_padrao || {};
                 for (const [p, val] of Object.entries(epp)) {
                     const v = typeof val === 'object' ? Object.values(val).reduce((a,b)=>a+b,0) : val;
                     const inp = qs(t, `input[name="epp_${t}_${p}"]`);
                     if (inp) { inp.value = v; if (inp.nextElementSibling) inp.nextElementSibling.textContent = v; }
                 }
-                // Lateralidade squat
                 const lat = cfg.lateralidade_por_padrao || {};
                 if (lat.squat) {
                     const bi = qs(t, `input[name="squat_bi_${t}"]`);
@@ -728,31 +810,27 @@ function aplicarConfigs(data) {
                 }
             }
         } else {
-            // Hierarquia: marcar checkboxes com base nas demandas
             const demandas = cfg.demandas || [];
             demandas.forEach(dem => {
                 const [nivel, escopo, qtd] = dem;
                 if (nivel === 'regiao') {
                     const chk = qs(t, `.reg-chk[data-regiao="${escopo}"]`);
                     if (chk) chk.checked = true;
+                    const detEl = document.getElementById('det-' + t + '-' + escopo);
+                    if (detEl) detEl.open = true;
                 } else if (nivel === 'subregiao') {
-                    // Abrir o expander de região pai e marcar o checkbox
                     const chk = qs(t, `.sub-chk[data-subregiao="${escopo}"]`);
                     if (chk) {
                         chk.checked = true;
                         const regiao = chk.dataset.regiao;
-                        // Abrir expander da região
-                        const subsEl = document.getElementById('subs-' + t + '-' + regiao);
-                        if (subsEl) subsEl.style.display = '';
-                        // Marcar o checkbox pai da região
+                        const detEl = document.getElementById('det-' + t + '-' + regiao);
+                        if (detEl) detEl.open = true;
                         const regChk = qs(t, `.reg-chk[data-regiao="${regiao}"]`);
                         if (regChk) regChk.checked = true;
                     }
                 } else if (nivel === 'padrao') {
-                    // Checar lateralidade squat especial
                     const lat = cfg.lateralidade_por_padrao || {};
                     if (escopo === 'squat' && lat.squat) {
-                        // Marcar lat checkboxes
                         if (lat.squat.bilateral) {
                             const c = qs(t, '.lat-chk[data-padrao="squat"][data-lat="bilateral"]');
                             if (c) c.checked = true;
@@ -761,9 +839,8 @@ function aplicarConfigs(data) {
                             const c = qs(t, '.lat-chk[data-padrao="squat"][data-lat="unilateral"]');
                             if (c) c.checked = true;
                         }
-                        // Abrir expanders
-                        const subsEl = document.getElementById('subs-' + t + '-lower');
-                        if (subsEl) subsEl.style.display = '';
+                        const detEl = document.getElementById('det-' + t + '-lower');
+                        if (detEl) detEl.open = true;
                         const padsEl = document.getElementById('pads-' + t + '-perna_anterior');
                         if (padsEl) padsEl.style.display = '';
                         const subChk = qs(t, '.sub-chk[data-subregiao="perna_anterior"]');
@@ -771,14 +848,13 @@ function aplicarConfigs(data) {
                         const regChk = qs(t, '.reg-chk[data-regiao="lower"]');
                         if (regChk) regChk.checked = true;
                     } else {
-                        // Padrao normal
                         const chk = qs(t, `.pad-chk[data-padrao="${escopo}"]`);
                         if (chk) {
                             chk.checked = true;
                             const subregiao = chk.dataset.subregiao;
                             const regiao = chk.dataset.regiao;
-                            const subsEl = document.getElementById('subs-' + t + '-' + regiao);
-                            if (subsEl) subsEl.style.display = '';
+                            const detEl = document.getElementById('det-' + t + '-' + regiao);
+                            if (detEl) detEl.open = true;
                             const padsEl = document.getElementById('pads-' + t + '-' + subregiao);
                             if (padsEl) padsEl.style.display = '';
                             const subChk = qs(t, `.sub-chk[data-subregiao="${subregiao}"]`);
@@ -790,10 +866,8 @@ function aplicarConfigs(data) {
                 }
             });
 
-            // Trigger updateDemandas para criar sliders
             updateDemandas(t);
 
-            // Agora setar valores dos sliders criados
             setTimeout(() => {
                 demandas.forEach((dem, i) => {
                     const [nivel, escopo, qtd] = dem;
@@ -813,12 +887,45 @@ function aplicarConfigs(data) {
         }
     });
 
-    // Voltar para tab 0
     showTreino(0);
+    updateConfigResumo();
+}
+
+function showPanel(panel) {
+    const config = document.getElementById('panel-config');
+    const resultado = document.getElementById('panel-resultado');
+    const mobileGerar = document.getElementById('mobile-btn-gerar');
+    const mobileConfig = document.getElementById('mobile-btn-config');
+    const mobileVer = document.getElementById('mobile-btn-ver');
+    const desktopVer = document.getElementById('btn-ver-treinos');
+    const hasResultado = !!document.querySelector('.resultado-grid');
+    if (panel === 'resultado') {
+        config.classList.add('hidden');
+        resultado.classList.remove('hidden');
+        if (mobileGerar) mobileGerar.style.display = 'none';
+        if (mobileVer) mobileVer.style.display = 'none';
+        if (mobileConfig) mobileConfig.style.display = '';
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    } else {
+        resultado.classList.add('hidden');
+        config.classList.remove('hidden');
+        if (mobileConfig) mobileConfig.style.display = 'none';
+        if (mobileGerar) mobileGerar.style.display = '';
+        if (mobileVer) mobileVer.style.display = hasResultado ? '' : 'none';
+        if (desktopVer) desktopVer.style.display = hasResultado ? '' : 'none';
+    }
+}
+
+function syncRefs() {
+    const src = document.getElementById('ref-container');
+    const dest = document.getElementById('ref-container-resultado');
+    if (src && dest) dest.innerHTML = src.innerHTML;
 }
 
 // Init
 onChangeNTreinos();
+updateConfigResumo();
+if (document.getElementById('ref-container') && document.getElementById('ref-container').innerHTML.trim()) syncRefs();
 </script>
 
 {% endblock %}

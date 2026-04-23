@@ -15,7 +15,23 @@
       "Bash(curl *)",
       "Bash(pkill -f \"python app_flask.py\")",
       "Bash(start *)",
-      "Bash(grep -n \"^[a-z_]*\\\\s*=\\\\s*\\\\[\\\\]$\\\\|^[a-z_]*\\\\s*=\\\\s*{}\\\\s*$\\\\|^global \" \"G:/My Drive/Projeto Workout App/App Flask HTMX 2/app_flask.py\")"
+      "Bash(grep -n \"^[a-z_]*\\\\s*=\\\\s*\\\\[\\\\]$\\\\|^[a-z_]*\\\\s*=\\\\s*{}\\\\s*$\\\\|^global \" \"G:/My Drive/Projeto Workout App/App Flask HTMX 2/app_flask.py\")",
+      "Bash(git checkout *)",
+      "Bash(timeout 3)",
+      "Bash(pip install *)",
+      "Bash(pip list *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :5001)",
+      "Bash(tasklist /FI \"PID eq 30152\" /FO CSV /NH)",
+      "Bash(tasklist /FI \"PID eq 30096\" /FO CSV /NH)",
+      "Bash(tasklist /FI \"PID eq 33060\" /FO CSV /NH)",
+      "Bash(tasklist /FI \"PID eq 37420\" /FO CSV /NH)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(powershell *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(taskkill *)",
+      "Bash(curl -s \"http://localhost:5001/historico\")",
+      "Read(//tmp/**)"
     ]
   }
 }

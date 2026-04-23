@@ -1,10 +1,9 @@
-<p style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 2px">
-    Gestão de alunos</p>
-<p style="font-size:20px;font-weight:600;margin:0 0 16px">Cadastro</p>
+<p class="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">Gestão de alunos</p>
+<p class="text-xl font-semibold mb-4">Cadastro</p>
 
 <details {% if not alunos %}open{% endif %}>
-    <summary>➕ Novo aluno</summary>
-    <div class="config-panel" style="margin-top:8px">
+    <summary class="text-sm font-semibold py-2 cursor-pointer text-gray-700"><span class="chevron text-gray-400 text-xs">▶</span> ➕ Novo aluno</summary>
+    <div class="config-panel mt-2">
         <form hx-post="/alunos/novo" hx-target="#tab-alunos" hx-swap="innerHTML">
             <div class="form-grid">
                 <div class="campo">
@@ -31,21 +30,21 @@
                     <input type="text" name="restricoes" placeholder="ex: ombro direito, joelho">
                 </div>
             </div>
-            <div class="campo" style="margin-bottom:12px">
+            <div class="campo mb-3">
                 <label>Observações</label>
-                <textarea name="obs" rows="2" style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:13px"></textarea>
+                <textarea name="obs" rows="2" class="w-full px-2.5 py-2 border border-gray-200 rounded-lg text-sm font-[inherit]"></textarea>
             </div>
-            <button type="submit" class="btn btn-primary" style="width:100%">Salvar aluno</button>
+            <button type="submit" class="btn btn-primary w-full justify-center">Salvar aluno</button>
         </form>
     </div>
 </details>
 
-<hr class="thin" style="margin:16px 0">
+<hr class="thin my-4">
 
 {% if not alunos %}
-<div style="text-align:center;padding:40px 20px;color:#9ca3af">
-    <div style="font-size:40px;margin-bottom:8px">👥</div>
-    <div style="font-size:14px">Nenhum aluno cadastrado ainda.</div>
+<div class="text-center py-10 text-gray-400">
+    <div class="text-4xl mb-2">👥</div>
+    <div class="text-sm">Nenhum aluno cadastrado ainda.</div>
 </div>
 {% else %}
 <p class="meta-count">{{ alunos|length }} aluno(s)</p>
@@ -63,7 +62,7 @@
         <div class="aluno-card-obs"><b>Obs:</b> {{ aluno.obs }}</div>
         {% endif %}
     </div>
-    <div style="display:flex;gap:4px;flex-shrink:0">
+    <div class="flex gap-1 shrink-0">
         <button class="btn-ghost" title="Editar"
                 onclick='editarAluno({{ aluno.id }}, {{ aluno | tojson }})'>✏️</button>
         <button class="btn-ghost" title="Remover"
@@ -75,10 +74,10 @@
 {% endfor %}
 {% endif %}
 
-<!-- Edit modal (hidden, shown by JS) -->
+<!-- Edit modal -->
 <div id="edit-aluno-form" style="display:none">
-    <div class="config-panel" style="margin-top:8px;border-color:#e85d04">
-        <p style="font-size:13px;font-weight:600;color:#e85d04;margin-bottom:8px">✏️ Editando aluno</p>
+    <div class="config-panel mt-2 border-brand-500">
+        <p class="text-sm font-semibold text-brand-500 mb-2">✏️ Editando aluno</p>
         <form id="form-edit-aluno" hx-target="#tab-alunos" hx-swap="innerHTML">
             <div class="form-grid">
                 <div class="campo"><label>Nome *</label><input type="text" name="nome" id="edit-nome" required></div>
@@ -97,13 +96,13 @@
                 </div>
                 <div class="campo"><label>Restrições</label><input type="text" name="restricoes" id="edit-rest"></div>
             </div>
-            <div class="campo" style="margin-bottom:12px">
+            <div class="campo mb-3">
                 <label>Observações</label>
-                <textarea name="obs" id="edit-obs" rows="2" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:13px"></textarea>
+                <textarea name="obs" id="edit-obs" rows="2" class="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm font-[inherit]"></textarea>
             </div>
-            <div style="display:flex;gap:8px">
-                <button type="submit" class="btn btn-primary" style="flex:1">💾 Salvar</button>
-                <button type="button" class="btn" onclick="document.getElementById('edit-aluno-form').style.display='none'" style="flex:1">✕ Cancelar</button>
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-primary flex-1 justify-center">💾 Salvar</button>
+                <button type="button" class="btn flex-1 justify-center" onclick="document.getElementById('edit-aluno-form').style.display='none'">✕ Cancelar</button>
             </div>
         </form>
     </div>
