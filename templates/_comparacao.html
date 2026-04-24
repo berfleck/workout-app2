@@ -1,10 +1,10 @@
 <div class="comparacao-panel">
-    <div class="comparacao-header">
-        <span class="ref-titulo">Comparação</span>
-        <span class="comparacao-stats">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <span class="text-sm font-bold text-gray-700">Comparação</span>
+        <span class="text-xs text-gray-500">
             {{ mantidos|length }} mantido(s) ·
-            <span style="color:#dc2626">{{ removidos|length }} removido(s)</span> ·
-            <span style="color:#16a34a">{{ adicionados|length }} adicionado(s)</span>
+            <span class="text-red-600">{{ removidos|length }} removido(s)</span> ·
+            <span class="text-green-600">{{ adicionados|length }} adicionado(s)</span>
         </span>
     </div>
     <div class="comparacao-grid">
@@ -15,7 +15,7 @@
             {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
             <div class="exercicio {{ 'diff-removido' if ex.nome in removidos else '' }}">
                 <div class="exercicio-info">
-                    <span class="exercicio-nome" style="font-size:13px">{{ ex.nome }}</span>
+                    <span class="exercicio-nome text-[13px]">{{ ex.nome }}</span>
                     <div class="exercicio-meta">{{ ex.purpose }} · {{ ex.eq_primario }}</div>
                 </div>
             </div>
@@ -29,7 +29,7 @@
             {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
             <div class="exercicio {{ 'diff-adicionado' if ex.nome in adicionados else '' }}">
                 <div class="exercicio-info">
-                    <span class="exercicio-nome" style="font-size:13px">{{ ex.nome }}</span>
+                    <span class="exercicio-nome text-[13px]">{{ ex.nome }}</span>
                     <div class="exercicio-meta">{{ ex.purpose }} · {{ ex.eq_primario }}</div>
                 </div>
             </div>

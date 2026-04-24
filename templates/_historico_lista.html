@@ -1,0 +1,100 @@
+{% if not historico %}
+<div class="text-center py-16 text-gray-400">
+    <div class="text-4xl mb-3">📋</div>
+    <div class="text-[15px] font-medium text-gray-700">
+        {% if aluno_filtro or busca %}Nenhum registro encontrado{% else %}Nenhum treino salvo ainda{% endif %}
+    </div>
+    {% if not aluno_filtro and not busca %}
+    <div class="text-sm mt-1.5">Gere um treino e clique em <b>Salvar no histórico</b> para registrá-lo aqui.</div>
+    {% endif %}
+</div>
+{% else %}
+
+<!-- Barra de ações (aparece quando há seleção) -->
+<div id="barra-selecao" class="sticky top-0 z-10 flex items-center gap-3 mb-3 p-2.5 bg-red-50 rounded-lg border border-red-200 shadow-sm" style="display:none">
+    <span id="contagem-sel" class="text-xs font-semibold text-red-700"></span>
+    <button type="button" class="btn btn-sm btn-danger ml-auto"
+            hx-post="/historico/apagar-selecionados"
+            hx-target="#historico-content" hx-swap="innerHTML"
+            hx-include=".hist-check:checked"
+            onclick="if(!confirm('Apagar os '+document.querySelectorAll('.hist-check:checked').length+' registros selecionados?'))event.stopPropagation()">
+        🗑 Apagar selecionados
+    </button>
+</div>
+
+<p class="meta-count">{{ historico|length }} registro(s)</p>
+
+{% set agrupado = {} %}
+{% for reg in historico %}
+    {% set aluno = reg.get('aluno', '—') or '—' %}
+    {% if aluno not in agrupado %}
+        {% set _ = agrupado.update({aluno: []}) %}
+    {% endif %}
+    {% set _ = agrupado[aluno].append(reg) %}
+{% endfor %}
+
+{% if aluno_filtro or agrupado|length == 1 %}
+    {# Filtrado por aluno ou só 1 aluno — checkbox "selecionar todos" no topo #}
+    <label class="flex items-center gap-1.5 text-xs font-medium text-gray-500 cursor-pointer select-none mb-2 px-1"
+           onclick="event.stopPropagation()">
+        <input type="checkbox" class="accent-brand-500 check-grupo"
+               onchange="toggleGrupo(this, null)"> Selecionar todos ({{ historico|length }})
+    </label>
+    {% for reg in historico %}
+    {% include '_historico_item.html' %}
+    {% endfor %}
+{% else %}
+    {% for aluno, regs in agrupado.items() %}
+    <details class="hist-grupo mb-2" {% if loop.first %}open{% endif %}>
+        <summary class="flex items-center gap-2 cursor-pointer py-2 px-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+            <span class="chevron text-xs text-gray-400 inline-block transition-transform">▶</span>
+            <span class="text-[13px] font-semibold text-gray-700">{{ aluno }}</span>
+            <span class="text-[11px] text-gray-400 ml-auto">{{ regs|length }} registro(s)</span>
+        </summary>
+        <div class="pl-1 mt-1">
+            <label class="flex items-center gap-1.5 text-xs font-medium text-gray-500 cursor-pointer select-none mb-1 px-1"
+                   onclick="event.stopPropagation()">
+                <input type="checkbox" class="accent-brand-500 check-grupo"
+                       data-grupo="{{ aluno }}"
+                       onchange="toggleGrupo(this, '{{ aluno }}')"> Selecionar todos ({{ regs|length }})
+            </label>
+            {% for reg in regs %}
+            {% include '_historico_item.html' %}
+            {% endfor %}
+        </div>
+    </details>
+    {% endfor %}
+{% endif %}
+
+<script>
+function atualizarBarraSelecao() {
+    const checked = document.querySelectorAll('.hist-check:checked');
+    const barra = document.getElementById('barra-selecao');
+    const contagem = document.getElementById('contagem-sel');
+    if (checked.length > 0) {
+        barra.style.display = '';
+        contagem.textContent = checked.length + ' selecionado(s)';
+    } else {
+        barra.style.display = 'none';
+    }
+    // Atualizar estado dos checkboxes de grupo
+    document.querySelectorAll('.check-grupo').forEach(master => {
+        const grupo = master.dataset.grupo;
+        const checks = grupo
+            ? master.closest('.hist-grupo').querySelectorAll('.hist-check')
+            : document.querySelectorAll('.hist-check');
+        const checkedInGroup = Array.from(checks).filter(cb => cb.checked);
+        master.checked = checkedInGroup.length === checks.length;
+        master.indeterminate = checkedInGroup.length > 0 && checkedInGroup.length < checks.length;
+    });
+}
+
+function toggleGrupo(master, grupo) {
+    const checks = grupo
+        ? master.closest('.hist-grupo').querySelectorAll('.hist-check')
+        : document.querySelectorAll('.hist-check');
+    checks.forEach(cb => cb.checked = master.checked);
+    atualizarBarraSelecao();
+}
+</script>
+{% endif %}

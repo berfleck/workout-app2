@@ -1,0 +1,10 @@
+<select name="aluno" id="sel-aluno" onchange="onAlunoChange(this.value)"
+        class="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10"
+        hx-swap-oob="true">
+    <option value="">Selecionar...</option>
+    {% for a in alunos_dropdown %}<option value="{{ a.nome }}" {% if aluno_pre_selecionado and a.nome == aluno_pre_selecionado %}selected{% endif %}>{{ a.nome }}</option>{% endfor %}
+    {% if nomes_hist_dropdown %}
+    <option disabled>───</option>
+    {% for n in nomes_hist_dropdown %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+    {% endif %}
+</select>

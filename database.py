@@ -28,7 +28,8 @@ def init_db():
             nivel TEXT DEFAULT 'intermediario',
             objetivo TEXT DEFAULT '',
             restricoes TEXT DEFAULT '[]',
-            obs TEXT DEFAULT ''
+            obs TEXT DEFAULT '',
+            rotina_ativa_id TEXT DEFAULT NULL
         );
 
         CREATE TABLE IF NOT EXISTS historico (
@@ -41,7 +42,18 @@ def init_db():
             configs TEXT DEFAULT NULL
         );
     """)
-    con.commit()
+    # Migração: adicionar coluna rotina_ativa_id se não existir (DBs já criados)
+    try:
+        con.execute("ALTER TABLE alunos ADD COLUMN rotina_ativa_id TEXT DEFAULT NULL")
+        con.commit()
+    except sqlite3.OperationalError:
+        pass  # coluna já existe
+    # Migração: adicionar coluna rascunho_rotina se não existir
+    try:
+        con.execute("ALTER TABLE alunos ADD COLUMN rascunho_rotina TEXT DEFAULT NULL")
+        con.commit()
+    except sqlite3.OperationalError:
+        pass
     con.close()
 
 
@@ -101,7 +113,8 @@ def carregar_alunos():
     return [{"id": r["id"], "nome": r["nome"], "nivel": r["nivel"],
              "objetivo": r["objetivo"],
              "restricoes": json.loads(r["restricoes"]),
-             "obs": r["obs"]} for r in rows]
+             "obs": r["obs"],
+             "rotina_ativa_id": r["rotina_ativa_id"]} for r in rows]
 
 
 def salvar_aluno(nome, nivel, objetivo, restricoes, obs):
@@ -127,6 +140,78 @@ def deletar_aluno(aluno_id):
     con.execute("DELETE FROM alunos WHERE id = ?", (aluno_id,))
     con.commit()
     con.close()
+
+
+def definir_rotina_ativa(aluno_id, historico_id):
+    con = _conn()
+    con.execute("UPDATE alunos SET rotina_ativa_id = ? WHERE id = ?", (historico_id, aluno_id))
+    con.commit()
+    con.close()
+
+
+def salvar_rascunho(aluno_id, sessoes_list):
+    con = _conn()
+    con.execute("UPDATE alunos SET rascunho_rotina = ? WHERE id = ?",
+                (json.dumps(sessoes_list, ensure_ascii=False), aluno_id))
+    con.commit()
+    con.close()
+
+
+def carregar_rascunho(aluno_id):
+    con = _conn()
+    row = con.execute("SELECT rascunho_rotina FROM alunos WHERE id = ?", (aluno_id,)).fetchone()
+    con.close()
+    if not row or not row["rascunho_rotina"]:
+        return None
+    return json.loads(row["rascunho_rotina"])
+
+
+def limpar_rascunho(aluno_id):
+    con = _conn()
+    con.execute("UPDATE alunos SET rascunho_rotina = NULL WHERE id = ?", (aluno_id,))
+    con.commit()
+    con.close()
+
+
+def carregar_rotina_ativa(aluno_id):
+    con = _conn()
+    row = con.execute(
+        "SELECT h.* FROM historico h JOIN alunos a ON a.rotina_ativa_id = h.id WHERE a.id = ?",
+        (aluno_id,)).fetchone()
+    con.close()
+    if not row:
+        return None
+    return {"id": row["id"], "data": row["data_salvo"], "aluno": row["aluno"],
+            "etiqueta": row["etiqueta"], "n_treinos": row["n_treinos"],
+            "sessoes": json.loads(row["sessoes"]),
+            "configs": json.loads(row["configs"]) if row["configs"] else None}
+
+
+def carregar_rotina_anterior(aluno_nome, rotina_ativa_id):
+    con = _conn()
+    row = con.execute(
+        "SELECT * FROM historico WHERE aluno = ? AND id != ? ORDER BY id DESC LIMIT 1",
+        (aluno_nome, rotina_ativa_id or "")).fetchone()
+    con.close()
+    if not row:
+        return None
+    return {"id": row["id"], "data": row["data_salvo"], "aluno": row["aluno"],
+            "etiqueta": row["etiqueta"], "n_treinos": row["n_treinos"],
+            "sessoes": json.loads(row["sessoes"]),
+            "configs": json.loads(row["configs"]) if row["configs"] else None}
+
+
+def buscar_aluno_por_nome(nome):
+    con = _conn()
+    row = con.execute("SELECT * FROM alunos WHERE nome = ?", (nome,)).fetchone()
+    con.close()
+    if not row:
+        return None
+    return {"id": row["id"], "nome": row["nome"], "nivel": row["nivel"],
+            "objetivo": row["objetivo"],
+            "restricoes": json.loads(row["restricoes"]),
+            "obs": row["obs"],
+            "rotina_ativa_id": row["rotina_ativa_id"]}
 
 
 # ══════════════════════════════════════════════════════════════

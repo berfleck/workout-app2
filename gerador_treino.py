@@ -705,7 +705,7 @@ def substituir_exercicio(
     else:
         bloco.ex3 = substituto
 
-    print(f"  [✓] '{nome_atual}' substituído por '{substituto.nome}'")
+    print(f"  [OK] '{nome_atual}' substituido por '{substituto.nome}'")
     return nova_sessao
 
 

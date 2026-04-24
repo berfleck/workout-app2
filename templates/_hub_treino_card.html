@@ -1,0 +1,35 @@
+<div class="treino-card modo-visualizar">
+    <div class="treino-header">
+        <div class="treino-acoes">
+            <button class="btn btn-sm btn-icon" title="Editar"
+                    hx-post="/hub/rotina/{{ aluno_id }}/treino/{{ idx }}/editar-inline"
+                    hx-target="#treino-{{ idx }}" hx-swap="innerHTML">✏️</button>
+            <a href="/gerador?aluno_id={{ aluno_id }}&acao=substituir&treino={{ idx }}"
+               class="btn btn-sm btn-icon" title="Substituir treino inteiro">↺</a>
+            <button class="btn btn-sm btn-icon" title="Remover treino"
+                    hx-delete="/hub/rotina/{{ aluno_id }}/treino/{{ idx }}"
+                    hx-target="#rotina-display" hx-swap="innerHTML"
+                    hx-confirm="Remover Treino {{ idx + 1 }} da rotina?">✕</button>
+        </div>
+        <span class="treino-titulo">Treino {{ idx + 1 }}</span>
+        <span class="treino-tipo">{{ sessao.tipo }}</span>
+    </div>
+    {% for bloco in sessao.blocos %}
+    <p class="bloco-label">Bloco {{ bloco.label }}</p>
+    {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
+    <div class="exercicio">
+        <div class="exercicio-info">
+            <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
+                {% if ex.series or ex.reps %}
+                <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
+                {% endif %}
+                {% if nomes_anteriores and ex.nome in nomes_anteriores %}
+                <span class="badge-mantido">✓ mantido</span>
+                {% endif %}
+            </span>
+        </div>
+    </div>
+    {% endfor %}
+    <hr class="thin">
+    {% endfor %}
+</div>
