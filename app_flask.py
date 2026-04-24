@@ -3,7 +3,7 @@ BF Treinamento — Versão Flask + HTMX (completa)
 """
 
 from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify
-import random, json, copy, io, zipfile, unicodedata, secrets
+import os, random, json, copy, io, zipfile, unicodedata, secrets
 from pathlib import Path
 from datetime import datetime
 from gerador_treino import (
@@ -26,7 +26,7 @@ from database import (
 )
 
 app = Flask(__name__)
-app.secret_key = "bf-treinamento-dev"
+app.secret_key = os.environ.get("SECRET_KEY", "bf-treinamento-dev")
 
 # ══════════════════════════════════════════════════════════════
 # DADOS
@@ -1649,5 +1649,7 @@ if __name__ == "__main__":
     if sessoes_ativas:
         print(f"  Restauradas {len(sessoes_ativas)} sessoes ativas")
     print(f"[OK] Banco carregado: {len(banco)} exercicios")
-    print(f"[OK] Acesse: http://localhost:5000 (ou do celular: use o IP da maquina na rede)")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
+    print(f"[OK] Acesse: http://localhost:{port}")
+    app.run(debug=debug, host="0.0.0.0", port=port)
