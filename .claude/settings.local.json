@@ -31,7 +31,10 @@
       "PowerShell(Stop-Process *)",
       "PowerShell(taskkill *)",
       "Bash(curl -s \"http://localhost:5001/historico\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
