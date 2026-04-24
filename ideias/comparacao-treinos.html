@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BF Treinamento — Comparar treinos</title>
+
+  <!-- Tailwind via CDN só pra protótipo. No teu Flask você já tem Tailwind configurado -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Fonte -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    /* Animação sutil ao trocar de período */
+    .fade-in { animation: fade 180ms ease-out; }
+    @keyframes fade {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="bg-zinc-50 text-zinc-900 min-h-screen">
+
+  <!-- ================== CABEÇALHO ================== -->
+  <header class="border-b border-zinc-200 bg-white">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div>
+        <p class="text-xs uppercase tracking-wider text-zinc-500">Aluno</p>
+        <h1 class="text-xl font-bold">João Silva</h1>
+      </div>
+      <button class="text-sm text-zinc-600 hover:text-zinc-900">← Voltar</button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-6">
+
+    <!-- ================== BARRA DE CONTROLES ================== -->
+    <!-- Toggle de período + botão de lado-a-lado -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-zinc-600">Comparar com:</span>
+
+        <!-- Toggle estilo "segmented control" -->
+        <!-- No HTMX: cada botão faz hx-get="/treinos/aluno/1?periodo=atual" hx-target="#lista-treinos" -->
+        <div class="inline-flex bg-zinc-200 rounded-lg p-1" role="tablist">
+          <button
+            onclick="trocarPeriodo('atual')"
+            id="btn-atual"
+            class="px-4 py-1.5 text-sm font-medium rounded-md bg-white text-zinc-900 shadow-sm">
+            Atual
+          </button>
+          <button
+            onclick="trocarPeriodo('anterior')"
+            id="btn-anterior"
+            class="px-4 py-1.5 text-sm font-medium rounded-md text-zinc-600 hover:text-zinc-900">
+            Mês passado
+          </button>
+        </div>
+      </div>
+
+      <button
+        onclick="alternarLadoALado()"
+        id="btn-lado-a-lado"
+        class="text-sm font-medium px-3 py-1.5 rounded-md border border-zinc-300 hover:bg-zinc-100">
+        Ver lado a lado
+      </button>
+    </div>
+
+    <!-- ================== ÁREA DE TREINOS ================== -->
+    <!-- id="lista-treinos" é onde o HTMX injetaria o HTML vindo do Flask -->
+    <div id="lista-treinos" class="fade-in">
+      <!-- Conteúdo preenchido pelo JS pra protótipo. No Flask, vem do Jinja. -->
+    </div>
+  </main>
+
+  <script>
+    // ============================================================
+    // DADOS DE EXEMPLO
+    // No teu Flask, esses dados virão do SQLite via query e serão
+    // renderizados por um template Jinja tipo treinos_lista.html
+    // ============================================================
+    const dados = {
+      atual: [
+        {
+          nome: 'Treino A',
+          grupo: 'Superiores',
+          cor: 'azul',
+          exercicios: [
+            { nome: 'Supino reto',        series: '4x8-10',  repetido: true },
+            { nome: 'Supino inclinado',   series: '3x10-12', repetido: false },
+            { nome: 'Crossover',          series: '3x12',    repetido: false },
+            { nome: 'Tríceps pulley',     series: '4x10',    repetido: true },
+            { nome: 'Tríceps francês',    series: '3x12',    repetido: true },
+          ],
+        },
+        {
+          nome: 'Treino B',
+          grupo: 'Inferiores',
+          cor: 'verde',
+          exercicios: [
+            { nome: 'Agachamento livre',  series: '4x8',     repetido: true },
+            { nome: 'Leg press 45°',      series: '4x10-12', repetido: true },
+            { nome: 'Cadeira extensora',  series: '3x15',    repetido: false },
+            { nome: 'Stiff',              series: '3x10',    repetido: true },
+          ],
+        },
+        {
+          nome: 'Treino C',
+          grupo: 'Core',
+          cor: 'laranja',
+          exercicios: [
+            { nome: 'Prancha',            series: '3x40s',   repetido: true },
+            { nome: 'Abdominal infra',    series: '3x15',    repetido: true },
+            { nome: 'Russian twist',      series: '3x20',    repetido: false },
+          ],
+        },
+      ],
+      anterior: [
+        {
+          nome: 'Treino A',
+          grupo: 'Superiores',
+          cor: 'azul',
+          exercicios: [
+            { nome: 'Supino reto',        series: '4x10' },
+            { nome: 'Crucifixo',          series: '3x12' },
+            { nome: 'Tríceps pulley',     series: '4x12' },
+            { nome: 'Tríceps francês',    series: '3x12' },
+          ],
+        },
+        {
+          nome: 'Treino B',
+          grupo: 'Inferiores',
+          cor: 'verde',
+          exercicios: [
+            { nome: 'Agachamento livre',  series: '4x10' },
+            { nome: 'Leg press 45°',      series: '4x12' },
+            { nome: 'Mesa flexora',       series: '3x12' },
+            { nome: 'Stiff',              series: '3x12' },
+          ],
+        },
+        {
+          nome: 'Treino C',
+          grupo: 'Core',
+          cor: 'laranja',
+          exercicios: [
+            { nome: 'Prancha',            series: '3x30s' },
+            { nome: 'Abdominal infra',    series: '3x15' },
+          ],
+        },
+      ],
+    };
+
+    // Mapeamento das cores das barras/badges por grupo muscular
+    const coresBarra = {
+      azul:    'bg-blue-500',
+      verde:   'bg-emerald-500',
+      laranja: 'bg-orange-500',
+      roxo:    'bg-violet-500',
+    };
+    const coresBadge = {
+      azul:    'bg-blue-50 text-blue-700',
+      verde:   'bg-emerald-50 text-emerald-700',
+      laranja: 'bg-orange-50 text-orange-700',
+      roxo:    'bg-violet-50 text-violet-700',
+    };
+
+    let periodoAtivo = 'atual';
+    let modoLadoALado = false;
+
+    // ============================================================
+    // RENDERIZAÇÃO
+    // ============================================================
+    function renderCardTreino(treino, mostrarRepeticao = false) {
+      const exerciciosHTML = treino.exercicios.map(ex => `
+        <li class="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
+          <span class="flex items-center gap-2 text-zinc-800">
+            ${mostrarRepeticao && ex.repetido
+              ? '<span class="text-emerald-500" title="Também estava no mês passado">✓</span>'
+              : '<span class="w-3"></span>'}
+            ${ex.nome}
+          </span>
+          <span class="text-sm text-zinc-500 font-medium tabular-nums">${ex.series}</span>
+        </li>
+      `).join('');
+
+      return `
+        <article class="bg-white rounded-xl border border-zinc-200 overflow-hidden flex">
+          <!-- Barra colorida lateral indicando grupo muscular -->
+          <div class="w-1.5 ${coresBarra[treino.cor]}"></div>
+
+          <div class="flex-1 p-5">
+            <header class="flex items-center justify-between mb-3">
+              <h2 class="font-bold text-zinc-900">${treino.nome}</h2>
+              <span class="text-xs font-medium px-2 py-0.5 rounded-full ${coresBadge[treino.cor]}">
+                ${treino.grupo}
+              </span>
+            </header>
+            <ul class="text-[15px]">
+              ${exerciciosHTML}
+            </ul>
+          </div>
+        </article>
+      `;
+    }
+
+    function render() {
+      const container = document.getElementById('lista-treinos');
+      container.classList.remove('fade-in');
+      void container.offsetWidth; // truque pra reiniciar a animação
+      container.classList.add('fade-in');
+
+      if (modoLadoALado) {
+        // Lado a lado: 2 colunas no desktop, empilha no mobile
+        const atuais = dados.atual.map(t => renderCardTreino(t, true)).join('');
+        const anteriores = dados.anterior.map(t => renderCardTreino(t)).join('');
+
+        container.innerHTML = `
+          <div class="grid md:grid-cols-2 gap-6">
+            <div>
+              <h3 class="text-xs uppercase tracking-wider text-zinc-500 mb-3">Atual</h3>
+              <div class="space-y-4">${atuais}</div>
+            </div>
+            <div>
+              <h3 class="text-xs uppercase tracking-wider text-zinc-500 mb-3">Mês passado</h3>
+              <div class="space-y-4">${anteriores}</div>
+            </div>
+          </div>
+        `;
+      } else {
+        // Visão única (toggle)
+        const treinos = dados[periodoAtivo];
+        // Quando mostra "atual", marca os exercícios que também estavam no mês passado
+        const mostrarRepeticao = periodoAtivo === 'atual';
+        const cards = treinos.map(t => renderCardTreino(t, mostrarRepeticao)).join('');
+
+        container.innerHTML = `
+          <div class="grid md:grid-cols-3 gap-4">
+            ${cards}
+          </div>
+        `;
+      }
+    }
+
+    // ============================================================
+    // INTERAÇÕES
+    // ============================================================
+    function trocarPeriodo(periodo) {
+      periodoAtivo = periodo;
+      modoLadoALado = false;
+      document.getElementById('btn-lado-a-lado').textContent = 'Ver lado a lado';
+
+      // Atualiza visual dos botões
+      const btnAtual = document.getElementById('btn-atual');
+      const btnAnt = document.getElementById('btn-anterior');
+      const ativo = 'bg-white text-zinc-900 shadow-sm';
+      const inativo = 'text-zinc-600 hover:text-zinc-900';
+
+      if (periodo === 'atual') {
+        btnAtual.className = `px-4 py-1.5 text-sm font-medium rounded-md ${ativo}`;
+        btnAnt.className   = `px-4 py-1.5 text-sm font-medium rounded-md ${inativo}`;
+      } else {
+        btnAtual.className = `px-4 py-1.5 text-sm font-medium rounded-md ${inativo}`;
+        btnAnt.className   = `px-4 py-1.5 text-sm font-medium rounded-md ${ativo}`;
+      }
+
+      render();
+    }
+
+    function alternarLadoALado() {
+      modoLadoALado = !modoLadoALado;
+      document.getElementById('btn-lado-a-lado').textContent =
+        modoLadoALado ? 'Voltar pra visão única' : 'Ver lado a lado';
+      render();
+    }
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+{% if not rotina %}
+<div class="text-center py-12 text-gray-400">
+    <div class="text-4xl mb-3">📋</div>
+    <div class="text-base font-semibold text-gray-600">Nenhuma rotina ativa</div>
+    <div class="text-sm mt-1">Use o botão <strong>+ Gerar treino</strong> para criar a primeira rotina deste aluno.</div>
+</div>
+{% else %}
+
+{% if periodo == 'comparar' %}
+<!-- Modo lado a lado -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Atual -->
+    <div>
+        <p class="text-xs font-bold text-brand-500 uppercase tracking-wider mb-3">Rotina Atual
+            {% if rotina.etiqueta %}<span class="text-gray-400 font-normal">· {{ rotina.etiqueta }}</span>{% endif %}
+        </p>
+        <div class="space-y-2.5">
+        {% for sessao in rotina.sessoes %}
+            <div class="treino-card modo-visualizar">
+                <div class="treino-header">
+                    <span class="treino-titulo">Treino {{ loop.index }}</span>
+                    <span class="treino-tipo">{{ sessao.tipo }}</span>
+                </div>
+                {% for bloco in sessao.blocos %}
+                <p class="bloco-label">Bloco {{ bloco.label }}</p>
+                {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
+                <div class="exercicio">
+                    <div class="exercicio-info">
+                        <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
+                            {% if ex.series or ex.reps %}
+                            <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
+                            {% endif %}
+                            {% if nomes_anteriores and ex.nome in nomes_anteriores %}
+                            <span class="badge-mantido">✓ mantido</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+                <hr class="thin">
+                {% endfor %}
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+    <!-- Anterior -->
+    <div>
+        {% if anterior %}
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Rotina Anterior
+            {% if anterior.etiqueta %}<span class="font-normal">· {{ anterior.etiqueta }}</span>{% endif %}
+            <span class="font-normal">· {{ anterior.data }}</span>
+        </p>
+        <div class="space-y-2.5">
+        {% for sessao in anterior.sessoes %}
+            <div class="treino-card modo-visualizar" style="opacity:0.7; border-color:#d1d5db">
+                <div class="treino-header">
+                    <span class="treino-titulo">Treino {{ loop.index }}</span>
+                    <span class="treino-tipo">{{ sessao.tipo }}</span>
+                </div>
+                {% for bloco in sessao.blocos %}
+                <p class="bloco-label">Bloco {{ bloco.label }}</p>
+                {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
+                <div class="exercicio" style="border-left-color:#9ca3af">
+                    <div class="exercicio-info">
+                        <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
+                            {% if ex.series or ex.reps %}
+                            <span class="prescr-badge" style="background:#f3f4f6; color:#6b7280">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+                <hr class="thin">
+                {% endfor %}
+            </div>
+        {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12 text-gray-400">
+            <div class="text-sm">Nenhum período anterior encontrado para este aluno.</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% elif periodo == 'anterior' %}
+<!-- Modo anterior (read-only) -->
+{% if anterior %}
+<div class="auto-ref-badge mb-3">Visualizando rotina anterior · {{ anterior.data }}{% if anterior.etiqueta %} · {{ anterior.etiqueta }}{% endif %}</div>
+<div class="resultado-grid" data-n="{{ anterior.sessoes|length }}">
+{% for sessao in anterior.sessoes %}
+<div>
+    <div class="treino-card modo-visualizar" style="opacity:0.8; border-color:#d1d5db">
+        <div class="treino-header">
+            <span class="treino-titulo">Treino {{ loop.index }}</span>
+            <span class="treino-tipo">{{ sessao.tipo }}</span>
+        </div>
+        {% for bloco in sessao.blocos %}
+        <p class="bloco-label">Bloco {{ bloco.label }}</p>
+        {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
+        <div class="exercicio" style="border-left-color:#9ca3af">
+            <div class="exercicio-info">
+                <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
+                    {% if ex.series or ex.reps %}
+                    <span class="prescr-badge" style="background:#f3f4f6; color:#6b7280">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+        <hr class="thin">
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div class="text-center py-12 text-gray-400">
+    <div class="text-sm">Nenhum período anterior encontrado para este aluno.</div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- Modo atual (default) -->
+
+{% if eh_rascunho %}
+<div class="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 mb-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+            <span class="text-sm font-semibold text-amber-700">Rascunho</span>
+            <span class="text-xs text-amber-600">Alterações não salvas</span>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <input type="text" name="etiqueta" id="etiqueta-rotina" placeholder="Etiqueta (ex: Abril - Hipertrofia)"
+                   class="input-field text-sm" style="width:220px; margin:0; padding:4px 10px">
+            <button class="btn btn-sm btn-primary"
+                    hx-post="/hub/rotina/{{ aluno_id }}/salvar-rotina"
+                    hx-target="#rotina-display" hx-swap="innerHTML"
+                    hx-include="#etiqueta-rotina">
+                Salvar rotina
+            </button>
+            <button class="btn btn-sm"
+                    hx-post="/hub/rotina/{{ aluno_id }}/descartar-rascunho"
+                    hx-target="#rotina-display" hx-swap="innerHTML"
+                    hx-confirm="Descartar todas as alterações e voltar à última rotina salva?">
+                Descartar
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="resultado-grid" data-n="{{ rotina.sessoes|length }}">
+{% for sessao in rotina.sessoes %}
+{% set idx = loop.index0 %}
+<div id="treino-{{ idx }}">
+    {% include "_hub_treino_card.html" with context %}
+</div>
+{% endfor %}
+</div>
+<script>
+// Re-inicializa Sortable em cards que entrarem em modo edição (inline HUB)
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    const m = evt.detail.target && evt.detail.target.id && evt.detail.target.id.match(/^treino-(\d+)$/);
+    if (m && typeof initSortable === 'function') initSortable(parseInt(m[1]));
+});
+</script>
+
+{% if not eh_rascunho and (rotina.etiqueta or rotina.data) %}
+<p class="text-xs text-gray-400 mt-3">{{ rotina.etiqueta }}{% if rotina.etiqueta and rotina.data %} · {% endif %}{{ rotina.data }}</p>
+{% endif %}
+{% endif %}
+
+{% endif %}

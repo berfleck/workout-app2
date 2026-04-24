@@ -1,20 +1,24 @@
 <div class="hist-card">
     <div class="flex items-start justify-between gap-2">
-        <div class="flex-1 min-w-0">
-            <div class="hist-titulo">{{ reg.etiqueta }}</div>
-            <div class="hist-meta">
-                {{ reg.get('data', '—') }} · {{ reg.get('n_treinos', reg.get('sessoes', [])|length) }} treino(s)
-                {% if not aluno_filtro %} · <span class="text-gray-600">{{ reg.get('aluno', '—') }}</span>{% endif %}
+        <div class="flex items-start gap-2 flex-1 min-w-0">
+            <input type="checkbox" name="sel" value="{{ reg.id }}" class="hist-check mt-1 shrink-0 accent-brand-500"
+                   onchange="atualizarBarraSelecao()">
+            <div class="flex-1 min-w-0">
+                <div class="hist-titulo">{{ reg.etiqueta }}</div>
+                <div class="hist-meta">
+                    {{ reg.get('data', '—') }} · {{ reg.get('n_treinos', reg.get('sessoes', [])|length) }} treino(s)
+                    {% if not aluno_filtro %} · <span class="text-gray-600">{{ reg.get('aluno', '—') }}</span>{% endif %}
+                </div>
             </div>
         </div>
         <div class="flex gap-1 items-center shrink-0">
             <button class="btn-icon" title="Carregar para edição"
                     hx-post="/historico/{{ reg.id }}/carregar"
                     hx-target="#resultado"
-                    onclick="showTab('treinos'); document.querySelector('.nav-tab:first-child').click()">↩</button>
+                    onclick="window.location.href='/gerador'">↩</button>
             <button class="btn-icon text-red-400 hover:text-red-600" title="Apagar registro"
                     hx-delete="/historico/{{ reg.id }}/apagar"
-                    hx-target="#tab-historico" hx-swap="innerHTML"
+                    hx-target="#historico-content" hx-swap="innerHTML"
                     hx-confirm="Apagar este registro?">🗑</button>
         </div>
     </div>

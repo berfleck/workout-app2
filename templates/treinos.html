@@ -1,11 +1,29 @@
 {% extends "base.html" %}
-{% block treinos %}
+{% block content %}
 
 {% set MAX_TREINOS = 5 %}
+
+{% if ctx_acao %}
+<div class="bg-brand-50 border border-brand-500 rounded-xl px-5 py-3 mb-4 flex items-center justify-between flex-wrap gap-2">
+    <div>
+        <span class="text-sm font-semibold text-brand-600">
+            {% if ctx_acao == 'substituir' %}↺ Substituindo Treino {{ (ctx_treino_idx or 0) + 1 }}{% elif ctx_acao == 'adicionar' %}+ Adicionando treino{% else %}Gerando nova rotina{% endif %}
+            {% if ctx_aluno %} para {{ ctx_aluno.nome }}{% endif %}
+        </span>
+    </div>
+    <a href="/{% if ctx_aluno %}?aluno_id={{ ctx_aluno.id }}{% endif %}" class="btn btn-sm">← Voltar ao HUB</a>
+</div>
+{% endif %}
 
 <div id="panel-config" class="{% if sessoes %}hidden{% endif %}">
 <form id="form-config" hx-post="/gerar" hx-target="#resultado" hx-indicator="#loading"
       hx-on::before-request="showPanel('resultado')">
+
+{% if ctx_acao %}
+<input type="hidden" name="ctx_acao" value="{{ ctx_acao }}">
+<input type="hidden" name="ctx_aluno_id" value="{{ ctx_aluno.id if ctx_aluno else '' }}">
+{% if ctx_treino_idx is not none %}<input type="hidden" name="ctx_treino_idx" value="{{ ctx_treino_idx }}">{% endif %}
+{% endif %}
 
 <!-- ═══ Layout 3 colunas (lg) / stack (mobile) ═══ -->
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 pb-24 lg:pb-6">
@@ -16,7 +34,7 @@
         <!-- Aluno selector -->
         <div class="bg-white border border-gray-200 rounded-xl p-4">
             <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Aluno / Turma</label>
-            {% with alunos_dropdown=alunos, nomes_hist_dropdown=nomes_hist %}
+            {% with alunos_dropdown=alunos, nomes_hist_dropdown=nomes_hist, aluno_pre_selecionado=(ctx_aluno.nome if ctx_aluno else '') %}
             {% include "_aluno_dropdown.html" %}
             {% endwith %}
 
@@ -47,9 +65,11 @@
             <div class="px-4 pb-4 pt-1 grid grid-cols-2 gap-4">
                 <div class="campo">
                     <label>Nº de treinos</label>
-                    <select name="n_treinos" id="n_treinos" onchange="onChangeNTreinos()">
-                        {% for i in range(1, MAX_TREINOS + 1) %}<option value="{{ i }}">{{ i }}</option>{% endfor %}
+                    <select name="n_treinos" id="n_treinos" onchange="onChangeNTreinos()"
+                            {% if ctx_acao in ('substituir', 'adicionar') %}disabled{% endif %}>
+                        {% for i in range(1, MAX_TREINOS + 1) %}<option value="{{ i }}" {% if ctx_acao in ('substituir', 'adicionar') and i == 1 %}selected{% endif %}>{{ i }}</option>{% endfor %}
                     </select>
+                    {% if ctx_acao in ('substituir', 'adicionar') %}<input type="hidden" name="n_treinos" value="1">{% endif %}
                 </div>
                 <div class="campo">
                     <label>Exerc. por bloco</label>
@@ -224,6 +244,8 @@
                         <div id="template-epp-{{ t }}"></div>
                     </div>
 
+                    <div id="total-exercicios-{{ t }}" class="text-sm font-semibold text-gray-700 mt-2"></div>
+
                 </div>
             </div>
             {% endfor %}
@@ -302,12 +324,15 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
 <script>
 const TEMPLATE_EPP = {{ template_epp | tojson }};
 const PADROES_LABELS = {{ padroes_labels | tojson }};
 const SUBREGIOES_LABELS_JS = {{ subregioes_labels | tojson }};
 const REGIOES_LABELS_JS = {{ regioes_labels | tojson }};
-const MAX_TREINOS = {{ MAX_TREINOS }};
+const MAX_TREINOS = 5;
 
 function tabEl(t) { return document.getElementById('tab-' + t); }
 function qs(t, sel) { return tabEl(t).querySelector(sel); }
@@ -405,7 +430,7 @@ function selectTemplate(t, nome) {
             <label>${label}</label>
             <div class="range-row">
                 <input type="range" name="epp_${t}_${p}" min="0" max="5" step="1" value="${val}"
-                       oninput="this.nextElementSibling.textContent=this.value">
+                       oninput="this.nextElementSibling.textContent=this.value; updateTotal(${t})"
                 <span class="range-value">${val}</span>
             </div>
         </div>`;
@@ -441,6 +466,7 @@ function selectTemplate(t, nome) {
         b.style.borderColor = sel ? '#e85d04' : '';
         b.style.background = sel ? '#fff7ed' : '';
     });
+    updateTotal(t);
 }
 
 function capturarValoresAtuais(t) {
@@ -510,7 +536,7 @@ function updateDemandas(t) {
 
     for (const [reg, subs] of Object.entries(subsMarcadas)) {
         for (const sub of subs) {
-            demandas.push({nivel: 'subregiao', escopo: sub, label: SUBREGIOES_LABELS_JS[sub] || sub, default: 1});
+            demandas.push({nivel: 'subregiao', escopo: sub, label: SUBREGIOES_LABELS_JS[sub] || sub, default: 2});
         }
     }
 
@@ -526,7 +552,7 @@ function updateDemandas(t) {
             return !!subChk;
         });
         if (!temSubs && !temPads && !temLats) {
-            demandas.push({nivel: 'regiao', escopo: reg, label: REGIOES_LABELS_JS[reg] || reg, default: 1});
+            demandas.push({nivel: 'regiao', escopo: reg, label: REGIOES_LABELS_JS[reg] || reg, default: 6});
         }
     });
 
@@ -548,7 +574,7 @@ function updateDemandas(t) {
                         <label>Agachamento bilateral</label>
                         <div class="range-row">
                             <input type="range" name="squat_bi_${t}" min="0" max="8" step="1" value="${biVal}"
-                                   oninput="this.nextElementSibling.textContent=this.value; updateSquatTotal(${t}, ${i})">
+                                   oninput="this.nextElementSibling.textContent=this.value; updateSquatTotal(${t}, ${i}); updateTotal(${t})">
                             <span class="range-value">${biVal}</span>
                         </div>
                     </div>`;
@@ -560,7 +586,7 @@ function updateDemandas(t) {
                         <label>Agachamento unilateral</label>
                         <div class="range-row">
                             <input type="range" name="squat_uni_${t}" min="0" max="8" step="1" value="${uniVal}"
-                                   oninput="this.nextElementSibling.textContent=this.value; updateSquatTotal(${t}, ${i})">
+                                   oninput="this.nextElementSibling.textContent=this.value; updateSquatTotal(${t}, ${i}); updateTotal(${t})">
                             <span class="range-value">${uniVal}</span>
                         </div>
                     </div>`;
@@ -576,7 +602,7 @@ function updateDemandas(t) {
                     <label>${d.label}</label>
                     <div class="range-row">
                         <input type="range" name="dem_qtd_${t}_${i}" min="0" max="12" step="1" value="${val}"
-                               oninput="this.nextElementSibling.textContent=this.value">
+                               oninput="this.nextElementSibling.textContent=this.value; updateTotal(${t})">
                         <span class="range-value">${val}</span>
                     </div>
                 </div>`;
@@ -589,6 +615,7 @@ function updateDemandas(t) {
     qs(t, '#demandas-container-' + t).innerHTML = html;
     qs(t, '#demandas-hidden-inputs-' + t).innerHTML = hidden;
     qs(t, '#lateralidade-container-' + t).innerHTML = '';
+    updateTotal(t);
 }
 
 function updateSquatTotal(t, i) {
@@ -596,6 +623,22 @@ function updateSquatTotal(t, i) {
     const uni = parseInt((qs(t, `input[name="squat_uni_${t}"]`) || {}).value) || 0;
     const hidden = qs(t, `input[name="dem_qtd_${t}_${i}"]`);
     if (hidden) hidden.value = bi + uni;
+}
+
+function updateTotal(t) {
+    let total = 0;
+    const modo = qs(t, '#input-modo-' + t).value;
+    if (modo === 'template') {
+        qsa(t, `input[name^="epp_${t}_"]`).forEach(inp => {
+            total += parseInt(inp.value) || 0;
+        });
+    } else {
+        qsa(t, `input[name^="dem_qtd_${t}_"]`).forEach(inp => {
+            total += parseInt(inp.value) || 0;
+        });
+    }
+    const el = qs(t, '#total-exercicios-' + t);
+    if (el) el.textContent = total > 0 ? `Total de exercícios: ${total}` : '';
 }
 
 function checkLatTotal(t) {
@@ -625,6 +668,7 @@ function resetTreino(t) {
     // Close all pattern refinements
     qsa(t, '[id^="pads-' + t + '-"]').forEach(el => el.style.display = 'none');
     setModo(t, 'hierarquia');
+    updateTotal(t);
 }
 
 function resetAll() {

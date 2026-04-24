@@ -48,6 +48,7 @@
         .prescr-badge { @apply inline-block bg-brand-100 text-brand-500 rounded-md px-1.5 py-px text-[11px] font-bold ml-1.5; }
         .exercicio-acoes { @apply flex gap-0.5 shrink-0; }
         .badge-novo { @apply inline-block text-[10px] font-semibold text-green-600 bg-green-100 rounded px-1.5 py-px ml-1 align-middle; }
+        .badge-mantido { @apply inline-block text-[10px] font-semibold text-blue-600 bg-blue-100 rounded px-1.5 py-px ml-1 align-middle; }
 
         .config-panel { @apply bg-white border border-gray-200 rounded-xl p-6 mb-5; }
         .config-title { @apply text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-4; }
@@ -132,16 +133,17 @@
         .template-btn { @apply px-4 py-2.5 border border-gray-200 rounded-lg bg-white text-sm font-[inherit] cursor-pointer text-left transition hover:border-brand-500 hover:bg-brand-50; }
 
         .demandas-grid { @apply grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 my-3; }
+
+        /* ── Sidebar ── */
+        .sidebar { @apply fixed left-0 top-0 h-full w-[60px] bg-white border-r border-gray-200 flex flex-col items-center py-4 z-40; }
+        .sidebar-link { @apply w-10 h-10 rounded-lg flex items-center justify-center text-lg text-gray-400 hover:bg-gray-100 hover:text-brand-500 transition mb-1; }
+        .sidebar-link.active { @apply bg-brand-50 text-brand-500; }
     </style>
     <style>
         /* HTMX indicators */
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display: inline-block; }
         .htmx-request .htmx-hide { display: none; }
-
-        /* Tab content */
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
 
         /* Details / accordion */
         details > summary { list-style: none; cursor: pointer; }
@@ -209,39 +211,57 @@
         /* Spinner */
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #e85d04; border-radius: 50%; animation: spin 0.6s linear infinite; }
+
+        /* Mobile sidebar overlay */
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 35; }
+        .sidebar-overlay.active { display: block; }
+
+        /* Segmented control (toggle) */
+        .seg-control { display: inline-flex; background: #f3f4f6; border-radius: 8px; padding: 3px; }
+        .seg-btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: #6b7280; transition: all 0.15s; font-family: inherit; }
+        .seg-btn.active { background: white; color: #111827; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 antialiased font-sans">
 
-<!-- Header -->
-<header class="border-b border-gray-200 bg-white sticky top-0 z-20">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
-        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-brand-500 text-white grid place-items-center font-bold text-sm shrink-0">BF</div>
-        <div class="min-w-0">
-            <h1 class="text-sm sm:text-base font-bold tracking-tight truncate">BF Treinamento</h1>
-            <p class="text-[10px] sm:text-xs text-gray-400 hidden sm:block">Gerador de treinos personalizados</p>
-        </div>
-        <nav class="ml-auto flex gap-1 text-xs sm:text-sm">
-            <button class="nav-tab px-2 sm:px-3 py-1.5 rounded-md font-medium transition {% if active_tab == 'treinos' or not active_tab %}bg-gray-100 text-gray-900{% else %}text-gray-500 hover:text-gray-900 hover:bg-gray-100{% endif %}"
-                    onclick="showTab('treinos')">🏋️<span class="hidden sm:inline"> Treinos</span></button>
-            <button class="nav-tab px-2 sm:px-3 py-1.5 rounded-md font-medium transition {% if active_tab == 'alunos' %}bg-gray-100 text-gray-900{% else %}text-gray-500 hover:text-gray-900 hover:bg-gray-100{% endif %}"
-                    hx-get="/alunos" hx-target="#tab-alunos" hx-swap="innerHTML"
-                    onclick="showTab('alunos')">👥<span class="hidden sm:inline"> Alunos</span></button>
-            <button class="nav-tab px-2 sm:px-3 py-1.5 rounded-md font-medium transition {% if active_tab == 'historico' %}bg-gray-100 text-gray-900{% else %}text-gray-500 hover:text-gray-900 hover:bg-gray-100{% endif %}"
-                    hx-get="/historico" hx-target="#tab-historico" hx-swap="innerHTML"
-                    onclick="showTab('historico')">📚<span class="hidden sm:inline"> Histórico</span></button>
+<!-- Sidebar (desktop) -->
+<nav class="sidebar hidden lg:flex">
+    <a href="/" class="w-9 h-9 rounded-lg bg-brand-500 text-white grid place-items-center font-bold text-sm mb-6 no-underline">BF</a>
+    <a href="/" class="sidebar-link {% if active_page == 'hub' %}active{% endif %}" title="Treinos">🏋️</a>
+    <a href="/alunos" class="sidebar-link {% if active_page == 'alunos' %}active{% endif %}" title="Alunos">👥</a>
+    <a href="/historico" class="sidebar-link {% if active_page == 'historico' %}active{% endif %}" title="Histórico">📚</a>
+</nav>
+
+<!-- Mobile top bar -->
+<header class="lg:hidden border-b border-gray-200 bg-white sticky top-0 z-20">
+    <div class="px-4 py-3 flex items-center gap-3">
+        <button onclick="toggleMobileSidebar()" class="w-9 h-9 rounded-lg bg-brand-500 text-white grid place-items-center font-bold text-sm shrink-0 cursor-pointer border-none">BF</button>
+        <h1 class="text-sm font-bold tracking-tight flex-1">BF Treinamento</h1>
+        <nav class="flex gap-1">
+            <a href="/" class="sidebar-link {% if active_page == 'hub' %}active{% endif %}">🏋️</a>
+            <a href="/alunos" class="sidebar-link {% if active_page == 'alunos' %}active{% endif %}">👥</a>
+            <a href="/historico" class="sidebar-link {% if active_page == 'historico' %}active{% endif %}">📚</a>
         </nav>
     </div>
 </header>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-    <div id="tab-treinos" class="tab-content active">{% block treinos %}{% endblock %}</div>
-    <div id="tab-alunos" class="tab-content">{% block alunos %}{% endblock %}</div>
-    <div id="tab-historico" class="tab-content">{% block historico %}{% endblock %}</div>
-</div>
+<!-- Main content -->
+<main class="lg:ml-[60px] min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        {% block content %}{% endblock %}
+    </div>
+</main>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script>
+function toggleMobileSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    sidebar.classList.toggle('hidden');
+    sidebar.classList.toggle('flex');
+    overlay.classList.toggle('active');
+}
+
 function copiarBloco(refT, blocoIdx, destT) {
     htmx.ajax('POST', `/referencia/copiar-bloco/${refT}/${blocoIdx}/para/${destT}`, {
         target: `#treino-${destT}`,
@@ -277,17 +297,6 @@ function atualizarComparador() {
     }).catch(() => {});
 }
 
-function showTab(name) {
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.getElementById('tab-' + name).classList.add('active');
-    document.querySelectorAll('.nav-tab').forEach(t => {
-        t.classList.remove('bg-gray-100', 'text-gray-900');
-        t.classList.add('text-gray-500');
-    });
-    event.target.closest('.nav-tab').classList.add('bg-gray-100', 'text-gray-900');
-    event.target.closest('.nav-tab').classList.remove('text-gray-500');
-}
-
 function atualizarFocoEdicao() {
     document.querySelectorAll('.resultado-grid').forEach(grid => {
         const temEditar = grid.querySelector('.treino-card.modo-editar');
@@ -305,6 +314,32 @@ document.body.addEventListener('htmx:afterSwap', function(evt) {
     }
 });
 document.addEventListener('DOMContentLoaded', atualizarFocoEdicao);
+
+function atualizarLinksHub() {
+    const sel = document.getElementById('sel-aluno-hub');
+    let alunoId = sel ? sel.value : '';
+    if (alunoId) {
+        sessionStorage.setItem('hub_aluno_id', alunoId);
+    } else if (!sel) {
+        alunoId = sessionStorage.getItem('hub_aluno_id') || '';
+    }
+    const href = alunoId ? `/?aluno_id=${alunoId}` : '/';
+    document.querySelectorAll('a.sidebar-link, a.w-9').forEach(link => {
+        const title = link.getAttribute('title');
+        const text = link.textContent.trim();
+        if (title === 'Treinos' || text === '🏋️' || text === 'BF') {
+            link.href = href;
+        }
+    });
+}
+document.addEventListener('DOMContentLoaded', function() {
+    atualizarLinksHub();
+    const sel = document.getElementById('sel-aluno-hub');
+    if (sel) sel.addEventListener('change', atualizarLinksHub);
+});
 </script>
+<!-- Mobile sidebar overlay -->
+<div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
+{% block scripts %}{% endblock %}
 </body>
 </html>

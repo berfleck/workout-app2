@@ -4,7 +4,7 @@
 <details {% if not alunos %}open{% endif %}>
     <summary class="text-sm font-semibold py-2 cursor-pointer text-gray-700"><span class="chevron text-gray-400 text-xs">▶</span> ➕ Novo aluno</summary>
     <div class="config-panel mt-2">
-        <form hx-post="/alunos/novo" hx-target="#tab-alunos" hx-swap="innerHTML">
+        <form hx-post="/alunos/novo" hx-target="#alunos-content" hx-swap="innerHTML">
             <div class="form-grid">
                 <div class="campo">
                     <label>Nome *</label>
@@ -67,7 +67,7 @@
                 onclick='editarAluno({{ aluno.id }}, {{ aluno | tojson }})'>✏️</button>
         <button class="btn-ghost" title="Remover"
                 hx-delete="/alunos/{{ aluno.id }}/deletar"
-                hx-target="#tab-alunos" hx-swap="innerHTML"
+                hx-target="#alunos-content" hx-swap="innerHTML"
                 hx-confirm="Remover {{ aluno.nome }}?">🗑</button>
     </div>
 </div>
@@ -78,7 +78,7 @@
 <div id="edit-aluno-form" style="display:none">
     <div class="config-panel mt-2 border-brand-500">
         <p class="text-sm font-semibold text-brand-500 mb-2">✏️ Editando aluno</p>
-        <form id="form-edit-aluno" hx-target="#tab-alunos" hx-swap="innerHTML">
+        <form id="form-edit-aluno" hx-target="#alunos-content" hx-swap="innerHTML">
             <div class="form-grid">
                 <div class="campo"><label>Nome *</label><input type="text" name="nome" id="edit-nome" required></div>
                 <div class="campo"><label>Nível</label>

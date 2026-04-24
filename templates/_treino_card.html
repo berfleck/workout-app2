@@ -1,11 +1,39 @@
+{% set eh_criacao = modo == 'editar' and hub_aluno_id and criacao_manual_aluno == hub_aluno_id and criacao_manual_idx == idx %}
 <div class="treino-card modo-{{ modo }}">
+    {% if eh_criacao %}
+    <div class="criacao-manual-banner" style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:10px 12px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px">
+        <div style="font-size:13px">
+            <span style="font-weight:600; color:#9a3412">Criando treino manual</span>
+            <span style="color:#9a3412; opacity:0.8"> · salve para manter na rotina ou cancele para descartar</span>
+        </div>
+        <div style="display:flex; gap:6px">
+            <button class="btn btn-sm btn-primary"
+                    hx-post="/hub/rotina/{{ hub_aluno_id }}/criar-manual/salvar"
+                    hx-target="#rotina-display" hx-swap="innerHTML">✓ Salvar treino</button>
+            <button class="btn btn-sm"
+                    hx-post="/hub/rotina/{{ hub_aluno_id }}/criar-manual/cancelar"
+                    hx-target="#rotina-display" hx-swap="innerHTML"
+                    hx-confirm="Descartar o treino em criação e voltar à rotina anterior?">✕ Cancelar</button>
+        </div>
+    </div>
+    {% endif %}
     <div class="treino-header">
         <div class="treino-acoes">
             {% if modo == 'visualizar' %}
             <button class="btn btn-sm btn-icon" title="Regerar" hx-post="/treino/{{ idx }}/regerar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">🔄</button>
+            {% if hub_aluno_id %}
+            <button class="btn btn-sm btn-icon" title="Editar" hx-post="/hub/rotina/{{ hub_aluno_id }}/treino/{{ idx }}/editar-inline" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">✏️</button>
+            {% else %}
             <button class="btn btn-sm btn-icon" title="Editar" hx-get="/treino/{{ idx }}/editar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">✏️</button>
+            {% endif %}
+            {% else %}
+            {% if not eh_criacao %}
+            {% if hub_aluno_id %}
+            <button class="btn btn-sm btn-icon" title="Concluir edição" hx-get="/hub/rotina/{{ hub_aluno_id }}/treino/{{ idx }}/visualizar-inline" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">👁</button>
             {% else %}
             <button class="btn btn-sm btn-icon" title="Visualizar" hx-get="/treino/{{ idx }}/visualizar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">👁</button>
+            {% endif %}
+            {% endif %}
             {% endif %}
             <a class="btn btn-sm btn-icon" title="Baixar PNG" href="/treino/{{ idx }}/png/Aluno" id="dl-png-{{ idx }}"
                onclick="this.href='/treino/{{ idx }}/png/'+(document.getElementById('sel-aluno')?.value||'Aluno')">⬇</a>
@@ -27,6 +55,7 @@
     {% if modo == 'editar' %}
     <div class="bloco-header">
         <p class="bloco-label" style="margin:14px 0 6px">Bloco {{ bloco.label }}</p>
+        <button class="btn-ghost" title="Regerar bloco" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/regerar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML" hx-confirm="Regerar bloco {{ bloco.label }} com novos exercícios?">🔄</button>
         {% if loop.index0 > 0 %}
         <button class="btn-ghost" title="Mover acima" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/mover/up" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">↑</button>
         {% endif %}
@@ -85,14 +114,63 @@
             </form>
             <div class="exercicio-acoes">
                 <button class="btn-ghost" title="Substituir aleatório"
-                        hx-post="/treino/{{ idx }}/substituir/{{ ex.nome }}"
-                        hx-target="#treino-{{ idx }}" hx-swap="innerHTML">↺</button>
+                        hx-post="/treino/{{ idx }}/substituir/{{ ex.nome|urlencode }}"
+                        hx-target="#treino-{{ idx }}" hx-swap="innerHTML">🎲</button>
+                <button type="button" class="btn-ghost" title="Substituir manualmente"
+                        onclick="toggleSubstPanel({{ idx }}, {{ bloco_idx }}, {{ ei }})">↺</button>
                 <button class="btn-ghost" title="Remover"
                         hx-post="/treino/{{ idx }}/exercicio/remover/{{ bloco_idx }}/{{ ei }}"
                         hx-target="#treino-{{ idx }}" hx-swap="innerHTML">✕</button>
             </div>
             {% endif %}
         </div>
+        {% if modo == 'editar' %}
+        <div class="subst-panel" id="subst-{{ idx }}-{{ bloco_idx }}-{{ ei }}" style="display:none">
+            <div class="filtros-grid">
+                <input type="text" placeholder="Buscar por nome..." name="texto"
+                       id="sub-txt-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
+                       hx-get="/treino/{{ idx }}/buscar-substitutos/{{ ex.nome|urlencode }}"
+                       hx-trigger="keyup changed delay:300ms"
+                       hx-target="#sub-results-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
+                       hx-include="#sub-txt-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pur-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-uni-{{ idx }}-{{ bloco_idx }}-{{ ei }}">
+                <select name="padrao" id="sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
+                        hx-get="/treino/{{ idx }}/buscar-substitutos/{{ ex.nome|urlencode }}"
+                        hx-trigger="change"
+                        hx-target="#sub-results-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
+                        hx-include="#sub-txt-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pur-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-uni-{{ idx }}-{{ bloco_idx }}-{{ ei }}">
+                    <option value="{{ ex.padrao }}" selected>{{ padroes_labels.get(ex.padrao, ex.padrao) }} (mesmo)</option>
+                    <option value="">Qualquer categoria</option>
+                    {% for p in todos_padroes if p != ex.padrao %}<option value="{{ p }}">{{ padroes_labels.get(p, p) }}</option>{% endfor %}
+                </select>
+                <select name="purpose" id="sub-pur-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
+                        hx-get="/treino/{{ idx }}/buscar-substitutos/{{ ex.nome|urlencode }}"
+                        hx-trigger="change"
+                        hx-target="#sub-results-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
+                        hx-include="#sub-txt-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pur-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-uni-{{ idx }}-{{ bloco_idx }}-{{ ei }}">
+                    <option value="">Qualquer purpose</option>
+                    <option>compound</option><option>isolation</option><option>stability</option><option>explosive</option>
+                </select>
+                <select name="unilateral" id="sub-uni-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
+                        hx-get="/treino/{{ idx }}/buscar-substitutos/{{ ex.nome|urlencode }}"
+                        hx-trigger="change"
+                        hx-target="#sub-results-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
+                        hx-include="#sub-txt-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pur-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-uni-{{ idx }}-{{ bloco_idx }}-{{ ei }}">
+                    <option value="">Qualquer lateralidade</option>
+                    <option>bilateral</option><option>unilateral</option>
+                </select>
+            </div>
+            <div id="sub-results-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
+                 hx-get="/treino/{{ idx }}/buscar-substitutos/{{ ex.nome|urlencode }}"
+                 hx-trigger="load"
+                 hx-include="#sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}"></div>
+            <div style="margin-top:8px; display:flex; gap:6px">
+                <button type="button" class="btn btn-sm btn-primary"
+                        onclick="confirmarSubst({{ idx }}, {{ bloco_idx }}, {{ ei }}, {{ ex.nome|tojson }})">✅ Substituir</button>
+                <button type="button" class="btn btn-sm"
+                        onclick="toggleSubstPanel({{ idx }}, {{ bloco_idx }}, {{ ei }})">Cancelar</button>
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endfor %}
     </div>
@@ -190,6 +268,18 @@
 </div>
 
 <script>
+function toggleSubstPanel(t, bi, ei) {
+    const el = document.getElementById('subst-' + t + '-' + bi + '-' + ei);
+    if (!el) return;
+    el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+}
+function confirmarSubst(t, bi, ei, nomeAtual) {
+    const radio = document.querySelector('#sub-results-' + t + '-' + bi + '-' + ei + ' input[name="exercicio_escolhido"]:checked');
+    if (!radio) { alert('Selecione um exercício'); return; }
+    htmx.ajax('POST',
+        '/treino/' + t + '/substituir-por/' + encodeURIComponent(nomeAtual) + '/' + encodeURIComponent(radio.value),
+        {target: '#treino-' + t, swap: 'innerHTML'});
+}
 function adicionarEx(t, bi) {
     const radio = document.querySelector('#add-results-' + t + '-' + bi + ' input[name="exercicio_escolhido"]:checked');
     if (!radio) { alert('Selecione um exercício'); return; }

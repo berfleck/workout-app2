@@ -6,7 +6,7 @@
     <div class="flex-1 min-w-[140px]">
         <label class="text-[11px] text-gray-500 font-medium block mb-0.5">Aluno / Turma</label>
         <select name="aluno" class="input-field text-sm w-full"
-                hx-get="/historico" hx-target="#tab-historico" hx-swap="innerHTML"
+                hx-get="/historico" hx-target="#historico-content" hx-swap="innerHTML"
                 hx-include="[name='busca']"
                 hx-vals='{"partial":"0"}'>
             <option value="">Todos</option>
@@ -19,7 +19,7 @@
         <label class="text-[11px] text-gray-500 font-medium block mb-0.5">Buscar etiqueta</label>
         <input type="search" name="busca" value="{{ busca }}" placeholder="Ex: Semana 1..."
                class="input-field text-sm w-full"
-               hx-get="/historico" hx-target="#tab-historico" hx-swap="innerHTML"
+               hx-get="/historico" hx-target="#historico-content" hx-swap="innerHTML"
                hx-trigger="input changed delay:300ms, search"
                hx-include="[name='aluno']">
     </div>

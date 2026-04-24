@@ -2,3 +2,5 @@
 bf_treinamento.db-shm
 bf_treinamento.db-wal
 __pycache__/
+server.log
+server.pid
