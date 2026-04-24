@@ -1,6 +1,28 @@
+{% if aluno %}
+{% set partes = aluno.nome.split() %}
+{% set iniciais = (partes[0][0] ~ (partes[-1][0] if partes|length > 1 else '')) | upper %}
+<div class="flex items-center gap-3.5 bg-white border border-gray-200 rounded-xl px-4 py-3.5 mb-4">
+    <div class="w-11 h-11 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white grid place-items-center font-bold text-sm shrink-0">{{ iniciais }}</div>
+    <div class="flex-1 min-w-0">
+        <div class="flex items-baseline flex-wrap gap-x-2">
+            <span class="text-base font-semibold text-gray-900">{{ aluno.nome }}</span>
+            <span class="text-xs text-gray-500">
+                {% if aluno.get('nivel') %}{{ aluno.nivel|capitalize }}{% endif %}
+                {% if aluno.get('objetivo') %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ aluno.objetivo|capitalize }}{% endif %}
+                {% if rotina and rotina.sessoes %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ rotina.sessoes|length }} treino{{ 's' if rotina.sessoes|length > 1 else '' }}{% endif %}
+                {% if rotina and rotina.data %}{% set rel = tempo_relativo(rotina.data) %}{% if rel %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>atualizado {{ rel }}{% endif %}{% endif %}
+            </span>
+        </div>
+        {% if rotina and rotina.etiqueta %}
+        <div class="mt-1"><span class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">{{ rotina.etiqueta }}</span></div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 {% if not rotina %}
 <div class="text-center py-12 text-gray-400">
-    <div class="text-4xl mb-3">📋</div>
+    <svg class="icon mb-3 mx-auto text-gray-300" style="width:40px;height:40px"><use href="#i-clipboard-list"/></svg>
     <div class="text-base font-semibold text-gray-600">Nenhuma rotina ativa</div>
     <div class="text-sm mt-1">Use o botão <strong>+ Gerar treino</strong> para criar a primeira rotina deste aluno.</div>
 </div>
@@ -11,7 +33,7 @@
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     <!-- Atual -->
     <div>
-        <p class="text-xs font-bold text-brand-500 uppercase tracking-wider mb-3">Rotina Atual
+        <p class="text-xs font-semibold text-brand-500 mb-3">Rotina atual
             {% if rotina.etiqueta %}<span class="text-gray-400 font-normal">· {{ rotina.etiqueta }}</span>{% endif %}
         </p>
         <div class="space-y-2.5">
@@ -19,25 +41,33 @@
             <div class="treino-card modo-visualizar">
                 <div class="treino-header">
                     <span class="treino-titulo">Treino {{ loop.index }}</span>
-                    <span class="treino-tipo">{{ sessao.tipo }}</span>
+                    {% set chips = sessao_chips(sessao) %}
+                    {% if chips %}
+                    <div class="regiao-chips mt-1">
+                        {% for label, slug in chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
                 {% for bloco in sessao.blocos %}
-                <p class="bloco-label">Bloco {{ bloco.label }}</p>
+                <div class="bloco-wrap">
+                <div class="bloco-header">
+                    <span class="bloco-chip">{{ bloco.label }}</span>
+                </div>
                 {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
                 <div class="exercicio">
                     <div class="exercicio-info">
                         <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
-                            {% if ex.series or ex.reps %}
-                            <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
-                            {% endif %}
                             {% if nomes_anteriores and ex.nome in nomes_anteriores %}
                             <span class="badge-mantido">✓ mantido</span>
                             {% endif %}
                         </span>
                     </div>
+                    {% if ex.series or ex.reps %}
+                    <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
+                    {% endif %}
                 </div>
                 {% endfor %}
-                <hr class="thin">
+                </div>
                 {% endfor %}
             </div>
         {% endfor %}
@@ -46,7 +76,7 @@
     <!-- Anterior -->
     <div>
         {% if anterior %}
-        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Rotina Anterior
+        <p class="text-xs font-semibold text-gray-500 mb-3">Rotina anterior
             {% if anterior.etiqueta %}<span class="font-normal">· {{ anterior.etiqueta }}</span>{% endif %}
             <span class="font-normal">· {{ anterior.data }}</span>
         </p>
@@ -55,22 +85,29 @@
             <div class="treino-card modo-visualizar" style="opacity:0.7; border-color:#d1d5db">
                 <div class="treino-header">
                     <span class="treino-titulo">Treino {{ loop.index }}</span>
-                    <span class="treino-tipo">{{ sessao.tipo }}</span>
+                    {% set chips = sessao_chips(sessao) %}
+                    {% if chips %}
+                    <div class="regiao-chips mt-1">
+                        {% for label, slug in chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
                 {% for bloco in sessao.blocos %}
-                <p class="bloco-label">Bloco {{ bloco.label }}</p>
+                <div class="bloco-wrap">
+                <div class="bloco-header">
+                    <span class="bloco-chip">{{ bloco.label }}</span>
+                </div>
                 {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
                 <div class="exercicio" style="border-left-color:#9ca3af">
                     <div class="exercicio-info">
-                        <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
-                            {% if ex.series or ex.reps %}
-                            <span class="prescr-badge" style="background:#f3f4f6; color:#6b7280">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
-                            {% endif %}
-                        </span>
+                        <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}</span>
                     </div>
+                    {% if ex.series or ex.reps %}
+                    <span class="prescr-badge" style="background:#f3f4f6; color:#6b7280">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
+                    {% endif %}
                 </div>
                 {% endfor %}
-                <hr class="thin">
+                </div>
                 {% endfor %}
             </div>
         {% endfor %}
@@ -93,22 +130,29 @@
     <div class="treino-card modo-visualizar" style="opacity:0.8; border-color:#d1d5db">
         <div class="treino-header">
             <span class="treino-titulo">Treino {{ loop.index }}</span>
-            <span class="treino-tipo">{{ sessao.tipo }}</span>
+            {% set chips = sessao_chips(sessao) %}
+            {% if chips %}
+            <div class="regiao-chips mt-1">
+                {% for label, slug in chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
+            </div>
+            {% endif %}
         </div>
         {% for bloco in sessao.blocos %}
-        <p class="bloco-label">Bloco {{ bloco.label }}</p>
+        <div class="bloco-wrap">
+        <div class="bloco-header">
+            <span class="bloco-chip">{{ bloco.label }}</span>
+        </div>
         {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
         <div class="exercicio" style="border-left-color:#9ca3af">
             <div class="exercicio-info">
-                <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
-                    {% if ex.series or ex.reps %}
-                    <span class="prescr-badge" style="background:#f3f4f6; color:#6b7280">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
-                    {% endif %}
-                </span>
+                <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}</span>
             </div>
+            {% if ex.series or ex.reps %}
+            <span class="prescr-badge" style="background:#f3f4f6; color:#6b7280">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
+            {% endif %}
         </div>
         {% endfor %}
-        <hr class="thin">
+        </div>
         {% endfor %}
     </div>
 </div>

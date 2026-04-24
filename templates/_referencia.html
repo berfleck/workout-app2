@@ -2,7 +2,7 @@
 <div class="ref-panel-slim">
     <details class="ref-details">
         <summary class="ref-bar">
-            <span class="ref-bar-titulo">📌 Referências ({{ referencias|length }})</span>
+            <span class="ref-bar-titulo inline-flex items-center gap-1"><svg class="icon"><use href="#i-pin"/></svg> Referências ({{ referencias|length }})</span>
             <span class="ref-bar-resumo">
                 {% for r in referencias %}
                     {{ r.origem.aluno }} · {{ r.origem.data.split(' ')[0] if r.origem.data else '—' }}{% if not loop.last %} · {% endif %}
@@ -29,12 +29,12 @@
                             hx-post="/referencia/clonar/{{ r.id_ref }}"
                             hx-target="#resultado"
                             hx-swap="innerHTML"
-                            title="Clonar este treino para edição">📋 Clonar</button>
+                            title="Clonar este treino para edição"><svg class="icon"><use href="#i-clipboard"/></svg> Clonar</button>
                     <button class="btn-ghost ref-item-remover"
                             hx-post="/referencia/remover/{{ r.id_ref }}"
                             hx-target="#ref-container"
                             hx-swap="innerHTML"
-                            title="Remover este item da referência">✕</button>
+                            title="Remover este item da referência"><svg class="icon"><use href="#i-x"/></svg></button>
                 </div>
             </div>
 
@@ -45,7 +45,8 @@
                 {% for bloco in r.sessao.blocos %}
                 {% set bloco_idx = loop.index0 %}
                 <div class="ref-bloco-head">
-                    <p class="bloco-label" style="margin:0">Bloco {{ bloco.label }}</p>
+                    <div class="bloco-header" style="margin:0">
+                        <span class="bloco-chip">{{ bloco.label }}</span>                    </div>
                     {% if n_sessoes_ativas is defined and n_sessoes_ativas > 0 %}
                     <span class="copiar-bloco-wrap">
                         {% if n_sessoes_ativas == 1 %}

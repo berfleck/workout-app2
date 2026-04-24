@@ -7,7 +7,7 @@
 <div class="bg-brand-50 border border-brand-500 rounded-xl px-5 py-3 mb-4 flex items-center justify-between flex-wrap gap-2">
     <div>
         <span class="text-sm font-semibold text-brand-600">
-            {% if ctx_acao == 'substituir' %}↺ Substituindo Treino {{ (ctx_treino_idx or 0) + 1 }}{% elif ctx_acao == 'adicionar' %}+ Adicionando treino{% else %}Gerando nova rotina{% endif %}
+            {% if ctx_acao == 'substituir' %}<svg class="icon align-[-2px]"><use href="#i-rotate-ccw"/></svg> Substituindo Treino {{ (ctx_treino_idx or 0) + 1 }}{% elif ctx_acao == 'adicionar' %}+ Adicionando treino{% else %}Gerando nova rotina{% endif %}
             {% if ctx_aluno %} para {{ ctx_aluno.nome }}{% endif %}
         </span>
     </div>
@@ -33,7 +33,7 @@
 
         <!-- Aluno selector -->
         <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Aluno / Turma</label>
+            <label class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Aluno / Turma</label>
             {% with alunos_dropdown=alunos, nomes_hist_dropdown=nomes_hist, aluno_pre_selecionado=(ctx_aluno.nome if ctx_aluno else '') %}
             {% include "_aluno_dropdown.html" %}
             {% endwith %}
@@ -58,7 +58,7 @@
             <summary class="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
                 <div class="flex items-center gap-2">
                     <span class="chevron text-gray-400 text-xs">▶</span>
-                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Configurações gerais</span>
+                    <span class="text-xs font-semibold text-gray-700">Configurações gerais</span>
                 </div>
                 <span class="text-xs text-gray-400" id="config-resumo"></span>
             </summary>
@@ -105,12 +105,12 @@
                     {% if not sessoes %}style="display:none"{% endif %}>
                 Ver treinos →
             </button>
-            <button type="button" class="w-full btn btn-sm justify-center text-gray-400" onclick="resetAll()">↺ Resetar</button>
+            <button type="button" class="w-full btn btn-sm justify-center text-gray-400" onclick="resetAll()"><svg class="icon"><use href="#i-rotate-ccw"/></svg> Resetar</button>
         </div>
     </aside>
 
     <!-- ── MAIN: configuração dos treinos ── -->
-    <main class="lg:col-span-6 space-y-4 order-2">
+    <main class="lg:col-span-9 space-y-4 order-2">
 
         <!-- Tabs de treino (estilo shadcn) -->
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -124,8 +124,8 @@
                     Treino {{ t + 1 }}
                 </button>
                 {% endfor %}
-                <button type="button" id="copiar-btn-bar" class="ml-auto px-2 py-2 text-sm text-gray-400 hover:text-brand-500" title="Copiar config de outro treino" style="display:none"
-                        onclick="toggleCopiarBar()">📋</button>
+                <button type="button" id="copiar-btn-bar" class="ml-auto px-2 py-2 text-sm text-gray-400 hover:text-brand-500 inline-flex items-center" title="Copiar config de outro treino" style="display:none"
+                        onclick="toggleCopiarBar()"><svg class="icon"><use href="#i-clipboard"/></svg></button>
             </div>
 
             {% for t in range(MAX_TREINOS) %}
@@ -134,7 +134,7 @@
 
                     <!-- Barra copiar config (hidden) -->
                     <div class="copiar-bar hidden items-center gap-2 text-sm" id="copiar-bar-{{ t }}">
-                        <span class="text-gray-500">📋 Copiar de</span>
+                        <span class="text-gray-500 inline-flex items-center gap-1"><svg class="icon"><use href="#i-clipboard"/></svg> Copiar de</span>
                         <select id="copiar-src-{{ t }}" class="px-2 py-1 border border-gray-200 rounded text-sm">
                             {% for s in range(MAX_TREINOS) %}{% if s != t %}
                             <option value="{{ s }}">Treino {{ s + 1 }}</option>
@@ -252,23 +252,6 @@
         </div>
     </main>
 
-    <!-- ── SIDEBAR DIREITA: referências ── -->
-    <aside class="lg:col-span-3 space-y-4 order-3">
-        <div id="ref-container">
-            {% if referencias %}
-                {% include "_referencia.html" %}
-            {% endif %}
-        </div>
-
-        <!-- Dicas -->
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Dicas</p>
-            <p class="text-xs text-gray-600 leading-relaxed">
-                Ao gerar, exercícios marcados como <span class="inline-block bg-indigo-100 text-indigo-700 px-1.5 rounded text-[10px] font-semibold">REF</span> serão evitados.
-                Novos exercícios ganharão badge <span class="inline-block bg-green-100 text-green-700 px-1.5 rounded text-[10px] font-semibold">novo</span>.
-            </p>
-        </div>
-    </aside>
 
 </div>
 </form>
@@ -285,7 +268,6 @@
             <span class="htmx-indicator"><span class="spinner"></span> Gerando...</span>
         </button>
     </div>
-    <div id="ref-container-resultado"></div>
     <div id="loading" class="htmx-indicator text-center py-5">
         <span class="spinner" style="width:24px;height:24px"></span>
         <p class="text-gray-400 text-sm mt-2">Gerando treinos...</p>
@@ -295,7 +277,7 @@
         {% include "_resultado.html" %}
     {% else %}
         <div class="text-center py-16 text-gray-400">
-            <div class="text-5xl mb-4">🏋️</div>
+            <svg class="icon icon-xl mb-4 mx-auto text-gray-300" style="width:48px;height:48px"><use href="#i-dumbbell"/></svg>
             <div class="text-lg font-semibold text-gray-700">Configure e gere seu primeiro treino</div>
             <div class="text-sm mt-2">Use o painel acima para definir as categorias e clique em <strong>Gerar treinos</strong></div>
         </div>
@@ -423,7 +405,7 @@ function toggleCopiarBar() {
 function selectTemplate(t, nome) {
     qs(t, '#input-template-' + t).value = nome;
     const epp = TEMPLATE_EPP[nome] || {};
-    let html = '<p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mt-3 mb-1">Exercícios por categoria</p><div class="demandas-grid">';
+    let html = '<p class="text-xs font-semibold text-gray-700 mt-3 mb-1">Exercícios por categoria</p><div class="demandas-grid">';
     for (const [p, val] of Object.entries(epp)) {
         const label = PADROES_LABELS[p] || p;
         html += `<div class="campo">
@@ -559,7 +541,7 @@ function updateDemandas(t) {
     let html = '';
     let hidden = '';
     if (demandas.length > 0) {
-        html = '<p class="text-[11px] text-gray-500 uppercase tracking-wider mt-4 mb-1">Quantos exercícios de cada grupo</p><div class="demandas-grid">';
+        html = '<p class="text-xs font-medium text-gray-600 mt-4 mb-1">Quantos exercícios de cada grupo</p><div class="demandas-grid">';
         demandas.forEach((d, i) => {
             const key = `${d.nivel}:${d.escopo}`;
 
@@ -750,15 +732,6 @@ function copiarConfigTreino(src, dest) {
         });
         checkLatTotal(dest);
     }
-}
-
-async function fixarTodosComoRef(regId, n) {
-    for (let i = 0; i < n; i++) {
-        await fetch('/referencia/fixar/' + regId + '/' + i, {method: 'POST'})
-            .then(r => r.text())
-            .then(html => { document.getElementById('ref-container').innerHTML = html; });
-    }
-    atualizarComparador();
 }
 
 function onAlunoChange(nome) {
@@ -960,16 +933,9 @@ function showPanel(panel) {
     }
 }
 
-function syncRefs() {
-    const src = document.getElementById('ref-container');
-    const dest = document.getElementById('ref-container-resultado');
-    if (src && dest) dest.innerHTML = src.innerHTML;
-}
-
 // Init
 onChangeNTreinos();
 updateConfigResumo();
-if (document.getElementById('ref-container') && document.getElementById('ref-container').innerHTML.trim()) syncRefs();
 </script>
 
 {% endblock %}

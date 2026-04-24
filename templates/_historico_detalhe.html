@@ -2,33 +2,27 @@
 {% set t_idx = loop.index0 %}
 <div class="mb-3">
     <div class="flex items-center justify-between gap-2 my-2.5 flex-wrap">
-        <p class="text-[11px] font-bold text-brand-500 uppercase tracking-wider m-0">
+        <p class="text-xs font-semibold text-brand-500 m-0">
             Treino {{ loop.index }} — {% for p in sessao.tipo.split(' + ') if p %}{{ padroes_labels.get(p, p) }}{% if not loop.last %} · {% endif %}{% endfor %}
         </p>
-        {% if reg_id is defined %}
-        <button class="btn btn-sm"
-                hx-post="/referencia/fixar/{{ reg_id }}/{{ t_idx }}"
-                hx-target="#ref-container"
-                hx-swap="innerHTML"
-                hx-on::after-request="if(window.atualizarComparador) atualizarComparador();"
-                title="Fixar este treino como referência">📌 Fixar</button>
-        {% endif %}
     </div>
     {% for bloco in sessao.blocos %}
-    <p class="bloco-label">Bloco {{ bloco.label }}</p>
+    <div class="bloco-wrap">
+    <div class="bloco-header">
+        <span class="bloco-chip">{{ bloco.label }}</span>
+    </div>
     {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
     <div class="exercicio">
         <div class="exercicio-info">
-            <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
-                {% if ex.series or ex.reps %}
-                <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
-                {% endif %}
-            </span>
+            <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}</span>
             <div class="exercicio-meta">{{ ex.purpose }} · 🔧 {{ ex.eq_primario }}</div>
         </div>
+        {% if ex.series or ex.reps %}
+        <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
+        {% endif %}
     </div>
     {% endfor %}
-    <hr class="thin">
+    </div>
     {% endfor %}
 </div>
 {% endfor %}

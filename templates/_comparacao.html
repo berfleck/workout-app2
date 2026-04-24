@@ -11,7 +11,9 @@
         <div>
             <p class="config-title">Referência {% if ref_origem %}· {{ ref_origem.aluno }} · T{{ (ref_origem.treino_idx or 0) + 1 }} · {{ ref_origem.data.split(' ')[0] if ref_origem.data else '' }}{% endif %}</p>
             {% for bloco in ref.blocos %}
-            <p class="bloco-label">{{ bloco.label }}</p>
+            <div class="bloco-header">
+                <span class="bloco-chip">{{ bloco.label }}</span>
+            </div>
             {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
             <div class="exercicio {{ 'diff-removido' if ex.nome in removidos else '' }}">
                 <div class="exercicio-info">
@@ -25,7 +27,9 @@
         <div>
             <p class="config-title">Ativo (Treino {{ ativo_idx + 1 }})</p>
             {% for bloco in ativo.blocos %}
-            <p class="bloco-label">{{ bloco.label }}</p>
+            <div class="bloco-header">
+                <span class="bloco-chip">{{ bloco.label }}</span>
+            </div>
             {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
             <div class="exercicio {{ 'diff-adicionado' if ex.nome in adicionados else '' }}">
                 <div class="exercicio-info">

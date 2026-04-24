@@ -62,6 +62,71 @@ def _nomes_ref_set():
 def _novo_id_ref():
     return secrets.token_hex(4)
 
+# Mapeamento padrão → (label curto, slug de cor) para chips no card de treino.
+# Derivado dos exercícios da sessão (não da string sessao.tipo, que pode vir em níveis diferentes).
+PADRAO_PARA_CHIP = {
+    "empurrar_compostos": ("peito", "peito"),
+    "empurrar_isolados":  ("peito", "peito"),
+    "remadas":            ("costas", "costas"),
+    "puxadas":            ("costas", "costas"),
+    "ombro_composto":     ("ombro", "ombro"),
+    "ombro_isolado":      ("ombro", "ombro"),
+    "posterior_ombro":    ("ombro post.", "ombro"),
+    "biceps":             ("bíceps", "bracos"),
+    "triceps":            ("tríceps", "bracos"),
+    "squat":              ("quadríceps", "perna-ant"),
+    "hinge":              ("posterior", "perna-post"),
+    "knee_flexion":       ("posterior", "perna-post"),
+    "abduction":          ("abdutores", "perna-post"),
+    "adduction":          ("adutores", "adutores"),
+    "flexao_plantar":     ("panturrilha", "panturrilha"),
+    "core_isometrico":    ("core", "core"),
+    "core_dinamico":      ("core", "core"),
+    "cardio":             ("cardio", "cardio"),
+}
+
+def tempo_relativo(data_str):
+    """Retorna 'hoje', 'ontem', 'há X dias', 'há X meses' ou 'há X anos' a partir de 'dd/mm/YYYY HH:MM'."""
+    if not data_str:
+        return ""
+    try:
+        dt = datetime.strptime(data_str, "%d/%m/%Y %H:%M")
+    except ValueError:
+        try:
+            dt = datetime.strptime(data_str.split(" ")[0], "%d/%m/%Y")
+        except ValueError:
+            return ""
+    dias = (datetime.now().date() - dt.date()).days
+    if dias < 0:
+        return ""
+    if dias == 0:
+        return "hoje"
+    if dias == 1:
+        return "ontem"
+    if dias < 30:
+        return f"há {dias} dias"
+    if dias < 365:
+        meses = dias // 30
+        return f"há {meses} {'mês' if meses == 1 else 'meses'}"
+    anos = dias // 365
+    return f"há {anos} {'ano' if anos == 1 else 'anos'}"
+
+def sessao_chips(sessao):
+    """Retorna chips deduplicados (label, slug) para a sessão, na ordem de aparição dos exercícios."""
+    if not sessao or not getattr(sessao, "blocos", None):
+        return []
+    chips, vistos = [], set()
+    for bloco in sessao.blocos:
+        for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+            if not ex or not getattr(ex, "padrao", None):
+                continue
+            chip = PADRAO_PARA_CHIP.get(ex.padrao)
+            if not chip or chip[0] in vistos:
+                continue
+            vistos.add(chip[0])
+            chips.append(chip)
+    return chips
+
 PADROES_LABELS = {
     "squat": "Agachamento", "hinge": "Extensão de quadril",
     "knee_flexion": "Flexão de joelho", "abduction": "Abdução",
@@ -210,6 +275,8 @@ def _inject_hub_ctx():
         "hub_aluno_id": edicao_hub["aluno_id"] if edicao_hub else None,
         "criacao_manual_idx": criacao_manual["novo_idx"] if criacao_manual else None,
         "criacao_manual_aluno": criacao_manual["aluno_id"] if criacao_manual else None,
+        "sessao_chips": sessao_chips,
+        "tempo_relativo": tempo_relativo,
     }
 
 def carregar_sessoes_disco():
@@ -341,6 +408,7 @@ def hub_rotina():
                            rotina=rotina,
                            anterior=anterior,
                            nomes_anteriores=nomes_anteriores,
+                           aluno=aluno,
                            aluno_id=aluno_id,
                            periodo=periodo,
                            eh_rascunho=eh_rascunho,

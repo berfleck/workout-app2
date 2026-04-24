@@ -1,6 +1,6 @@
 {% if not historico %}
 <div class="text-center py-16 text-gray-400">
-    <div class="text-4xl mb-3">📋</div>
+    <svg class="icon mb-3 mx-auto text-gray-300" style="width:40px;height:40px"><use href="#i-clipboard-list"/></svg>
     <div class="text-[15px] font-medium text-gray-700">
         {% if aluno_filtro or busca %}Nenhum registro encontrado{% else %}Nenhum treino salvo ainda{% endif %}
     </div>
@@ -18,7 +18,7 @@
             hx-target="#historico-content" hx-swap="innerHTML"
             hx-include=".hist-check:checked"
             onclick="if(!confirm('Apagar os '+document.querySelectorAll('.hist-check:checked').length+' registros selecionados?'))event.stopPropagation()">
-        🗑 Apagar selecionados
+        <svg class="icon"><use href="#i-trash"/></svg> Apagar selecionados
     </button>
 </div>
 
