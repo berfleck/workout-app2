@@ -6,7 +6,7 @@
     <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
             <p class="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">Painel principal</p>
-            <h2 class="text-xl font-semibold">Treinos</h2>
+            <h2 class="text-xl font-semibold uppercase tracking-wide">Treinos</h2>
         </div>
     </div>
 
@@ -14,7 +14,7 @@
     <div class="bg-white border border-gray-200 rounded-xl px-5 py-4 mb-5">
         <div class="flex items-center gap-4 flex-wrap">
             <div class="campo flex-1 min-w-[200px]" style="margin-bottom:0">
-                <label>Aluno / Turma</label>
+                <label class="uppercase tracking-wider">Aluno / Turma</label>
                 <select id="sel-aluno-hub" name="aluno_id" class="input-field text-sm w-full"
                         hx-get="/hub/rotina" hx-target="#rotina-display" hx-swap="innerHTML"
                         hx-include="this">
@@ -49,7 +49,7 @@
     <!-- Área da rotina -->
     <div id="rotina-display">
         <div class="text-center py-16 text-gray-400">
-            <div class="text-5xl mb-4">🏋️</div>
+            <svg class="icon mb-4 mx-auto text-gray-300" style="width:48px;height:48px"><use href="#i-dumbbell"/></svg>
             <div class="text-lg font-semibold text-gray-700">Selecione um aluno para começar</div>
             <div class="text-sm mt-2">Escolha um aluno no seletor acima para ver sua rotina atual</div>
         </div>

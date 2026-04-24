@@ -3,7 +3,7 @@
 {% else %}
 <div class="bg-white border border-gray-200 rounded-xl p-4">
     <div class="flex items-center justify-between mb-3">
-        <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Histórico</label>
+        <label class="text-xs font-semibold text-gray-700">Histórico</label>
         <span class="text-[10px] text-gray-400">{{ registros|length }} registro{{ 's' if registros|length > 1 else '' }}</span>
     </div>
     <ul class="space-y-1.5">
@@ -17,9 +17,6 @@
                 <button type="button" class="btn btn-sm text-gray-400 hover:text-brand-500"
                         onclick="carregarConfigDoHistorico('{{ reg.id }}')"
                         title="Carregar config no gerador">⚙</button>
-                <button type="button" class="btn btn-sm text-gray-400 hover:text-brand-500"
-                        onclick="fixarTodosComoRef('{{ reg.id }}', {{ reg.n_treinos }})"
-                        title="Fixar todos como referência">📌</button>
             </div>
         </li>
     {% endfor %}

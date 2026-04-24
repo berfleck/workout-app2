@@ -35,27 +35,29 @@
 
         .treino-card { @apply bg-white border border-gray-200 rounded-xl p-6; }
         .treino-header { @apply flex flex-col items-start mb-3 gap-1.5; }
-        .treino-titulo { @apply text-sm font-bold; }
+        .treino-titulo { @apply text-sm font-bold uppercase tracking-wider; }
         .treino-tipo { @apply text-[11px] text-gray-400; }
         .treino-acoes { @apply flex gap-1 flex-wrap; }
 
-        .bloco-label { @apply text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-3.5 mb-1.5; }
-        .bloco-header { @apply flex items-center gap-1.5; }
-        .exercicio { @apply flex items-center gap-3 py-2 pl-3 border-l-[3px] border-brand-500 mb-1; }
-        .exercicio-info { @apply flex-1 min-w-0; }
+        .bloco-label { @apply text-[10px] font-bold text-gray-400 uppercase tracking-wider; }
+        .bloco-wrap { @apply bg-gray-50 rounded-lg py-2 mb-2; }
+        .bloco-header { @apply flex items-center gap-2 mb-1; }
+        .bloco-chip { @apply inline-flex items-center justify-center rounded-full bg-brand-500 text-white font-bold text-[10px] leading-none shrink-0; width: 18px; height: 18px; }
+        .exercicio { @apply flex items-center flex-wrap gap-x-3 gap-y-0.5 py-0 pl-3 border-l-[3px] border-brand-500 leading-tight; }
+        .exercicio-info { @apply flex-1; }
         .exercicio-nome { @apply text-sm font-semibold; }
         .exercicio-meta { @apply text-[11px] text-gray-400 mt-0.5; }
-        .prescr-badge { @apply inline-block bg-brand-100 text-brand-500 rounded-md px-1.5 py-px text-[11px] font-bold ml-1.5; }
+        .prescr-badge { @apply inline-flex items-center bg-brand-100 text-brand-500 rounded-md px-2 py-0.5 text-[11px] font-semibold font-mono whitespace-nowrap ml-auto shrink-0; }
         .exercicio-acoes { @apply flex gap-0.5 shrink-0; }
         .badge-novo { @apply inline-block text-[10px] font-semibold text-green-600 bg-green-100 rounded px-1.5 py-px ml-1 align-middle; }
         .badge-mantido { @apply inline-block text-[10px] font-semibold text-blue-600 bg-blue-100 rounded px-1.5 py-px ml-1 align-middle; }
 
         .config-panel { @apply bg-white border border-gray-200 rounded-xl p-6 mb-5; }
-        .config-title { @apply text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-4; }
+        .config-title { @apply text-xs font-semibold text-gray-700 mb-4; }
 
         .campo { @apply flex flex-col gap-1; }
-        .campo-label { @apply text-[11px] font-semibold text-gray-500 uppercase tracking-wide; }
-        .campo label { @apply text-[11px] font-semibold text-gray-500 uppercase tracking-wide; }
+        .campo-label { @apply text-xs font-medium text-gray-600; }
+        .campo label { @apply text-xs font-medium text-gray-600; }
         .campo select, .campo input[type="text"], .campo input[type="number"], .campo textarea {
             @apply w-full px-2.5 py-2 border border-gray-200 rounded-lg text-sm font-[inherit] bg-white;
         }
@@ -72,7 +74,7 @@
         .check-inline { @apply flex items-center gap-1.5 text-sm; }
         .check-inline input { @apply accent-brand-500; }
 
-        hr.thin { @apply border-t border-gray-100 my-2; border-bottom: none; border-left: none; border-right: none; }
+        hr.thin { @apply border-t border-gray-100 my-1.5; border-bottom: none; border-left: none; border-right: none; }
 
         .meta-count { @apply text-[11px] text-gray-400 my-1; }
 
@@ -135,9 +137,12 @@
         .demandas-grid { @apply grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 my-3; }
 
         /* ── Sidebar ── */
-        .sidebar { @apply fixed left-0 top-0 h-full w-[60px] bg-white border-r border-gray-200 flex-col items-center py-4 z-40; }
+        .sidebar { @apply fixed left-0 top-0 h-full w-[60px] bg-white border-r border-gray-200 flex flex-col items-center py-4 z-40; transform: translateX(-100%); transition: transform 0.2s ease; }
+        .sidebar.open { transform: translateX(0); }
+        @media (min-width: 1024px) { .sidebar { transform: translateX(0); } }
         .sidebar-link { @apply w-10 h-10 rounded-lg flex items-center justify-center text-lg text-gray-400 hover:bg-gray-100 hover:text-brand-500 transition mb-1; }
         .sidebar-link.active { @apply bg-brand-50 text-brand-500; }
+        .mobile-menu-btn { @apply lg:hidden fixed top-3 left-3 z-40 w-10 h-10 bg-white border border-gray-200 rounded-lg shadow-sm grid place-items-center text-gray-600 hover:text-brand-500 cursor-pointer; }
     </style>
     <style>
         /* HTMX indicators */
@@ -171,7 +176,8 @@
         /* Modo visualizar compacto */
         .treino-card.modo-visualizar { padding: 14px 18px; }
         .treino-card.modo-visualizar .treino-header { margin-bottom: 8px; }
-        .treino-card.modo-visualizar .bloco-label { margin-top: 8px; margin-bottom: 2px; }
+        .treino-card.modo-visualizar .bloco-wrap { padding-top: 4px; padding-bottom: 4px; margin-bottom: 6px; }
+        .treino-card.modo-visualizar .bloco-header { margin-bottom: 2px; }
         .treino-card.modo-visualizar .exercicio { padding: 3px 0 3px 10px; margin-bottom: 2px; border-left-width: 2px; }
         .treino-card.modo-visualizar .exercicio-nome { font-size: 13px; }
         .treino-card.modo-visualizar hr.thin { margin: 4px 0; }
@@ -215,38 +221,77 @@
         /* Mobile sidebar overlay */
         .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 35; }
         .sidebar-overlay.active { display: block; }
+        @media (min-width: 1024px) { .sidebar-overlay.active { display: none; } }
 
         /* Segmented control (toggle) */
         .seg-control { display: inline-flex; background: #f3f4f6; border-radius: 8px; padding: 3px; }
         .seg-btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: #6b7280; transition: all 0.15s; font-family: inherit; }
         .seg-btn.active { background: white; color: #111827; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+        /* Chips de região (no header do card de treino) */
+        .regiao-chips { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+        .reg-chip { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 5px; line-height: 1.4; white-space: nowrap; }
+        .reg-chip-peito        { background: #ffe4e6; color: #9f1239; }
+        .reg-chip-costas       { background: #e0f2fe; color: #075985; }
+        .reg-chip-ombro        { background: #fef3c7; color: #92400e; }
+        .reg-chip-bracos       { background: #ede9fe; color: #5b21b6; }
+        .reg-chip-perna-ant    { background: #d1fae5; color: #065f46; }
+        .reg-chip-perna-post   { background: #ccfbf1; color: #115e59; }
+        .reg-chip-core         { background: #f3e8ff; color: #6b21a8; }
+        .reg-chip-panturrilha  { background: #e0e7ff; color: #3730a3; }
+        .reg-chip-adutores     { background: #ecfccb; color: #3f6212; }
+        .reg-chip-cardio       { background: #fef9c3; color: #854d0e; }
+
+        /* Icons (Lucide-style SVG symbols) */
+        .icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; display: inline-block; vertical-align: middle; }
+        .icon-sm { width: 14px; height: 14px; }
+        .icon-lg { width: 20px; height: 20px; }
+        .icon-xl { width: 48px; height: 48px; stroke-width: 1.5; }
+        .sidebar-link .icon { width: 20px; height: 20px; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 antialiased font-sans">
 
-<!-- Sidebar (desktop) -->
-<nav class="sidebar hidden lg:flex">
+<!-- Lucide-style icon sprite (referenced via <svg class="icon"><use href="#i-..."/></svg>) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+    <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></symbol>
+    <symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+    <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-clipboard-list" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></symbol>
+</svg>
+
+<!-- Botão flutuante (mobile) para abrir a sidebar -->
+<button type="button" class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Abrir menu">
+    <svg class="icon icon-lg"><use href="#i-menu"/></svg>
+</button>
+
+<!-- Sidebar -->
+<nav class="sidebar">
     <a href="/" class="w-9 h-9 rounded-lg bg-brand-500 text-white grid place-items-center font-bold text-sm mb-6 no-underline">BF</a>
-    <a href="/" class="sidebar-link {% if active_page == 'hub' %}active{% endif %}" title="Treinos">🏋️</a>
-    <a href="/alunos" class="sidebar-link {% if active_page == 'alunos' %}active{% endif %}" title="Alunos">👥</a>
-    <a href="/historico" class="sidebar-link {% if active_page == 'historico' %}active{% endif %}" title="Histórico">📚</a>
+    <a href="/" class="sidebar-link {% if active_page == 'hub' %}active{% endif %}" title="Treinos"><svg class="icon"><use href="#i-dumbbell"/></svg></a>
+    <a href="/alunos" class="sidebar-link {% if active_page == 'alunos' %}active{% endif %}" title="Alunos"><svg class="icon"><use href="#i-users"/></svg></a>
+    <a href="/historico" class="sidebar-link {% if active_page == 'historico' %}active{% endif %}" title="Histórico"><svg class="icon"><use href="#i-book"/></svg></a>
 </nav>
 
-<!-- Mobile top bar -->
-<header class="lg:hidden border-b border-gray-200 bg-white sticky top-0 z-20">
-    <div class="px-4 py-3 flex items-center gap-3">
-        <button onclick="toggleMobileSidebar()" class="w-9 h-9 rounded-lg bg-brand-500 text-white grid place-items-center font-bold text-sm shrink-0 cursor-pointer border-none">BF</button>
-        <h1 class="text-sm font-bold tracking-tight flex-1">BF Treinamento</h1>
-        <nav class="flex gap-1">
-            <a href="/" class="sidebar-link {% if active_page == 'hub' %}active{% endif %}">🏋️</a>
-            <a href="/alunos" class="sidebar-link {% if active_page == 'alunos' %}active{% endif %}">👥</a>
-            <a href="/historico" class="sidebar-link {% if active_page == 'historico' %}active{% endif %}">📚</a>
-        </nav>
-    </div>
-</header>
-
 <!-- Main content -->
-<main class="lg:ml-[60px] min-h-screen">
+<main class="lg:ml-[60px] pt-14 lg:pt-0 min-h-screen">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {% block content %}{% endblock %}
     </div>
@@ -257,45 +302,19 @@
 function toggleMobileSidebar() {
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('sidebar-overlay');
-    sidebar.classList.toggle('hidden');
-    sidebar.classList.toggle('flex');
+    sidebar.classList.toggle('open');
     overlay.classList.toggle('active');
 }
-
-function copiarBloco(refT, blocoIdx, destT) {
-    htmx.ajax('POST', `/referencia/copiar-bloco/${refT}/${blocoIdx}/para/${destT}`, {
-        target: `#treino-${destT}`,
-        swap: 'innerHTML'
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.sidebar a').forEach(function(a) {
+        a.addEventListener('click', function() {
+            if (window.innerWidth < 1024) {
+                document.querySelector('.sidebar').classList.remove('open');
+                document.getElementById('sidebar-overlay').classList.remove('active');
+            }
+        });
     });
-}
-
-function compararTreinos() {
-    const a = document.getElementById('cmp-ativo');
-    const r = document.getElementById('cmp-ref');
-    if (!a || !r) return;
-    htmx.ajax('GET', `/comparar/${r.value}/${a.value}`, {
-        target: '#comparacao-result',
-        swap: 'innerHTML'
-    });
-}
-
-function atualizarComparador() {
-    fetch('/referencia/lista').then(r => r.json()).then(refs => {
-        const wrap = document.getElementById('cmp-wrap');
-        if (!wrap) return;
-        if (refs.length === 0) {
-            wrap.style.display = 'none';
-            return;
-        }
-        wrap.style.display = '';
-        const sel = document.getElementById('cmp-ref');
-        if (sel) {
-            sel.innerHTML = refs.map(r =>
-                `<option value="${r.idx}">${r.aluno} · T${(r.treino_idx||0)+1} · ${r.data}</option>`
-            ).join('');
-        }
-    }).catch(() => {});
-}
+});
 
 function atualizarFocoEdicao() {
     document.querySelectorAll('.resultado-grid').forEach(grid => {
@@ -305,10 +324,6 @@ function atualizarFocoEdicao() {
 }
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     atualizarFocoEdicao();
-    if (evt.detail.target && evt.detail.target.id === 'ref-container') {
-        atualizarComparador();
-        if (typeof syncRefs === 'function') syncRefs();
-    }
     if (evt.detail.target && evt.detail.target.id === 'resultado') {
         if (typeof showPanel === 'function') showPanel('resultado');
     }
@@ -327,7 +342,7 @@ function atualizarLinksHub() {
     document.querySelectorAll('a.sidebar-link, a.w-9').forEach(link => {
         const title = link.getAttribute('title');
         const text = link.textContent.trim();
-        if (title === 'Treinos' || text === '🏋️' || text === 'BF') {
+        if (title === 'Treinos' || text === 'BF') {
             link.href = href;
         }
     });
