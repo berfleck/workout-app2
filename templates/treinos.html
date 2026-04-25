@@ -176,24 +176,23 @@
 
                         {% set regiao_icones = {'upper': 'i-dumbbell', 'lower': 'i-target', 'core': 'i-flame', 'cardio': 'i-heart'} %}
                         {% for regiao in regioes %}
-                        <details id="det-{{ t }}-{{ regiao }}" class="regiao-card">
-                            <summary class="regiao-head">
+                        <details id="det-{{ t }}-{{ regiao }}" class="regiao-card" data-regiao="{{ regiao }}">
+                            <summary class="regiao-head" onclick="onRegiaoHeadClick(event, {{ t }}, '{{ regiao }}')">
                                 <svg class="icon icon-sm regiao-toggle-icon"><use href="#i-chevron-right"/></svg>
                                 <div class="regiao-icon {{ regiao }}"><svg class="icon icon-sm"><use href="#{{ regiao_icones.get(regiao, 'i-dumbbell') }}"/></svg></div>
                                 <span class="regiao-title">{{ regioes_labels[regiao] }}</span>
-                                <button type="button" class="subregiao-quick-toggle" onclick="event.preventDefault(); event.stopPropagation(); toggleRegiaoTodos({{ t }}, '{{ regiao }}')">+ Todos</button>
+                                <span class="regiao-hint" data-role="hint-regiao"></span>
                                 <input type="checkbox" class="reg-chk hidden" data-regiao="{{ regiao }}" onchange="updateDemandas({{ t }})">
                             </summary>
                             <div class="regiao-body">
                                 {% for subregiao in subregioes.get(regiao, []) %}
                                 {% set pads = padroes_ordem.get(subregiao, []) %}
-                                <div class="subregiao-section">
-                                    <div class="subregiao-head">
-                                        <span class="subregiao-name">{{ subregioes_labels[subregiao] }}</span>
-                                        <button type="button" class="subregiao-quick-toggle" onclick="toggleSubregiaoTodos({{ t }}, '{{ subregiao }}')">+ Todos</button>
-                                    </div>
+                                <div class="subregiao-section" data-subregiao="{{ subregiao }}">
                                     <input type="checkbox" class="sub-chk hidden" data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}" onchange="updateDemandas({{ t }})">
                                     <div class="padroes-tags">
+                                        <button type="button" class="subregiao-tag" onclick="onSubregiaoHeadClick(event, {{ t }}, '{{ subregiao }}', '{{ regiao }}')">
+                                            {{ subregioes_labels[subregiao] }}
+                                        </button>
                                     {% if subregiao == 'perna_anterior' %}
                                         <label class="padrao-tag">
                                             <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="bilateral" data-subregiao="perna_anterior" data-regiao="lower" onchange="updateDemandas({{ t }})">
@@ -391,25 +390,38 @@ function setModo(t, modo) {
     }
 }
 
-function toggleRegiaoTodos(t, regiao) {
+function toggleDetails(e, t, regiao) {
     const det = document.getElementById('det-' + t + '-' + regiao);
-    if (!det) return;
-    if (!det.open) det.open = true;
-    const tags = det.querySelectorAll('.pad-chk, .lat-chk');
-    const algumDesmarcado = Array.from(tags).some(c => !c.checked);
-    tags.forEach(c => c.checked = algumDesmarcado);
-    updateDemandas(t);
+    if (det) det.open = !det.open;
 }
-function toggleSubregiaoTodos(t, subregiao) {
-    const det = tabEl(t).querySelector(`.sub-chk[data-subregiao="${subregiao}"]`);
-    if (!det) return;
-    const subSection = det.parentElement.querySelector('.padroes-tags') || det.parentElement;
-    const tags = subSection.querySelectorAll('.pad-chk, .lat-chk');
-    const algumDesmarcado = Array.from(tags).some(c => !c.checked);
-    tags.forEach(c => c.checked = algumDesmarcado);
+
+function onRegiaoHeadClick(e, t, regiao) {
+    if (e.target.closest('.regiao-toggle-icon')) return;
+    if (e.target.closest('button')) return;
+    e.preventDefault();
+    const chk = qs(t, `.reg-chk[data-regiao="${regiao}"]`);
+    if (!chk) return;
+    chk.checked = !chk.checked;
+    if (chk.checked) {
+        qsa(t, `.sub-chk[data-regiao="${regiao}"], .pad-chk[data-regiao="${regiao}"], .lat-chk[data-regiao="${regiao}"]`)
+            .forEach(c => c.checked = false);
+    }
     updateDemandas(t);
 }
 
+function onSubregiaoHeadClick(e, t, subregiao, regiao) {
+    e.preventDefault();
+    const chk = qs(t, `.sub-chk[data-subregiao="${subregiao}"]`);
+    if (!chk) return;
+    chk.checked = !chk.checked;
+    if (chk.checked) {
+        qsa(t, `.pad-chk[data-subregiao="${subregiao}"], .lat-chk[data-subregiao="${subregiao}"]`)
+            .forEach(c => c.checked = false);
+        const regChk = qs(t, `.reg-chk[data-regiao="${regiao}"]`);
+        if (regChk) regChk.checked = false;
+    }
+    updateDemandas(t);
+}
 function toggleCopiarBar(t) {
     const bar = document.getElementById('copiar-bar-' + t);
     if (!bar) return;
@@ -508,6 +520,18 @@ function capturarValoresAtuais(t) {
 function updateDemandas(t) {
     const prev = capturarValoresAtuais(t);
 
+    // Normalização: se filhos marcados, desmarca pai (mantém estado coerente)
+    qsa(t, '.pad-chk:checked, .lat-chk:checked').forEach(chk => {
+        const sub = chk.dataset.subregiao;
+        const subChk = qs(t, `.sub-chk[data-subregiao="${sub}"]`);
+        if (subChk) subChk.checked = false;
+    });
+    qsa(t, '.sub-chk:checked, .pad-chk:checked, .lat-chk:checked').forEach(chk => {
+        const reg = chk.dataset.regiao;
+        const regChk = qs(t, `.reg-chk[data-regiao="${reg}"]`);
+        if (regChk) regChk.checked = false;
+    });
+
     const demandas = [];
     const padsMarcados = {};
     const subsMarcadas = {};
@@ -591,7 +615,13 @@ function updateDemandas(t) {
                 if (subChk) return `<span class="reg-chip reg-chip-${c[1]}">${SUBREGIOES_LABELS_JS[escopo] || escopo}</span>`;
             }
         }
-        return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${REGIOES_LABELS_JS[nivel === 'regiao' ? escopo : ''] || ''}</span>`;
+        if (nivel === 'regiao') {
+            const cor = {core: 'core', cardio: 'cardio'}[escopo];
+            const label = REGIOES_LABELS_JS[escopo] || escopo;
+            if (cor) return `<span class="reg-chip reg-chip-${cor}">${label}</span>`;
+            return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${label}</span>`;
+        }
+        return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563"></span>`;
     }
 
     demandas.forEach((d, i) => {
@@ -642,7 +672,24 @@ function updateDemandas(t) {
     qs(t, '#demandas-container-' + t).innerHTML = html;
     qs(t, '#demandas-hidden-inputs-' + t).innerHTML = hidden;
     qs(t, '#lateralidade-container-' + t).innerHTML = '';
+    atualizarVisualHierarquia(t);
     updateTotal(t);
+}
+
+function atualizarVisualHierarquia(t) {
+    tabEl(t).querySelectorAll('.regiao-card').forEach(card => {
+        const reg = card.dataset.regiao;
+        const regChecked = !!card.querySelector('.reg-chk:checked');
+        const anyChild = !!card.querySelector('.sub-chk:checked, .pad-chk:checked, .lat-chk:checked');
+        card.classList.toggle('has-selected', regChecked || anyChild);
+        const hintReg = card.querySelector('[data-role="hint-regiao"]');
+        if (hintReg) hintReg.textContent = regChecked ? 'região inteira' : '';
+    });
+    tabEl(t).querySelectorAll('.subregiao-section').forEach(sec => {
+        const sub = sec.dataset.subregiao;
+        const subChecked = !!sec.querySelector(`.sub-chk[data-subregiao="${sub}"]:checked`);
+        sec.classList.toggle('sub-selected', subChecked);
+    });
 }
 
 function renderRow(t, inputName, val, chip, label, _incExpr, _removeExpr) {

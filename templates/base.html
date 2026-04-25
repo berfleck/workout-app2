@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BF Treinamento</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23e85d04'/><text x='50%25' y='52%25' dominant-baseline='middle' text-anchor='middle' font-family='DM Sans, Arial, sans-serif' font-weight='800' font-size='30' fill='white'>BF</text></svg>">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -689,16 +690,19 @@
         .regiao-icon.core   { background: #f3e8ff; color: #6b21a8; }
         .regiao-icon.cardio { background: #fef9c3; color: #854d0e; }
         .regiao-title { font-size: 14px; font-weight: 600; color: var(--gray-900); flex: 1; }
+        .regiao-hint { font-size: 11px; color: var(--brand-600); font-weight: 600; font-style: italic; margin-left: auto; padding-right: 4px; }
+        .regiao-hint:empty { display: none; }
+        .regiao-card.has-selected .regiao-title { color: var(--brand-600); }
         .regiao-summary { font-size: 11px; color: var(--gray-500); font-weight: 500; }
         .regiao-summary.has-selected { color: var(--brand-500); font-weight: 600; }
         .regiao-body { padding: 12px 16px 14px; }
         .subregiao-section { margin-bottom: 14px; }
         .subregiao-section:last-child { margin-bottom: 0; }
-        .subregiao-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px; }
-        .subregiao-name { font-size: 12px; font-weight: 600; color: var(--gray-700); }
-        .subregiao-quick-toggle { font-size: 10px; color: var(--gray-500); font-weight: 600; padding: 2px 8px; border-radius: 5px; background: var(--gray-100); border: 0; cursor: pointer; transition: all 0.12s; }
-        .subregiao-quick-toggle:hover { background: var(--brand-100); color: var(--brand-600); }
-        .padroes-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .padroes-tags { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 8px; }
+        .subregiao-tag { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; color: var(--gray-800); background: var(--gray-200); border: 1px solid transparent; cursor: pointer; user-select: none; transition: all 0.12s; font-family: inherit; }
+        .subregiao-tag:hover { background: var(--gray-300); }
+        .subregiao-section.sub-selected .subregiao-tag { background: var(--brand-500); color: white; border-color: var(--brand-500); }
+        .subregiao-section.sub-selected .subregiao-tag::before { content: ''; width: 12px; height: 12px; border-radius: 999px; background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e85d04' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/8px no-repeat; display: inline-block; }
         .padrao-tag { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--gray-600); background: var(--gray-100); border: 1px solid transparent; transition: all 0.12s; cursor: pointer; user-select: none; }
         .padrao-tag:hover { background: var(--gray-200); }
         .padrao-tag input { display: none; }
@@ -838,6 +842,21 @@
         .icon-lg { width: 20px; height: 20px; }
         .icon-xl { width: 48px; height: 48px; stroke-width: 1.5; }
         .sidebar-link .icon { width: 20px; height: 20px; }
+
+        /* ── Modal customizado (substitui confirm/alert nativos) ── */
+        .app-modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: none; align-items: center; justify-content: center; z-index: 1000; opacity: 0; transition: opacity 0.15s ease; padding: 16px; }
+        .app-modal-backdrop.is-open { display: flex; opacity: 1; }
+        .app-modal { background: white; border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,0.25); max-width: 420px; width: 100%; padding: 22px 22px 18px; transform: translateY(8px) scale(0.98); transition: transform 0.15s ease; font-family: 'DM Sans', sans-serif; }
+        .app-modal-backdrop.is-open .app-modal { transform: translateY(0) scale(1); }
+        .app-modal-title { font-size: 16px; font-weight: 700; color: var(--gray-900); margin-bottom: 6px; }
+        .app-modal-msg { font-size: 14px; color: var(--gray-700); line-height: 1.45; white-space: pre-wrap; }
+        .app-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+        .app-modal-btn { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid var(--gray-200); background: white; color: var(--gray-700); cursor: pointer; transition: all 0.12s; font-family: inherit; }
+        .app-modal-btn:hover { background: var(--gray-50); border-color: var(--gray-300); }
+        .app-modal-btn-primary { background: var(--brand-500); color: white; border-color: var(--brand-500); }
+        .app-modal-btn-primary:hover { background: var(--brand-600); border-color: var(--brand-600); }
+        .app-modal-btn-danger { background: #dc2626; color: white; border-color: #dc2626; }
+        .app-modal-btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 antialiased font-sans">
@@ -908,8 +927,78 @@
     </div>
 </main>
 
+<!-- Modal global (substitui confirm/alert nativos) -->
+<div id="app-modal-backdrop" class="app-modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="app-modal" role="document">
+        <div id="app-modal-title" class="app-modal-title"></div>
+        <div id="app-modal-msg" class="app-modal-msg"></div>
+        <div class="app-modal-actions">
+            <button type="button" id="app-modal-cancel" class="app-modal-btn">Cancelar</button>
+            <button type="button" id="app-modal-ok" class="app-modal-btn app-modal-btn-primary">Confirmar</button>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script>
+// ── Modal customizado ──
+(function() {
+    const backdrop = document.getElementById('app-modal-backdrop');
+    const titleEl = document.getElementById('app-modal-title');
+    const msgEl = document.getElementById('app-modal-msg');
+    const okBtn = document.getElementById('app-modal-ok');
+    const cancelBtn = document.getElementById('app-modal-cancel');
+    let resolver = null;
+
+    function close(result) {
+        backdrop.classList.remove('is-open');
+        backdrop.setAttribute('aria-hidden', 'true');
+        const r = resolver;
+        resolver = null;
+        if (r) r(result);
+    }
+
+    function open(opts) {
+        return new Promise(resolve => {
+            if (resolver) resolver(false);
+            resolver = resolve;
+            titleEl.textContent = opts.title || (opts.alert ? 'Aviso' : 'Confirmação');
+            titleEl.style.display = (opts.title || opts.alert) ? '' : 'none';
+            msgEl.textContent = opts.message || '';
+            okBtn.textContent = opts.okLabel || (opts.alert ? 'OK' : 'Confirmar');
+            okBtn.className = 'app-modal-btn ' + (opts.danger ? 'app-modal-btn-danger' : 'app-modal-btn-primary');
+            cancelBtn.style.display = opts.alert ? 'none' : '';
+            backdrop.classList.add('is-open');
+            backdrop.setAttribute('aria-hidden', 'false');
+            setTimeout(() => okBtn.focus(), 50);
+        });
+    }
+
+    okBtn.addEventListener('click', () => close(true));
+    cancelBtn.addEventListener('click', () => close(false));
+    backdrop.addEventListener('click', e => { if (e.target === backdrop) close(false); });
+    document.addEventListener('keydown', e => {
+        if (!backdrop.classList.contains('is-open')) return;
+        if (e.key === 'Escape') { e.preventDefault(); close(false); }
+        else if (e.key === 'Enter') { e.preventDefault(); close(true); }
+    });
+
+    window.appConfirm = (message, opts = {}) => open({ ...opts, message, alert: false });
+    window.appAlert = (message, opts = {}) => open({ ...opts, message, alert: true });
+
+    // Intercepta hx-confirm para usar modal customizado
+    document.body.addEventListener('htmx:confirm', function(evt) {
+        if (!evt.detail.question) return;
+        evt.preventDefault();
+        const isDelete = /remov|exclu|apag|delet/i.test(evt.detail.question);
+        open({
+            message: evt.detail.question,
+            danger: isDelete,
+            okLabel: isDelete ? 'Remover' : 'Confirmar',
+        }).then(ok => { if (ok) evt.detail.issueRequest(true); });
+    });
+})();
+
 function toggleMobileSidebar() {
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('sidebar-overlay');

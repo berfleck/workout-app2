@@ -330,6 +330,31 @@ def diff_rascunho_vs_publicada(aluno_id):
 
     mudancas = []
 
+    # Detecta treinos inteiros removidos: treino da publicada cujos exercícios
+    # nenhum aparece no rascunho. Colapsa em uma única mudança "treino_removed".
+    treinos_removidos = set()
+    if len(rascunho) < len(rotina_reg["sessoes"]):
+        faltam = len(rotina_reg["sessoes"]) - len(rascunho)
+        for ti, sessao in enumerate(rotina_reg["sessoes"]):
+            nomes_treino = set()
+            for bloco in sessao.get("blocos", []):
+                for k in ("ex1", "ex2", "ex3"):
+                    ex = bloco.get(k)
+                    if ex and ex.get("nome"):
+                        nomes_treino.add(ex["nome"])
+            if nomes_treino and not (nomes_treino & nomes_rasc):
+                treinos_removidos.add(ti)
+                if len(treinos_removidos) >= faltam:
+                    break
+
+    for ti in treinos_removidos:
+        mudancas.append({
+            "tipo": "treino_removed",
+            "ex": f"Treino {ti + 1} removido",
+            "treino_idx": ti,
+            "bloco_label": "",
+        })
+
     # Adicionados (no rascunho, ausentes na publicada)
     for nome in nomes_rasc - nomes_pub:
         info = rasc[nome]
@@ -340,9 +365,11 @@ def diff_rascunho_vs_publicada(aluno_id):
             "bloco_label": info["bloco_label"],
         })
 
-    # Removidos (na publicada, ausentes no rascunho)
+    # Removidos (na publicada, ausentes no rascunho) — exclui os de treinos inteiros já colapsados
     for nome in nomes_pub - nomes_rasc:
         info = pub[nome]
+        if info["treino_idx"] in treinos_removidos:
+            continue
         mudancas.append({
             "tipo": "removed",
             "ex": nome,
@@ -366,7 +393,7 @@ def diff_rascunho_vs_publicada(aluno_id):
             })
 
     # Ordenar: edited primeiro (mais "ativo"), depois added, depois removed; dentro de cada por treino_idx
-    ordem = {"edited": 0, "added": 1, "removed": 2}
+    ordem = {"treino_removed": 0, "edited": 1, "added": 2, "removed": 3}
     mudancas.sort(key=lambda m: (ordem.get(m["tipo"], 9), m["treino_idx"], m["ex"]))
     return mudancas
 
@@ -617,11 +644,8 @@ def hub_rotina():
             "data": rot_ant_reg.get("data", ""),
             "rotulo_origem": "Anterior",
         }
-        for s in sessoes_ant:
-            for bloco in s.blocos:
-                for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
-                    if ex:
-                        nomes_anteriores.add(ex.nome)
+        # Não popula nomes_anteriores aqui: o badge "mantido" só faz sentido em rascunho×publicada.
+        # Comparação explícita rotina×anterior usa o toggle "Lado a lado" (diff_atual/diff_anterior).
 
     total_alteracoes = 0
     tem_rotina_publicada = False
