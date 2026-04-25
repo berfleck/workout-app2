@@ -129,12 +129,16 @@
                 </span>
                 {% set equip = ex.eq_primario if ex.eq_primario else '' %}
                 {% if ex.eq_secundario %}{% set equip = (equip ~ ' + ' ~ ex.eq_secundario) if equip else ex.eq_secundario %}{% endif %}
-                {% if ex.purpose or equip or ex.unilateral or (ex.fadiga and ex.fadiga >= 4) %}
+                {% set show_meta = (modo != 'editar') and (ex.purpose or equip or ex.unilateral) %}
+                {% set show_fadiga = ex.fadiga and ex.fadiga >= 4 %}
+                {% if show_meta or show_fadiga %}
                 <div class="ex-meta-chips">
+                    {% if modo != 'editar' %}
                     {% if ex.purpose %}<span class="meta-chip purpose"><svg class="icon"><use href="#i-zap"/></svg>{{ purpose_pt.get(ex.purpose, ex.purpose) }}</span>{% endif %}
                     {% if equip %}<span class="meta-chip equip"><svg class="icon"><use href="#i-tool"/></svg>{{ equip }}</span>{% endif %}
                     {% if ex.unilateral %}<span class="meta-chip lateralidade">{{ ex.unilateral }}</span>{% endif %}
-                    {% if ex.fadiga and ex.fadiga >= 4 %}<span class="meta-chip fadiga"><svg class="icon"><use href="#i-flame"/></svg>{{ ex.fadiga }}</span>{% endif %}
+                    {% endif %}
+                    {% if show_fadiga %}<span class="meta-chip fadiga"><svg class="icon"><use href="#i-flame"/></svg>{{ ex.fadiga }}</span>{% endif %}
                 </div>
                 {% endif %}
             </div>
@@ -144,7 +148,7 @@
             {% if modo == 'editar' %}
             <form class="prescricao-inline"
                   hx-post="/treino/{{ idx }}/prescricao/{{ bloco_idx }}/{{ ei }}"
-                  hx-trigger="change delay:200ms"
+                  hx-trigger="focusout delay:300ms"
                   hx-swap="none">
                 <input type="number" name="series" value="{{ ex.series or 3 }}" min="1" max="10" title="Séries">
                 <span class="sep">×</span>
@@ -152,6 +156,11 @@
                 <span class="sep">·</span>
                 <span class="label">RIR</span>
                 <input type="number" name="rir" value="{{ ex.rir if ex.rir is not none else 2 }}" min="0" max="4" title="RIR">
+                {% if ex.series is not none or ex.reps or ex.rir is not none %}
+                <button type="button" class="prescricao-limpar" title="Limpar prescrição"
+                        hx-post="/treino/{{ idx }}/prescricao/{{ bloco_idx }}/{{ ei }}/limpar"
+                        hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-x"/></svg></button>
+                {% endif %}
             </form>
             <div class="exercicio-acoes">
                 <button class="btn-ghost" title="Substituir aleatório"

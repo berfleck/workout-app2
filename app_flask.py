@@ -1606,6 +1606,21 @@ def salvar_prescricao(t, bi, ei):
     salvar_sessoes_disco()
     return _responder_card_com_banner(t)
 
+
+@app.route("/treino/<int:t>/prescricao/<int:bi>/<int:ei>/limpar", methods=["POST"])
+def limpar_prescricao(t, bi, ei):
+    """Zera séries/reps/RIR do exercício alvo (volta para 'sem prescrição')."""
+    global sessoes_ativas
+    if t >= len(sessoes_ativas): return "", 404
+    bloco = sessoes_ativas[t].blocos[bi]
+    ex = [bloco.ex1, bloco.ex2, bloco.ex3][ei]
+    if ex:
+        ex.series = None
+        ex.reps = None
+        ex.rir = None
+    salvar_sessoes_disco()
+    return _responder_card_com_banner(t)
+
 # ── Busca de exercícios (para painéis de adicionar/novo bloco) ─
 
 @app.route("/buscar-exercicios")
