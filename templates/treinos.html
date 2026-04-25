@@ -154,6 +154,12 @@
                         <button type="button" class="btn btn-sm" onclick="copiarConfigTreino(parseInt(document.getElementById('copiar-src-{{ t }}').value), {{ t }})">Aplicar</button>
                     </div>
 
+                    <!-- Nome do treino (opcional) -->
+                    <input type="text" name="nome_{{ t }}" id="input-nome-{{ t }}"
+                           class="treino-nome-input-config"
+                           placeholder="Nome do treino (opcional)"
+                           autocomplete="off">
+
                     <!-- Header da tab: switch de modo + copiar -->
                     <div class="flex items-center justify-between gap-2 flex-wrap">
                         <div class="inline-flex p-1 bg-gray-100 rounded-lg text-xs">
@@ -809,6 +815,8 @@ function checkLatTotal(t) {
 }
 
 function resetTreino(t) {
+    const nomeInp = document.getElementById('input-nome-' + t);
+    if (nomeInp) nomeInp.value = '';
     qsa(t, '.reg-chk, .sub-chk, .pad-chk, .lat-chk').forEach(c => c.checked = false);
     qs(t, '#demandas-container-' + t).innerHTML = '';
     qs(t, '#demandas-hidden-inputs-' + t).innerHTML = '';
@@ -829,6 +837,10 @@ function resetAll() {
 function copiarConfigTreino(src, dest) {
     if (src === dest) return;
     resetTreino(dest);
+
+    const nomeSrc = document.getElementById('input-nome-' + src);
+    const nomeDest = document.getElementById('input-nome-' + dest);
+    if (nomeSrc && nomeDest) nomeDest.value = nomeSrc.value;
 
     const modoSrc = qs(src, '#input-modo-' + src).value;
     setModo(dest, modoSrc);

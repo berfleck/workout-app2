@@ -114,6 +114,23 @@ def tempo_relativo(data_str):
     anos = dias // 365
     return f"há {anos} {'ano' if anos == 1 else 'anos'}"
 
+def subtitulo_sessao(sessao):
+    """Devolve subtítulo amigável para o card do treino.
+
+    Regras:
+    - Se sessao.tipo for um nome livre (sem ' + ' e diferente de 'manual'): usa direto.
+    - Senão: deriva dos chips de grupo (ex: 'Peito · Costas · Ombro'), até 3 chips.
+    """
+    tipo = getattr(sessao, "tipo", None) if sessao else None
+    if tipo and tipo != "manual" and " + " not in tipo:
+        return tipo
+    chips = sessao_chips(sessao)
+    if not chips:
+        return ""
+    labels = [c[0].capitalize() for c in chips[:3]]
+    return " · ".join(labels)
+
+
 def sessao_chips(sessao):
     """Retorna chips deduplicados (label, slug) para a sessão, na ordem de aparição dos exercícios."""
     if not sessao or not getattr(sessao, "blocos", None):
@@ -499,6 +516,7 @@ def _inject_hub_ctx():
         "criacao_manual_aluno_obj": aluno_obj,
         "criacao_manual_quick_pick": quick_pick_para_aluno(aluno_obj) if aluno_obj else [],
         "sessao_chips": sessao_chips,
+        "subtitulo_sessao": subtitulo_sessao,
         "tempo_relativo": tempo_relativo,
         "todos_padroes_drawer": sorted(PADROES_LABELS.keys()),
         "padroes_labels_drawer": PADROES_LABELS,
@@ -1242,6 +1260,14 @@ def gerar():
         n_bloqueados_hist = banco_antes - len(banco_gerar)
 
     sessoes_ativas = gerar_multiplos_treinos(banco_gerar, all_configs, variar_entre_treinos=variar)
+
+    # Aplica nome customizado por treino (sobrescreve sessao.tipo se usuário digitou)
+    for t in range(min(n_treinos, len(sessoes_ativas))):
+        nome_custom = (request.form.get(f"nome_{t}", "") or "").strip()
+        if nome_custom:
+            sessoes_ativas[t].tipo = nome_custom
+            all_configs[t]["nome_custom"] = nome_custom
+
     configs_geradas = all_configs
     opcoes_globais = {
         "n_treinos": n_treinos,
@@ -1382,6 +1408,10 @@ def treino_regerar(t):
             exercicios_travados=cfg_r.get("exercicios_travados", []),
             evitar_agonistas=cfg_r.get("evitar_agonistas", False))
 
+    # Preserva o nome custom do treino se existir
+    nome_custom = cfg_r.get("nome_custom", "")
+    if nome_custom:
+        nova.tipo = nome_custom
     sessoes_ativas[t] = nova
     salvar_sessoes_disco()
     return render_template("_treino_card.html", sessao=nova, idx=t,

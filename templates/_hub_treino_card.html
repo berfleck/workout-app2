@@ -1,7 +1,8 @@
 <div class="treino-card modo-visualizar">
     <div class="treino-header">
         <div class="treino-titulo-linha">
-            <span class="treino-titulo">Treino {{ idx + 1 }}</span>
+            {% set sub = subtitulo_sessao(sessao) %}
+            <span class="treino-titulo">Treino {{ idx + 1 }}{% if sub %}<span class="treino-nome-inline"> · {{ sub }}</span>{% endif %}</span>
             {% set chips = sessao_chips(sessao) %}
             {% if chips %}
             <div class="regiao-chips mt-1">
