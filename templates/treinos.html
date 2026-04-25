@@ -609,11 +609,12 @@ function updateDemandas(t) {
             if (c) return `<span class="reg-chip reg-chip-${c[1]}">${c[0]}${latSuffix ? ' · ' + latSuffix : ''}</span>`;
         }
         if (nivel === 'subregiao') {
-            // tenta achar um chip via algum padrão da sub
+            const label = SUBREGIOES_LABELS_JS[escopo] || escopo;
             for (const [pad, c] of Object.entries(PADRAO_PARA_CHIP_JS)) {
-                const subChk = qs(t, `.pad-chk[data-padrao="${pad}"][data-subregiao="${escopo}"]`);
-                if (subChk) return `<span class="reg-chip reg-chip-${c[1]}">${SUBREGIOES_LABELS_JS[escopo] || escopo}</span>`;
+                const subChk = qs(t, `.pad-chk[data-padrao="${pad}"][data-subregiao="${escopo}"], .lat-chk[data-padrao="${pad}"][data-subregiao="${escopo}"]`);
+                if (subChk) return `<span class="reg-chip reg-chip-${c[1]}">${label}</span>`;
             }
+            return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${label}</span>`;
         }
         if (nivel === 'regiao') {
             const cor = {core: 'core', cardio: 'cardio'}[escopo];
