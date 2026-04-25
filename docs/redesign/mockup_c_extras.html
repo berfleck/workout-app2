@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup C — Criação manual, rascunho, lado-a-lado · BF Treinamento</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --brand-500: #e85d04;
+    --brand-600: #d4520a;
+    --brand-50: #fff7ed;
+    --brand-100: #fff3e6;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-900: #111827;
+    --green-50: #f0fdf4;
+    --green-100: #dcfce7;
+    --green-500: #22c55e;
+    --green-600: #16a34a;
+    --green-700: #15803d;
+    --amber-50: #fffbeb;
+    --amber-100: #fef3c7;
+    --amber-200: #fde68a;
+    --amber-500: #f59e0b;
+    --amber-600: #d97706;
+    --amber-700: #b45309;
+    --red-50: #fef2f2;
+    --red-100: #fee2e2;
+    --red-500: #ef4444;
+    --red-600: #dc2626;
+    --red-700: #b91c1c;
+    --font-body: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html, body { height: 100%; }
+body {
+    font-family: var(--font-body);
+    background: var(--gray-100);
+    color: var(--gray-900);
+    -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, select { font-family: inherit; }
+.hidden { display: none !important; }
+.icon { width: 16px; height: 16px; stroke-width: 2; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.icon-sm { width: 14px; height: 14px; }
+.icon-xs { width: 12px; height: 12px; }
+.icon-lg { width: 20px; height: 20px; }
+
+/* Topbar */
+.topbar { position: sticky; top: 0; z-index: 50; background: white; border-bottom: 1px solid var(--gray-200); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.topbar-inner { max-width: 1280px; margin: 0 auto; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.topbar-title-group { display: flex; align-items: center; gap: 12px; }
+.topbar-logo { width: 36px; height: 36px; border-radius: 8px; background: var(--gray-900); color: white; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.topbar-title { font-size: 14px; font-weight: 700; color: var(--gray-900); }
+.topbar-sub { font-size: 12px; color: var(--gray-500); }
+.scenarios { display: flex; gap: 6px; flex-wrap: wrap; }
+.scenario-tab { padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; background: transparent; color: var(--gray-700); transition: all 0.15s; }
+.scenario-tab:hover { background: var(--gray-100); }
+.scenario-tab.active { background: var(--gray-900); color: white; }
+.desc-bar { max-width: 1280px; margin: 0 auto; padding: 0 16px 12px; font-size: 12px; color: var(--gray-600); line-height: 1.6; }
+.desc-bar strong { color: var(--gray-900); }
+
+/* Layout */
+.app { display: flex; background: var(--gray-50); min-height: calc(100vh - 100px); }
+.sidebar-nav { display: none; width: 60px; background: white; border-right: 1px solid var(--gray-200); flex-direction: column; align-items: center; padding: 16px 0; gap: 4px; flex-shrink: 0; }
+@media (min-width: 1024px) { .sidebar-nav { display: flex; } }
+.sidebar-logo { width: 36px; height: 36px; border-radius: 8px; background: var(--brand-500); color: white; display: grid; place-items: center; font-weight: 700; font-size: 13px; margin-bottom: 20px; }
+.sidebar-link { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--gray-400); transition: all 0.15s; text-decoration: none; }
+.sidebar-link:hover { background: var(--gray-100); color: var(--brand-500); }
+.sidebar-link.active { background: var(--brand-100); color: var(--brand-500); }
+.sidebar-link .icon { width: 20px; height: 20px; }
+
+.main { flex: 1; padding: 20px 16px; min-width: 0; }
+@media (min-width: 640px) { .main { padding: 24px; } }
+.container { max-width: 1280px; margin: 0 auto; }
+
+.page-eyebrow { font-size: 11px; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+.page-title { font-size: 22px; font-weight: 600; color: var(--gray-900); }
+.page-header { margin-bottom: 14px; }
+
+/* Mini-header do aluno */
+.aluno-header { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: white; border: 1px solid var(--gray-200); border-radius: 12px; margin-bottom: 14px; }
+.avatar { width: 44px; height: 44px; border-radius: 999px; background: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-600) 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0; }
+.aluno-info { flex: 1; min-width: 0; }
+.aluno-nome { font-size: 16px; font-weight: 600; color: var(--gray-900); display: inline-block; }
+.aluno-meta { font-size: 12px; color: var(--gray-500); margin-left: 6px; }
+.meta-dot { display: inline-block; width: 3px; height: 3px; border-radius: 999px; background: var(--gray-300); margin: 0 8px; vertical-align: middle; }
+
+/* Botões base */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; transition: all 0.15s; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.btn-sm { padding: 6px 11px; font-size: 12px; }
+.btn-lg { padding: 10px 18px; font-size: 14px; }
+.btn-primary { background: var(--brand-500); color: white; }
+.btn-primary:hover { background: var(--brand-600); }
+.btn-default { background: white; color: var(--gray-700); border: 1px solid var(--gray-200); }
+.btn-default:hover { background: var(--gray-50); border-color: var(--gray-300); }
+.btn-ghost { background: transparent; color: var(--gray-500); }
+.btn-ghost:hover { background: var(--gray-100); color: var(--gray-700); }
+.btn-success { background: var(--green-600); color: white; }
+.btn-success:hover { background: var(--green-700); }
+.btn-danger-ghost { background: transparent; color: var(--red-600); }
+.btn-danger-ghost:hover { background: var(--red-50); }
+
+/* Reg chips */
+.reg-chip { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 5px; }
+.reg-peito        { background: #ffe4e6; color: #9f1239; }
+.reg-costas       { background: #e0f2fe; color: #075985; }
+.reg-ombro        { background: #fef3c7; color: #92400e; }
+.reg-bracos       { background: #ede9fe; color: #5b21b6; }
+.reg-perna-ant    { background: #d1fae5; color: #065f46; }
+.reg-perna-post   { background: #ccfbf1; color: #115e59; }
+.reg-core         { background: #f3e8ff; color: #6b21a8; }
+
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; color: var(--gray-400); transition: all 0.15s; }
+.icon-btn:hover { background: var(--gray-100); color: var(--brand-500); }
+
+/* ═══════════ BANNER DE RASCUNHO ═══════════ */
+.draft-banner {
+    background: linear-gradient(135deg, var(--amber-50) 0%, var(--amber-100) 100%);
+    border: 1px solid var(--amber-200);
+    border-radius: 12px;
+    margin-bottom: 14px;
+    overflow: hidden;
+}
+.draft-banner-top {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.draft-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.draft-icon-wrap {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: var(--amber-500);
+    color: white;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    position: relative;
+}
+.draft-icon-wrap::after {
+    content: '';
+    position: absolute;
+    width: 8px; height: 8px;
+    background: var(--amber-500);
+    border: 2px solid var(--amber-50);
+    border-radius: 999px;
+    top: -2px; right: -2px;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.7; }
+}
+.draft-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.draft-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--amber-700);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.draft-changes {
+    background: white;
+    color: var(--amber-700);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+.draft-sub { font-size: 11px; color: var(--amber-600); opacity: 0.9; }
+.draft-actions { display: flex; gap: 6px; align-items: center; }
+
+.draft-banner-bottom {
+    padding: 10px 16px 12px;
+    background: rgba(255,255,255,0.5);
+    border-top: 1px solid var(--amber-200);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.draft-label-input {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    border: 1px solid var(--amber-200);
+    border-radius: 8px;
+    padding: 6px 10px;
+    transition: all 0.15s;
+}
+.draft-label-input:focus-within {
+    border-color: var(--amber-500);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+.draft-label-input svg {
+    color: var(--amber-600);
+    flex-shrink: 0;
+}
+.draft-label-input input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-900);
+    min-width: 0;
+}
+.draft-label-input input::placeholder { color: var(--gray-400); font-weight: 400; }
+.draft-label-input input:focus { outline: none; }
+.draft-label-hint {
+    font-size: 10px;
+    color: var(--amber-600);
+    font-weight: 500;
+}
+
+/* Lista de mudanças (popover/details) */
+.draft-changes-detail {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--amber-200);
+    display: none;
+}
+.draft-banner.expanded .draft-changes-detail { display: block; }
+.draft-banner.expanded .draft-toggle-icon { transform: rotate(180deg); }
+
+.draft-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--amber-700);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 5px;
+    transition: background 0.15s;
+}
+.draft-toggle:hover { background: rgba(245, 158, 11, 0.1); }
+.draft-toggle-icon { transition: transform 0.2s; }
+
+.changes-list { display: flex; flex-direction: column; gap: 4px; padding: 0 16px 12px; }
+.change-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    background: white;
+}
+.change-icon {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+}
+.change-icon.add { background: var(--green-100); color: var(--green-700); }
+.change-icon.rem { background: var(--red-100); color: var(--red-700); }
+.change-icon.edt { background: #dbeafe; color: #1d4ed8; }
+.change-text { color: var(--gray-700); flex: 1; }
+.change-text strong { color: var(--gray-900); font-weight: 600; }
+.change-when { font-size: 10px; color: var(--gray-400); font-family: var(--font-mono); }
+
+/* ═══════════ CRIAÇÃO MANUAL · ESTADO VAZIO ═══════════ */
+
+/* Banner contextual de criação manual */
+.creating-banner {
+    background: linear-gradient(135deg, var(--brand-50) 0%, var(--brand-100) 100%);
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.creating-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.creating-icon-wrap { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-500); color: white; display: grid; place-items: center; flex-shrink: 0; }
+.creating-text { display: flex; flex-direction: column; gap: 1px; }
+.creating-title { font-size: 13px; font-weight: 600; color: var(--brand-600); }
+.creating-sub { font-size: 11px; color: var(--brand-600); opacity: 0.85; }
+.creating-actions { display: flex; gap: 6px; }
+
+/* Card do treino sendo criado (vazio) */
+.treino-card { background: white; border: 1px solid var(--gray-200); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+.treino-card.creating { border-color: #fed7aa; box-shadow: 0 0 0 4px rgba(232, 93, 4, 0.06); }
+.treino-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; gap: 8px; }
+.treino-titulo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.treino-tnum { font-size: 11px; font-family: var(--font-mono); color: var(--gray-400); font-weight: 500; }
+.treino-nome-input {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-900);
+    border: none;
+    background: transparent;
+    border-bottom: 1px dashed transparent;
+    padding: 1px 4px;
+    margin-left: -4px;
+    transition: all 0.15s;
+    min-width: 200px;
+}
+.treino-nome-input::placeholder { color: var(--gray-400); }
+.treino-nome-input:hover { border-bottom-color: var(--gray-300); }
+.treino-nome-input:focus { outline: none; border-bottom-color: var(--brand-500); background: var(--brand-50); }
+
+.regiao-chips-empty {
+    font-size: 11px;
+    color: var(--gray-400);
+    font-style: italic;
+}
+
+/* Estado vazio do bloco - guiado */
+.empty-bloco-card {
+    background: white;
+    border: 2px dashed var(--gray-300);
+    border-radius: 12px;
+    padding: 36px 24px;
+    text-align: center;
+    transition: all 0.15s;
+    margin-bottom: 14px;
+}
+.empty-bloco-card:hover {
+    border-color: var(--brand-500);
+    background: var(--brand-50);
+}
+.empty-bloco-illust {
+    width: 64px; height: 64px;
+    margin: 0 auto 14px;
+    border-radius: 999px;
+    background: var(--brand-100);
+    color: var(--brand-500);
+    display: grid; place-items: center;
+}
+.empty-bloco-illust .icon { width: 28px; height: 28px; }
+.empty-bloco-title { font-size: 16px; font-weight: 600; color: var(--gray-900); }
+.empty-bloco-sub {
+    font-size: 13px;
+    color: var(--gray-500);
+    margin-top: 4px;
+    max-width: 360px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.5;
+}
+.empty-bloco-cta-row { display: flex; gap: 8px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+
+/* Quick-pick de exercícios sugeridos */
+.quick-pick-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--gray-200); }
+.quick-pick-title { font-size: 11px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 10px; }
+.quick-pick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 6px;
+    max-width: 460px;
+    margin: 0 auto;
+}
+.quick-pick-btn {
+    padding: 8px 10px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gray-700);
+    text-align: left;
+    transition: all 0.12s;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.quick-pick-btn:hover {
+    border-color: var(--brand-500);
+    background: var(--brand-50);
+    color: var(--brand-600);
+    transform: translateY(-1px);
+}
+.quick-pick-btn .qp-name { display: block; }
+.quick-pick-btn .qp-meta { font-size: 10px; color: var(--gray-400); }
+.quick-pick-btn:hover .qp-meta { color: var(--brand-500); opacity: 0.8; }
+
+/* ═══════════ LADO A LADO COM DIFF ═══════════ */
+.toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.view-mode-switch {
+    display: inline-flex;
+    background: var(--gray-100);
+    border-radius: 9px;
+    padding: 3px;
+}
+.view-mode-switch button {
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-500);
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.view-mode-switch button.active { background: white; color: var(--gray-900); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+
+/* Diff summary bar */
+.diff-summary {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.diff-summary-info { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.diff-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+.diff-stat .icon { width: 13px; height: 13px; }
+.diff-stat.maintained { background: #f0fdf4; color: var(--green-700); }
+.diff-stat.added { background: var(--green-100); color: var(--green-700); }
+.diff-stat.removed { background: var(--red-100); color: var(--red-700); }
+.diff-summary-meta {
+    font-size: 12px;
+    color: var(--gray-500);
+}
+.diff-summary-meta strong { color: var(--gray-900); font-weight: 600; }
+
+.diff-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+}
+@media (min-width: 1024px) {
+    .diff-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
+}
+
+.diff-column { display: flex; flex-direction: column; gap: 12px; }
+.diff-column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    gap: 10px;
+}
+.diff-column-header.current { border-left: 3px solid var(--brand-500); }
+.diff-column-header.previous { border-left: 3px solid var(--gray-400); }
+.diff-column-title-group { display: flex; flex-direction: column; gap: 1px; }
+.diff-column-eyebrow {
+    font-size: 10px;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+}
+.diff-column-eyebrow.current-eyebrow { color: var(--brand-500); }
+.diff-column-title { font-size: 14px; font-weight: 600; color: var(--gray-900); }
+.diff-column-meta { font-size: 11px; color: var(--gray-500); font-family: var(--font-mono); }
+
+/* Card do treino na comparação */
+.diff-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+.diff-card.muted { background: var(--gray-50); }
+.diff-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.diff-card-num { font-size: 11px; font-family: var(--font-mono); color: var(--gray-400); font-weight: 500; }
+.diff-card-title { font-size: 14px; font-weight: 600; color: var(--gray-900); }
+.diff-card.muted .diff-card-title { color: var(--gray-700); }
+
+.bloco-section { margin-bottom: 10px; }
+.bloco-section:last-child { margin-bottom: 0; }
+.bloco-label-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.bloco-chip { width: 20px; height: 20px; border-radius: 999px; background: var(--brand-500); color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10px; flex-shrink: 0; }
+.diff-card.muted .bloco-chip { background: var(--gray-400); }
+.bloco-label { font-size: 10px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+
+/* Exercícios com estados de diff */
+.diff-ex {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-left: 3px solid var(--brand-500);
+    border-radius: 0 6px 6px 0;
+    background: white;
+    margin-bottom: 4px;
+    transition: all 0.15s;
+}
+.diff-ex:last-child { margin-bottom: 0; }
+.diff-card.muted .diff-ex { background: white; border-left-color: var(--gray-400); }
+
+.diff-ex.maintained {
+    background: var(--green-50);
+    border-left-color: var(--green-500);
+}
+.diff-ex.added {
+    background: #ecfdf5;
+    border-left-color: var(--green-600);
+    box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.15);
+}
+.diff-ex.removed {
+    background: var(--red-50);
+    border-left-color: var(--red-500);
+    text-decoration: line-through;
+    text-decoration-color: rgba(220, 38, 38, 0.4);
+    text-decoration-thickness: 1px;
+}
+
+.diff-ex-info { flex: 1; min-width: 0; }
+.diff-ex-nome { font-size: 13px; font-weight: 500; color: var(--gray-900); }
+.diff-ex.removed .diff-ex-nome { color: var(--red-700); }
+.diff-ex.added .diff-ex-nome { color: var(--green-700); }
+.diff-ex-meta { font-size: 10px; color: var(--gray-400); margin-top: 1px; }
+
+.diff-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+.diff-badge .icon { width: 10px; height: 10px; }
+.diff-badge.maintained { background: var(--green-100); color: var(--green-700); }
+.diff-badge.added { background: var(--green-200); color: var(--green-700); }
+.diff-badge.removed { background: var(--red-100); color: var(--red-700); }
+
+/* Filtro de visualização do diff */
+.diff-filter-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 14px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    padding: 4px;
+    flex-wrap: wrap;
+}
+.diff-filter-btn {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-500);
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.diff-filter-btn:hover { background: var(--gray-50); color: var(--gray-700); }
+.diff-filter-btn.active { background: var(--gray-900); color: white; }
+
+/* Mobile: empilha colunas mas com header sticky */
+@media (max-width: 1023px) {
+    .diff-column-header { position: sticky; top: 96px; z-index: 5; }
+}
+
+/* Tooltip */
+[data-tooltip] { position: relative; }
+[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--gray-900);
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+}
+
+/* Bloco card - manter estilo igual ao mockup do HUB */
+.bloco-wrap { background: #fafafa; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.bloco-wrap:last-child { margin-bottom: 0; }
+.bloco-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.bloco-header-left { display: flex; align-items: center; gap: 8px; }
+.bloco-tag { font-size: 10px; padding: 1px 7px; border-radius: 4px; background: var(--gray-100); color: var(--gray-600); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="m12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+    <symbol id="i-columns" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-circle-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></symbol>
+    <symbol id="i-equal" viewBox="0 0 24 24"><line x1="5" x2="19" y1="9" y2="9"/><line x1="5" x2="19" y1="15" y2="15"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></symbol>
+</svg>
+
+<!-- Topbar -->
+<div class="topbar">
+    <div class="topbar-inner">
+        <div class="topbar-title-group">
+            <div class="topbar-logo">BF</div>
+            <div>
+                <div class="topbar-title">Mockup C — Criação manual, rascunho e diff</div>
+                <div class="topbar-sub">Três fluxos auxiliares</div>
+            </div>
+        </div>
+        <div class="scenarios">
+            <button class="scenario-tab active" data-s="manual" onclick="showScenario('manual')">Criação manual</button>
+            <button class="scenario-tab" data-s="rascunho" onclick="showScenario('rascunho')">Modo rascunho</button>
+            <button class="scenario-tab" data-s="diff" onclick="showScenario('diff')">Lado-a-lado / Diff</button>
+        </div>
+    </div>
+    <div class="desc-bar">
+        <div id="desc-manual"><strong>Cenário 1 — Criação manual com estado vazio guiado.</strong> Quando o usuário inicia "Criar treino manual" no HUB, o app entra em modo edição com um treino vazio. O <em>estado vazio</em> aqui é decisivo: em vez de um bloco A em branco esperando interação adivinhada, o card mostra ilustração + título claro + dois CTAs primários ("Adicionar exercício" / "Adicionar bloco vazio") e abaixo um quick-pick de exercícios sugeridos com base na estratégia do aluno. O nome do treino é editável inline (clica e digita). Banner laranja contextual fixo no topo.</div>
+        <div id="desc-rascunho" class="hidden"><strong>Cenário 2 — Banner de rascunho refinado.</strong> Banner amber dividido em duas faixas. Topo: ícone com pulse (alterações vivas), título com badge "3 alterações", botões Salvar/Descartar. Faixa inferior: input de etiqueta com label clara, hint discreto. Banner expansível: clica em "ver alterações" e abre lista detalhada de o que foi adicionado/removido/editado, com timestamp. Resolve o input apertado e a falta de visibilidade do que mudou.</div>
+        <div id="desc-diff" class="hidden"><strong>Cenário 3 — Lado-a-lado com diff visual.</strong> Toolbar com switch grid/colunas + filtros ("Todos · Mantidos · Mudanças"). Sumário de diff no topo: badges com contagens (✓ 5 mantidos · + 3 adicionados · − 2 removidos). Cards lado a lado com headers diferentes (Atual em laranja, Anterior em cinza). Exercícios <em>mantidos</em> ficam verde sutil; <em>adicionados</em> verde forte com badge "+"; <em>removidos</em> vermelho sutil com strikethrough. Em mobile cada coluna ganha header sticky pra você não se perder.</div>
+    </div>
+</div>
+
+<div class="app">
+    <aside class="sidebar-nav">
+        <div class="sidebar-logo">BF</div>
+        <a href="#" class="sidebar-link active" title="Treinos"><svg class="icon"><use href="#i-dumbbell"/></svg></a>
+        <a href="#" class="sidebar-link" title="Alunos"><svg class="icon"><use href="#i-users"/></svg></a>
+        <a href="#" class="sidebar-link" title="Histórico"><svg class="icon"><use href="#i-book"/></svg></a>
+    </aside>
+
+    <main class="main">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="page-eyebrow">Painel principal</div>
+                <h2 class="page-title">Treinos</h2>
+            </div>
+
+            <div class="aluno-header">
+                <div class="avatar">BF</div>
+                <div class="aluno-info">
+                    <span class="aluno-nome">Bernardo Fleck</span>
+                    <span class="aluno-meta">Nível 3<span class="meta-dot"></span>Hipertrofia<span class="meta-dot"></span>4 treinos<span class="meta-dot"></span>atualizado há 3 dias</span>
+                </div>
+            </div>
+
+            <!-- ═══════ CENÁRIO 1: CRIAÇÃO MANUAL ═══════ -->
+            <div id="cenario-manual">
+
+                <div class="creating-banner">
+                    <div class="creating-info">
+                        <div class="creating-icon-wrap"><svg class="icon"><use href="#i-circle-plus"/></svg></div>
+                        <div class="creating-text">
+                            <span class="creating-title">Criando treino manual · Treino 4</span>
+                            <span class="creating-sub">Será adicionado à rotina atual · cancele para descartar</span>
+                        </div>
+                    </div>
+                    <div class="creating-actions">
+                        <button class="btn btn-sm btn-default">
+                            <svg class="icon icon-sm"><use href="#i-x"/></svg> Cancelar
+                        </button>
+                        <button class="btn btn-sm btn-success">
+                            <svg class="icon icon-sm"><use href="#i-check"/></svg> Salvar treino
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Card vazio em modo criação -->
+                <div class="treino-card creating">
+                    <div class="treino-card-header">
+                        <div>
+                            <div class="treino-titulo-row">
+                                <span class="treino-tnum">T4</span>
+                                <input type="text" class="treino-nome-input" placeholder="Dê um nome ao treino..." value="">
+                            </div>
+                            <div class="regiao-chips-empty">As regiões aparecerão conforme você adicionar exercícios</div>
+                        </div>
+                    </div>
+
+                    <div class="empty-bloco-card" onclick="event.stopPropagation()">
+                        <div class="empty-bloco-illust">
+                            <svg class="icon"><use href="#i-dumbbell"/></svg>
+                        </div>
+                        <div class="empty-bloco-title">Comece adicionando o primeiro exercício</div>
+                        <div class="empty-bloco-sub">Você pode escolher manualmente da biblioteca ou usar uma das sugestões abaixo, baseadas na estratégia <strong>Hipertrofia · Nível 3</strong> do aluno.</div>
+
+                        <div class="empty-bloco-cta-row">
+                            <button class="btn btn-primary btn-lg">
+                                <svg class="icon"><use href="#i-search"/></svg> Buscar exercício
+                            </button>
+                            <button class="btn btn-default btn-lg">
+                                <svg class="icon"><use href="#i-plus"/></svg> Adicionar bloco vazio
+                            </button>
+                        </div>
+
+                        <div class="quick-pick-section">
+                            <div class="quick-pick-title">Sugestões para este aluno</div>
+                            <div class="quick-pick-grid">
+                                <button class="quick-pick-btn">
+                                    <span class="qp-name">Supino reto barra</span>
+                                    <span class="qp-meta">peito · composto</span>
+                                </button>
+                                <button class="quick-pick-btn">
+                                    <span class="qp-name">Remada curvada</span>
+                                    <span class="qp-meta">costas · composto</span>
+                                </button>
+                                <button class="quick-pick-btn">
+                                    <span class="qp-name">Agachamento livre</span>
+                                    <span class="qp-meta">perna ant. · composto</span>
+                                </button>
+                                <button class="quick-pick-btn">
+                                    <span class="qp-name">Stiff (RDL)</span>
+                                    <span class="qp-meta">posterior · composto</span>
+                                </button>
+                                <button class="quick-pick-btn">
+                                    <span class="qp-name">Desenvolvimento halteres</span>
+                                    <span class="qp-meta">ombro · composto</span>
+                                </button>
+                                <button class="quick-pick-btn">
+                                    <span class="qp-name">Barra fixa</span>
+                                    <span class="qp-meta">costas · composto</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ═══════ CENÁRIO 2: RASCUNHO ═══════ -->
+            <div id="cenario-rascunho" style="display:none">
+
+                <div class="draft-banner" id="draft-banner">
+                    <div class="draft-banner-top">
+                        <div class="draft-info">
+                            <div class="draft-icon-wrap"><svg class="icon"><use href="#i-pencil"/></svg></div>
+                            <div class="draft-text">
+                                <span class="draft-title">
+                                    Rascunho ativo
+                                    <span class="draft-changes">3 alterações</span>
+                                </span>
+                                <span class="draft-sub">Salvo automaticamente · não publicado para o aluno</span>
+                            </div>
+                        </div>
+                        <div class="draft-actions">
+                            <button class="draft-toggle" onclick="document.getElementById('draft-banner').classList.toggle('expanded')">
+                                Ver alterações
+                                <svg class="icon icon-xs draft-toggle-icon"><use href="#i-chevron-down"/></svg>
+                            </button>
+                            <button class="btn btn-sm btn-danger-ghost">
+                                <svg class="icon icon-sm"><use href="#i-trash"/></svg> Descartar
+                            </button>
+                            <button class="btn btn-sm btn-success">
+                                <svg class="icon icon-sm"><use href="#i-check"/></svg> Salvar rotina
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="draft-banner-bottom">
+                        <div class="draft-label-input">
+                            <svg class="icon icon-sm"><use href="#i-tag"/></svg>
+                            <input type="text" placeholder="Etiqueta da rotina (ex: Abril · Hipertrofia)">
+                        </div>
+                        <span class="draft-label-hint">Aparecerá no histórico e no card do aluno</span>
+                    </div>
+
+                    <div class="draft-changes-detail">
+                        <div class="changes-list">
+
+                            <div class="change-row">
+                                <div class="change-icon add"><svg class="icon icon-xs"><use href="#i-plus"/></svg></div>
+                                <div class="change-text">
+                                    <strong>Treino 2 · B2</strong> adicionado: <strong>Face pull</strong>
+                                </div>
+                                <span class="change-when">há 2 min</span>
+                            </div>
+
+                            <div class="change-row">
+                                <div class="change-icon edt"><svg class="icon icon-xs"><use href="#i-pencil"/></svg></div>
+                                <div class="change-text">
+                                    <strong>Treino 1 · A1</strong> Supino reto barra: prescrição alterada de <strong>3×10</strong> para <strong>4×8</strong>
+                                </div>
+                                <span class="change-when">há 5 min</span>
+                            </div>
+
+                            <div class="change-row">
+                                <div class="change-icon rem"><svg class="icon icon-xs"><use href="#i-minus"/></svg></div>
+                                <div class="change-text">
+                                    <strong>Treino 3 · C1</strong> removido: <strong>Panturrilha em pé</strong>
+                                </div>
+                                <span class="change-when">há 8 min</span>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cards de exemplo abaixo do banner (mostrando que a página continua normal) -->
+                <div class="treino-card">
+                    <div class="treino-card-header">
+                        <div>
+                            <div class="treino-titulo-row">
+                                <span class="treino-tnum">T1</span>
+                                <h3 style="font-size:16px; font-weight:600; color:var(--gray-900)">Upper Push</h3>
+                            </div>
+                            <div style="display:flex; gap:4px; flex-wrap:wrap">
+                                <span class="reg-chip reg-peito">peito</span>
+                                <span class="reg-chip reg-ombro">ombro</span>
+                                <span class="reg-chip reg-bracos">tríceps</span>
+                            </div>
+                        </div>
+                        <button class="icon-btn"><svg class="icon"><use href="#i-pencil"/></svg></button>
+                    </div>
+                    <div class="bloco-wrap">
+                        <div class="bloco-header">
+                            <div class="bloco-header-left">
+                                <span class="bloco-chip">A</span>
+                                <span class="bloco-label">Bloco</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; padding:7px 10px; background:#fef3c7; border-left:3px solid var(--amber-500); border-radius:0 6px 6px 0; margin-bottom:4px;">
+                            <div style="flex:1">
+                                <div style="font-size:13px; font-weight:500; color:var(--gray-900)">Supino reto barra · <span style="color:var(--amber-700); font-family:var(--font-mono); font-size:11px; font-weight:600;">4×8 (era 3×10)</span></div>
+                                <div style="font-size:10px; color:var(--gray-400); margin-top:1px">A1 · peito</div>
+                            </div>
+                            <span class="diff-badge" style="background:#fef3c7; color:var(--amber-700)">EDITADO</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-left:3px solid var(--brand-500); border-radius:0 6px 6px 0;">
+                            <div style="flex:1">
+                                <div style="font-size:13px; font-weight:500; color:var(--gray-900)">Desenvolvimento halteres</div>
+                                <div style="font-size:10px; color:var(--gray-400); margin-top:1px">A2 · ombro</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ═══════ CENÁRIO 3: LADO A LADO COM DIFF ═══════ -->
+            <div id="cenario-diff" style="display:none">
+
+                <div class="toolbar">
+                    <div class="view-mode-switch">
+                        <button>
+                            <svg class="icon icon-xs"><use href="#i-grid"/></svg> Atual
+                        </button>
+                        <button>
+                            <svg class="icon icon-xs"><use href="#i-list"/></svg> Anterior
+                        </button>
+                        <button class="active">
+                            <svg class="icon icon-xs"><use href="#i-columns"/></svg> Lado a lado
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sumário de diff -->
+                <div class="diff-summary">
+                    <div class="diff-summary-info">
+                        <span class="diff-stat maintained">
+                            <svg class="icon"><use href="#i-equal"/></svg> 8 mantidos
+                        </span>
+                        <span class="diff-stat added">
+                            <svg class="icon"><use href="#i-plus"/></svg> 3 adicionados
+                        </span>
+                        <span class="diff-stat removed">
+                            <svg class="icon"><use href="#i-minus"/></svg> 2 removidos
+                        </span>
+                    </div>
+                    <div class="diff-summary-meta">
+                        Comparando <strong>Atual · Abril Hipertrofia</strong> com <strong>Março Hipertrofia</strong> · há 28 dias
+                    </div>
+                </div>
+
+                <!-- Filtro -->
+                <div class="diff-filter-bar">
+                    <button class="diff-filter-btn active">Todos os exercícios</button>
+                    <button class="diff-filter-btn">Apenas mudanças</button>
+                    <button class="diff-filter-btn">
+                        <svg class="icon icon-xs"><use href="#i-equal"/></svg> Mantidos
+                    </button>
+                    <button class="diff-filter-btn">
+                        <svg class="icon icon-xs"><use href="#i-plus"/></svg> Adicionados
+                    </button>
+                    <button class="diff-filter-btn">
+                        <svg class="icon icon-xs"><use href="#i-minus"/></svg> Removidos
+                    </button>
+                </div>
+
+                <div class="diff-grid">
+
+                    <!-- COLUNA ESQUERDA: ATUAL -->
+                    <div class="diff-column">
+                        <div class="diff-column-header current">
+                            <div class="diff-column-title-group">
+                                <div class="diff-column-eyebrow current-eyebrow">Rotina atual</div>
+                                <div class="diff-column-title">Abril · Hipertrofia</div>
+                            </div>
+                            <div class="diff-column-meta">há 3 dias</div>
+                        </div>
+
+                        <div class="diff-card">
+                            <div class="diff-card-head">
+                                <span class="diff-card-num">T1</span>
+                                <span class="diff-card-title">Upper · Push</span>
+                                <span class="reg-chip reg-peito">peito</span>
+                                <span class="reg-chip reg-ombro">ombro</span>
+                                <span class="reg-chip reg-bracos">tríceps</span>
+                            </div>
+
+                            <div class="bloco-section">
+                                <div class="bloco-label-row">
+                                    <span class="bloco-chip">A</span>
+                                    <span class="bloco-label">Bloco</span>
+                                </div>
+                                <div class="diff-ex maintained">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Supino reto barra</div>
+                                        <div class="diff-ex-meta">A1 · peito · composto</div>
+                                    </div>
+                                    <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                                </div>
+                                <div class="diff-ex added">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Desenvolvimento halteres</div>
+                                        <div class="diff-ex-meta">A2 · ombro · composto</div>
+                                    </div>
+                                    <span class="diff-badge added"><svg class="icon"><use href="#i-plus"/></svg>novo</span>
+                                </div>
+                            </div>
+
+                            <div class="bloco-section">
+                                <div class="bloco-label-row">
+                                    <span class="bloco-chip">B</span>
+                                    <span class="bloco-label">Bloco</span>
+                                </div>
+                                <div class="diff-ex maintained">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Crucifixo máquina</div>
+                                        <div class="diff-ex-meta">B1 · peito · isolado</div>
+                                    </div>
+                                    <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                                </div>
+                                <div class="diff-ex added">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Tríceps corda</div>
+                                        <div class="diff-ex-meta">B2 · tríceps · isolado</div>
+                                    </div>
+                                    <span class="diff-badge added"><svg class="icon"><use href="#i-plus"/></svg>novo</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="diff-card">
+                            <div class="diff-card-head">
+                                <span class="diff-card-num">T2</span>
+                                <span class="diff-card-title">Upper · Pull</span>
+                                <span class="reg-chip reg-costas">costas</span>
+                                <span class="reg-chip reg-bracos">bíceps</span>
+                            </div>
+
+                            <div class="bloco-section">
+                                <div class="bloco-label-row">
+                                    <span class="bloco-chip">A</span>
+                                    <span class="bloco-label">Bloco</span>
+                                </div>
+                                <div class="diff-ex maintained">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Barra fixa</div>
+                                        <div class="diff-ex-meta">A1 · costas · composto</div>
+                                    </div>
+                                    <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                                </div>
+                                <div class="diff-ex maintained">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Remada curvada barra</div>
+                                        <div class="diff-ex-meta">A2 · costas · composto</div>
+                                    </div>
+                                    <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                                </div>
+                            </div>
+
+                            <div class="bloco-section">
+                                <div class="bloco-label-row">
+                                    <span class="bloco-chip">B</span>
+                                    <span class="bloco-label">Bloco</span>
+                                </div>
+                                <div class="diff-ex added">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Face pull</div>
+                                        <div class="diff-ex-meta">B1 · ombro post.</div>
+                                    </div>
+                                    <span class="diff-badge added"><svg class="icon"><use href="#i-plus"/></svg>novo</span>
+                                </div>
+                                <div class="diff-ex maintained">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Rosca direta</div>
+                                        <div class="diff-ex-meta">B2 · bíceps</div>
+                                    </div>
+                                    <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- COLUNA DIREITA: ANTERIOR -->
+                    <div class="diff-column">
+                        <div class="diff-column-header previous">
+                            <div class="diff-column-title-group">
+                                <div class="diff-column-eyebrow">Rotina anterior</div>
+                                <div class="diff-column-title">Março · Hipertrofia</div>
+                            </div>
+                            <div class="diff-column-meta">há 31 dias</div>
+                        </div>
+
+                        <div class="diff-card muted">
+                            <div class="diff-card-head">
+                                <span class="diff-card-num">T1</span>
+                                <span class="diff-card-title">Upper · Push</span>
+                                <span class="reg-chip reg-peito">peito</span>
+                                <span class="reg-chip reg-ombro">ombro</span>
+                                <span class="reg-chip reg-bracos">tríceps</span>
+                            </div>
+
+                            <div class="bloco-section">
+                                <div class="bloco-label-row">
+                                    <span class="bloco-chip">A</span>
+                                    <span class="bloco-label">Bloco</span>
+                                </div>
+                                <div class="diff-ex maintained">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Supino reto barra</div>
+                                        <div class="diff-ex-meta">A1 · peito · composto</div>
+                                    </div>
+                                    <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                                </div>
+                                <div class="diff-ex removed">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Crossover na polia</div>
+                                        <div class="diff-ex-meta">A2 · peito · isolado</div>
+                                    </div>
+                                    <span class="diff-badge removed"><svg class="icon"><use href="#i-minus"/></svg>removido</span>
+                                </div>
+                            </div>
+
+                            <div class="bloco-section">
+                                <div class="bloco-label-row">
+                                    <span class="bloco-chip">B</span>
+                                    <span class="bloco-label">Bloco</span>
+                                </div>
+                                <div class="diff-ex maintained">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Crucifixo máquina</div>
+                                        <div class="diff-ex-meta">B1 · peito · isolado</div>
+                                    </div>
+                                    <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                                </div>
+                                <div class="diff-ex removed">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Tríceps testa</div>
+                                        <div class="diff-ex-meta">B2 · tríceps · isolado</div>
+                                    </div>
+                                    <span class="diff-badge removed"><svg class="icon"><use href="#i-minus"/></svg>removido</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="diff-card muted">
+                            <div class="diff-card-head">
+                                <span class="diff-card-num">T2</span>
+                                <span class="diff-card-title">Upper · Pull</span>
+                                <span class="reg-chip reg-costas">costas</span>
+                                <span class="reg-chip reg-bracos">bíceps</span>
+                            </div>
+
+                            <div class="bloco-section">
+                                <div class="bloco-label-row">
+                                    <span class="bloco-chip">A</span>
+                                    <span class="bloco-label">Bloco</span>
+                                </div>
+                                <div class="diff-ex maintained">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Barra fixa</div>
+                                        <div class="diff-ex-meta">A1 · costas · composto</div>
+                                    </div>
+                                    <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                                </div>
+                                <div class="diff-ex maintained">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Remada curvada barra</div>
+                                        <div class="diff-ex-meta">A2 · costas · composto</div>
+                                    </div>
+                                    <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                                </div>
+                            </div>
+
+                            <div class="bloco-section">
+                                <div class="bloco-label-row">
+                                    <span class="bloco-chip">B</span>
+                                    <span class="bloco-label">Bloco</span>
+                                </div>
+                                <div class="diff-ex maintained">
+                                    <div class="diff-ex-info">
+                                        <div class="diff-ex-nome">Rosca direta</div>
+                                        <div class="diff-ex-meta">B1 · bíceps</div>
+                                    </div>
+                                    <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<script>
+function showScenario(s) {
+    document.querySelectorAll('.scenario-tab').forEach(b => b.classList.toggle('active', b.dataset.s === s));
+    document.querySelectorAll('[id^="desc-"]').forEach(d => d.classList.add('hidden'));
+    document.getElementById('desc-' + s).classList.remove('hidden');
+
+    document.getElementById('cenario-manual').style.display = (s === 'manual') ? '' : 'none';
+    document.getElementById('cenario-rascunho').style.display = (s === 'rascunho') ? '' : 'none';
+    document.getElementById('cenario-diff').style.display = (s === 'diff') ? '' : 'none';
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Filter buttons
+document.querySelectorAll('.diff-filter-btn').forEach(b => {
+    b.addEventListener('click', () => {
+        document.querySelectorAll('.diff-filter-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+    });
+});
+
+// View mode switch
+document.querySelectorAll('.view-mode-switch button').forEach(b => {
+    b.addEventListener('click', () => {
+        document.querySelectorAll('.view-mode-switch button').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+    });
+});
+
+// Quick pick - simulação visual
+document.querySelectorAll('.quick-pick-btn').forEach(b => {
+    b.addEventListener('click', () => {
+        b.style.background = 'var(--brand-100)';
+        b.style.borderColor = 'var(--brand-500)';
+        b.style.color = 'var(--brand-600)';
+        setTimeout(() => {
+            b.style.background = '';
+            b.style.borderColor = '';
+            b.style.color = '';
+        }, 600);
+    });
+});
+</script>
+</body>
+</html>

@@ -1,21 +1,88 @@
 {% if aluno %}
 {% set partes = aluno.nome.split() %}
 {% set iniciais = (partes[0][0] ~ (partes[-1][0] if partes|length > 1 else '')) | upper %}
-<div class="flex items-center gap-3.5 bg-white border border-gray-200 rounded-xl px-4 py-3.5 mb-4">
-    <div class="w-11 h-11 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white grid place-items-center font-bold text-sm shrink-0">{{ iniciais }}</div>
-    <div class="flex-1 min-w-0">
-        <div class="flex items-baseline flex-wrap gap-x-2">
-            <span class="text-base font-semibold text-gray-900">{{ aluno.nome }}</span>
-            <span class="text-xs text-gray-500">
-                {% if aluno.get('nivel') %}{{ aluno.nivel|capitalize }}{% endif %}
-                {% if aluno.get('objetivo') %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ aluno.objetivo|capitalize }}{% endif %}
-                {% if rotina and rotina.sessoes %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ rotina.sessoes|length }} treino{{ 's' if rotina.sessoes|length > 1 else '' }}{% endif %}
-                {% if rotina and rotina.data %}{% set rel = tempo_relativo(rotina.data) %}{% if rel %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>atualizado {{ rel }}{% endif %}{% endif %}
-            </span>
+<div class="aluno-badge bg-white border border-gray-200 rounded-xl px-4 py-3.5 mb-4">
+    <div class="aluno-badge-row">
+        <div class="w-11 h-11 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white grid place-items-center font-bold text-sm shrink-0">{{ iniciais }}</div>
+        <div class="flex-1 min-w-0">
+            <div class="flex items-baseline flex-wrap gap-x-2">
+                <span class="text-base font-semibold text-gray-900">{{ aluno.nome }}</span>
+                <span class="text-xs text-gray-500">
+                    {% if aluno.get('nivel') %}{{ aluno.nivel|capitalize }}{% endif %}
+                    {% if aluno.get('objetivo') %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ aluno.objetivo|capitalize }}{% endif %}
+                    {% if rotina and rotina.sessoes %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ rotina.sessoes|length }} treino{{ 's' if rotina.sessoes|length > 1 else '' }}{% endif %}
+                    {% if rotina %}
+                    {% set ref_data = rotina.data_atualizada or rotina.data %}
+                    {% set ref_label = 'atualizada' if rotina.data_atualizada else 'criada' %}
+                    {% if ref_data %}{% set rel = tempo_relativo(ref_data) %}{% if rel %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ ref_label }} {{ rel }}{% endif %}{% endif %}
+                    {% endif %}
+                </span>
+            </div>
+            {% if rotina and rotina.etiqueta %}
+            <div class="mt-1"><span class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">{{ rotina.etiqueta }}</span></div>
+            {% endif %}
         </div>
-        {% if rotina and rotina.etiqueta %}
-        <div class="mt-1"><span class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">{{ rotina.etiqueta }}</span></div>
+        {% if rotina %}
+        <div class="view-mode-switch aluno-toggle">
+            <button type="button" class="{% if periodo == 'atual' %}active{% endif %}" onclick="hubTogglePeriodo('atual')" title="Atual">
+                <svg class="icon icon-xs"><use href="#i-eye"/></svg> Atual
+            </button>
+            <button type="button" class="{% if periodo == 'anterior' %}active{% endif %}" onclick="hubTogglePeriodo('anterior')" title="Anterior">
+                <svg class="icon icon-xs"><use href="#i-clock"/></svg> Anterior
+            </button>
+            <button type="button" class="{% if periodo == 'comparar' %}active{% endif %}" onclick="hubTogglePeriodo('comparar')" title="Lado a lado">
+                <svg class="icon icon-xs"><use href="#i-columns"/></svg> Lado a lado
+            </button>
+        </div>
         {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if aluno_id %}
+{% set confirm_manual = 'Você tem alterações não salvas. Descartar e começar uma nova rotina manual?' if eh_rascunho else '' %}
+<div class="flex flex-wrap gap-2 mb-4">
+    {% if rotina %}
+    <!-- + Treino: adicionar treino (com gerador / manual) -->
+    <div class="split-btn primary">
+        <a class="split-btn-main" href="/gerador?aluno_id={{ aluno_id }}&acao=adicionar">
+            <svg class="icon"><use href="#i-plus"/></svg> Treino
+        </a>
+        <button type="button" class="split-btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções">
+            <svg class="icon icon-xs split-btn-caret-icon"><use href="#i-chevron-down"/></svg>
+        </button>
+        <div class="split-btn-menu" role="menu">
+            <a href="/gerador?aluno_id={{ aluno_id }}&acao=adicionar" role="menuitem">
+                <svg class="icon"><use href="#i-zap"/></svg> Com gerador
+            </a>
+            <button type="button" role="menuitem"
+                    hx-post="/hub/rotina/{{ aluno_id }}/criar-manual"
+                    hx-target="#rotina-display" hx-swap="innerHTML">
+                <svg class="icon"><use href="#i-pencil"/></svg> Manual
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Nova rotina: começar do zero (com gerador / manual) -->
+    <div class="split-btn primary">
+        <a class="split-btn-main" href="/gerador?aluno_id={{ aluno_id }}&acao=nova_rotina">
+            <svg class="icon"><use href="#i-rotate-ccw"/></svg> Nova rotina
+        </a>
+        <button type="button" class="split-btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções">
+            <svg class="icon icon-xs split-btn-caret-icon"><use href="#i-chevron-down"/></svg>
+        </button>
+        <div class="split-btn-menu" role="menu">
+            <a href="/gerador?aluno_id={{ aluno_id }}&acao=nova_rotina" role="menuitem">
+                <svg class="icon"><use href="#i-zap"/></svg> Com gerador
+            </a>
+            <button type="button" role="menuitem"
+                    hx-post="/hub/rotina/{{ aluno_id }}/nova-rotina-manual"
+                    hx-target="#rotina-display" hx-swap="innerHTML"
+                    {% if confirm_manual %}hx-confirm="{{ confirm_manual }}"{% endif %}>
+                <svg class="icon"><use href="#i-pencil"/></svg> Manual
+            </button>
+        </div>
     </div>
 </div>
 {% endif %}
@@ -24,101 +91,138 @@
 <div class="text-center py-12 text-gray-400">
     <svg class="icon mb-3 mx-auto text-gray-300" style="width:40px;height:40px"><use href="#i-clipboard-list"/></svg>
     <div class="text-base font-semibold text-gray-600">Nenhuma rotina ativa</div>
-    <div class="text-sm mt-1">Use o botão <strong>+ Gerar treino</strong> para criar a primeira rotina deste aluno.</div>
+    <div class="text-sm mt-1">Use o botão <strong>Nova rotina</strong> acima para criar a primeira rotina deste aluno.</div>
 </div>
 {% else %}
 
 {% if periodo == 'comparar' %}
-<!-- Modo lado a lado -->
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <!-- Atual -->
-    <div>
-        <p class="text-xs font-semibold text-brand-500 mb-3">Rotina atual
-            {% if rotina.etiqueta %}<span class="text-gray-400 font-normal">· {{ rotina.etiqueta }}</span>{% endif %}
-        </p>
-        <div class="space-y-2.5">
-        {% for sessao in rotina.sessoes %}
-            <div class="treino-card modo-visualizar">
-                <div class="treino-header">
-                    <span class="treino-titulo">Treino {{ loop.index }}</span>
-                    {% set chips = sessao_chips(sessao) %}
-                    {% if chips %}
-                    <div class="regiao-chips mt-1">
-                        {% for label, slug in chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
-                    </div>
-                    {% endif %}
-                </div>
-                {% for bloco in sessao.blocos %}
-                <div class="bloco-wrap">
-                <div class="bloco-header">
-                    <span class="bloco-chip">{{ bloco.label }}</span>
-                </div>
-                {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
-                <div class="exercicio">
-                    <div class="exercicio-info">
-                        <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
-                            {% if nomes_anteriores and ex.nome in nomes_anteriores %}
-                            <span class="badge-mantido">✓ mantido</span>
+<!-- Modo lado a lado com diff visual -->
+{% macro diff_card(sessoes, lado, status_map) %}
+    {% for sessao in sessoes %}
+    <div class="diff-card{% if lado == 'previous' %} muted{% endif %}">
+        <div class="diff-card-head">
+            <span class="diff-card-num">T{{ loop.index }}</span>
+            <span class="diff-card-title">Treino {{ loop.index }}</span>
+            {% set chips = sessao_chips(sessao) %}
+            {% for label, slug in chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
+        </div>
+        {% for bloco in sessao.blocos %}
+        <div class="diff-bloco-section">
+            <div class="diff-bloco-label-row">
+                <span class="bloco-chip">{{ bloco.label }}</span>
+                <span class="bloco-label">Bloco</span>
+            </div>
+            {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
+            {% set info = status_map.get(ex.nome, {'status':'mantido'}) %}
+            {% set st = info.status %}
+            <div class="diff-ex {{ st }}" data-status="{{ st }}">
+                <div class="diff-ex-info">
+                    <div class="diff-ex-nome">{{ ex.nome }}</div>
+                    <div class="diff-ex-meta">{{ bloco.label }}{{ loop.index }}{% if ex.padrao %} · {{ ex.padrao.replace('_',' ') }}{% endif %}{% if ex.purpose %} · {{ ex.purpose }}{% endif %}</div>
+                    {% if ex.series or ex.reps or ex.rir is not none %}
+                    <div class="diff-ex-prescr">
+                        {% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}
+                        {% if st == 'editado' and info.prescr_outro %}
+                            {% if lado == 'current' %}
+                                <span class="diff-ex-prescr-old">(antes: {{ info.prescr_outro }})</span>
+                            {% else %}
+                                <span class="diff-ex-prescr-old">(agora: {{ info.prescr_outro }})</span>
                             {% endif %}
-                        </span>
+                        {% endif %}
                     </div>
-                    {% if ex.series or ex.reps %}
-                    <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
                     {% endif %}
                 </div>
-                {% endfor %}
-                </div>
-                {% endfor %}
+                {% if st == 'mantido' %}
+                <span class="diff-badge maintained"><svg class="icon"><use href="#i-equal"/></svg>mantido</span>
+                {% elif st == 'adicionado' %}
+                <span class="diff-badge added"><svg class="icon"><use href="#i-plus"/></svg>novo</span>
+                {% elif st == 'removido' %}
+                <span class="diff-badge removed"><svg class="icon"><use href="#i-minus"/></svg>removido</span>
+                {% elif st == 'editado' %}
+                <span class="diff-badge edited"><svg class="icon"><use href="#i-pencil"/></svg>editado</span>
+                {% endif %}
             </div>
-        {% endfor %}
+            {% endfor %}
         </div>
+        {% endfor %}
     </div>
-    <!-- Anterior -->
-    <div>
-        {% if anterior %}
-        <p class="text-xs font-semibold text-gray-500 mb-3">Rotina anterior
-            {% if anterior.etiqueta %}<span class="font-normal">· {{ anterior.etiqueta }}</span>{% endif %}
-            <span class="font-normal">· {{ anterior.data }}</span>
-        </p>
-        <div class="space-y-2.5">
-        {% for sessao in anterior.sessoes %}
-            <div class="treino-card modo-visualizar" style="opacity:0.7; border-color:#d1d5db">
-                <div class="treino-header">
-                    <span class="treino-titulo">Treino {{ loop.index }}</span>
-                    {% set chips = sessao_chips(sessao) %}
-                    {% if chips %}
-                    <div class="regiao-chips mt-1">
-                        {% for label, slug in chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
-                    </div>
-                    {% endif %}
-                </div>
-                {% for bloco in sessao.blocos %}
-                <div class="bloco-wrap">
-                <div class="bloco-header">
-                    <span class="bloco-chip">{{ bloco.label }}</span>
-                </div>
-                {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
-                <div class="exercicio" style="border-left-color:#9ca3af">
-                    <div class="exercicio-info">
-                        <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}</span>
-                    </div>
-                    {% if ex.series or ex.reps %}
-                    <span class="prescr-badge" style="background:#f3f4f6; color:#6b7280">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
-                    {% endif %}
-                </div>
-                {% endfor %}
-                </div>
-                {% endfor %}
-            </div>
-        {% endfor %}
-        </div>
-        {% else %}
-        <div class="text-center py-12 text-gray-400">
-            <div class="text-sm">Nenhum período anterior encontrado para este aluno.</div>
-        </div>
-        {% endif %}
+    {% endfor %}
+{% endmacro %}
+
+{% if anterior %}
+<div class="diff-summary">
+    <div class="diff-summary-info">
+        <span class="diff-stat maintained"><svg class="icon"><use href="#i-equal"/></svg> {{ diff_summary.mantidos }} mantido{{ 's' if diff_summary.mantidos != 1 else '' }}</span>
+        {% if diff_summary.editados > 0 %}<span class="diff-stat edited"><svg class="icon"><use href="#i-pencil"/></svg> {{ diff_summary.editados }} editado{{ 's' if diff_summary.editados != 1 else '' }}</span>{% endif %}
+        <span class="diff-stat added"><svg class="icon"><use href="#i-plus"/></svg> {{ diff_summary.adicionados }} adicionado{{ 's' if diff_summary.adicionados != 1 else '' }}</span>
+        <span class="diff-stat removed"><svg class="icon"><use href="#i-minus"/></svg> {{ diff_summary.removidos }} removido{{ 's' if diff_summary.removidos != 1 else '' }}</span>
+    </div>
+    <div class="diff-summary-meta">
+        Comparando <strong>{% if rotina.etiqueta %}{{ rotina.etiqueta }}{% else %}rotina atual{% endif %}</strong>
+        com <strong>{% if anterior.etiqueta %}{{ anterior.etiqueta }}{% else %}{{ anterior.rotulo_origem or 'anterior' }}{% endif %}</strong>
+        {% if anterior.data %}{% set rel = tempo_relativo(anterior.data) %}{% if rel %} · {{ rel }}{% endif %}{% endif %}
     </div>
 </div>
+
+<div class="diff-filter-bar" id="diff-filter-bar">
+    <button type="button" class="diff-filter-btn active" data-filter="all">Todos os exercícios</button>
+    <button type="button" class="diff-filter-btn" data-filter="changes">Apenas mudanças</button>
+    <button type="button" class="diff-filter-btn" data-filter="mantido"><svg class="icon icon-xs"><use href="#i-equal"/></svg> Mantidos</button>
+    {% if diff_summary.editados > 0 %}<button type="button" class="diff-filter-btn" data-filter="editado"><svg class="icon icon-xs"><use href="#i-pencil"/></svg> Editados</button>{% endif %}
+    <button type="button" class="diff-filter-btn" data-filter="adicionado"><svg class="icon icon-xs"><use href="#i-plus"/></svg> Adicionados</button>
+    <button type="button" class="diff-filter-btn" data-filter="removido"><svg class="icon icon-xs"><use href="#i-minus"/></svg> Removidos</button>
+</div>
+
+<div class="diff-grid">
+    <div class="diff-column">
+        <div class="diff-column-header current">
+            <div class="diff-column-title-group">
+                <div class="diff-column-eyebrow current">{% if eh_rascunho %}Rascunho{% else %}Rotina atual{% endif %}</div>
+                <div class="diff-column-title">{{ rotina.etiqueta or 'Atual' }}</div>
+            </div>
+            {% if rotina.data %}{% set rel = tempo_relativo(rotina.data_atualizada or rotina.data) %}{% if rel %}<div class="diff-column-meta">{{ rel }}</div>{% endif %}{% endif %}
+        </div>
+        {{ diff_card(rotina.sessoes, 'current', diff_atual) }}
+    </div>
+
+    <div class="diff-column">
+        <div class="diff-column-header previous">
+            <div class="diff-column-title-group">
+                <div class="diff-column-eyebrow">{{ anterior.rotulo_origem or 'Rotina anterior' }}</div>
+                <div class="diff-column-title">{{ anterior.etiqueta or '—' }}</div>
+            </div>
+            {% if anterior.data %}{% set rel = tempo_relativo(anterior.data) %}{% if rel %}<div class="diff-column-meta">{{ rel }}</div>{% endif %}{% endif %}
+        </div>
+        {{ diff_card(anterior.sessoes, 'previous', diff_anterior) }}
+    </div>
+</div>
+
+<script>
+(function() {
+    var bar = document.getElementById('diff-filter-bar');
+    if (!bar) return;
+    bar.addEventListener('click', function(e) {
+        var btn = e.target.closest('.diff-filter-btn');
+        if (!btn) return;
+        bar.querySelectorAll('.diff-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        var f = btn.dataset.filter;
+        document.querySelectorAll('.diff-ex').forEach(function(el) {
+            var s = el.dataset.status;
+            var show = (f === 'all') ||
+                       (f === 'changes' && s !== 'mantido') ||
+                       (f === s);
+            el.classList.toggle('hidden-by-filter', !show);
+        });
+    });
+})();
+</script>
+
+{% else %}
+<div class="text-center py-12 text-gray-400">
+    <div class="text-sm">Nenhum período anterior encontrado para este aluno.</div>
+</div>
+{% endif %}
 
 {% elif periodo == 'anterior' %}
 <!-- Modo anterior (read-only) -->
@@ -167,33 +271,7 @@
 {% else %}
 <!-- Modo atual (default) -->
 
-{% if eh_rascunho %}
-<div class="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 mb-4">
-    <div class="flex items-center justify-between flex-wrap gap-3">
-        <div class="flex items-center gap-2">
-            <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
-            <span class="text-sm font-semibold text-amber-700">Rascunho</span>
-            <span class="text-xs text-amber-600">Alterações não salvas</span>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap">
-            <input type="text" name="etiqueta" id="etiqueta-rotina" placeholder="Etiqueta (ex: Abril - Hipertrofia)"
-                   class="input-field text-sm" style="width:220px; margin:0; padding:4px 10px">
-            <button class="btn btn-sm btn-primary"
-                    hx-post="/hub/rotina/{{ aluno_id }}/salvar-rotina"
-                    hx-target="#rotina-display" hx-swap="innerHTML"
-                    hx-include="#etiqueta-rotina">
-                Salvar rotina
-            </button>
-            <button class="btn btn-sm"
-                    hx-post="/hub/rotina/{{ aluno_id }}/descartar-rascunho"
-                    hx-target="#rotina-display" hx-swap="innerHTML"
-                    hx-confirm="Descartar todas as alterações e voltar à última rotina salva?">
-                Descartar
-            </button>
-        </div>
-    </div>
-</div>
-{% endif %}
+{% include "_draft_banner.html" %}
 
 <div class="resultado-grid" data-n="{{ rotina.sessoes|length }}">
 {% for sessao in rotina.sessoes %}

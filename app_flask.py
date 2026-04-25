@@ -12,7 +12,7 @@ from gerador_treino import (
     expandir_para_padroes, selecionar_sem_repeticao_similaridade,
     TEMPLATES, TEMPLATE_EPP, EXERCICIOS_POR_PADRAO,
     PADRAO_PARA_SUBREGIAO, SUBREGIAO_PARA_REGIAO,
-    REGIAO_PARA_SUBREGIOES, SUBREGIAO_PARA_PADROES,
+    REGIAO_PARA_SUBREGIOES, SUBREGIAO_PARA_PADROES, PADROES_COMPOSTOS,
     Exercicio, Sessao, SuperSerie,
 )
 from gerar_imagem import gerar_png
@@ -21,7 +21,10 @@ from database import (
     carregar_alunos, salvar_aluno, editar_aluno, deletar_aluno,
     definir_rotina_ativa, carregar_rotina_ativa, carregar_rotina_anterior, buscar_aluno_por_nome,
     salvar_rascunho, carregar_rascunho, limpar_rascunho,
-    carregar_historico, carregar_registro, salvar_historico_registro, deletar_historico,
+    salvar_etiqueta_rascunho, carregar_etiqueta_rascunho,
+    salvar_intent_rascunho, carregar_intent_rascunho,
+    carregar_historico, carregar_registro, salvar_historico_registro,
+    atualizar_historico_registro, deletar_historico,
     buscar_historico_por_aluno, nomes_unicos_historico,
 )
 
@@ -269,14 +272,210 @@ def salvar_sessoes_disco():
                             [_sessao_to_dict(s) for s in sessoes_ativas])
         except Exception: pass
 
+def _formatar_prescricao(ex_dict):
+    """Formata séries × reps · RIR; retorna '' se nada definido."""
+    if not ex_dict:
+        return ""
+    s = ex_dict.get("series")
+    r = ex_dict.get("reps")
+    rir = ex_dict.get("rir")
+    if not s and not r and rir in (None, ""):
+        return ""
+    partes = []
+    if s and r:
+        partes.append(f"{s}×{r}")
+    elif s:
+        partes.append(f"{s}×")
+    elif r:
+        partes.append(str(r))
+    if rir not in (None, ""):
+        partes.append(f"RIR {rir}")
+    return " · ".join(partes)
+
+
+def _coletar_exercicios_por_nome(sessoes_dicts):
+    """Retorna {nome_ex: {'ex': dict, 'treino_idx': int, 'bloco_label': str}} (1ª ocorrência)."""
+    out = {}
+    for ti, sessao in enumerate(sessoes_dicts or []):
+        for bloco in sessao.get("blocos", []):
+            for key in ("ex1", "ex2", "ex3"):
+                ex = bloco.get(key)
+                if not ex or not ex.get("nome"):
+                    continue
+                if ex["nome"] not in out:
+                    out[ex["nome"]] = {
+                        "ex": ex,
+                        "treino_idx": ti,
+                        "bloco_label": bloco.get("label", ""),
+                    }
+    return out
+
+
+def diff_rascunho_vs_publicada(aluno_id):
+    """Compara rascunho com rotina publicada (por nome de exercício, ignorando posição).
+    Retorna lista de mudanças: added / removed / edited (prescrição)."""
+    rascunho = carregar_rascunho(aluno_id)
+    if not rascunho:
+        return []
+    rotina_reg = carregar_rotina_ativa(aluno_id)
+    if not rotina_reg:
+        # Rotina nova — não há base para comparar
+        return []
+
+    pub = _coletar_exercicios_por_nome(rotina_reg["sessoes"])
+    rasc = _coletar_exercicios_por_nome(rascunho)
+
+    nomes_pub = set(pub.keys())
+    nomes_rasc = set(rasc.keys())
+
+    mudancas = []
+
+    # Adicionados (no rascunho, ausentes na publicada)
+    for nome in nomes_rasc - nomes_pub:
+        info = rasc[nome]
+        mudancas.append({
+            "tipo": "added",
+            "ex": nome,
+            "treino_idx": info["treino_idx"],
+            "bloco_label": info["bloco_label"],
+        })
+
+    # Removidos (na publicada, ausentes no rascunho)
+    for nome in nomes_pub - nomes_rasc:
+        info = pub[nome]
+        mudancas.append({
+            "tipo": "removed",
+            "ex": nome,
+            "treino_idx": info["treino_idx"],
+            "bloco_label": info["bloco_label"],
+        })
+
+    # Editados — prescrição mudou
+    for nome in nomes_rasc & nomes_pub:
+        antes = _formatar_prescricao(pub[nome]["ex"])
+        depois = _formatar_prescricao(rasc[nome]["ex"])
+        if antes != depois:
+            info = rasc[nome]
+            mudancas.append({
+                "tipo": "edited",
+                "ex": nome,
+                "treino_idx": info["treino_idx"],
+                "bloco_label": info["bloco_label"],
+                "antes": antes or "—",
+                "depois": depois or "—",
+            })
+
+    # Ordenar: edited primeiro (mais "ativo"), depois added, depois removed; dentro de cada por treino_idx
+    ordem = {"edited": 0, "added": 1, "removed": 2}
+    mudancas.sort(key=lambda m: (ordem.get(m["tipo"], 9), m["treino_idx"], m["ex"]))
+    return mudancas
+
+
+def classificar_exercicios_diff(sessoes_atuais, sessoes_anteriores):
+    """Para o lado-a-lado: classifica cada exercício (por nome) em mantido/adicionado/removido/editado.
+
+    Retorna dois dicts:
+      atual_status[nome] = {'status': 'mantido'|'adicionado'|'editado', 'prescr_outro': str}
+      anterior_status[nome] = {'status': 'mantido'|'removido'|'editado', 'prescr_outro': str}
+    """
+    atuais = _coletar_exercicios_por_nome(sessoes_atuais or [])
+    anteriores = _coletar_exercicios_por_nome(sessoes_anteriores or [])
+    atual_status, anterior_status = {}, {}
+
+    nomes_atuais = set(atuais.keys())
+    nomes_anteriores = set(anteriores.keys())
+
+    for nome in nomes_atuais & nomes_anteriores:
+        prescr_a = _formatar_prescricao(atuais[nome]["ex"])
+        prescr_p = _formatar_prescricao(anteriores[nome]["ex"])
+        if prescr_a != prescr_p:
+            atual_status[nome] = {"status": "editado", "prescr_outro": prescr_p or "—"}
+            anterior_status[nome] = {"status": "editado", "prescr_outro": prescr_a or "—"}
+        else:
+            atual_status[nome] = {"status": "mantido", "prescr_outro": ""}
+            anterior_status[nome] = {"status": "mantido", "prescr_outro": ""}
+
+    for nome in nomes_atuais - nomes_anteriores:
+        atual_status[nome] = {"status": "adicionado", "prescr_outro": ""}
+
+    for nome in nomes_anteriores - nomes_atuais:
+        anterior_status[nome] = {"status": "removido", "prescr_outro": ""}
+
+    return atual_status, anterior_status
+
+
+def render_draft_banner_oob(aluno_id):
+    """Renderiza o banner de rascunho como fragmento OOB (swap outerHTML #draft-banner-X)."""
+    if not aluno_id:
+        return ""
+    rascunho_sessoes = carregar_rascunho(aluno_id)
+    rotina_reg = carregar_rotina_ativa(aluno_id)
+    eh_rascunho = bool(rascunho_sessoes)
+    tem_rotina_publicada = bool(rotina_reg)
+    total_alteracoes = len(diff_rascunho_vs_publicada(aluno_id)) if (eh_rascunho and tem_rotina_publicada) else 0
+    etiqueta = carregar_etiqueta_rascunho(aluno_id) if eh_rascunho else ""
+    intent = carregar_intent_rascunho(aluno_id) if eh_rascunho else ""
+    html = render_template("_draft_banner.html",
+                           aluno_id=aluno_id,
+                           eh_rascunho=eh_rascunho,
+                           tem_rotina_publicada=tem_rotina_publicada,
+                           total_alteracoes=total_alteracoes,
+                           etiqueta_rascunho=etiqueta,
+                           rascunho_intent=intent)
+    # Marcar como OOB swap outerHTML
+    return html.replace(f'<div id="draft-banner-{aluno_id}">',
+                        f'<div id="draft-banner-{aluno_id}" hx-swap-oob="outerHTML">', 1)
+
+
+def _responder_card_com_banner(t):
+    """Renderiza _treino_card.html (modo editar) + OOB do banner se em edição inline do HUB.
+    Substitui chamadas diretas a render_template em rotas /treino/* durante edicao_hub."""
+    card = render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
+                           modo="editar", padroes_labels=PADROES_LABELS,
+                           alunos=carregar_alunos(),
+                           todos_padroes=sorted(PADROES_LABELS.keys()),
+                           todos_equipamentos=todos_equipamentos,
+                           todos_musculos=todos_musculos)
+    if edicao_hub and edicao_hub.get("aluno_id"):
+        card += render_draft_banner_oob(edicao_hub["aluno_id"])
+    return card
+
+
+QUICK_PICK_PADROES = [
+    "empurrar_compostos", "remadas", "squat", "hinge", "ombro_composto", "puxadas",
+]
+
+def quick_pick_para_aluno(aluno=None):
+    """Retorna até 6 exercícios compostos, um por padrão de movimento principal.
+    Hoje a seleção não depende do aluno — espaço reservado para sugestões inteligentes."""
+    sugestoes = []
+    for padrao in QUICK_PICK_PADROES:
+        candidatos = [e for e in banco if e.padrao == padrao and e.purpose == "compound"]
+        if not candidatos:
+            continue
+        candidatos.sort(key=lambda e: (-(e.fadiga or 0), e.complexidade or 0, e.nome))
+        sugestoes.append(candidatos[0])
+    return sugestoes
+
+def _criacao_manual_aluno_obj():
+    if not criacao_manual:
+        return None
+    return next((a for a in carregar_alunos() if a["id"] == criacao_manual.get("aluno_id")), None)
+
 @app.context_processor
 def _inject_hub_ctx():
+    aluno_obj = _criacao_manual_aluno_obj()
     return {
         "hub_aluno_id": edicao_hub["aluno_id"] if edicao_hub else None,
         "criacao_manual_idx": criacao_manual["novo_idx"] if criacao_manual else None,
         "criacao_manual_aluno": criacao_manual["aluno_id"] if criacao_manual else None,
+        "criacao_manual_aluno_obj": aluno_obj,
+        "criacao_manual_quick_pick": quick_pick_para_aluno(aluno_obj) if aluno_obj else [],
         "sessao_chips": sessao_chips,
         "tempo_relativo": tempo_relativo,
+        "todos_padroes_drawer": sorted(PADROES_LABELS.keys()),
+        "padroes_labels_drawer": PADROES_LABELS,
+        "padrao_para_chip": PADRAO_PARA_CHIP,
     }
 
 def carregar_sessoes_disco():
@@ -373,9 +572,10 @@ def hub_rotina():
         sessoes_obj = [_dict_to_sessao(s) for s in rascunho_sessoes]
         rotina = {
             "sessoes": sessoes_obj,
-            "etiqueta": "",
-            "data": "",
-            "id": None,
+            "etiqueta": rotina_reg.get("etiqueta", "") if rotina_reg else "",
+            "data": rotina_reg.get("data", "") if rotina_reg else "",
+            "data_atualizada": rotina_reg.get("data_atualizada") if rotina_reg else None,
+            "id": rotina_reg["id"] if rotina_reg else None,
         }
         eh_rascunho = True
     elif rotina_reg:
@@ -384,25 +584,68 @@ def hub_rotina():
             "sessoes": sessoes_obj,
             "etiqueta": rotina_reg.get("etiqueta", ""),
             "data": rotina_reg.get("data", ""),
+            "data_atualizada": rotina_reg.get("data_atualizada"),
             "id": rotina_reg["id"],
         }
 
-    # Carregar rotina anterior para comparação (sempre a última SALVA)
+    # Carregar rotina anterior para comparação:
+    # - Quando há rascunho: "anterior" = rotina ativa publicada (referência do que está com o aluno)
+    # - Sem rascunho: "anterior" = última rotina antes da ativa (comportamento original)
     anterior = None
     nomes_anteriores = set()
-    rot_ant_reg = carregar_rotina_anterior(aluno["nome"], aluno.get("rotina_ativa_id"))
-    if rot_ant_reg:
-        sessoes_ant = [_dict_to_sessao(s) for s in rot_ant_reg["sessoes"]]
+    if eh_rascunho and rotina_reg:
+        sessoes_ant = [_dict_to_sessao(s) for s in rotina_reg["sessoes"]]
         anterior = {
             "sessoes": sessoes_ant,
-            "etiqueta": rot_ant_reg.get("etiqueta", ""),
-            "data": rot_ant_reg.get("data", ""),
+            "etiqueta": rotina_reg.get("etiqueta", ""),
+            "data": rotina_reg.get("data", ""),
+            "rotulo_origem": "Publicada",
         }
         for s in sessoes_ant:
             for bloco in s.blocos:
                 for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
                     if ex:
                         nomes_anteriores.add(ex.nome)
+        rot_ant_reg = None
+    else:
+        rot_ant_reg = carregar_rotina_anterior(aluno["nome"], aluno.get("rotina_ativa_id"))
+    if rot_ant_reg:
+        sessoes_ant = [_dict_to_sessao(s) for s in rot_ant_reg["sessoes"]]
+        anterior = {
+            "sessoes": sessoes_ant,
+            "etiqueta": rot_ant_reg.get("etiqueta", ""),
+            "data": rot_ant_reg.get("data", ""),
+            "rotulo_origem": "Anterior",
+        }
+        for s in sessoes_ant:
+            for bloco in s.blocos:
+                for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
+                    if ex:
+                        nomes_anteriores.add(ex.nome)
+
+    total_alteracoes = 0
+    tem_rotina_publicada = False
+    if eh_rascunho:
+        tem_rotina_publicada = bool(rotina_reg)
+        if tem_rotina_publicada:
+            total_alteracoes = len(diff_rascunho_vs_publicada(aluno_id))
+
+    # Para o lado-a-lado: classifica exercícios por nome em mantido/adicionado/removido/editado
+    diff_atual, diff_anterior, diff_summary = {}, {}, {"mantidos": 0, "adicionados": 0, "removidos": 0, "editados": 0}
+    if periodo == "comparar" and rotina and anterior:
+        atuais_dicts = [_sessao_to_dict(s) for s in rotina["sessoes"]]
+        anteriores_dicts = [_sessao_to_dict(s) for s in anterior["sessoes"]]
+        diff_atual, diff_anterior = classificar_exercicios_diff(atuais_dicts, anteriores_dicts)
+        for nome, info in diff_atual.items():
+            if info["status"] == "mantido":
+                diff_summary["mantidos"] += 1
+            elif info["status"] == "adicionado":
+                diff_summary["adicionados"] += 1
+            elif info["status"] == "editado":
+                diff_summary["editados"] += 1
+        for nome, info in diff_anterior.items():
+            if info["status"] == "removido":
+                diff_summary["removidos"] += 1
 
     return render_template("_rotina_hub.html",
                            rotina=rotina,
@@ -412,6 +655,13 @@ def hub_rotina():
                            aluno_id=aluno_id,
                            periodo=periodo,
                            eh_rascunho=eh_rascunho,
+                           etiqueta_rascunho=carregar_etiqueta_rascunho(aluno_id) if eh_rascunho else "",
+                           rascunho_intent=carregar_intent_rascunho(aluno_id) if eh_rascunho else "",
+                           total_alteracoes=total_alteracoes,
+                           tem_rotina_publicada=tem_rotina_publicada,
+                           diff_atual=diff_atual,
+                           diff_anterior=diff_anterior,
+                           diff_summary=diff_summary,
                            padroes_labels=PADROES_LABELS)
 
 
@@ -466,12 +716,7 @@ def hub_editar_inline(aluno_id, t):
     if t < 0 or t >= len(sessoes_ativas):
         return '<div class="erro">Treino não encontrado.</div>'
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 
 @app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/visualizar-inline")
@@ -551,7 +796,12 @@ def hub_salvar_edicao():
 
 @app.route("/hub/rotina/<int:aluno_id>/salvar-rotina", methods=["POST"])
 def hub_salvar_rotina(aluno_id):
-    """Salva o rascunho (ou rotina atual) como registro oficial no histórico."""
+    """Salva o rascunho (ou rotina atual) como registro oficial no histórico.
+
+    modo='atualizar' (default): sobrescreve o registro vigente mantendo o id.
+    modo='nova': cria registro novo no histórico e vira a nova rotina ativa.
+    Se não há rotina publicada, 'atualizar' degrada para 'nova'.
+    """
     sessoes = _obter_sessoes_trabalho(aluno_id)
     if not sessoes:
         return '<div class="erro">Nenhuma rotina para salvar.</div>'
@@ -560,19 +810,48 @@ def hub_salvar_rotina(aluno_id):
     if not aluno:
         return '<div class="erro">Aluno não encontrado.</div>'
 
-    etiqueta = request.form.get("etiqueta", "").strip()
-    reg_id = datetime.now().strftime("%Y%m%d_%H%M%S_") + secrets.token_hex(2)
-    salvar_historico_registro(
-        reg_id=reg_id,
-        data_salvo=datetime.now().strftime("%d/%m/%Y %H:%M"),
-        aluno=aluno["nome"],
-        etiqueta=etiqueta,
-        n_treinos=len(sessoes),
-        sessoes=sessoes,
-    )
-    definir_rotina_ativa(aluno_id, reg_id)
+    modo = (request.form.get("modo") or "atualizar").strip()
+    etiqueta = (request.form.get("etiqueta", "") or carregar_etiqueta_rascunho(aluno_id) or "").strip()
+    rotina_atual = carregar_rotina_ativa(aluno_id)
+    agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    if modo == "atualizar" and rotina_atual:
+        atualizar_historico_registro(
+            reg_id=rotina_atual["id"],
+            data_atualizada=agora,
+            etiqueta=etiqueta or rotina_atual.get("etiqueta", ""),
+            n_treinos=len(sessoes),
+            sessoes=sessoes,
+        )
+    else:
+        reg_id = datetime.now().strftime("%Y%m%d_%H%M%S_") + secrets.token_hex(2)
+        salvar_historico_registro(
+            reg_id=reg_id,
+            data_salvo=agora,
+            aluno=aluno["nome"],
+            etiqueta=etiqueta,
+            n_treinos=len(sessoes),
+            sessoes=sessoes,
+        )
+        definir_rotina_ativa(aluno_id, reg_id)
+
     limpar_rascunho(aluno_id)
     return hub_rotina_render(aluno_id, "atual")
+
+
+@app.route("/hub/rotina/<int:aluno_id>/alteracoes")
+def hub_alteracoes(aluno_id):
+    """Retorna a lista de mudanças do rascunho vs rotina publicada (HTMX lazy)."""
+    mudancas = diff_rascunho_vs_publicada(aluno_id)
+    return render_template("_changes_list.html", mudancas=mudancas)
+
+
+@app.route("/hub/rotina/<int:aluno_id>/etiqueta-rascunho", methods=["POST"])
+def hub_etiqueta_rascunho(aluno_id):
+    """Salva a etiqueta do rascunho (autosave on-blur). Não re-renderiza nada."""
+    etiqueta = (request.form.get("etiqueta", "") or "").strip()
+    salvar_etiqueta_rascunho(aluno_id, etiqueta)
+    return ("", 204)
 
 
 @app.route("/hub/rotina/<int:aluno_id>/descartar-rascunho", methods=["POST"])
@@ -628,6 +907,63 @@ def hub_criar_manual_cancelar(aluno_id):
     criacao_manual = None
     edicao_hub = None
     return hub_rotina_render(aluno_id, "atual")
+
+
+@app.route("/hub/rotina/<int:aluno_id>/nova-rotina-manual", methods=["POST"])
+def hub_nova_rotina_manual(aluno_id):
+    """Inicia uma rotina nova do zero, manualmente. Limpa rascunho atual e cria 1 sessão vazia.
+
+    Marca intent='nova-rotina' para o banner esconder 'Atualizar rotina' (a rotina vigente
+    publicada não deve ser sobrescrita por uma nova rotina manual em construção)."""
+    global criacao_manual
+    aluno = next((a for a in carregar_alunos() if a["id"] == aluno_id), None)
+    if not aluno:
+        return '<div class="erro">Aluno não encontrado.</div>'
+
+    limpar_rascunho(aluno_id)
+    sessoes_dicts = [_sessao_to_dict(Sessao(tipo="manual", blocos=[]))]
+    salvar_rascunho(aluno_id, sessoes_dicts)
+    salvar_intent_rascunho(aluno_id, "nova-rotina")
+    criacao_manual = {"aluno_id": aluno_id, "novo_idx": 0}
+
+    html = hub_rotina_render(aluno_id, "atual")
+    html += ('<script>setTimeout(function(){'
+             'var b=document.querySelector("#treino-0 [title=Editar]");'
+             'if(b)b.click();},30);</script>')
+    return html
+
+
+@app.route("/hub/rotina/<int:aluno_id>/criar-manual/nome", methods=["POST"])
+def hub_criar_manual_nome(aluno_id):
+    """Salva o nome (Sessao.tipo) do treino em criação manual."""
+    if not criacao_manual or criacao_manual.get("aluno_id") != aluno_id:
+        return ("", 204)
+    novo_idx = criacao_manual.get("novo_idx")
+    nome = (request.form.get("nome") or "").strip()
+
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id) or []
+    if novo_idx is not None and 0 <= novo_idx < len(sessoes_dicts):
+        sessoes_dicts[novo_idx]["tipo"] = nome or "manual"
+        salvar_rascunho(aluno_id, sessoes_dicts)
+        # Mantém sessoes_ativas em sincronia se edição inline está ativa
+        if edicao_hub and edicao_hub.get("aluno_id") == aluno_id and novo_idx < len(sessoes_ativas):
+            sessoes_ativas[novo_idx].tipo = nome or "manual"
+            salvar_sessoes_disco()
+    return ("", 204)
+
+
+@app.route("/treino/<int:t>/novo-bloco-vazio", methods=["POST"])
+def novo_bloco_vazio(t):
+    """Cria um bloco sem exercício (CTA do estado vazio guiado)."""
+    global sessoes_ativas
+    if t >= len(sessoes_ativas):
+        return "", 404
+    labels = "ABCDEFGHIJKLMNOP"
+    n = len(sessoes_ativas[t].blocos)
+    lbl = labels[n] if n < len(labels) else str(n + 1)
+    sessoes_ativas[t].blocos.append(SuperSerie(label=lbl, ex1=None, ex2=None, ex3=None))
+    salvar_sessoes_disco()
+    return _responder_card_com_banner(t)
 
 
 @app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/bloco/<int:bi>/regerar", methods=["POST"])
@@ -963,12 +1299,7 @@ def treino_visualizar(t):
 @app.route("/treino/<int:t>/editar")
 def treino_editar(t):
     if t >= len(sessoes_ativas): return "Treino não encontrado", 404
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 @app.route("/treino/<int:t>/regerar", methods=["POST"])
 def treino_regerar(t):
@@ -1046,12 +1377,7 @@ def treino_substituir(t, nome_ex):
         banco_subst = banco_sem_ref if banco_sem_ref else banco
     sessoes_ativas[t] = substituir_exercicio(sessoes_ativas[t], nome_ex, banco_subst)
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 @app.route("/treino/<int:t>/substituir-por/<nome_atual>/<nome_novo>", methods=["POST"])
 def treino_substituir_por(t, nome_atual, nome_novo):
@@ -1059,12 +1385,7 @@ def treino_substituir_por(t, nome_atual, nome_novo):
     if t >= len(sessoes_ativas): return "", 404
     sessoes_ativas[t] = substituir_exercicio_por(sessoes_ativas[t], nome_atual, nome_novo, banco)
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 @app.route("/treino/<int:t>/buscar-substitutos/<nome_ex>")
 def buscar_subs(t, nome_ex):
@@ -1110,12 +1431,7 @@ def bloco_mover(t, bi, direction):
         blocos[bi], blocos[bi+1] = blocos[bi+1], blocos[bi]
     for j, b in enumerate(blocos): b.label = labels[j] if j < len(labels) else str(j+1)
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 @app.route("/treino/<int:t>/bloco/<int:bi>/regerar", methods=["POST"])
 def bloco_regerar(t, bi):
@@ -1172,12 +1488,7 @@ def bloco_regerar(t, bi):
         setattr(bloco, slots[i], ex)
 
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 
 @app.route("/treino/<int:t>/bloco/<int:bi>/deletar", methods=["POST"])
@@ -1189,12 +1500,7 @@ def bloco_deletar(t, bi):
     for j, b in enumerate(sessoes_ativas[t].blocos):
         b.label = labels[j] if j < len(labels) else str(j+1)
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 @app.route("/treino/<int:t>/exercicio/remover/<int:bi>/<int:ei>", methods=["POST"])
 def exercicio_remover(t, bi, ei):
@@ -1213,12 +1519,7 @@ def exercicio_remover(t, bi, ei):
         for j, b in enumerate(sessoes_ativas[t].blocos):
             b.label = labels[j] if j < len(labels) else str(j+1)
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 @app.route("/treino/<int:t>/exercicio/mover/<int:bi>/<int:ei>/<dest_label>", methods=["POST"])
 def exercicio_mover(t, bi, ei, dest_label):
@@ -1242,12 +1543,7 @@ def exercicio_mover(t, bi, ei, dest_label):
             elif bd.ex3 is None: bd.ex3 = ex
             break
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 @app.route("/treino/<int:t>/exercicio/<int:bi>/<int:ei>/destacar", methods=["POST"])
 def exercicio_destacar(t, bi, ei):
@@ -1269,12 +1565,7 @@ def exercicio_destacar(t, bi, ei):
     lbl = labels[n] if n < len(labels) else str(n + 1)
     sessoes_ativas[t].blocos.append(SuperSerie(label=lbl, ex1=ex, ex2=None, ex3=None))
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 @app.route("/treino/<int:t>/bloco/<int:bi>/adicionar/<nome_ex>", methods=["POST"])
 def bloco_adicionar_exercicio(t, bi, nome_ex):
@@ -1287,12 +1578,7 @@ def bloco_adicionar_exercicio(t, bi, nome_ex):
         elif bloco.ex2 is None: bloco.ex2 = novo_ex
         elif bloco.ex3 is None: bloco.ex3 = novo_ex
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 @app.route("/treino/<int:t>/novo-bloco/<nome_ex>", methods=["POST"])
 def novo_bloco(t, nome_ex):
@@ -1305,12 +1591,7 @@ def novo_bloco(t, nome_ex):
         lbl = labels[n] if n < len(labels) else str(n+1)
         sessoes_ativas[t].blocos.append(SuperSerie(label=lbl, ex1=novo_ex, ex2=None, ex3=None))
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 @app.route("/treino/<int:t>/prescricao/<int:bi>/<int:ei>", methods=["POST"])
 def salvar_prescricao(t, bi, ei):
@@ -1323,12 +1604,7 @@ def salvar_prescricao(t, bi, ei):
         ex.reps = request.form.get("reps", "8-12").strip() or None
         ex.rir = int(request.form.get("rir", 2))
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(t)
 
 # ── Busca de exercícios (para painéis de adicionar/novo bloco) ─
 
@@ -1592,12 +1868,7 @@ def referencia_copiar_bloco(ref_t, ref_bi, dest_t):
     bloco_novo.label = labels[n] if n < len(labels) else str(n + 1)
     sessoes_ativas[dest_t].blocos.append(bloco_novo)
     salvar_sessoes_disco()
-    return render_template("_treino_card.html", sessao=sessoes_ativas[dest_t], idx=dest_t,
-                           modo="editar", padroes_labels=PADROES_LABELS,
-                           alunos=carregar_alunos(),
-                           todos_padroes=sorted(PADROES_LABELS.keys()),
-                           todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos)
+    return _responder_card_com_banner(dest_t)
 
 @app.route("/comparar/<int:ref_t>/<int:ativo_t>")
 def comparar_treinos(ref_t, ativo_t):

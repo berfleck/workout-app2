@@ -1,0 +1,99 @@
+{# Banner de rascunho. Sempre renderiza um container <div id="draft-banner-{aluno_id}">,
+   vazio quando não há rascunho — assim hx-swap-oob="outerHTML" pode trocá-lo. #}
+<div id="draft-banner-{{ aluno_id }}">
+{% if eh_rascunho %}
+{% set eh_nova_rotina = (rascunho_intent == 'nova-rotina') %}
+{% if not tem_rotina_publicada or eh_nova_rotina %}
+    {% set badge_texto = 'rotina nova' %}
+{% elif total_alteracoes == 0 %}
+    {% set badge_texto = 'sem alterações' %}
+{% elif total_alteracoes == 1 %}
+    {% set badge_texto = '1 alteração' %}
+{% else %}
+    {% set badge_texto = total_alteracoes ~ ' alterações' %}
+{% endif %}
+<div class="draft-banner" id="draft-banner-inner-{{ aluno_id }}">
+    <div class="draft-banner-top">
+        <div class="draft-info">
+            <div class="draft-icon-wrap"><svg class="icon"><use href="#i-pencil"/></svg></div>
+            <div class="draft-text">
+                <span class="draft-title">
+                    Rascunho ativo
+                    <span class="draft-changes-badge">{{ badge_texto }}</span>
+                </span>
+                <span class="draft-sub">Salvo automaticamente · não publicado para o aluno</span>
+            </div>
+        </div>
+        <div class="draft-actions">
+            {% if tem_rotina_publicada and total_alteracoes > 0 and not eh_nova_rotina %}
+            <button type="button" class="draft-toggle"
+                    onclick="toggleDraftDetail('{{ aluno_id }}')">
+                Ver alterações
+                <svg class="icon icon-xs draft-toggle-icon"><use href="#i-chevron-down"/></svg>
+            </button>
+            {% endif %}
+            <button type="button" class="btn btn-sm btn-danger-ghost"
+                    hx-post="/hub/rotina/{{ aluno_id }}/descartar-rascunho"
+                    hx-target="#rotina-display" hx-swap="innerHTML"
+                    hx-confirm="Descartar todas as alterações e voltar à última rotina salva?">
+                <svg class="icon"><use href="#i-trash"/></svg> Descartar
+            </button>
+            {% if tem_rotina_publicada and not eh_nova_rotina %}
+            <button type="button" class="btn btn-sm"
+                    hx-post="/hub/rotina/{{ aluno_id }}/salvar-rotina"
+                    hx-target="#rotina-display" hx-swap="innerHTML"
+                    hx-include="#etiqueta-rotina"
+                    hx-vals='{"modo":"nova"}'>
+                <svg class="icon"><use href="#i-plus"/></svg> Salvar como nova
+            </button>
+            <button type="button" class="btn btn-sm btn-success"
+                    hx-post="/hub/rotina/{{ aluno_id }}/salvar-rotina"
+                    hx-target="#rotina-display" hx-swap="innerHTML"
+                    hx-include="#etiqueta-rotina"
+                    hx-vals='{"modo":"atualizar"}'>
+                <svg class="icon"><use href="#i-check"/></svg> Atualizar rotina
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-sm btn-success"
+                    hx-post="/hub/rotina/{{ aluno_id }}/salvar-rotina"
+                    hx-target="#rotina-display" hx-swap="innerHTML"
+                    hx-include="#etiqueta-rotina"
+                    hx-vals='{"modo":"nova"}'>
+                <svg class="icon"><use href="#i-check"/></svg> Salvar rotina
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    <div class="draft-banner-bottom">
+        <div class="draft-label-input">
+            <svg class="icon"><use href="#i-tag"/></svg>
+            <input type="text" name="etiqueta" id="etiqueta-rotina"
+                   placeholder="Etiqueta da rotina (ex: Abril · Hipertrofia)"
+                   value="{{ etiqueta_rascunho }}"
+                   hx-post="/hub/rotina/{{ aluno_id }}/etiqueta-rascunho"
+                   hx-trigger="blur changed, keyup[key=='Enter']"
+                   hx-swap="none">
+        </div>
+        <span class="draft-label-hint">Aparecerá no histórico e no card do aluno</span>
+    </div>
+    {% if tem_rotina_publicada and total_alteracoes > 0 and not eh_nova_rotina %}
+    <div class="draft-changes-detail" id="draft-changes-detail-{{ aluno_id }}">
+        <div class="changes-empty">Carregando…</div>
+    </div>
+    {% endif %}
+</div>
+<script>
+function toggleDraftDetail(alunoId) {
+    var b = document.getElementById('draft-banner-inner-' + alunoId);
+    if (!b) return;
+    var d = document.getElementById('draft-changes-detail-' + alunoId);
+    var jaExpanded = b.classList.contains('expanded');
+    b.classList.toggle('expanded');
+    if (!jaExpanded && d && !d.dataset.loaded) {
+        htmx.ajax('GET', '/hub/rotina/' + alunoId + '/alteracoes', {target: '#' + d.id, swap: 'innerHTML'});
+        d.dataset.loaded = '1';
+    }
+}
+</script>
+{% endif %}
+</div>

@@ -1,0 +1,29 @@
+{% if not mudancas %}
+<div class="changes-empty">Sem alterações em relação à rotina publicada.</div>
+{% else %}
+<div class="changes-list">
+    {% for m in mudancas %}
+    <div class="change-row">
+        {% if m.tipo == 'added' %}
+        <div class="change-icon add"><svg class="icon icon-xs"><use href="#i-plus"/></svg></div>
+        <div class="change-text">
+            <strong>Treino {{ m.treino_idx + 1 }}{% if m.bloco_label %} · {{ m.bloco_label }}{% endif %}</strong>
+            adicionado: <strong>{{ m.ex }}</strong>
+        </div>
+        {% elif m.tipo == 'removed' %}
+        <div class="change-icon rem"><svg class="icon icon-xs"><use href="#i-minus"/></svg></div>
+        <div class="change-text">
+            <strong>Treino {{ m.treino_idx + 1 }}{% if m.bloco_label %} · {{ m.bloco_label }}{% endif %}</strong>
+            removido: <strong>{{ m.ex }}</strong>
+        </div>
+        {% elif m.tipo == 'edited' %}
+        <div class="change-icon edt"><svg class="icon icon-xs"><use href="#i-pencil"/></svg></div>
+        <div class="change-text">
+            <strong>Treino {{ m.treino_idx + 1 }}{% if m.bloco_label %} · {{ m.bloco_label }}{% endif %}</strong>
+            {{ m.ex }}: prescrição alterada de <strong>{{ m.antes }}</strong> para <strong>{{ m.depois }}</strong>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}

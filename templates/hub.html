@@ -3,47 +3,22 @@
 
 <div class="max-w-5xl mx-auto">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div>
-            <p class="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">Painel principal</p>
-            <h2 class="text-xl font-semibold uppercase tracking-wide">Treinos</h2>
-        </div>
+    <div class="mb-3">
+        <p class="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-1">Painel principal</p>
+        <h2 class="text-2xl md:text-3xl font-bold uppercase tracking-wide leading-tight text-gray-900">Gerenciamento das rotinas de treino</h2>
     </div>
 
-    <!-- Seletor de aluno -->
-    <div class="bg-white border border-gray-200 rounded-xl px-5 py-4 mb-5">
-        <div class="flex items-center gap-4 flex-wrap">
-            <div class="campo flex-1 min-w-[200px]" style="margin-bottom:0">
-                <label class="uppercase tracking-wider">Aluno / Turma</label>
-                <select id="sel-aluno-hub" name="aluno_id" class="input-field text-sm w-full"
-                        hx-get="/hub/rotina" hx-target="#rotina-display" hx-swap="innerHTML"
-                        hx-include="this">
-                    <option value="">Selecione um aluno...</option>
-                    {% for a in alunos %}
-                    <option value="{{ a.id }}" {% if selected_aluno_id == a.id %}selected{% endif %}>{{ a.nome }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div id="hub-controles" class="flex items-center gap-2 flex-wrap" style="display:none">
-                <!-- Toggle Atual/Anterior -->
-                <div class="seg-control" id="periodo-toggle">
-                    <button type="button" class="seg-btn active" data-periodo="atual"
-                            onclick="hubTogglePeriodo('atual')">Atual</button>
-                    <button type="button" class="seg-btn" data-periodo="anterior"
-                            onclick="hubTogglePeriodo('anterior')">Anterior</button>
-                </div>
-                <button type="button" class="btn btn-sm" id="btn-lado-a-lado"
-                        onclick="hubTogglePeriodo('comparar')">⇄ Lado a lado</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Botões de ação -->
-    <div id="hub-acoes" class="flex gap-2 mb-4 flex-wrap" style="display:none">
-        <a id="btn-gerar-novo" href="/gerador" class="btn btn-primary">+ Gerar treino</a>
-        <button type="button" class="btn" id="btn-criar-manual"
-                hx-post="" hx-target="#rotina-display" hx-swap="innerHTML">+ Criar manualmente</button>
-        <a id="btn-adicionar" href="/gerador" class="btn">+ Adicionar treino</a>
+    <!-- Seletor de aluno (compacto) -->
+    <div class="mb-4">
+        <select id="sel-aluno-hub" name="aluno_id"
+                class="input-field text-sm font-medium w-full sm:w-auto sm:min-w-[220px] sm:max-w-[300px]"
+                hx-get="/hub/rotina" hx-target="#rotina-display" hx-swap="innerHTML"
+                hx-include="this">
+            <option value="">Selecione um aluno ou turma...</option>
+            {% for a in alunos %}
+            <option value="{{ a.id }}" {% if selected_aluno_id == a.id %}selected{% endif %}>{{ a.nome }}</option>
+            {% endfor %}
+        </select>
     </div>
 
     <!-- Área da rotina -->
@@ -63,20 +38,6 @@
 function hubTogglePeriodo(periodo) {
     const alunoId = document.getElementById('sel-aluno-hub').value;
     if (!alunoId) return;
-
-    // Update toggle buttons
-    document.querySelectorAll('#periodo-toggle .seg-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.periodo === periodo);
-    });
-    const ladoBtn = document.getElementById('btn-lado-a-lado');
-    if (periodo === 'comparar') {
-        ladoBtn.classList.add('btn-primary');
-        ladoBtn.classList.remove('btn');
-    } else {
-        ladoBtn.classList.remove('btn-primary');
-        ladoBtn.classList.add('btn');
-    }
-
     htmx.ajax('GET', `/hub/rotina?aluno_id=${alunoId}&periodo=${periodo}`, {
         target: '#rotina-display',
         swap: 'innerHTML'
@@ -88,28 +49,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const sel = document.getElementById('sel-aluno-hub');
     if (sel.value) {
         sel.dispatchEvent(new Event('change'));
-    }
-});
-
-document.getElementById('sel-aluno-hub').addEventListener('change', function() {
-    const alunoId = this.value;
-    const controles = document.getElementById('hub-controles');
-    const acoes = document.getElementById('hub-acoes');
-
-    if (alunoId) {
-        controles.style.display = '';
-        acoes.style.display = '';
-        document.getElementById('btn-gerar-novo').href = `/gerador?aluno_id=${alunoId}&acao=nova_rotina`;
-        document.getElementById('btn-adicionar').href = `/gerador?aluno_id=${alunoId}&acao=adicionar`;
-        const btnManual = document.getElementById('btn-criar-manual');
-        btnManual.setAttribute('hx-post', `/hub/rotina/${alunoId}/criar-manual`);
-        htmx.process(btnManual);
-        document.querySelectorAll('#periodo-toggle .seg-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.periodo === 'atual');
-        });
-    } else {
-        controles.style.display = 'none';
-        acoes.style.display = 'none';
     }
 });
 </script>

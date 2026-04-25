@@ -4,14 +4,20 @@
 {% set MAX_TREINOS = 5 %}
 
 {% if ctx_acao %}
-<div class="bg-brand-50 border border-brand-500 rounded-xl px-5 py-3 mb-4 flex items-center justify-between flex-wrap gap-2">
-    <div>
-        <span class="text-sm font-semibold text-brand-600">
-            {% if ctx_acao == 'substituir' %}<svg class="icon align-[-2px]"><use href="#i-rotate-ccw"/></svg> Substituindo Treino {{ (ctx_treino_idx or 0) + 1 }}{% elif ctx_acao == 'adicionar' %}+ Adicionando treino{% else %}Gerando nova rotina{% endif %}
-            {% if ctx_aluno %} para {{ ctx_aluno.nome }}{% endif %}
-        </span>
+{% set ctx_icone = {'substituir': 'i-replace', 'adicionar': 'i-plus'}.get(ctx_acao, 'i-dumbbell') %}
+{% set ctx_titulo = {'substituir': 'Substituindo Treino ' ~ ((ctx_treino_idx or 0) + 1), 'adicionar': 'Adicionando treino à rotina'}.get(ctx_acao, 'Gerando nova rotina') %}
+{% set ctx_subs = {'substituir': 'Os outros treinos da rotina serão preservados', 'adicionar': 'Será adicionado ao final da rotina atual'}.get(ctx_acao, 'A rotina atual será substituída') %}
+<div class="context-banner">
+    <div class="context-info">
+        <div class="context-icon"><svg class="icon"><use href="#{{ ctx_icone }}"/></svg></div>
+        <div class="context-text">
+            <span class="context-title">{{ ctx_titulo }}</span>
+            <span class="context-sub">{{ ctx_subs }}{% if ctx_aluno %} · Aluno: {{ ctx_aluno.nome }}{% endif %}</span>
+        </div>
     </div>
-    <a href="/{% if ctx_aluno %}?aluno_id={{ ctx_aluno.id }}{% endif %}" class="btn btn-sm">← Voltar ao HUB</a>
+    <div class="context-actions">
+        <a href="/{% if ctx_aluno %}?aluno_id={{ ctx_aluno.id }}{% endif %}" class="btn btn-sm btn-default"><svg class="icon"><use href="#i-arrow-left"/></svg> Cancelar</a>
+    </div>
 </div>
 {% endif %}
 
@@ -25,18 +31,28 @@
 {% if ctx_treino_idx is not none %}<input type="hidden" name="ctx_treino_idx" value="{{ ctx_treino_idx }}">{% endif %}
 {% endif %}
 
-<!-- ═══ Layout 3 colunas (lg) / stack (mobile) ═══ -->
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 pb-24 lg:pb-6">
+<!-- ═══ Layout 2 colunas (lg) / stack (mobile) ═══ -->
+<div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 lg:gap-6 pb-24 lg:pb-6">
 
-    <!-- ── SIDEBAR ESQUERDA: aluno + histórico + ação ── -->
-    <aside class="lg:col-span-3 space-y-4 order-1">
+    <!-- ── SIDEBAR ESQUERDA: aluno + histórico + config + ação ── -->
+    <aside class="space-y-4 order-1">
 
         <!-- Aluno selector -->
         <div class="bg-white border border-gray-200 rounded-xl p-4">
             <label class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Aluno / Turma</label>
+            {% if ctx_acao and ctx_aluno %}
+            <div class="aluno-fixo-chip">
+                <svg class="icon"><use href="#i-lock"/></svg>
+                <span class="aluno-fixo-chip-nome">{{ ctx_aluno.nome }}</span>
+                <span class="aluno-fixo-chip-hint">fixo</span>
+                <input type="hidden" name="aluno" value="{{ ctx_aluno.nome }}">
+                <input type="hidden" id="sel-aluno" value="{{ ctx_aluno.nome }}">
+            </div>
+            {% else %}
             {% with alunos_dropdown=alunos, nomes_hist_dropdown=nomes_hist, aluno_pre_selecionado=(ctx_aluno.nome if ctx_aluno else '') %}
             {% include "_aluno_dropdown.html" %}
             {% endwith %}
+            {% endif %}
 
             <div id="evitar-hist-wrap" class="mt-3 items-center gap-2 text-xs hidden">
                 <span class="text-gray-500">Evitar exerc. dos últimos</span>
@@ -53,18 +69,12 @@
         <!-- Histórico do aluno (carregado via HTMX) -->
         <div id="hist-aluno-panel"></div>
 
-        <!-- Configurações gerais (COLAPSÁVEL) -->
-        <details class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <summary class="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
-                <div class="flex items-center gap-2">
-                    <span class="chevron text-gray-400 text-xs">▶</span>
-                    <span class="text-xs font-semibold text-gray-700">Configurações gerais</span>
-                </div>
-                <span class="text-xs text-gray-400" id="config-resumo"></span>
-            </summary>
-            <div class="px-4 pb-4 pt-1 grid grid-cols-2 gap-4">
+        <!-- Configurações gerais (sempre visível) -->
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <div class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Configurações gerais</div>
+            <div class="grid grid-cols-2 gap-4">
                 <div class="campo">
-                    <label>Nº de treinos</label>
+                    <label>Nº de treinos {% if ctx_acao in ('substituir', 'adicionar') %}<svg class="icon" style="width:11px;height:11px;color:var(--gray-400)"><use href="#i-lock"/></svg>{% endif %}</label>
                     <select name="n_treinos" id="n_treinos" onchange="onChangeNTreinos()"
                             {% if ctx_acao in ('substituir', 'adicionar') %}disabled{% endif %}>
                         {% for i in range(1, MAX_TREINOS + 1) %}<option value="{{ i }}" {% if ctx_acao in ('substituir', 'adicionar') and i == 1 %}selected{% endif %}>{{ i }}</option>{% endfor %}
@@ -92,7 +102,7 @@
                     <label class="check-inline"><input type="checkbox" name="evitar_agonistas" checked> Evitar agonistas</label>
                 </div>
             </div>
-        </details>
+        </div>
 
         <!-- Botão Gerar — desktop (sticky na sidebar) -->
         <div class="hidden lg:block sticky top-20 space-y-2">
@@ -110,22 +120,23 @@
     </aside>
 
     <!-- ── MAIN: configuração dos treinos ── -->
-    <main class="lg:col-span-9 space-y-4 order-2">
+    <main class="space-y-4 order-2 min-w-0">
 
-        <!-- Tabs de treino (estilo shadcn) -->
+        <!-- Tabs de treino (T1-T5 + adicionar) -->
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div class="flex border-b border-gray-200 bg-gray-50 px-2 pt-2" id="tabs-treino-bar">
+            <div class="tabs-bar" id="tabs-treino-bar">
                 {% for t in range(MAX_TREINOS) %}
-                <button type="button" class="tab-treino-btn {% if t == 0 %}px-4 py-2 text-sm font-medium rounded-t-lg bg-white border-x border-t border-gray-200 -mb-px text-gray-900{% else %}px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900{% endif %}"
+                <button type="button" class="tab-btn {% if t == 0 %}active{% endif %}"
                         data-t="{{ t }}"
                         onclick="showTreino({{ t }})"
                         id="tab-btn-{{ t }}"
                         {% if t > 0 %}style="display:none"{% endif %}>
-                    Treino {{ t + 1 }}
+                    Treino {{ t + 1 }}<span class="tab-count is-zero" id="tab-count-{{ t }}">0</span>
                 </button>
                 {% endfor %}
-                <button type="button" id="copiar-btn-bar" class="ml-auto px-2 py-2 text-sm text-gray-400 hover:text-brand-500 inline-flex items-center" title="Copiar config de outro treino" style="display:none"
-                        onclick="toggleCopiarBar()"><svg class="icon"><use href="#i-clipboard"/></svg></button>
+                {% if ctx_acao not in ('substituir', 'adicionar') %}
+                <button type="button" id="tab-add-btn" class="tab-btn-add" onclick="addTreino()"><svg class="icon"><use href="#i-plus"/></svg> Treino</button>
+                {% endif %}
             </div>
 
             {% for t in range(MAX_TREINOS) %}
@@ -143,89 +154,69 @@
                         <button type="button" class="btn btn-sm" onclick="copiarConfigTreino(parseInt(document.getElementById('copiar-src-{{ t }}').value), {{ t }})">Aplicar</button>
                     </div>
 
-                    <!-- Seletor de modo -->
-                    <div class="inline-flex p-1 bg-gray-100 rounded-lg text-xs">
-                        <button type="button" id="btn-modo-hier-{{ t }}"
-                                onclick="setModo({{ t }}, 'hierarquia')"
-                                class="px-3 py-1 rounded-md bg-white shadow-sm font-semibold text-sm">Hierarquia</button>
-                        <button type="button" id="btn-modo-tmpl-{{ t }}"
-                                onclick="setModo({{ t }}, 'template')"
-                                class="px-3 py-1 rounded-md text-gray-500 hover:text-gray-900 text-sm">Template</button>
+                    <!-- Header da tab: switch de modo + copiar -->
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div class="inline-flex p-1 bg-gray-100 rounded-lg text-xs">
+                            <button type="button" id="btn-modo-hier-{{ t }}"
+                                    onclick="setModo({{ t }}, 'hierarquia')"
+                                    class="px-3 py-1 rounded-md bg-white shadow-sm font-semibold text-sm">Hierarquia</button>
+                            <button type="button" id="btn-modo-tmpl-{{ t }}"
+                                    onclick="setModo({{ t }}, 'template')"
+                                    class="px-3 py-1 rounded-md text-gray-500 hover:text-gray-900 text-sm">Template</button>
+                        </div>
+                        <button type="button" class="copiar-trigger" id="copiar-trigger-{{ t }}" style="display:none"
+                                onclick="toggleCopiarBar({{ t }})" title="Copiar configuração de outro treino"><svg class="icon"><use href="#i-copy"/></svg> Copiar de outro treino</button>
                     </div>
                     <input type="hidden" name="modo_{{ t }}" id="input-modo-{{ t }}" value="hierarquia">
 
-                    <!-- MODO HIERARQUIA (acordeões) -->
+                    <!-- MODO HIERARQUIA (cards de região + tags clicáveis) -->
                     <div id="modo-hierarquia-{{ t }}" class="modo-hierarquia-bloco">
                         <p class="text-[11px] text-gray-400 mb-2">
-                            Abra uma região, marque grupos e defina quantos exercícios.</p>
+                            Abra uma região e clique nos padrões que quer incluir.</p>
 
-                        <div class="space-y-2">
+                        {% set regiao_icones = {'upper': 'i-dumbbell', 'lower': 'i-target', 'core': 'i-flame', 'cardio': 'i-heart'} %}
                         {% for regiao in regioes %}
-                            <details id="det-{{ t }}-{{ regiao }}" class="border border-gray-200 rounded-lg overflow-hidden">
-                                <summary class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
-                                    <div class="flex items-center gap-2">
-                                        <span class="chevron text-gray-400 text-xs">▶</span>
-                                        <span class="font-semibold text-sm">{{ regioes_labels[regiao] }}</span>
+                        <details id="det-{{ t }}-{{ regiao }}" class="regiao-card">
+                            <summary class="regiao-head">
+                                <svg class="icon icon-sm regiao-toggle-icon"><use href="#i-chevron-right"/></svg>
+                                <div class="regiao-icon {{ regiao }}"><svg class="icon icon-sm"><use href="#{{ regiao_icones.get(regiao, 'i-dumbbell') }}"/></svg></div>
+                                <span class="regiao-title">{{ regioes_labels[regiao] }}</span>
+                                <button type="button" class="subregiao-quick-toggle" onclick="event.preventDefault(); event.stopPropagation(); toggleRegiaoTodos({{ t }}, '{{ regiao }}')">+ Todos</button>
+                                <input type="checkbox" class="reg-chk hidden" data-regiao="{{ regiao }}" onchange="updateDemandas({{ t }})">
+                            </summary>
+                            <div class="regiao-body">
+                                {% for subregiao in subregioes.get(regiao, []) %}
+                                {% set pads = padroes_ordem.get(subregiao, []) %}
+                                <div class="subregiao-section">
+                                    <div class="subregiao-head">
+                                        <span class="subregiao-name">{{ subregioes_labels[subregiao] }}</span>
+                                        <button type="button" class="subregiao-quick-toggle" onclick="toggleSubregiaoTodos({{ t }}, '{{ subregiao }}')">+ Todos</button>
                                     </div>
-                                    <label class="flex items-center gap-1.5 text-xs text-gray-500" onclick="event.stopPropagation()">
-                                        <input type="checkbox" class="reg-chk accent-brand-500" data-regiao="{{ regiao }}"
-                                               onchange="updateDemandas({{ t }})">
-                                        Todos
-                                    </label>
-                                </summary>
-                                <div class="px-4 pb-3 pt-1 space-y-1">
-                                    {% for subregiao in subregioes.get(regiao, []) %}
-                                        {% set pads = padroes_ordem.get(subregiao, []) %}
-                                        {% set tem_refinamento = pads|length > 1 or subregiao == 'perna_anterior' %}
-                                        <div class="flex items-center gap-2 py-0.5">
-                                            <label class="check-inline">
-                                                <input type="checkbox" class="sub-chk" data-subregiao="{{ subregiao }}"
-                                                       data-regiao="{{ regiao }}" onchange="updateDemandas({{ t }})">
-                                                <span>{{ subregioes_labels[subregiao] }}</span>
-                                            </label>
-                                            {% if tem_refinamento %}
-                                            <button type="button" class="text-xs text-brand-500 hover:bg-brand-50 px-1.5 py-0.5 rounded cursor-pointer"
-                                                    onclick="togglePads({{ t }}, '{{ subregiao }}')">▸</button>
-                                            {% endif %}
-                                        </div>
-                                        {% if tem_refinamento %}
-                                        <div id="pads-{{ t }}-{{ subregiao }}" style="display:none" class="pl-6 space-y-0.5">
-                                        {% if subregiao == 'perna_anterior' %}
-                                            <div class="flex items-center gap-2 py-0.5">
-                                                <label class="check-inline">
-                                                    <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="bilateral"
-                                                           data-subregiao="perna_anterior" data-regiao="lower"
-                                                           onchange="updateDemandas({{ t }})">
-                                                    <span>Agachamento bilateral</span>
-                                                </label>
-                                            </div>
-                                            <div class="flex items-center gap-2 py-0.5">
-                                                <label class="check-inline">
-                                                    <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="unilateral"
-                                                           data-subregiao="perna_anterior" data-regiao="lower"
-                                                           onchange="updateDemandas({{ t }})">
-                                                    <span>Agachamento unilateral</span>
-                                                </label>
-                                            </div>
-                                        {% else %}
+                                    <input type="checkbox" class="sub-chk hidden" data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}" onchange="updateDemandas({{ t }})">
+                                    <div class="padroes-tags">
+                                    {% if subregiao == 'perna_anterior' %}
+                                        <label class="padrao-tag">
+                                            <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="bilateral" data-subregiao="perna_anterior" data-regiao="lower" onchange="updateDemandas({{ t }})">
+                                            agachamento bilateral
+                                        </label>
+                                        <label class="padrao-tag">
+                                            <input type="checkbox" class="lat-chk" data-padrao="squat" data-lat="unilateral" data-subregiao="perna_anterior" data-regiao="lower" onchange="updateDemandas({{ t }})">
+                                            agachamento unilateral
+                                        </label>
+                                    {% else %}
                                         {% for pad in pads %}
-                                            <div class="flex items-center gap-2 py-0.5">
-                                                <label class="check-inline">
-                                                    <input type="checkbox" class="pad-chk" data-padrao="{{ pad }}"
-                                                           data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}"
-                                                           onchange="updateDemandas({{ t }})">
-                                                    <span>{{ padroes_labels.get(pad, pad) }}</span>
-                                                </label>
-                                            </div>
+                                        <label class="padrao-tag">
+                                            <input type="checkbox" class="pad-chk" data-padrao="{{ pad }}" data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}" onchange="updateDemandas({{ t }})">
+                                            {{ padroes_labels.get(pad, pad) }}
+                                        </label>
                                         {% endfor %}
-                                        {% endif %}
-                                        </div>
-                                        {% endif %}
-                                    {% endfor %}
+                                    {% endif %}
+                                    </div>
                                 </div>
-                            </details>
+                                {% endfor %}
+                            </div>
+                        </details>
                         {% endfor %}
-                        </div>
 
                         <div id="demandas-container-{{ t }}"></div>
                         <div id="demandas-hidden-inputs-{{ t }}"></div>
@@ -234,10 +225,21 @@
 
                     <!-- MODO TEMPLATE -->
                     <div id="modo-template-{{ t }}" class="modo-template-bloco" style="display:none">
-                        <p class="config-title">Escolha um template</p>
-                        <div class="template-grid">
+                        <p class="text-[11px] text-gray-400 mb-2">Escolha um template para começar.</p>
+                        <div class="templates-grid">
                             {% for tmpl in templates %}
-                            <button type="button" class="template-btn" onclick="selectTemplate({{ t }}, '{{ tmpl }}')">{{ tmpl }}</button>
+                            {% set epp = template_epp.get(tmpl, {}) %}
+                            {% set total_padroes = epp|length %}
+                            {% set total_ex = epp.values()|sum %}
+                            <button type="button" class="template-card" data-tmpl="{{ tmpl }}" onclick="selectTemplate({{ t }}, '{{ tmpl }}')">
+                                <div class="template-name">{{ tmpl }}</div>
+                                <div class="template-tags">
+                                    {% for pad in epp.keys() %}
+                                    <span class="template-tag">{{ padroes_labels.get(pad, pad) }}</span>
+                                    {% endfor %}
+                                </div>
+                                <div class="template-meta">{{ total_padroes }} grupos · {{ total_ex }} ex.</div>
+                            </button>
                             {% endfor %}
                         </div>
                         <input type="hidden" name="template_{{ t }}" id="input-template-{{ t }}" value="">
@@ -314,6 +316,7 @@ const TEMPLATE_EPP = {{ template_epp | tojson }};
 const PADROES_LABELS = {{ padroes_labels | tojson }};
 const SUBREGIOES_LABELS_JS = {{ subregioes_labels | tojson }};
 const REGIOES_LABELS_JS = {{ regioes_labels | tojson }};
+const PADRAO_PARA_CHIP_JS = {{ padrao_para_chip | tojson }};
 const MAX_TREINOS = 5;
 
 function tabEl(t) { return document.getElementById('tab-' + t); }
@@ -324,13 +327,8 @@ function showTreino(t) {
     document.querySelectorAll('.tab-treino').forEach(el => {
         el.style.display = (parseInt(el.dataset.t) === t) ? '' : 'none';
     });
-    document.querySelectorAll('.tab-treino-btn').forEach(b => {
-        const on = parseInt(b.dataset.t) === t;
-        if (on) {
-            b.className = 'tab-treino-btn px-4 py-2 text-sm font-medium rounded-t-lg bg-white border-x border-t border-gray-200 -mb-px text-gray-900';
-        } else {
-            b.className = 'tab-treino-btn px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900';
-        }
+    document.querySelectorAll('.tab-btn[data-t]').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.t) === t);
     });
 }
 
@@ -344,12 +342,12 @@ function onChangeNTreinos() {
         .some(el => el.style.display !== 'none' && parseInt(el.dataset.t) < n);
     if (!activeVisible) showTreino(0);
 
-    // Copiar bar visibility
-    const copiarBtn = document.getElementById('copiar-btn-bar');
-    if (copiarBtn) copiarBtn.style.display = (n > 1) ? '' : 'none';
+    // Copiar — visibilidade do trigger e da barra por tab
     for (let t = 0; t < MAX_TREINOS; t++) {
+        const trigger = document.getElementById('copiar-trigger-' + t);
+        if (trigger) trigger.style.display = (n > 1 && t < n) ? '' : 'none';
         const bar = document.getElementById('copiar-bar-' + t);
-        if (bar) bar.style.display = (n > 1 && t < n) ? 'flex' : 'none';
+        if (bar && n <= 1) bar.classList.add('hidden');
         const sel = document.getElementById('copiar-src-' + t);
         if (sel) {
             Array.from(sel.options).forEach(opt => {
@@ -364,14 +362,18 @@ function onChangeNTreinos() {
             }
         }
     }
-    updateConfigResumo();
+    const addBtn = document.getElementById('tab-add-btn');
+    if (addBtn) addBtn.style.display = (n < MAX_TREINOS) ? '' : 'none';
 }
 
-function updateConfigResumo() {
-    const n = document.getElementById('n_treinos').value;
-    const cx = document.getElementById('val-cx').textContent;
-    const el = document.getElementById('config-resumo');
-    if (el) el.textContent = `${n} treino${n>1?'s':''} · compl. ${cx}`;
+function addTreino() {
+    const sel = document.getElementById('n_treinos');
+    if (!sel || sel.disabled) return;
+    const cur = parseInt(sel.value || '1');
+    if (cur >= MAX_TREINOS) return;
+    sel.value = cur + 1;
+    onChangeNTreinos();
+    showTreino(cur);
 }
 
 function setModo(t, modo) {
@@ -389,64 +391,99 @@ function setModo(t, modo) {
     }
 }
 
-function togglePads(t, sub) {
-    const el = document.getElementById('pads-' + t + '-' + sub);
-    el.style.display = el.style.display === 'none' ? '' : 'none';
+function toggleRegiaoTodos(t, regiao) {
+    const det = document.getElementById('det-' + t + '-' + regiao);
+    if (!det) return;
+    if (!det.open) det.open = true;
+    const tags = det.querySelectorAll('.pad-chk, .lat-chk');
+    const algumDesmarcado = Array.from(tags).some(c => !c.checked);
+    tags.forEach(c => c.checked = algumDesmarcado);
+    updateDemandas(t);
+}
+function toggleSubregiaoTodos(t, subregiao) {
+    const det = tabEl(t).querySelector(`.sub-chk[data-subregiao="${subregiao}"]`);
+    if (!det) return;
+    const subSection = det.parentElement.querySelector('.padroes-tags') || det.parentElement;
+    const tags = subSection.querySelectorAll('.pad-chk, .lat-chk');
+    const algumDesmarcado = Array.from(tags).some(c => !c.checked);
+    tags.forEach(c => c.checked = algumDesmarcado);
+    updateDemandas(t);
 }
 
-function toggleCopiarBar() {
-    const active = document.querySelector('.tab-treino[style=""],.tab-treino:not([style])');
-    if (!active) return;
-    const t = active.dataset.t;
+function toggleCopiarBar(t) {
     const bar = document.getElementById('copiar-bar-' + t);
-    if (bar) bar.style.display = bar.style.display === 'flex' ? 'none' : 'flex';
+    if (!bar) return;
+    bar.classList.toggle('hidden');
+    if (!bar.classList.contains('hidden')) bar.classList.add('flex');
+    else bar.classList.remove('flex');
 }
 
 function selectTemplate(t, nome) {
     qs(t, '#input-template-' + t).value = nome;
     const epp = TEMPLATE_EPP[nome] || {};
-    let html = '<p class="text-xs font-semibold text-gray-700 mt-3 mb-1">Exercícios por categoria</p><div class="demandas-grid">';
+
+    function chipPadrao(p) {
+        const c = PADRAO_PARA_CHIP_JS[p];
+        if (c) return `<span class="reg-chip reg-chip-${c[1]}">${c[0]}</span>`;
+        return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${p}</span>`;
+    }
+
+    let rows = '';
     for (const [p, val] of Object.entries(epp)) {
         const label = PADROES_LABELS[p] || p;
-        html += `<div class="campo">
-            <label>${label}</label>
-            <div class="range-row">
-                <input type="range" name="epp_${t}_${p}" min="0" max="5" step="1" value="${val}"
-                       oninput="this.nextElementSibling.textContent=this.value; updateTotal(${t})"
-                <span class="range-value">${val}</span>
+        const inputName = `epp_${t}_${p}`;
+        rows += `<div class="demanda-row">
+            <div class="demanda-info">
+                <div class="demanda-name">${chipPadrao(p)}<span>${label}</span></div>
             </div>
+            <div class="demanda-counter">
+                <button type="button" onclick="bumpQtd(${t}, '${inputName}', -1)">−</button>
+                <span class="count" data-target="${inputName}">${val}</span>
+                <button type="button" onclick="bumpQtd(${t}, '${inputName}', 1)">+</button>
+                <input type="hidden" name="${inputName}" value="${val}">
+            </div>
+            <span></span>
         </div>`;
     }
-    html += '</div>';
+
+    let latHtml = '';
     if ('squat' in epp) {
-        html += `<details class="my-3">
-            <summary class="text-sm font-semibold py-2 cursor-pointer"><span class="chevron text-gray-400 text-xs">▶</span> Lateralidade — Agachamento</summary>
-            <div class="grid grid-cols-2 gap-3 mt-2">
-                <div class="campo">
-                    <label>Bilateral</label>
-                    <div class="range-row">
-                        <input type="range" name="squat_bi_${t}" min="0" max="6" step="1" value="0"
-                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal(${t})">
-                        <span class="range-value">0</span>
+        latHtml = `<details class="mt-3">
+            <summary class="text-xs font-semibold py-1.5 cursor-pointer text-gray-700"><span class="chevron text-gray-400 text-xs">▶</span> Lateralidade — Agachamento</summary>
+            <div class="demandas-list mt-2">
+                <div class="demanda-row">
+                    <div class="demanda-info"><div class="demanda-name">${chipPadrao('squat')}<span>Bilateral</span></div></div>
+                    <div class="demanda-counter">
+                        <button type="button" onclick="bumpQtd(${t}, 'squat_bi_${t}', -1); checkLatTotal(${t})">−</button>
+                        <span class="count" data-target="squat_bi_${t}">0</span>
+                        <button type="button" onclick="bumpQtd(${t}, 'squat_bi_${t}', 1); checkLatTotal(${t})">+</button>
+                        <input type="hidden" name="squat_bi_${t}" value="0">
                     </div>
+                    <span></span>
                 </div>
-                <div class="campo">
-                    <label>Unilateral</label>
-                    <div class="range-row">
-                        <input type="range" name="squat_uni_${t}" min="0" max="6" step="1" value="0"
-                               oninput="this.nextElementSibling.textContent=this.value; checkLatTotal(${t})">
-                        <span class="range-value">0</span>
+                <div class="demanda-row">
+                    <div class="demanda-info"><div class="demanda-name">${chipPadrao('squat')}<span>Unilateral</span></div></div>
+                    <div class="demanda-counter">
+                        <button type="button" onclick="bumpQtd(${t}, 'squat_uni_${t}', -1); checkLatTotal(${t})">−</button>
+                        <span class="count" data-target="squat_uni_${t}">0</span>
+                        <button type="button" onclick="bumpQtd(${t}, 'squat_uni_${t}', 1); checkLatTotal(${t})">+</button>
+                        <input type="hidden" name="squat_uni_${t}" value="0">
                     </div>
+                    <span></span>
                 </div>
             </div>
-            <p id="lat-aviso-${t}" class="text-[11px] text-gray-400 mt-1"></p>
+            <p id="lat-aviso-${t}" class="text-[11px] text-gray-400 mt-2"></p>
         </details>`;
     }
+
+    const html = `<div class="template-config-panel">
+        <div class="template-config-title">Exercícios por grupo</div>
+        <div class="demandas-list">${rows}</div>
+        ${latHtml}
+    </div>`;
     qs(t, '#template-epp-' + t).innerHTML = html;
-    qsa(t, '.template-btn').forEach(b => {
-        const sel = b.textContent.trim() === nome;
-        b.style.borderColor = sel ? '#e85d04' : '';
-        b.style.background = sel ? '#fff7ed' : '';
+    qsa(t, '.template-card').forEach(b => {
+        b.classList.toggle('selected', b.dataset.tmpl === nome);
     });
     updateTotal(t);
 }
@@ -538,66 +575,145 @@ function updateDemandas(t) {
         }
     });
 
-    let html = '';
+    let rows = '';
     let hidden = '';
-    if (demandas.length > 0) {
-        html = '<p class="text-xs font-medium text-gray-600 mt-4 mb-1">Quantos exercícios de cada grupo</p><div class="demandas-grid">';
-        demandas.forEach((d, i) => {
-            const key = `${d.nivel}:${d.escopo}`;
+    let totalPreview = 0;
 
-            if (d.lats) {
-                const biActive = d.lats.includes('bilateral');
-                const uniActive = d.lats.includes('unilateral');
-                const biVal = biActive ? (prev['__squat_bi'] !== undefined ? prev['__squat_bi'] : d.default) : 0;
-                const uniVal = uniActive ? (prev['__squat_uni'] !== undefined ? prev['__squat_uni'] : d.default) : 0;
-                const total = parseInt(biVal) + parseInt(uniVal);
-                if (biActive) {
-                    html += `<div class="campo">
-                        <label>Agachamento bilateral</label>
-                        <div class="range-row">
-                            <input type="range" name="squat_bi_${t}" min="0" max="8" step="1" value="${biVal}"
-                                   oninput="this.nextElementSibling.textContent=this.value; updateSquatTotal(${t}, ${i}); updateTotal(${t})">
-                            <span class="range-value">${biVal}</span>
-                        </div>
-                    </div>`;
-                } else {
-                    hidden += `<input type="hidden" name="squat_bi_${t}" value="0">`;
-                }
-                if (uniActive) {
-                    html += `<div class="campo">
-                        <label>Agachamento unilateral</label>
-                        <div class="range-row">
-                            <input type="range" name="squat_uni_${t}" min="0" max="8" step="1" value="${uniVal}"
-                                   oninput="this.nextElementSibling.textContent=this.value; updateSquatTotal(${t}, ${i}); updateTotal(${t})">
-                            <span class="range-value">${uniVal}</span>
-                        </div>
-                    </div>`;
-                } else {
-                    hidden += `<input type="hidden" name="squat_uni_${t}" value="0">`;
-                }
-                hidden += `<input type="hidden" name="dem_nivel_${t}_${i}" value="${d.nivel}">`;
-                hidden += `<input type="hidden" name="dem_escopo_${t}_${i}" value="${d.escopo}">`;
-                hidden += `<input type="hidden" name="dem_qtd_${t}_${i}" value="${total}">`;
-            } else {
-                const val = (prev[key] !== undefined) ? prev[key] : d.default;
-                html += `<div class="campo">
-                    <label>${d.label}</label>
-                    <div class="range-row">
-                        <input type="range" name="dem_qtd_${t}_${i}" min="0" max="12" step="1" value="${val}"
-                               oninput="this.nextElementSibling.textContent=this.value; updateTotal(${t})">
-                        <span class="range-value">${val}</span>
-                    </div>
-                </div>`;
-                hidden += `<input type="hidden" name="dem_nivel_${t}_${i}" value="${d.nivel}">`;
-                hidden += `<input type="hidden" name="dem_escopo_${t}_${i}" value="${d.escopo}">`;
+    function chipFor(nivel, escopo, latSuffix) {
+        if (nivel === 'padrao') {
+            const c = PADRAO_PARA_CHIP_JS[escopo];
+            if (c) return `<span class="reg-chip reg-chip-${c[1]}">${c[0]}${latSuffix ? ' · ' + latSuffix : ''}</span>`;
+        }
+        if (nivel === 'subregiao') {
+            // tenta achar um chip via algum padrão da sub
+            for (const [pad, c] of Object.entries(PADRAO_PARA_CHIP_JS)) {
+                const subChk = qs(t, `.pad-chk[data-padrao="${pad}"][data-subregiao="${escopo}"]`);
+                if (subChk) return `<span class="reg-chip reg-chip-${c[1]}">${SUBREGIOES_LABELS_JS[escopo] || escopo}</span>`;
             }
-        });
-        html += '</div>';
+        }
+        return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${REGIOES_LABELS_JS[nivel === 'regiao' ? escopo : ''] || ''}</span>`;
+    }
+
+    demandas.forEach((d, i) => {
+        const key = `${d.nivel}:${d.escopo}`;
+        if (d.lats) {
+            // squat bilat/uni — uma row por lateralidade
+            const biActive = d.lats.includes('bilateral');
+            const uniActive = d.lats.includes('unilateral');
+            const biVal = parseInt(biActive ? (prev['__squat_bi'] !== undefined ? prev['__squat_bi'] : d.default) : 0);
+            const uniVal = parseInt(uniActive ? (prev['__squat_uni'] !== undefined ? prev['__squat_uni'] : d.default) : 0);
+            const total = biVal + uniVal;
+            totalPreview += total;
+            if (biActive) {
+                rows += renderRow(t, `squat_bi_${t}`, biVal, chipFor('padrao', 'squat', 'bilateral'), 'Agachamento bilateral', null, `removerLat(${t}, 'bilateral')`);
+            } else {
+                hidden += `<input type="hidden" name="squat_bi_${t}" value="0">`;
+            }
+            if (uniActive) {
+                rows += renderRow(t, `squat_uni_${t}`, uniVal, chipFor('padrao', 'squat', 'unilateral'), 'Agachamento unilateral', null, `removerLat(${t}, 'unilateral')`);
+            } else {
+                hidden += `<input type="hidden" name="squat_uni_${t}" value="0">`;
+            }
+            hidden += `<input type="hidden" name="dem_nivel_${t}_${i}" value="${d.nivel}">`;
+            hidden += `<input type="hidden" name="dem_escopo_${t}_${i}" value="${d.escopo}">`;
+            hidden += `<input type="hidden" name="dem_qtd_${t}_${i}" value="${total}">`;
+        } else {
+            const val = parseInt((prev[key] !== undefined) ? prev[key] : d.default);
+            totalPreview += val;
+            const inputName = `dem_qtd_${t}_${i}`;
+            rows += renderRow(t, inputName, val, chipFor(d.nivel, d.escopo), d.label, `incDemanda('${inputName}', $1, ${t})`, `removerDemanda(${t}, '${d.nivel}', '${d.escopo}')`);
+            hidden += `<input type="hidden" name="dem_nivel_${t}_${i}" value="${d.nivel}">`;
+            hidden += `<input type="hidden" name="dem_escopo_${t}_${i}" value="${d.escopo}">`;
+        }
+    });
+
+    let html = '';
+    if (demandas.length > 0) {
+        html = `<div class="demandas-summary">
+            <div class="demandas-head">
+                <span class="demandas-title">Demandas configuradas</span>
+                <span class="demandas-total" id="demandas-total-${t}">${totalPreview} ${totalPreview === 1 ? 'exercício' : 'exercícios'}</span>
+            </div>
+            <div class="demandas-list">${rows}</div>
+        </div>`;
+    } else {
+        html = `<div class="demandas-summary"><div class="demandas-empty"><span class="demandas-empty-strong">Nenhuma demanda configurada</span>Marque grupos acima para começar</div></div>`;
     }
     qs(t, '#demandas-container-' + t).innerHTML = html;
     qs(t, '#demandas-hidden-inputs-' + t).innerHTML = hidden;
     qs(t, '#lateralidade-container-' + t).innerHTML = '';
     updateTotal(t);
+}
+
+function renderRow(t, inputName, val, chip, label, _incExpr, _removeExpr) {
+    return `<div class="demanda-row">
+        <div class="demanda-info">
+            <div class="demanda-name">${chip}<span>${label}</span></div>
+        </div>
+        <div class="demanda-counter">
+            <button type="button" onclick="bumpQtd(${t}, '${inputName}', -1)">−</button>
+            <span class="count" data-target="${inputName}">${val}</span>
+            <button type="button" onclick="bumpQtd(${t}, '${inputName}', 1)">+</button>
+            <input type="hidden" name="${inputName}" value="${val}">
+        </div>
+        <button type="button" class="demanda-remove" onclick="${_removeExpr}" title="Remover"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>`;
+}
+
+function setQtdInput(t, name, val) {
+    const inp = qs(t, `input[name="${name}"]`);
+    if (!inp) return;
+    inp.value = val;
+    const span = qs(t, `.count[data-target="${name}"]`);
+    if (span) span.textContent = val;
+}
+
+function bumpQtd(t, inputName, delta) {
+    const inp = qs(t, `input[name="${inputName}"]`);
+    if (!inp) return;
+    let v = parseInt(inp.value || '0') + delta;
+    if (v < 0) v = 0;
+    if (v > 12) v = 12;
+    inp.value = v;
+    const span = qs(t, `.demanda-counter .count[data-target="${inputName}"]`);
+    if (span) span.textContent = v;
+    // Para squat_bi/squat_uni, atualiza o dem_qtd correspondente
+    if (inputName.startsWith('squat_bi_') || inputName.startsWith('squat_uni_')) {
+        const bi = parseInt((qs(t, `input[name="squat_bi_${t}"]`) || {}).value) || 0;
+        const uni = parseInt((qs(t, `input[name="squat_uni_${t}"]`) || {}).value) || 0;
+        // Achar o índice da demanda squat
+        const escopoInputs = qsa(t, `input[name^="dem_escopo_${t}_"]`);
+        for (const ei of escopoInputs) {
+            if (ei.value === 'squat') {
+                const idx = ei.name.substring(('dem_escopo_' + t + '_').length);
+                const qtdInp = qs(t, `input[name="dem_qtd_${t}_${idx}"]`);
+                if (qtdInp) qtdInp.value = bi + uni;
+                break;
+            }
+        }
+    }
+    atualizarDemandasTotalHeader(t);
+    updateTotal(t);
+}
+
+function atualizarDemandasTotalHeader(t) {
+    let total = 0;
+    qsa(t, `input[name^="dem_qtd_${t}_"]`).forEach(inp => total += parseInt(inp.value) || 0);
+    const el = document.getElementById('demandas-total-' + t);
+    if (el) el.textContent = `${total} ${total === 1 ? 'exercício' : 'exercícios'}`;
+}
+
+function removerDemanda(t, nivel, escopo) {
+    let chk;
+    if (nivel === 'regiao') chk = qs(t, `.reg-chk[data-regiao="${escopo}"]`);
+    else if (nivel === 'subregiao') chk = qs(t, `.sub-chk[data-subregiao="${escopo}"]`);
+    else chk = qs(t, `.pad-chk[data-padrao="${escopo}"]`);
+    if (chk) { chk.checked = false; updateDemandas(t); }
+}
+
+function removerLat(t, lat) {
+    const chk = qs(t, `.lat-chk[data-padrao="squat"][data-lat="${lat}"]`);
+    if (chk) { chk.checked = false; updateDemandas(t); }
 }
 
 function updateSquatTotal(t, i) {
@@ -620,7 +736,14 @@ function updateTotal(t) {
         });
     }
     const el = qs(t, '#total-exercicios-' + t);
-    if (el) el.textContent = total > 0 ? `Total de exercícios: ${total}` : '';
+    if (el) el.textContent = (modo === 'template' && total > 0) ? `Total de exercícios: ${total}` : '';
+    const headerEl = document.getElementById('demandas-total-' + t);
+    if (headerEl) headerEl.textContent = `${total} ${total === 1 ? 'exercício' : 'exercícios'}`;
+    const badge = document.getElementById('tab-count-' + t);
+    if (badge) {
+        badge.textContent = total;
+        badge.classList.toggle('is-zero', total === 0);
+    }
 }
 
 function checkLatTotal(t) {
@@ -647,8 +770,6 @@ function resetTreino(t) {
     qs(t, '#lateralidade-container-' + t).innerHTML = '';
     // Close all region accordions
     document.querySelectorAll('[id^="det-' + t + '-"]').forEach(el => el.open = false);
-    // Close all pattern refinements
-    qsa(t, '[id^="pads-' + t + '-"]').forEach(el => el.style.display = 'none');
     setModo(t, 'hierarquia');
     updateTotal(t);
 }
@@ -670,19 +791,11 @@ function copiarConfigTreino(src, dest) {
             selectTemplate(dest, tmplNome);
             qsa(src, `input[name^="epp_${src}_"]`).forEach(inp => {
                 const pad = inp.name.substring(('epp_' + src + '_').length);
-                const target = qs(dest, `input[name="epp_${dest}_${pad}"]`);
-                if (target) {
-                    target.value = inp.value;
-                    if (target.nextElementSibling) target.nextElementSibling.textContent = inp.value;
-                }
+                setQtdInput(dest, `epp_${dest}_${pad}`, inp.value);
             });
             ['bi', 'uni'].forEach(k => {
                 const s = qs(src, `input[name="squat_${k}_${src}"]`);
-                const d = qs(dest, `input[name="squat_${k}_${dest}"]`);
-                if (s && d) {
-                    d.value = s.value;
-                    if (d.nextElementSibling) d.nextElementSibling.textContent = s.value;
-                }
+                if (s) setQtdInput(dest, `squat_${k}_${dest}`, s.value);
             });
         }
     } else {
@@ -707,28 +820,14 @@ function copiarConfigTreino(src, dest) {
             const destEl = document.getElementById('det-' + dest + '-' + regiao);
             if (destEl) destEl.open = srcEl.open;
         });
-        // Copy pattern refinement visibility
-        qsa(src, '[id^="pads-' + src + '-"]').forEach(srcEl => {
-            const sub = srcEl.id.substring(('pads-' + src + '-').length);
-            const destEl = document.getElementById('pads-' + dest + '-' + sub);
-            if (destEl) destEl.style.display = srcEl.style.display;
-        });
         updateDemandas(dest);
         qsa(src, `input[name^="dem_qtd_${src}_"]`).forEach(inp => {
             const i = inp.name.substring(('dem_qtd_' + src + '_').length);
-            const target = qs(dest, `input[name="dem_qtd_${dest}_${i}"]`);
-            if (target) {
-                target.value = inp.value;
-                if (target.nextElementSibling) target.nextElementSibling.textContent = inp.value;
-            }
+            setQtdInput(dest, `dem_qtd_${dest}_${i}`, inp.value);
         });
         ['bi', 'uni'].forEach(k => {
             const s = qs(src, `input[name="squat_${k}_${src}"]`);
-            const d = qs(dest, `input[name="squat_${k}_${dest}"]`);
-            if (s && d) {
-                d.value = s.value;
-                if (d.nextElementSibling) d.nextElementSibling.textContent = s.value;
-            }
+            if (s) setQtdInput(dest, `squat_${k}_${dest}`, s.value);
         });
         checkLatTotal(dest);
     }
@@ -815,15 +914,12 @@ function aplicarConfigs(data) {
                 const epp = cfg.exercicios_por_padrao || {};
                 for (const [p, val] of Object.entries(epp)) {
                     const v = typeof val === 'object' ? Object.values(val).reduce((a,b)=>a+b,0) : val;
-                    const inp = qs(t, `input[name="epp_${t}_${p}"]`);
-                    if (inp) { inp.value = v; if (inp.nextElementSibling) inp.nextElementSibling.textContent = v; }
+                    setQtdInput(t, `epp_${t}_${p}`, v);
                 }
                 const lat = cfg.lateralidade_por_padrao || {};
                 if (lat.squat) {
-                    const bi = qs(t, `input[name="squat_bi_${t}"]`);
-                    const uni = qs(t, `input[name="squat_uni_${t}"]`);
-                    if (bi) { bi.value = lat.squat.bilateral || 0; if (bi.nextElementSibling) bi.nextElementSibling.textContent = bi.value; }
-                    if (uni) { uni.value = lat.squat.unilateral || 0; if (uni.nextElementSibling) uni.nextElementSibling.textContent = uni.value; }
+                    setQtdInput(t, `squat_bi_${t}`, lat.squat.bilateral || 0);
+                    setQtdInput(t, `squat_uni_${t}`, lat.squat.unilateral || 0);
                 }
             }
         } else {
@@ -858,8 +954,6 @@ function aplicarConfigs(data) {
                         }
                         const detEl = document.getElementById('det-' + t + '-lower');
                         if (detEl) detEl.open = true;
-                        const padsEl = document.getElementById('pads-' + t + '-perna_anterior');
-                        if (padsEl) padsEl.style.display = '';
                         const subChk = qs(t, '.sub-chk[data-subregiao="perna_anterior"]');
                         if (subChk) subChk.checked = true;
                         const regChk = qs(t, '.reg-chk[data-regiao="lower"]');
@@ -872,8 +966,6 @@ function aplicarConfigs(data) {
                             const regiao = chk.dataset.regiao;
                             const detEl = document.getElementById('det-' + t + '-' + regiao);
                             if (detEl) detEl.open = true;
-                            const padsEl = document.getElementById('pads-' + t + '-' + subregiao);
-                            if (padsEl) padsEl.style.display = '';
                             const subChk = qs(t, `.sub-chk[data-subregiao="${subregiao}"]`);
                             if (subChk) subChk.checked = true;
                             const regChk = qs(t, `.reg-chk[data-regiao="${regiao}"]`);
@@ -890,14 +982,11 @@ function aplicarConfigs(data) {
                     const [nivel, escopo, qtd] = dem;
                     if (escopo === 'squat' && (cfg.lateralidade_por_padrao || {}).squat) {
                         const lat = cfg.lateralidade_por_padrao.squat;
-                        const bi = qs(t, `input[name="squat_bi_${t}"]`);
-                        const uni = qs(t, `input[name="squat_uni_${t}"]`);
-                        if (bi && lat.bilateral !== undefined) { bi.value = lat.bilateral; if (bi.nextElementSibling) bi.nextElementSibling.textContent = lat.bilateral; }
-                        if (uni && lat.unilateral !== undefined) { uni.value = lat.unilateral; if (uni.nextElementSibling) uni.nextElementSibling.textContent = lat.unilateral; }
+                        if (lat.bilateral !== undefined) setQtdInput(t, `squat_bi_${t}`, lat.bilateral);
+                        if (lat.unilateral !== undefined) setQtdInput(t, `squat_uni_${t}`, lat.unilateral);
                         updateSquatTotal(t, i);
                     } else {
-                        const inp = qs(t, `input[name="dem_qtd_${t}_${i}"]`);
-                        if (inp) { inp.value = qtd; if (inp.nextElementSibling) inp.nextElementSibling.textContent = qtd; }
+                        setQtdInput(t, `dem_qtd_${t}_${i}`, qtd);
                     }
                 });
             }, 50);
@@ -905,7 +994,6 @@ function aplicarConfigs(data) {
     });
 
     showTreino(0);
-    updateConfigResumo();
 }
 
 function showPanel(panel) {
@@ -935,7 +1023,6 @@ function showPanel(panel) {
 
 // Init
 onChangeNTreinos();
-updateConfigResumo();
 </script>
 
 {% endblock %}

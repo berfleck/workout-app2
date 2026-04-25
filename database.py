@@ -54,6 +54,24 @@ def init_db():
         con.commit()
     except sqlite3.OperationalError:
         pass
+    # Migração: adicionar coluna rascunho_etiqueta se não existir
+    try:
+        con.execute("ALTER TABLE alunos ADD COLUMN rascunho_etiqueta TEXT DEFAULT NULL")
+        con.commit()
+    except sqlite3.OperationalError:
+        pass
+    # Migração: adicionar coluna data_atualizada no histórico
+    try:
+        con.execute("ALTER TABLE historico ADD COLUMN data_atualizada TEXT DEFAULT NULL")
+        con.commit()
+    except sqlite3.OperationalError:
+        pass
+    # Migração: adicionar coluna rascunho_intent
+    try:
+        con.execute("ALTER TABLE alunos ADD COLUMN rascunho_intent TEXT DEFAULT NULL")
+        con.commit()
+    except sqlite3.OperationalError:
+        pass
     con.close()
 
 
@@ -166,11 +184,50 @@ def carregar_rascunho(aluno_id):
     return json.loads(row["rascunho_rotina"])
 
 
-def limpar_rascunho(aluno_id):
+def salvar_etiqueta_rascunho(aluno_id, etiqueta):
     con = _conn()
-    con.execute("UPDATE alunos SET rascunho_rotina = NULL WHERE id = ?", (aluno_id,))
+    con.execute("UPDATE alunos SET rascunho_etiqueta = ? WHERE id = ?",
+                (etiqueta or None, aluno_id))
     con.commit()
     con.close()
+
+
+def carregar_etiqueta_rascunho(aluno_id):
+    con = _conn()
+    row = con.execute("SELECT rascunho_etiqueta FROM alunos WHERE id = ?", (aluno_id,)).fetchone()
+    con.close()
+    return (row["rascunho_etiqueta"] or "") if row else ""
+
+
+def limpar_rascunho(aluno_id):
+    con = _conn()
+    con.execute("UPDATE alunos SET rascunho_rotina = NULL, rascunho_etiqueta = NULL, rascunho_intent = NULL WHERE id = ?", (aluno_id,))
+    con.commit()
+    con.close()
+
+
+def salvar_intent_rascunho(aluno_id, intent):
+    con = _conn()
+    con.execute("UPDATE alunos SET rascunho_intent = ? WHERE id = ?",
+                (intent or None, aluno_id))
+    con.commit()
+    con.close()
+
+
+def carregar_intent_rascunho(aluno_id):
+    con = _conn()
+    row = con.execute("SELECT rascunho_intent FROM alunos WHERE id = ?", (aluno_id,)).fetchone()
+    con.close()
+    return (row["rascunho_intent"] or "") if row else ""
+
+
+def _row_to_registro(row):
+    return {"id": row["id"], "data": row["data_salvo"],
+            "data_atualizada": row["data_atualizada"] if "data_atualizada" in row.keys() else None,
+            "aluno": row["aluno"],
+            "etiqueta": row["etiqueta"], "n_treinos": row["n_treinos"],
+            "sessoes": json.loads(row["sessoes"]),
+            "configs": json.loads(row["configs"]) if row["configs"] else None}
 
 
 def carregar_rotina_ativa(aluno_id):
@@ -179,12 +236,7 @@ def carregar_rotina_ativa(aluno_id):
         "SELECT h.* FROM historico h JOIN alunos a ON a.rotina_ativa_id = h.id WHERE a.id = ?",
         (aluno_id,)).fetchone()
     con.close()
-    if not row:
-        return None
-    return {"id": row["id"], "data": row["data_salvo"], "aluno": row["aluno"],
-            "etiqueta": row["etiqueta"], "n_treinos": row["n_treinos"],
-            "sessoes": json.loads(row["sessoes"]),
-            "configs": json.loads(row["configs"]) if row["configs"] else None}
+    return _row_to_registro(row) if row else None
 
 
 def carregar_rotina_anterior(aluno_nome, rotina_ativa_id):
@@ -193,12 +245,7 @@ def carregar_rotina_anterior(aluno_nome, rotina_ativa_id):
         "SELECT * FROM historico WHERE aluno = ? AND id != ? ORDER BY id DESC LIMIT 1",
         (aluno_nome, rotina_ativa_id or "")).fetchone()
     con.close()
-    if not row:
-        return None
-    return {"id": row["id"], "data": row["data_salvo"], "aluno": row["aluno"],
-            "etiqueta": row["etiqueta"], "n_treinos": row["n_treinos"],
-            "sessoes": json.loads(row["sessoes"]),
-            "configs": json.loads(row["configs"]) if row["configs"] else None}
+    return _row_to_registro(row) if row else None
 
 
 def buscar_aluno_por_nome(nome):
@@ -230,12 +277,7 @@ def carregar_registro(reg_id):
     con = _conn()
     row = con.execute("SELECT * FROM historico WHERE id = ?", (reg_id,)).fetchone()
     con.close()
-    if not row:
-        return None
-    return {"id": row["id"], "data": row["data_salvo"], "aluno": row["aluno"],
-            "etiqueta": row["etiqueta"], "n_treinos": row["n_treinos"],
-            "sessoes": json.loads(row["sessoes"]),
-            "configs": json.loads(row["configs"]) if row["configs"] else None}
+    return _row_to_registro(row) if row else None
 
 
 def salvar_historico_registro(reg_id, data_salvo, aluno, etiqueta, n_treinos, sessoes, configs=None):
@@ -245,6 +287,19 @@ def salvar_historico_registro(reg_id, data_salvo, aluno, etiqueta, n_treinos, se
         (reg_id, data_salvo, aluno, etiqueta, n_treinos,
          json.dumps(sessoes, ensure_ascii=False),
          json.dumps(configs, ensure_ascii=False) if configs else None))
+    con.commit()
+    con.close()
+
+
+def atualizar_historico_registro(reg_id, data_atualizada, etiqueta, n_treinos, sessoes, configs=None):
+    """Sobrescreve um registro existente do histórico mantendo o mesmo id."""
+    con = _conn()
+    con.execute(
+        "UPDATE historico SET data_atualizada=?, etiqueta=?, n_treinos=?, sessoes=?, configs=? WHERE id=?",
+        (data_atualizada, etiqueta, n_treinos,
+         json.dumps(sessoes, ensure_ascii=False),
+         json.dumps(configs, ensure_ascii=False) if configs else None,
+         reg_id))
     con.commit()
     con.close()
 

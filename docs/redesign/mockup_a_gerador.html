@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup A — Gerador · BF Treinamento</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --brand-500: #e85d04;
+    --brand-600: #d4520a;
+    --brand-50: #fff7ed;
+    --brand-100: #fff3e6;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-900: #111827;
+    --green-50: #f0fdf4;
+    --green-600: #16a34a;
+    --font-body: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html, body { height: 100%; }
+body {
+    font-family: var(--font-body);
+    background: var(--gray-100);
+    color: var(--gray-900);
+    -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, select { font-family: inherit; }
+.hidden { display: none !important; }
+.icon { width: 16px; height: 16px; stroke-width: 2; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.icon-sm { width: 14px; height: 14px; }
+.icon-xs { width: 12px; height: 12px; }
+.icon-lg { width: 20px; height: 20px; }
+
+/* Topbar */
+.topbar { position: sticky; top: 0; z-index: 50; background: white; border-bottom: 1px solid var(--gray-200); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.topbar-inner { max-width: 1280px; margin: 0 auto; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.topbar-title-group { display: flex; align-items: center; gap: 12px; }
+.topbar-logo { width: 36px; height: 36px; border-radius: 8px; background: var(--gray-900); color: white; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.topbar-title { font-size: 14px; font-weight: 700; color: var(--gray-900); }
+.topbar-sub { font-size: 12px; color: var(--gray-500); }
+.scenarios { display: flex; gap: 6px; flex-wrap: wrap; }
+.scenario-tab { padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; background: transparent; color: var(--gray-700); transition: all 0.15s; }
+.scenario-tab:hover { background: var(--gray-100); }
+.scenario-tab.active { background: var(--gray-900); color: white; }
+.desc-bar { max-width: 1280px; margin: 0 auto; padding: 0 16px 12px; font-size: 12px; color: var(--gray-600); line-height: 1.6; }
+.desc-bar strong { color: var(--gray-900); }
+
+/* App layout */
+.app { display: flex; background: var(--gray-50); min-height: calc(100vh - 100px); }
+.sidebar-nav { display: none; width: 60px; background: white; border-right: 1px solid var(--gray-200); flex-direction: column; align-items: center; padding: 16px 0; gap: 4px; flex-shrink: 0; }
+@media (min-width: 1024px) { .sidebar-nav { display: flex; } }
+.sidebar-logo { width: 36px; height: 36px; border-radius: 8px; background: var(--brand-500); color: white; display: grid; place-items: center; font-weight: 700; font-size: 13px; margin-bottom: 20px; }
+.sidebar-link { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--gray-400); transition: all 0.15s; text-decoration: none; }
+.sidebar-link:hover { background: var(--gray-100); color: var(--brand-500); }
+.sidebar-link.active { background: var(--brand-100); color: var(--brand-500); }
+.sidebar-link .icon { width: 20px; height: 20px; }
+
+.main { flex: 1; padding: 20px 16px 100px; min-width: 0; }
+@media (min-width: 640px) { .main { padding: 24px 24px 120px; } }
+@media (min-width: 1024px) { .main { padding: 24px; padding-bottom: 24px; } }
+.container { max-width: 1280px; margin: 0 auto; }
+
+.page-eyebrow { font-size: 11px; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+.page-title { font-size: 22px; font-weight: 600; color: var(--gray-900); }
+.page-header { margin-bottom: 16px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.page-header-actions { display: flex; gap: 6px; }
+
+/* Banner de contexto */
+.context-banner {
+    background: linear-gradient(135deg, var(--brand-50) 0%, var(--brand-100) 100%);
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.context-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.context-icon { width: 36px; height: 36px; border-radius: 8px; background: var(--brand-500); color: white; display: grid; place-items: center; flex-shrink: 0; }
+.context-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.context-title { font-size: 14px; font-weight: 600; color: var(--brand-600); }
+.context-sub { font-size: 12px; color: var(--brand-600); opacity: 0.85; }
+.context-actions { display: flex; gap: 6px; }
+
+/* Botões base */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; transition: all 0.15s; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.btn-sm { padding: 6px 11px; font-size: 12px; }
+.btn-lg { padding: 11px 18px; font-size: 14px; }
+.btn-primary { background: var(--brand-500); color: white; }
+.btn-primary:hover { background: var(--brand-600); }
+.btn-default { background: white; color: var(--gray-700); border: 1px solid var(--gray-200); }
+.btn-default:hover { background: var(--gray-50); border-color: var(--gray-300); }
+.btn-ghost { background: transparent; color: var(--gray-500); }
+.btn-ghost:hover { background: var(--gray-100); color: var(--gray-700); }
+
+/* Layout principal: 2 colunas */
+.gerador-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+@media (min-width: 1024px) {
+    .gerador-grid {
+        grid-template-columns: 320px 1fr;
+        gap: 20px;
+    }
+}
+
+/* ─── COLUNA ESQUERDA: Aluno + Config geral + Botão ─── */
+.left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+@media (min-width: 1024px) {
+    .left-col {
+        position: sticky;
+        top: 80px;
+        align-self: start;
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+        padding-right: 4px;
+    }
+}
+
+.section-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+.section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.section-title .icon { color: var(--gray-400); }
+
+.field-group { display: flex; flex-direction: column; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-500);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.field-input,
+.field-select {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--gray-200);
+    border-radius: 7px;
+    font-size: 13px;
+    color: var(--gray-900);
+    background: white;
+    transition: all 0.15s;
+}
+.field-input:focus,
+.field-select:focus {
+    outline: none;
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px rgba(232,93,4,0.08);
+}
+
+/* Slider de complexidade */
+.range-row { display: flex; align-items: center; gap: 10px; }
+.range-input {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--gray-200);
+    border-radius: 999px;
+    outline: none;
+}
+.range-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--brand-500);
+    border-radius: 999px;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px var(--brand-500);
+}
+.range-input::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--brand-500);
+    border-radius: 999px;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px var(--brand-500);
+}
+.range-value {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--brand-500);
+    min-width: 18px;
+    text-align: center;
+}
+
+/* Checkboxes */
+.check-list { display: flex; flex-direction: column; gap: 6px; }
+.check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--gray-700);
+    cursor: pointer;
+    padding: 4px 0;
+}
+.check-row input[type="checkbox"] {
+    width: 14px; height: 14px;
+    accent-color: var(--brand-500);
+    cursor: pointer;
+}
+
+/* Aluno mini-display */
+.aluno-current {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--gray-50);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+.avatar-sm {
+    width: 32px; height: 32px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--brand-500), var(--brand-600));
+    color: white;
+    display: grid; place-items: center;
+    font-weight: 700;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+.aluno-current-name { font-size: 13px; font-weight: 600; color: var(--gray-900); }
+.aluno-current-meta { font-size: 11px; color: var(--gray-500); }
+
+/* CTA Sticky / Footer botão gerar */
+.generate-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+.generate-summary {
+    font-size: 11px;
+    color: var(--gray-500);
+    line-height: 1.5;
+    margin-bottom: 10px;
+}
+.generate-summary strong { color: var(--gray-900); font-weight: 600; }
+.btn-generate {
+    width: 100%;
+    background: var(--brand-500);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 9px;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.15s;
+}
+.btn-generate:hover { background: var(--brand-600); }
+.btn-generate .icon { width: 16px; height: 16px; }
+
+/* ─── COLUNA DIREITA: Tabs + main ─── */
+.right-col { min-width: 0; }
+
+/* Tabs de treinos */
+.tabs-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 14px;
+    padding: 4px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.tabs-bar::-webkit-scrollbar { display: none; }
+.tab-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-500);
+    transition: all 0.15s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.tab-btn:hover { color: var(--gray-700); background: var(--gray-50); }
+.tab-btn.active { background: var(--gray-900); color: white; }
+.tab-count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    background: rgba(255,255,255,0.18);
+    padding: 1px 6px;
+    border-radius: 999px;
+    color: inherit;
+}
+.tab-btn:not(.active) .tab-count { background: var(--gray-100); color: var(--gray-500); }
+.tab-btn-add {
+    color: var(--gray-400);
+    border: 1px dashed var(--gray-300);
+    margin-left: auto;
+}
+.tab-btn-add:hover { color: var(--brand-500); border-color: var(--brand-500); background: var(--brand-50); }
+
+/* Switch de modo (Hierarquia / Template) */
+.mode-switch {
+    display: inline-flex;
+    background: var(--gray-100);
+    border-radius: 9px;
+    padding: 3px;
+    margin-bottom: 16px;
+}
+.mode-switch button {
+    padding: 7px 16px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-500);
+    transition: all 0.15s;
+}
+.mode-switch button.active {
+    background: white;
+    color: var(--gray-900);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* Modo Hierarquia: regiões expansíveis com tags interativas */
+.regiao-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+}
+.regiao-card.has-selected {
+    border-color: var(--brand-500);
+}
+.regiao-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.regiao-head:hover { background: var(--gray-50); }
+.regiao-card.open .regiao-head { background: var(--gray-50); border-bottom: 1px solid var(--gray-200); }
+.regiao-toggle-icon {
+    color: var(--gray-400);
+    transition: transform 0.2s;
+}
+.regiao-card.open .regiao-toggle-icon { transform: rotate(90deg); }
+.regiao-icon {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    background: var(--gray-100);
+    color: var(--gray-500);
+}
+.regiao-icon.upper { background: #ffe4e6; color: #9f1239; }
+.regiao-icon.lower { background: #d1fae5; color: #065f46; }
+.regiao-icon.core  { background: #f3e8ff; color: #6b21a8; }
+.regiao-icon.cardio { background: #fef9c3; color: #854d0e; }
+
+.regiao-title { font-size: 14px; font-weight: 600; color: var(--gray-900); flex: 1; }
+.regiao-summary {
+    font-size: 11px;
+    color: var(--gray-500);
+    font-weight: 500;
+}
+.regiao-summary.has-selected {
+    color: var(--brand-500);
+    font-weight: 600;
+}
+.regiao-count-pill {
+    background: var(--brand-500);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+}
+
+.regiao-body {
+    padding: 12px 16px 14px;
+    display: none;
+}
+.regiao-card.open .regiao-body { display: block; }
+
+.subregiao-section { margin-bottom: 14px; }
+.subregiao-section:last-child { margin-bottom: 0; }
+.subregiao-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+.subregiao-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+.subregiao-quick-toggle {
+    font-size: 10px;
+    color: var(--gray-500);
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 5px;
+    background: var(--gray-100);
+}
+.subregiao-quick-toggle:hover { background: var(--brand-100); color: var(--brand-600); }
+
+.padroes-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.padrao-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gray-600);
+    background: var(--gray-100);
+    border: 1px solid transparent;
+    transition: all 0.12s;
+    cursor: pointer;
+}
+.padrao-tag:hover {
+    background: var(--gray-200);
+}
+.padrao-tag.active {
+    background: var(--brand-100);
+    color: var(--brand-600);
+    border-color: var(--brand-500);
+    font-weight: 600;
+}
+.padrao-tag.active::before {
+    content: '';
+    width: 12px; height: 12px;
+    border-radius: 999px;
+    background: var(--brand-500);
+    display: inline-block;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+    background-size: 8px;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.padrao-tag-count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--brand-600);
+    background: white;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 2px;
+    font-weight: 700;
+}
+
+/* Demandas selecionadas */
+.demandas-summary {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-top: 14px;
+}
+.demandas-empty {
+    text-align: center;
+    padding: 8px 0;
+    color: var(--gray-400);
+    font-size: 12px;
+}
+.demandas-empty-strong { color: var(--gray-600); font-weight: 500; display: block; }
+.demandas-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.demandas-title { font-size: 12px; font-weight: 600; color: var(--gray-700); }
+.demandas-total {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--brand-600);
+    font-weight: 700;
+}
+.demandas-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.demanda-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--gray-50);
+    border-radius: 7px;
+}
+.demanda-info { min-width: 0; }
+.demanda-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.demanda-meta {
+    font-size: 10px;
+    color: var(--gray-500);
+    margin-top: 1px;
+}
+.demanda-counter {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--gray-200);
+    background: white;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.demanda-counter button {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    color: var(--gray-500);
+    transition: background 0.1s;
+}
+.demanda-counter button:hover { background: var(--gray-100); color: var(--brand-500); }
+.demanda-counter input,
+.demanda-counter span.count {
+    width: 26px;
+    text-align: center;
+    border: none;
+    border-left: 1px solid var(--gray-200);
+    border-right: 1px solid var(--gray-200);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-900);
+    line-height: 22px;
+}
+.demanda-remove {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    color: var(--gray-300);
+    border-radius: 5px;
+}
+.demanda-remove:hover { color: #dc2626; background: #fef2f2; }
+
+/* Modo Template */
+.templates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+.template-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+}
+.template-card:hover { border-color: var(--gray-300); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.04); }
+.template-card.selected {
+    border-color: var(--brand-500);
+    background: var(--brand-50);
+    box-shadow: 0 0 0 3px rgba(232,93,4,0.08);
+}
+.template-name { font-size: 13px; font-weight: 600; color: var(--gray-900); margin-bottom: 8px; }
+.template-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+.template-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--gray-100);
+    color: var(--gray-600);
+    font-weight: 500;
+}
+.template-card.selected .template-tag {
+    background: white;
+    color: var(--brand-600);
+}
+.template-meta {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 8px;
+    font-family: var(--font-mono);
+}
+
+.template-config-panel {
+    background: white;
+    border: 1px solid var(--brand-500);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 12px;
+}
+.template-config-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 10px;
+}
+
+/* Mobile: footer fixo com botão Gerar */
+.mobile-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: white;
+    border-top: 1px solid var(--gray-200);
+    padding: 10px 16px;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.04);
+    z-index: 30;
+}
+@media (min-width: 1024px) { .mobile-bar { display: none; } }
+.mobile-bar .btn-generate { padding: 12px; }
+
+/* Tooltip */
+[data-tooltip] { position: relative; }
+[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--gray-900);
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+}
+
+/* Page header tabs (Hierarquia/Template + tab atual) */
+.tab-content-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.tab-content-head-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.copy-config-btn {
+    font-size: 11px;
+    color: var(--gray-500);
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--gray-200);
+    background: white;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.copy-config-btn:hover { border-color: var(--gray-300); color: var(--gray-700); }
+
+/* Resultado preview (cenário 3) */
+.resultado-toolbar {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.resultado-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--gray-700);
+    font-weight: 500;
+}
+
+/* Pre-aluno selector card no topo (sem aluno selecionado) */
+.no-aluno-state {
+    background: white;
+    border: 2px dashed var(--gray-200);
+    border-radius: 14px;
+    padding: 60px 24px;
+    text-align: center;
+    margin: 40px 0;
+}
+.no-aluno-icon {
+    width: 56px; height: 56px;
+    margin: 0 auto 14px;
+    border-radius: 999px;
+    background: var(--brand-100);
+    color: var(--brand-500);
+    display: grid; place-items: center;
+}
+.no-aluno-title { font-size: 16px; font-weight: 600; color: var(--gray-700); margin-bottom: 4px; }
+.no-aluno-sub { font-size: 13px; color: var(--gray-500); }
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+    <symbol id="i-replace" viewBox="0 0 24 24"><path d="M14 4c0-1.1.9-2 2-2"/><path d="M20 2c1.1 0 2 .9 2 2"/><path d="M22 8c0 1.1-.9 2-2 2"/><path d="M16 10c-1.1 0-2-.9-2-2"/><path d="m3 7 3 3 3-3"/><path d="M6 10V5c0-1.7 1.3-3 3-3h1"/><path d="m21 17-3-3-3 3"/><path d="M18 14v5c0 1.7-1.3 3-3 3h-1"/><rect x="2" y="14" width="8" height="8" rx="2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-arms" viewBox="0 0 24 24"><path d="M12 2v4"/><circle cx="12" cy="9" r="3"/><path d="M5 22v-4a4 4 0 0 1 1.5-3.1L9 13"/><path d="M19 22v-4a4 4 0 0 0-1.5-3.1L15 13"/></symbol>
+    <symbol id="i-legs" viewBox="0 0 24 24"><path d="M9 2v18l-3 4"/><path d="M15 2v18l3 4"/><path d="M9 8h6"/></symbol>
+    <symbol id="i-core" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.91a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></symbol>
+</svg>
+
+<!-- Topbar -->
+<div class="topbar">
+    <div class="topbar-inner">
+        <div class="topbar-title-group">
+            <div class="topbar-logo">BF</div>
+            <div>
+                <div class="topbar-title">Mockup A — Gerador de treinos</div>
+                <div class="topbar-sub">Configuração e geração de rotinas</div>
+            </div>
+        </div>
+        <div class="scenarios">
+            <button class="scenario-tab active" data-s="hierarquia" onclick="showScenario('hierarquia')">Modo Hierarquia</button>
+            <button class="scenario-tab" data-s="template" onclick="showScenario('template')">Modo Template</button>
+            <button class="scenario-tab" data-s="contexto" onclick="showScenario('contexto')">Substituindo treino</button>
+        </div>
+    </div>
+    <div class="desc-bar">
+        <div id="desc-hierarquia"><strong>Cenário 1 — Modo Hierarquia.</strong> Layout 2 colunas. Esquerda: aluno + configurações gerais sempre visíveis + botão Gerar sticky. Direita: tabs T1-T5 com indicador de quantos exercícios já tem cada uma. Regiões viram cards expansíveis. Subregiões mostram <em>tags clicáveis</em> de padrões (em vez de árvore aninhada). Painel "Demandas" embaixo mostra resumo do que vai ser gerado, com contadores +/- pra ajustar quantidade.</div>
+        <div id="desc-template" class="hidden"><strong>Cenário 2 — Modo Template.</strong> Mesmo layout. Templates como cards com preview dos padrões inclusos — você vê o que tem dentro antes de selecionar. Após selecionar, painel embaixo mostra os padrões com input de quantidade individual (substitui o sistema atual de ter que adivinhar o que cada template gera).</div>
+        <div id="desc-contexto" class="hidden"><strong>Cenário 3 — Substituindo treino do HUB.</strong> Mostra como fica quando você vem do HUB com uma ação contextual (substituir T2, adicionar treino, etc). Banner laranja proeminente no topo. Aluno e número de treinos travados (não pode mexer). Botão de voltar pro HUB visível.</div>
+    </div>
+</div>
+
+<div class="app">
+    <aside class="sidebar-nav">
+        <div class="sidebar-logo">BF</div>
+        <a href="#" class="sidebar-link" title="Treinos"><svg class="icon"><use href="#i-dumbbell"/></svg></a>
+        <a href="#" class="sidebar-link active" title="Gerador"><svg class="icon"><use href="#i-sparkles"/></svg></a>
+        <a href="#" class="sidebar-link" title="Alunos"><svg class="icon"><use href="#i-users"/></svg></a>
+        <a href="#" class="sidebar-link" title="Histórico"><svg class="icon"><use href="#i-book"/></svg></a>
+    </aside>
+
+    <main class="main">
+        <div class="container">
+
+            <div class="page-header">
+                <div>
+                    <div class="page-eyebrow">Painel principal</div>
+                    <h2 class="page-title">Gerador de treinos</h2>
+                </div>
+                <div class="page-header-actions">
+                    <a href="#" class="btn btn-default btn-sm">
+                        <svg class="icon icon-sm"><use href="#i-arrow-left"/></svg> Voltar ao HUB
+                    </a>
+                </div>
+            </div>
+
+            <!-- Banner de contexto (apenas no cenário 3) -->
+            <div class="context-banner" id="context-banner" style="display:none">
+                <div class="context-info">
+                    <div class="context-icon"><svg class="icon"><use href="#i-replace"/></svg></div>
+                    <div class="context-text">
+                        <span class="context-title">Substituindo Treino 2 · Upper Pull</span>
+                        <span class="context-sub">Os outros treinos da rotina serão preservados · Aluno: Bernardo Fleck</span>
+                    </div>
+                </div>
+                <div class="context-actions">
+                    <a href="#" class="btn btn-sm btn-default">
+                        <svg class="icon icon-sm"><use href="#i-arrow-left"/></svg> Cancelar
+                    </a>
+                </div>
+            </div>
+
+            <div class="gerador-grid">
+
+                <!-- ════ COLUNA ESQUERDA ════ -->
+                <aside class="left-col">
+
+                    <!-- Aluno -->
+                    <div class="section-card">
+                        <div class="section-title">
+                            <svg class="icon icon-sm"><use href="#i-users"/></svg> Aluno / Turma
+                        </div>
+                        <div class="aluno-current">
+                            <div class="avatar-sm">BF</div>
+                            <div>
+                                <div class="aluno-current-name">Bernardo Fleck</div>
+                                <div class="aluno-current-meta">Nível 3 · Hipertrofia</div>
+                            </div>
+                        </div>
+                        <select class="field-select">
+                            <option>Trocar aluno...</option>
+                            <option>Bernardo Fleck</option>
+                            <option>Turma Manhã</option>
+                            <option>+ Novo aluno</option>
+                        </select>
+                        <div class="field" style="margin-top: 10px;">
+                            <label class="field-label">
+                                <svg class="icon icon-xs"><use href="#i-info"/></svg>
+                                Evitar exerc. dos últimos
+                            </label>
+                            <select class="field-select">
+                                <option>1 período</option>
+                                <option>2 períodos</option>
+                                <option>3 períodos</option>
+                                <option>Desativado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Configurações gerais -->
+                    <div class="section-card">
+                        <div class="section-title">
+                            <svg class="icon icon-sm"><use href="#i-sliders"/></svg> Configurações gerais
+                        </div>
+                        <div class="field-group">
+                            <div class="field-row">
+                                <div class="field">
+                                    <label class="field-label">Nº de treinos</label>
+                                    <select class="field-select" id="n-treinos-select">
+                                        <option>1</option>
+                                        <option>2</option>
+                                        <option selected>3</option>
+                                        <option>4</option>
+                                        <option>5</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Exerc. por bloco</label>
+                                    <select class="field-select">
+                                        <option>1 (simples)</option>
+                                        <option selected>2 (super séries)</option>
+                                        <option>3 (tri-sets)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="field-label">
+                                    Complexidade máxima
+                                </label>
+                                <div class="range-row">
+                                    <input type="range" class="range-input" min="1" max="5" value="5" id="rng-complex" oninput="document.getElementById('val-complex').textContent=this.value">
+                                    <span class="range-value" id="val-complex">5</span>
+                                </div>
+                            </div>
+                            <div class="check-list">
+                                <label class="check-row">
+                                    <input type="checkbox"> Evitar similaridade entre treinos
+                                </label>
+                                <label class="check-row">
+                                    <input type="checkbox" checked> Evitar agonistas no mesmo bloco
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botão Gerar (desktop) -->
+                    <div class="generate-card" id="generate-card-desktop">
+                        <div class="generate-summary">
+                            <strong>3 treinos</strong> com <strong>2 exerc. por bloco</strong> · 8 demandas configuradas · complexidade até 5
+                        </div>
+                        <button class="btn-generate">
+                            <svg class="icon"><use href="#i-sparkles"/></svg>
+                            Gerar treinos
+                        </button>
+                    </div>
+                </aside>
+
+                <!-- ════ COLUNA DIREITA ════ -->
+                <div class="right-col">
+
+                    <!-- Tabs T1-T5 -->
+                    <div class="tabs-bar">
+                        <button class="tab-btn active">Treino 1 <span class="tab-count">5</span></button>
+                        <button class="tab-btn">Treino 2 <span class="tab-count">3</span></button>
+                        <button class="tab-btn">Treino 3 <span class="tab-count">0</span></button>
+                        <button class="tab-btn-add tab-btn">
+                            <svg class="icon icon-sm"><use href="#i-plus"/></svg>
+                            Treino
+                        </button>
+                    </div>
+
+                    <!-- Header da tab atual -->
+                    <div class="tab-content-head">
+                        <div class="tab-content-head-left">
+                            <div class="mode-switch">
+                                <button class="active" id="btn-mode-hier">
+                                    <span style="display:inline-flex; align-items:center; gap:5px">
+                                        <svg class="icon icon-xs"><use href="#i-layers"/></svg>
+                                        Hierarquia
+                                    </span>
+                                </button>
+                                <button id="btn-mode-tmpl">
+                                    <span style="display:inline-flex; align-items:center; gap:5px">
+                                        <svg class="icon icon-xs"><use href="#i-grid"/></svg>
+                                        Template
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                        <button class="copy-config-btn">
+                            <svg class="icon icon-xs"><use href="#i-copy"/></svg>
+                            Copiar de outro treino
+                        </button>
+                    </div>
+
+                    <!-- ═════ MODO HIERARQUIA ═════ -->
+                    <div id="modo-hierarquia">
+
+                    <!-- Card região: UPPER (aberto, com seleções) -->
+                    <div class="regiao-card open has-selected">
+                        <div class="regiao-head">
+                            <svg class="icon icon-sm regiao-toggle-icon"><use href="#i-chevron-right"/></svg>
+                            <div class="regiao-icon upper"><svg class="icon icon-sm"><use href="#i-arms"/></svg></div>
+                            <div class="regiao-title">Membros superiores</div>
+                            <div class="regiao-summary has-selected">3 selecionados</div>
+                            <div class="regiao-count-pill">5</div>
+                        </div>
+                        <div class="regiao-body">
+
+                            <div class="subregiao-section">
+                                <div class="subregiao-head">
+                                    <span class="subregiao-name">Peito</span>
+                                    <button class="subregiao-quick-toggle">+ Todos</button>
+                                </div>
+                                <div class="padroes-tags">
+                                    <button class="padrao-tag active">Empurrar compostos<span class="padrao-tag-count">2</span></button>
+                                    <button class="padrao-tag">Empurrar isolados</button>
+                                </div>
+                            </div>
+
+                            <div class="subregiao-section">
+                                <div class="subregiao-head">
+                                    <span class="subregiao-name">Costas</span>
+                                    <button class="subregiao-quick-toggle">+ Todos</button>
+                                </div>
+                                <div class="padroes-tags">
+                                    <button class="padrao-tag">Remadas</button>
+                                    <button class="padrao-tag">Puxadas</button>
+                                </div>
+                            </div>
+
+                            <div class="subregiao-section">
+                                <div class="subregiao-head">
+                                    <span class="subregiao-name">Ombro</span>
+                                    <button class="subregiao-quick-toggle">+ Todos</button>
+                                </div>
+                                <div class="padroes-tags">
+                                    <button class="padrao-tag active">Desenvolvimento<span class="padrao-tag-count">1</span></button>
+                                    <button class="padrao-tag">Elevações</button>
+                                    <button class="padrao-tag">Posterior de ombro</button>
+                                </div>
+                            </div>
+
+                            <div class="subregiao-section">
+                                <div class="subregiao-head">
+                                    <span class="subregiao-name">Braços</span>
+                                    <button class="subregiao-quick-toggle">+ Todos</button>
+                                </div>
+                                <div class="padroes-tags">
+                                    <button class="padrao-tag">Bíceps</button>
+                                    <button class="padrao-tag active">Tríceps<span class="padrao-tag-count">2</span></button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Card região: LOWER (fechado) -->
+                    <div class="regiao-card">
+                        <div class="regiao-head">
+                            <svg class="icon icon-sm regiao-toggle-icon"><use href="#i-chevron-right"/></svg>
+                            <div class="regiao-icon lower"><svg class="icon icon-sm"><use href="#i-legs"/></svg></div>
+                            <div class="regiao-title">Membros inferiores</div>
+                            <div class="regiao-summary">Perna ant. · posterior · adutores · panturrilha</div>
+                        </div>
+                    </div>
+
+                    <!-- Card região: CORE (aberto, sem nada) -->
+                    <div class="regiao-card open">
+                        <div class="regiao-head">
+                            <svg class="icon icon-sm regiao-toggle-icon"><use href="#i-chevron-right"/></svg>
+                            <div class="regiao-icon core"><svg class="icon icon-sm"><use href="#i-core"/></svg></div>
+                            <div class="regiao-title">Core</div>
+                            <div class="regiao-summary">Isométrico · dinâmico</div>
+                        </div>
+                        <div class="regiao-body">
+                            <div class="subregiao-section">
+                                <div class="padroes-tags">
+                                    <button class="padrao-tag">Core isométrico</button>
+                                    <button class="padrao-tag">Core dinâmico</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card região: CARDIO (fechado) -->
+                    <div class="regiao-card">
+                        <div class="regiao-head">
+                            <svg class="icon icon-sm regiao-toggle-icon"><use href="#i-chevron-right"/></svg>
+                            <div class="regiao-icon cardio"><svg class="icon icon-sm"><use href="#i-heart"/></svg></div>
+                            <div class="regiao-title">Cardio</div>
+                            <div class="regiao-summary">—</div>
+                        </div>
+                    </div>
+
+                    <!-- Resumo de demandas selecionadas -->
+                    <div class="demandas-summary">
+                        <div class="demandas-head">
+                            <div class="demandas-title">Demandas configuradas</div>
+                            <div class="demandas-total">5 exercícios</div>
+                        </div>
+                        <div class="demandas-list">
+
+                            <div class="demanda-row">
+                                <div class="demanda-info">
+                                    <div class="demanda-name">
+                                        <span class="reg-chip" style="background:#ffe4e6; color:#9f1239; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px;">PEITO</span>
+                                        Empurrar compostos
+                                    </div>
+                                    <div class="demanda-meta">ex: Supino reto · Supino inclinado</div>
+                                </div>
+                                <div class="demanda-counter">
+                                    <button data-tooltip="Diminuir"><svg class="icon icon-xs"><use href="#i-minus"/></svg></button>
+                                    <span class="count">2</span>
+                                    <button data-tooltip="Aumentar"><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                </div>
+                                <button class="demanda-remove" data-tooltip="Remover"><svg class="icon icon-xs"><use href="#i-x"/></svg></button>
+                            </div>
+
+                            <div class="demanda-row">
+                                <div class="demanda-info">
+                                    <div class="demanda-name">
+                                        <span class="reg-chip" style="background:#fef3c7; color:#92400e; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px;">OMBRO</span>
+                                        Desenvolvimento
+                                    </div>
+                                    <div class="demanda-meta">ex: Desenv. halteres · Arnold press</div>
+                                </div>
+                                <div class="demanda-counter">
+                                    <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button>
+                                    <span class="count">1</span>
+                                    <button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                </div>
+                                <button class="demanda-remove"><svg class="icon icon-xs"><use href="#i-x"/></svg></button>
+                            </div>
+
+                            <div class="demanda-row">
+                                <div class="demanda-info">
+                                    <div class="demanda-name">
+                                        <span class="reg-chip" style="background:#ede9fe; color:#5b21b6; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px;">BRAÇOS</span>
+                                        Tríceps
+                                    </div>
+                                    <div class="demanda-meta">ex: Corda · Francês</div>
+                                </div>
+                                <div class="demanda-counter">
+                                    <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button>
+                                    <span class="count">2</span>
+                                    <button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                </div>
+                                <button class="demanda-remove"><svg class="icon icon-xs"><use href="#i-x"/></svg></button>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    </div><!-- fim modo hierarquia -->
+
+                    <!-- ═════ MODO TEMPLATE ═════ -->
+                    <div id="modo-template" style="display:none">
+
+                        <div class="templates-grid">
+
+                            <button class="template-card">
+                                <div class="template-name">Full Body</div>
+                                <div class="template-tags">
+                                    <span class="template-tag">remadas</span>
+                                    <span class="template-tag">puxadas</span>
+                                    <span class="template-tag">empurrar</span>
+                                    <span class="template-tag">desenv.</span>
+                                    <span class="template-tag">squat</span>
+                                    <span class="template-tag">+4</span>
+                                </div>
+                                <div class="template-meta">9 padrões</div>
+                            </button>
+
+                            <button class="template-card selected">
+                                <div class="template-name">Full Body + Braços</div>
+                                <div class="template-tags">
+                                    <span class="template-tag">remadas</span>
+                                    <span class="template-tag">puxadas</span>
+                                    <span class="template-tag">empurrar</span>
+                                    <span class="template-tag">desenv.</span>
+                                    <span class="template-tag">squat</span>
+                                    <span class="template-tag">+6</span>
+                                </div>
+                                <div class="template-meta">11 padrões</div>
+                            </button>
+
+                            <button class="template-card">
+                                <div class="template-name">Empurrar + Posterior</div>
+                                <div class="template-tags">
+                                    <span class="template-tag">empurrar</span>
+                                    <span class="template-tag">desenv.</span>
+                                    <span class="template-tag">hinge</span>
+                                    <span class="template-tag">flex. joelho</span>
+                                    <span class="template-tag">+4</span>
+                                </div>
+                                <div class="template-meta">8 padrões</div>
+                            </button>
+
+                            <button class="template-card">
+                                <div class="template-name">Puxar + Anterior</div>
+                                <div class="template-tags">
+                                    <span class="template-tag">remadas</span>
+                                    <span class="template-tag">puxadas</span>
+                                    <span class="template-tag">post. ombro</span>
+                                    <span class="template-tag">squat</span>
+                                    <span class="template-tag">+3</span>
+                                </div>
+                                <div class="template-meta">7 padrões</div>
+                            </button>
+
+                            <button class="template-card">
+                                <div class="template-name">Upper</div>
+                                <div class="template-tags">
+                                    <span class="template-tag">remadas</span>
+                                    <span class="template-tag">puxadas</span>
+                                    <span class="template-tag">empurrar</span>
+                                    <span class="template-tag">desenv.</span>
+                                    <span class="template-tag">+4</span>
+                                </div>
+                                <div class="template-meta">8 padrões</div>
+                            </button>
+
+                            <button class="template-card">
+                                <div class="template-name">Lower</div>
+                                <div class="template-tags">
+                                    <span class="template-tag">squat</span>
+                                    <span class="template-tag">hinge</span>
+                                    <span class="template-tag">flex. joelho</span>
+                                    <span class="template-tag">abdução</span>
+                                    <span class="template-tag">+3</span>
+                                </div>
+                                <div class="template-meta">7 padrões</div>
+                            </button>
+
+                        </div>
+
+                        <div class="template-config-panel">
+                            <div class="template-config-title">Configurar Full Body + Braços</div>
+                            <div class="demandas-list">
+
+                                <div class="demanda-row">
+                                    <div class="demanda-info">
+                                        <div class="demanda-name">Remadas</div>
+                                        <div class="demanda-meta">costas · puxar horizontal</div>
+                                    </div>
+                                    <div class="demanda-counter">
+                                        <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button>
+                                        <span class="count">1</span>
+                                        <button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                    </div>
+                                    <span></span>
+                                </div>
+
+                                <div class="demanda-row">
+                                    <div class="demanda-info">
+                                        <div class="demanda-name">Puxadas</div>
+                                        <div class="demanda-meta">costas · puxar vertical</div>
+                                    </div>
+                                    <div class="demanda-counter">
+                                        <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button>
+                                        <span class="count">1</span>
+                                        <button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                    </div>
+                                    <span></span>
+                                </div>
+
+                                <div class="demanda-row">
+                                    <div class="demanda-info">
+                                        <div class="demanda-name">Empurrar compostos</div>
+                                        <div class="demanda-meta">peito · supino e variações</div>
+                                    </div>
+                                    <div class="demanda-counter">
+                                        <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button>
+                                        <span class="count">1</span>
+                                        <button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                    </div>
+                                    <span></span>
+                                </div>
+
+                                <div class="demanda-row">
+                                    <div class="demanda-info">
+                                        <div class="demanda-name">Agachamento (squat)</div>
+                                        <div class="demanda-meta">perna anterior · composto</div>
+                                    </div>
+                                    <div class="demanda-counter">
+                                        <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button>
+                                        <span class="count">1</span>
+                                        <button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                    </div>
+                                    <span></span>
+                                </div>
+
+                                <div class="demanda-row">
+                                    <div class="demanda-info">
+                                        <div class="demanda-name">Bíceps</div>
+                                        <div class="demanda-meta">braços · isolado</div>
+                                    </div>
+                                    <div class="demanda-counter">
+                                        <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button>
+                                        <span class="count">1</span>
+                                        <button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                    </div>
+                                    <span></span>
+                                </div>
+
+                                <div style="text-align: center; padding: 6px; color: var(--gray-400); font-size: 11px; font-weight: 500;">+ 6 outros padrões</div>
+
+                            </div>
+                        </div>
+
+                    </div><!-- fim modo template -->
+
+                </div><!-- fim right-col -->
+
+            </div><!-- fim grid -->
+
+        </div>
+    </main>
+</div>
+
+<!-- Mobile bar com botão Gerar -->
+<div class="mobile-bar">
+    <button class="btn-generate">
+        <svg class="icon"><use href="#i-sparkles"/></svg>
+        Gerar treinos · 5 exercícios configurados
+    </button>
+</div>
+
+<script>
+function showScenario(s) {
+    document.querySelectorAll('.scenario-tab').forEach(b => b.classList.toggle('active', b.dataset.s === s));
+    document.querySelectorAll('[id^="desc-"]').forEach(d => d.classList.add('hidden'));
+    document.getElementById('desc-' + s).classList.remove('hidden');
+
+    const banner = document.getElementById('context-banner');
+    const hier = document.getElementById('modo-hierarquia');
+    const tmpl = document.getElementById('modo-template');
+    const btnHier = document.getElementById('btn-mode-hier');
+    const btnTmpl = document.getElementById('btn-mode-tmpl');
+
+    if (s === 'hierarquia') {
+        banner.style.display = 'none';
+        hier.style.display = '';
+        tmpl.style.display = 'none';
+        btnHier.classList.add('active');
+        btnTmpl.classList.remove('active');
+    } else if (s === 'template') {
+        banner.style.display = 'none';
+        hier.style.display = 'none';
+        tmpl.style.display = '';
+        btnHier.classList.remove('active');
+        btnTmpl.classList.add('active');
+    } else if (s === 'contexto') {
+        banner.style.display = '';
+        hier.style.display = '';
+        tmpl.style.display = 'none';
+        btnHier.classList.add('active');
+        btnTmpl.classList.remove('active');
+        // Trava número de treinos visualmente
+        const sel = document.getElementById('n-treinos-select');
+        sel.value = '1';
+        sel.disabled = true;
+    } else {
+        document.getElementById('n-treinos-select').disabled = false;
+    }
+    if (s !== 'contexto') {
+        document.getElementById('n-treinos-select').disabled = false;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Toggle de modo dentro da aba (sem mudar cenário)
+document.getElementById('btn-mode-hier').addEventListener('click', function(e) {
+    e.preventDefault();
+    document.getElementById('modo-hierarquia').style.display = '';
+    document.getElementById('modo-template').style.display = 'none';
+    this.classList.add('active');
+    document.getElementById('btn-mode-tmpl').classList.remove('active');
+});
+document.getElementById('btn-mode-tmpl').addEventListener('click', function(e) {
+    e.preventDefault();
+    document.getElementById('modo-hierarquia').style.display = 'none';
+    document.getElementById('modo-template').style.display = '';
+    this.classList.add('active');
+    document.getElementById('btn-mode-hier').classList.remove('active');
+});
+
+// Toggle de regiões (abrir/fechar)
+document.querySelectorAll('.regiao-head').forEach(h => {
+    h.addEventListener('click', () => h.parentElement.classList.toggle('open'));
+});
+
+// Toggle de tag de padrão
+document.querySelectorAll('.padrao-tag').forEach(t => {
+    t.addEventListener('click', () => t.classList.toggle('active'));
+});
+
+// Selecionar template
+document.querySelectorAll('.template-card').forEach(c => {
+    c.addEventListener('click', () => {
+        document.querySelectorAll('.template-card').forEach(x => x.classList.remove('selected'));
+        c.classList.add('selected');
+    });
+});
+</script>
+</body>
+</html>

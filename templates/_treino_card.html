@@ -1,23 +1,78 @@
 {% set eh_criacao = modo == 'editar' and hub_aluno_id and criacao_manual_aluno == hub_aluno_id and criacao_manual_idx == idx %}
+{% set bloco_vazio_guiado = eh_criacao and (sessao.blocos|length == 0) %}
+{% set purpose_pt = {'compound':'composto','isolation':'isolado','stability':'estabilidade','explosive':'explosivo'} %}
 <div class="treino-card modo-{{ modo }}">
     {% if eh_criacao %}
-    <div class="criacao-manual-banner" style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:10px 12px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px">
-        <div style="font-size:13px">
-            <span style="font-weight:600; color:#9a3412">Criando treino manual</span>
-            <span style="color:#9a3412; opacity:0.8"> · salve para manter na rotina ou cancele para descartar</span>
+    <div class="edit-mode-banner">
+        <div class="edit-mode-info">
+            <div class="edit-mode-icon"><svg class="icon"><use href="#i-circle-plus"/></svg></div>
+            <div class="edit-mode-text">
+                <span class="edit-mode-title">Criando treino manual · Treino {{ idx + 1 }}</span>
+                <span class="edit-mode-sub">Será adicionado à rotina atual · cancele para descartar</span>
+            </div>
         </div>
-        <div style="display:flex; gap:6px">
-            <button class="btn btn-sm btn-primary"
-                    hx-post="/hub/rotina/{{ hub_aluno_id }}/criar-manual/salvar"
-                    hx-target="#rotina-display" hx-swap="innerHTML">✓ Salvar treino</button>
+        <div class="edit-mode-actions">
             <button class="btn btn-sm"
                     hx-post="/hub/rotina/{{ hub_aluno_id }}/criar-manual/cancelar"
                     hx-target="#rotina-display" hx-swap="innerHTML"
                     hx-confirm="Descartar o treino em criação e voltar à rotina anterior?"><svg class="icon"><use href="#i-x"/></svg> Cancelar</button>
+            <button class="btn btn-sm btn-primary"
+                    hx-post="/hub/rotina/{{ hub_aluno_id }}/criar-manual/salvar"
+                    hx-target="#rotina-display" hx-swap="innerHTML"><svg class="icon"><use href="#i-check"/></svg> Salvar treino</button>
+        </div>
+    </div>
+    {% endif %}
+    {% if modo == 'editar' and not eh_criacao %}
+    {% set banner_chips = sessao_chips(sessao) %}
+    <div class="edit-mode-banner">
+        <div class="edit-mode-info">
+            <div class="edit-mode-icon"><svg class="icon"><use href="#i-pencil"/></svg></div>
+            <div class="edit-mode-text">
+                <span class="edit-mode-title">
+                    Editando Treino {{ idx + 1 }}
+                    {% for label, slug in banner_chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
+                </span>
+                <span class="edit-mode-sub">Alterações são salvas automaticamente</span>
+            </div>
+        </div>
+        <div class="edit-mode-actions">
+            {% if hub_aluno_id %}
+            <button class="btn btn-sm btn-default" hx-get="/hub/rotina/{{ hub_aluno_id }}/treino/{{ idx }}/visualizar-inline" hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-eye"/></svg> Concluir edição</button>
+            {% else %}
+            <button class="btn btn-sm btn-default" hx-get="/treino/{{ idx }}/visualizar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-eye"/></svg> Concluir edição</button>
+            {% endif %}
         </div>
     </div>
     {% endif %}
     <div class="treino-header">
+        <div class="treino-titulo-linha">
+            {% if eh_criacao %}
+            <span class="treino-titulo">Treino {{ idx + 1 }}</span>
+            <input type="text" class="treino-nome-input"
+                   name="nome"
+                   placeholder="Dê um nome ao treino..."
+                   value="{{ sessao.tipo if sessao.tipo and sessao.tipo != 'manual' else '' }}"
+                   hx-post="/hub/rotina/{{ hub_aluno_id }}/criar-manual/nome"
+                   hx-trigger="blur changed, keyup[key=='Enter']"
+                   hx-swap="none">
+            {% set chips = sessao_chips(sessao) %}
+            {% if chips %}
+            <div class="regiao-chips mt-1">
+                {% for label, slug in chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
+            </div>
+            {% else %}
+            <div class="regiao-chips-empty">As regiões aparecerão conforme você adicionar exercícios</div>
+            {% endif %}
+            {% else %}
+            <span class="treino-titulo">Treino {{ idx + 1 }}</span>
+            {% set chips = sessao_chips(sessao) %}
+            {% if chips %}
+            <div class="regiao-chips mt-1">
+                {% for label, slug in chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
         <div class="treino-acoes">
             {% if modo == 'visualizar' %}
             <button class="btn btn-sm btn-icon" title="Regerar" hx-post="/treino/{{ idx }}/regerar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-refresh-cw"/></svg></button>
@@ -26,26 +81,9 @@
             {% else %}
             <button class="btn btn-sm btn-icon" title="Editar" hx-get="/treino/{{ idx }}/editar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-pencil"/></svg></button>
             {% endif %}
-            {% else %}
-            {% if not eh_criacao %}
-            {% if hub_aluno_id %}
-            <button class="btn btn-sm btn-icon" title="Concluir edição" hx-get="/hub/rotina/{{ hub_aluno_id }}/treino/{{ idx }}/visualizar-inline" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">👁</button>
-            {% else %}
-            <button class="btn btn-sm btn-icon" title="Visualizar" hx-get="/treino/{{ idx }}/visualizar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">👁</button>
-            {% endif %}
-            {% endif %}
             {% endif %}
             <a class="btn btn-sm btn-icon" title="Baixar PNG" href="/treino/{{ idx }}/png/Aluno" id="dl-png-{{ idx }}"
-               onclick="this.href='/treino/{{ idx }}/png/'+(document.getElementById('sel-aluno')?.value||'Aluno')">⬇</a>
-        </div>
-        <div class="treino-titulo-linha">
-            <span class="treino-titulo">Treino {{ idx + 1 }}</span>
-            {% set chips = sessao_chips(sessao) %}
-            {% if chips %}
-            <div class="regiao-chips mt-1">
-                {% for label, slug in chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
-            </div>
-            {% endif %}
+               onclick="this.href='/treino/{{ idx }}/png/'+(document.getElementById('sel-aluno')?.value||'Aluno')"><svg class="icon"><use href="#i-download"/></svg></a>
         </div>
     </div>
 
@@ -60,10 +98,10 @@
     <div class="bloco-header">
         <span class="bloco-chip">{{ bloco.label }}</span>        <button class="btn-ghost" title="Regerar bloco" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/regerar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML" hx-confirm="Regerar bloco {{ bloco.label }} com novos exercícios?"><svg class="icon"><use href="#i-refresh-cw"/></svg></button>
         {% if loop.index0 > 0 %}
-        <button class="btn-ghost" title="Mover acima" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/mover/up" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">↑</button>
+        <button class="btn-ghost" title="Mover acima" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/mover/up" hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-arrow-up"/></svg></button>
         {% endif %}
         {% if not loop.last %}
-        <button class="btn-ghost" title="Mover abaixo" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/mover/down" hx-target="#treino-{{ idx }}" hx-swap="innerHTML">↓</button>
+        <button class="btn-ghost" title="Mover abaixo" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/mover/down" hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-arrow-down"/></svg></button>
         {% endif %}
         <button class="btn-ghost" title="Remover bloco" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/deletar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML" hx-confirm="Remover bloco {{ bloco.label }}?"><svg class="icon"><use href="#i-trash"/></svg></button>
     </div>
@@ -79,7 +117,7 @@
     {% set bi = bloco_idx %}
     <div class="exercicio-wrapper" data-treino="{{ idx }}" data-bloco="{{ bloco_idx }}" data-ei="{{ ei }}">
         <div class="exercicio">
-            {% if modo == 'editar' %}<span class="drag-handle" title="Arrastar">⠿</span>{% endif %}
+            {% if modo == 'editar' %}<span class="drag-handle" title="Arrastar"><svg class="icon"><use href="#i-grip-vertical"/></svg></span>{% endif %}
             <div class="exercicio-info">
                 <span class="exercicio-nome">
                     {{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
@@ -89,6 +127,16 @@
                         {% endif %}
                     {% endif %}
                 </span>
+                {% set equip = ex.eq_primario if ex.eq_primario else '' %}
+                {% if ex.eq_secundario %}{% set equip = (equip ~ ' + ' ~ ex.eq_secundario) if equip else ex.eq_secundario %}{% endif %}
+                {% if ex.purpose or equip or ex.unilateral or (ex.fadiga and ex.fadiga >= 4) %}
+                <div class="ex-meta-chips">
+                    {% if ex.purpose %}<span class="meta-chip purpose"><svg class="icon"><use href="#i-zap"/></svg>{{ purpose_pt.get(ex.purpose, ex.purpose) }}</span>{% endif %}
+                    {% if equip %}<span class="meta-chip equip"><svg class="icon"><use href="#i-tool"/></svg>{{ equip }}</span>{% endif %}
+                    {% if ex.unilateral %}<span class="meta-chip lateralidade">{{ ex.unilateral }}</span>{% endif %}
+                    {% if ex.fadiga and ex.fadiga >= 4 %}<span class="meta-chip fadiga"><svg class="icon"><use href="#i-flame"/></svg>{{ ex.fadiga }}</span>{% endif %}
+                </div>
+                {% endif %}
             </div>
             {% if modo != 'editar' and (ex.series or ex.reps) %}
             <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
@@ -96,80 +144,39 @@
             {% if modo == 'editar' %}
             <form class="prescricao-inline"
                   hx-post="/treino/{{ idx }}/prescricao/{{ bloco_idx }}/{{ ei }}"
-                  hx-target="#treino-{{ idx }}" hx-swap="innerHTML">
+                  hx-trigger="change delay:200ms"
+                  hx-swap="none">
                 <input type="number" name="series" value="{{ ex.series or 3 }}" min="1" max="10" title="Séries">
                 <span class="sep">×</span>
-                <input type="text" name="reps" value="{{ ex.reps or '8-12' }}" title="Reps">
-                <span class="sep">· RIR</span>
+                <input type="text" name="reps" class="reps" value="{{ ex.reps or '8-12' }}" title="Reps">
+                <span class="sep">·</span>
+                <span class="label">RIR</span>
                 <input type="number" name="rir" value="{{ ex.rir if ex.rir is not none else 2 }}" min="0" max="4" title="RIR">
-                <button type="submit" class="btn-ghost" title="Salvar">💾</button>
             </form>
             <div class="exercicio-acoes">
                 <button class="btn-ghost" title="Substituir aleatório"
                         hx-post="/treino/{{ idx }}/substituir/{{ ex.nome|urlencode }}"
-                        hx-target="#treino-{{ idx }}" hx-swap="innerHTML">🎲</button>
+                        hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-shuffle"/></svg></button>
+                {% set chip_ex = padrao_para_chip.get(ex.padrao) if ex.padrao else None %}
+                {% set meta_resumo = [] %}
+                {% if ex.purpose %}{% set _ = meta_resumo.append(purpose_pt.get(ex.purpose, ex.purpose)) %}{% endif %}
+                {% if ex.eq_primario %}{% set _ = meta_resumo.append(ex.eq_primario) %}{% endif %}
+                {% if ex.unilateral %}{% set _ = meta_resumo.append(ex.unilateral) %}{% endif %}
                 <button type="button" class="btn-ghost" title="Substituir manualmente"
-                        onclick="toggleSubstPanel({{ idx }}, {{ bloco_idx }}, {{ ei }})"><svg class="icon"><use href="#i-rotate-ccw"/></svg></button>
+                        onclick='openSubstDrawer({{ {"treino": idx, "bloco": bloco_idx, "ei": ei, "nome": ex.nome, "padrao": ex.padrao or "", "label": (bloco.label ~ (loop.index|string)), "regiaoLabel": (chip_ex[0] if chip_ex else ""), "regiaoSlug": (chip_ex[1] if chip_ex else ""), "meta": (meta_resumo|join(" · "))}|tojson }})'><svg class="icon"><use href="#i-replace"/></svg></button>
                 <button class="btn-ghost" title="Remover"
                         hx-post="/treino/{{ idx }}/exercicio/remover/{{ bloco_idx }}/{{ ei }}"
                         hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-x"/></svg></button>
             </div>
             {% endif %}
         </div>
-        {% if modo == 'editar' %}
-        <div class="subst-panel" id="subst-{{ idx }}-{{ bloco_idx }}-{{ ei }}" style="display:none">
-            <div class="filtros-grid">
-                <input type="text" placeholder="Buscar por nome..." name="texto"
-                       id="sub-txt-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
-                       hx-get="/treino/{{ idx }}/buscar-substitutos/{{ ex.nome|urlencode }}"
-                       hx-trigger="keyup changed delay:300ms"
-                       hx-target="#sub-results-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
-                       hx-include="#sub-txt-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pur-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-uni-{{ idx }}-{{ bloco_idx }}-{{ ei }}">
-                <select name="padrao" id="sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
-                        hx-get="/treino/{{ idx }}/buscar-substitutos/{{ ex.nome|urlencode }}"
-                        hx-trigger="change"
-                        hx-target="#sub-results-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
-                        hx-include="#sub-txt-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pur-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-uni-{{ idx }}-{{ bloco_idx }}-{{ ei }}">
-                    <option value="{{ ex.padrao }}" selected>{{ padroes_labels.get(ex.padrao, ex.padrao) }} (mesmo)</option>
-                    <option value="">Qualquer categoria</option>
-                    {% for p in todos_padroes if p != ex.padrao %}<option value="{{ p }}">{{ padroes_labels.get(p, p) }}</option>{% endfor %}
-                </select>
-                <select name="purpose" id="sub-pur-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
-                        hx-get="/treino/{{ idx }}/buscar-substitutos/{{ ex.nome|urlencode }}"
-                        hx-trigger="change"
-                        hx-target="#sub-results-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
-                        hx-include="#sub-txt-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pur-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-uni-{{ idx }}-{{ bloco_idx }}-{{ ei }}">
-                    <option value="">Qualquer purpose</option>
-                    <option>compound</option><option>isolation</option><option>stability</option><option>explosive</option>
-                </select>
-                <select name="unilateral" id="sub-uni-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
-                        hx-get="/treino/{{ idx }}/buscar-substitutos/{{ ex.nome|urlencode }}"
-                        hx-trigger="change"
-                        hx-target="#sub-results-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
-                        hx-include="#sub-txt-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-pur-{{ idx }}-{{ bloco_idx }}-{{ ei }}, #sub-uni-{{ idx }}-{{ bloco_idx }}-{{ ei }}">
-                    <option value="">Qualquer lateralidade</option>
-                    <option>bilateral</option><option>unilateral</option>
-                </select>
-            </div>
-            <div id="sub-results-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
-                 hx-get="/treino/{{ idx }}/buscar-substitutos/{{ ex.nome|urlencode }}"
-                 hx-trigger="load"
-                 hx-include="#sub-pad-{{ idx }}-{{ bloco_idx }}-{{ ei }}"></div>
-            <div style="margin-top:8px; display:flex; gap:6px">
-                <button type="button" class="btn btn-sm btn-primary"
-                        onclick="confirmarSubst({{ idx }}, {{ bloco_idx }}, {{ ei }}, {{ ex.nome|tojson }})">✅ Substituir</button>
-                <button type="button" class="btn btn-sm"
-                        onclick="toggleSubstPanel({{ idx }}, {{ bloco_idx }}, {{ ei }})">Cancelar</button>
-            </div>
-        </div>
-        {% endif %}
     </div>
     {% endfor %}
     </div>
 
     {% if modo == 'editar' and exs|length < 3 %}
     <details>
-        <summary class="panel-title panel-title-add">＋ Adicionar exercício</summary>
+        <summary class="add-ex-trigger"><svg class="icon"><use href="#i-plus"/></svg> Adicionar exercício neste bloco</summary>
         <div class="add-panel">
             <div class="filtros-grid">
                 <input type="text" placeholder="Buscar por nome..." name="texto"
@@ -208,7 +215,7 @@
                  hx-trigger="load"
                  ></div>
             <button type="button" class="btn btn-sm btn-primary" style="margin-top:8px"
-                    onclick="adicionarEx({{ idx }}, {{ bloco_idx }})">✅ Adicionar</button>
+                    onclick="adicionarEx({{ idx }}, {{ bloco_idx }})"><svg class="icon"><use href="#i-check"/></svg> Adicionar</button>
         </div>
     </details>
     {% endif %}
@@ -216,9 +223,53 @@
     </div>
     {% endfor %}
 
+    {% if bloco_vazio_guiado %}
+    {% set aluno = criacao_manual_aluno_obj %}
+    <div class="empty-bloco-card" id="empty-bloco-card-{{ idx }}">
+        <div class="empty-bloco-illust"><svg class="icon"><use href="#i-dumbbell"/></svg></div>
+        <div class="empty-bloco-title">Comece adicionando o primeiro exercício</div>
+        <div class="empty-bloco-sub">
+            Você pode escolher manualmente da biblioteca ou usar uma das sugestões abaixo
+            {% if aluno %}, baseadas na estratégia <strong>{{ aluno.objetivo or 'do aluno' }}{% if aluno.nivel %} · Nível {{ aluno.nivel }}{% endif %}</strong>{% endif %}.
+        </div>
+        <div class="empty-bloco-cta-row">
+            <button type="button" class="btn btn-primary"
+                    onclick="document.getElementById('empty-bloco-card-{{ idx }}').style.display='none'; var d=document.getElementById('novo-bloco-details-{{ idx }}'); if(d){ d.style.display=''; d.open=true; d.scrollIntoView({behavior:'smooth',block:'center'}); var i=d.querySelector('input[name=texto]'); if(i)setTimeout(function(){i.focus();},150); }">
+                <svg class="icon"><use href="#i-search"/></svg> Buscar exercício
+            </button>
+            <button type="button" class="btn"
+                    hx-post="/treino/{{ idx }}/novo-bloco-vazio"
+                    hx-target="#treino-{{ idx }}" hx-swap="innerHTML">
+                <svg class="icon"><use href="#i-plus"/></svg> Adicionar bloco vazio
+            </button>
+        </div>
+        {% if criacao_manual_quick_pick %}
+        <div class="quick-pick-section">
+            <div class="quick-pick-title">Sugestões para este aluno</div>
+            <div class="quick-pick-grid">
+                {% for ex in criacao_manual_quick_pick %}
+                {% set chip = padrao_para_chip.get(ex.padrao) %}
+                <button type="button" class="quick-pick-btn"
+                        hx-post="/treino/{{ idx }}/novo-bloco/{{ ex.nome|urlencode }}"
+                        hx-target="#treino-{{ idx }}" hx-swap="innerHTML">
+                    <span class="qp-name">{{ ex.nome }}</span>
+                    <span class="qp-meta">{{ chip[0] if chip else ex.padrao }} · {{ purpose_pt.get(ex.purpose, ex.purpose) }}</span>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     {% if modo == 'editar' %}
-    <details>
-        <summary class="panel-title panel-title-novo">＋ Novo bloco</summary>
+    {% set proxima_letra = ['A','B','C','D','E','F','G','H'][sessao.blocos|length] if sessao.blocos|length < 8 else '?' %}
+    <details id="novo-bloco-details-{{ idx }}"{% if bloco_vazio_guiado %} style="display:none"{% endif %}>
+        <summary class="novo-bloco-card">
+            <div class="novo-bloco-icon"><svg class="icon"><use href="#i-plus"/></svg></div>
+            <div class="novo-bloco-titulo">Novo bloco</div>
+            <div class="novo-bloco-sub">Adicionar bloco {{ proxima_letra }} ao treino</div>
+        </summary>
         <div class="novo-panel">
             <div class="filtros-grid">
                 <input type="text" placeholder="Buscar por nome..." name="texto"
@@ -249,29 +300,17 @@
                  hx-trigger="load"
                  ></div>
             <button type="button" class="btn btn-sm btn-primary" style="margin-top:8px"
-                    onclick="novoBloco({{ idx }})">✅ Criar bloco</button>
+                    onclick="novoBloco({{ idx }})"><svg class="icon"><use href="#i-check"/></svg> Criar bloco</button>
         </div>
     </details>
 
     <div class="novo-bloco-zone" id="novo-bloco-zone-{{ idx }}">
-        ⬇ Solte aqui para criar novo bloco
+        <svg class="icon"><use href="#i-arrow-down"/></svg> Solte aqui para criar novo bloco
     </div>
     {% endif %}
 </div>
 
 <script>
-function toggleSubstPanel(t, bi, ei) {
-    const el = document.getElementById('subst-' + t + '-' + bi + '-' + ei);
-    if (!el) return;
-    el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
-}
-function confirmarSubst(t, bi, ei, nomeAtual) {
-    const radio = document.querySelector('#sub-results-' + t + '-' + bi + '-' + ei + ' input[name="exercicio_escolhido"]:checked');
-    if (!radio) { alert('Selecione um exercício'); return; }
-    htmx.ajax('POST',
-        '/treino/' + t + '/substituir-por/' + encodeURIComponent(nomeAtual) + '/' + encodeURIComponent(radio.value),
-        {target: '#treino-' + t, swap: 'innerHTML'});
-}
 function adicionarEx(t, bi) {
     const radio = document.querySelector('#add-results-' + t + '-' + bi + ' input[name="exercicio_escolhido"]:checked');
     if (!radio) { alert('Selecione um exercício'); return; }
