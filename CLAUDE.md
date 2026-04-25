@@ -22,6 +22,8 @@ templates/
   _rotina_hub.html        — Partial: rotina do aluno no HUB (atual/anterior/comparar)
   _resultado.html         — Partial: treinos gerados (auto-ref, comparação, salvar)
   _treino_card.html       — Partial: card de 1 treino (visualizar/editar) + initSortable
+  _draft_banner.html      — Partial: banner de rascunho (atualizar/nova, etiqueta autosave, intent)
+  _changes_list.html      — Partial: lista de alterações do rascunho (added/removed/edited)
   _substituicao.html      — Partial: lista de exercícios para substituição/adição
   _aluno_dropdown.html    — Partial: select de aluno (hx-swap-oob)
   _historico_aluno.html   — Partial: histórico filtrado por aluno
@@ -35,7 +37,7 @@ templates/
   historico.html          — Partial: filtros + lista do histórico
   historico_page.html     — Página completa: wrapper de histórico
 
-Gerados: bf_treinamento.db, sessoes_salvas.json
+Gerados (gitignored): bf_treinamento.db, sessoes_salvas.json
 ```
 
 ## Estruturas de dados
@@ -43,7 +45,7 @@ Gerados: bf_treinamento.db, sessoes_salvas.json
 - **`Exercicio`** (dataclass): nome, variacao_de, eq_primario, eq_secundario, regiao, subregiao, padrao, purpose, unilateral, complexidade (1-5), fadiga (1-5), circuito, similaridade, musculo_primario, obs + prescrição: series, reps (str), rir (0-4)
 - **`SuperSerie`**: label (A/B/C...), ex1, ex2?, ex3?
 - **`Sessao`**: tipo (string de padrões), blocos (lista de SuperSerie)
-- **SQLite**: tabelas `alunos` (id, nome, nivel, objetivo, restricoes JSON, obs, rotina_ativa_id TEXT) e `historico` (id, data_salvo, aluno, etiqueta, n_treinos, sessoes JSON, configs JSON)
+- **SQLite**: tabela `alunos` (id, nome, nivel, objetivo, restricoes JSON, obs, rotina_ativa_id, rascunho_rotina JSON, rascunho_etiqueta, rascunho_intent) e `historico` (id, data_salvo, data_atualizada, aluno, etiqueta, n_treinos, sessoes JSON, configs JSON)
 
 ## Estado do servidor (variáveis globais em app_flask.py)
 
@@ -52,6 +54,7 @@ Gerados: bf_treinamento.db, sessoes_salvas.json
 - `opcoes_globais` — n_treinos, max_complexidade, tamanho_bloco, variar_entre, evitar_agonistas
 - `referencias` — lista de `{"sessao": Sessao, "origem": {...}, "id_ref": str}`. Auto-preenchidas ao gerar com histórico
 - `edicao_hub` — dict com `aluno_id` e `rotina_id` quando editando rotina do HUB
+- `criacao_manual` — dict com `aluno_id` e `novo_idx` quando há treino sendo criado manualmente
 - Persistência via `sessoes_salvas.json` (auto-save + auto-restore)
 
 ## Navegação (rotas principais)
@@ -89,7 +92,7 @@ Fluxo: selecionar exercícios (similaridade) → ordenar compostos primeiro → 
 
 ## Layout
 
-**HUB** (`hub.html`) — seletor de aluno no topo, toggle Atual/Anterior/Lado a lado, grid de treino cards com ações (substituir, remover, regerar bloco).
+**HUB** (`hub.html`) — seletor compacto de aluno no topo. Dois split buttons "+ Treino ▾" e "Nova rotina ▾" (cada um com sub-opções "Com gerador" / "Manual"). Toggle Atual/Anterior/Lado a lado dentro do badge do aluno (ícones i-eye, i-clock, i-columns). Grid de treino cards com ações (substituir, remover, regerar bloco). Banner de rascunho aparece automaticamente em qualquer alteração.
 
 **Gerador** (`treinos.html`) — grid 3 colunas (lg): sidebar esquerda (aluno + histórico + config geral + botão gerar), main (abas T1-T5 com hierarquia/template), sidebar direita (referências). Context-aware via query params (`aluno_id`, `acao`, `treino`).
 
@@ -106,14 +109,17 @@ Fluxo: selecionar exercícios (similaridade) → ordenar compostos primeiro → 
 - `initSortable(t)` em `_treino_card.html` re-roda a cada HTMX swap
 - Campos de formulário sufixados por treino: `modo_{t}`, `dem_nivel_{t}_{i}`, `dem_escopo_{t}_{i}`, `dem_qtd_{t}_{i}`, `epp_{t}_{padrao}`, `squat_bi_{t}`, `squat_uni_{t}`, `fixos_{t}`
 - Rotina ativa: `rotina_ativa_id` na tabela alunos aponta para registro no histórico. Auto-setado ao salvar.
+- **Rascunho/edição**: editar inline ativa rascunho automaticamente. Banner reativo via `hx-swap-oob` (helper `_responder_card_com_banner` adiciona OOB do banner em ~14 rotas `/treino/*` durante `edicao_hub`). Salvar tem dois modos: `atualizar` (sobrescreve registro mantendo id; preenche `data_atualizada`) e `nova` (cria registro novo, vira rotina ativa). Quando `rascunho_intent='nova-rotina'` (split "Nova rotina · Manual"), banner esconde "Atualizar rotina" para evitar sobrescrita acidental. Mini-header do aluno mostra "criada/atualizada há X" usando `data_atualizada` quando existe.
+- **Diff rascunho × publicada**: helper `diff_rascunho_vs_publicada(aluno_id)` compara por NOME do exercício no conjunto da rotina inteira (ignora posição, evita ruído de movimentação). Detecta added/removed/edited. Lazy-load via `/hub/rotina/<id>/alteracoes`. "Lado a lado" usa `classificar_exercicios_diff(atuais, anteriores)` com 4 estados visuais.
+- **Toggle Anterior**: quando há rascunho, "Anterior" passa a mostrar a rotina ativa publicada (não a anterior à ativa).
+- **Autosave de prescrição**: `hx-trigger="focusout delay:300ms"` na form. Salva ao sair do form, não enquanto digita. Rota `/limpar` zera prescrição.
 
 ## Pendências (curto prazo)
 
-- Fase 6 do redesign: remoção do sistema de referências manuais (substituído pelo toggle de período)
 - UI de exercícios fixos (backend suporta `exercicios_travados`, falta UI)
-- Painel de substituição manual conectado (backend suporta `/substituir-por/`)
 - Botão download ZIP na UI (rota existe)
 - Lista de exercícios pausados por aluno
+- Sistema de referências manuais legado (`_referencia.html`, `_comparacao.html`) — remover quando confirmado que toggle de período + lado a lado cobrem todos os casos
 
 ## Como rodar
 
