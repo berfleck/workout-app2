@@ -23,15 +23,11 @@
     </div>
     {% endif %}
     {% if modo == 'editar' and not eh_criacao %}
-    {% set banner_chips = sessao_chips(sessao) %}
     <div class="edit-mode-banner">
         <div class="edit-mode-info">
             <div class="edit-mode-icon"><svg class="icon"><use href="#i-pencil"/></svg></div>
             <div class="edit-mode-text">
-                <span class="edit-mode-title">
-                    Editando Treino {{ idx + 1 }}
-                    {% for label, slug in banner_chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
-                </span>
+                <span class="edit-mode-title">Editando Treino {{ idx + 1 }}</span>
                 <span class="edit-mode-sub">Alterações são salvas automaticamente</span>
             </div>
         </div>
