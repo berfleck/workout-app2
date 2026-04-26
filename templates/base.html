@@ -205,6 +205,8 @@
             /* Esconde sidebar e botão hambúrguer no mobile real */
             .mobile-menu-btn { display: none !important; }
             .sidebar { display: none !important; }
+            /* Gerador mobile usa topbar próprio (back + eyebrow + nome do aluno) */
+            body[data-active-page="gerador"] .topbar-mobile { display: none; }
             /* Main não precisa de pt-14 no mobile (topbar-mobile já ocupa o topo) */
             main.app-main { padding-top: 0 !important; padding-bottom: calc(var(--bb-height) + 16px); }
             main.app-main > div { padding-top: 16px !important; }
@@ -592,6 +594,236 @@
             /* Esconde Concluir/Cancelar/PNG do header do card editado no mobile (acoes vao pra bb) */
             .treino-card.modo-editar .edit-mode-actions { display: none !important; }
             .treino-card.modo-editar .treino-acoes { display: none !important; }
+
+            /* ── Gerador mobile · topbar custom (≤768px) ── redesign 02 etapa 9 ── */
+            /* Quebra padding-top do wrapper pra topbar grudar no topo */
+            body[data-active-page="gerador"] main.app-main > div { padding-top: 0 !important; }
+            .gerador-mobile-topbar {
+                display: flex; align-items: center; gap: 10px;
+                padding: 12px 14px;
+                margin: 0 -16px; /* quebra px-4 do wrapper pra ir borda-a-borda */
+                background: white;
+                border-bottom: 1px solid var(--gray-200);
+            }
+            #gerador-mobile { margin: 0 -16px; padding: 14px; }
+            .topbar-back {
+                width: 34px; height: 34px;
+                border-radius: 9px;
+                color: var(--gray-700);
+                display: grid; place-items: center;
+                flex-shrink: 0;
+                background: var(--gray-100);
+                border: none;
+                cursor: pointer;
+                transition: background 0.15s;
+                text-decoration: none;
+            }
+            .topbar-back:hover { background: var(--gray-200); }
+            .topbar-back .icon { width: 16px; height: 16px; }
+            .topbar-title-area { flex: 1; min-width: 0; }
+            .topbar-eyebrow {
+                font-family: var(--font-mono);
+                font-size: 9px; color: var(--gray-500);
+                text-transform: uppercase; letter-spacing: 0.12em;
+                font-weight: 700;
+            }
+            .topbar-title {
+                font-family: var(--font-body);
+                font-size: 15px; font-weight: 700;
+                color: var(--gray-900);
+                margin-top: 1px;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                letter-spacing: -0.012em;
+            }
+
+            /* ── Gerador mobile · seções colapsáveis (≤768px) ── redesign 02 etapa 9 ── */
+            .section {
+                background: white;
+                border: 1px solid var(--gray-200);
+                border-radius: 13px;
+                margin-bottom: 10px;
+                overflow: hidden;
+                box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset;
+            }
+            .section-head {
+                padding: 11px 13px;
+                display: flex; align-items: center; gap: 10px;
+                cursor: pointer;
+                transition: background 0.15s;
+            }
+            .section-head:hover { background: var(--gray-50); }
+            .section.open .section-head {
+                border-bottom: 1px solid var(--gray-200);
+                background: var(--gray-50);
+            }
+            .section-icon {
+                width: 30px; height: 30px;
+                border-radius: 8px;
+                background: var(--gray-100);
+                color: var(--gray-500);
+                display: grid; place-items: center;
+                flex-shrink: 0;
+            }
+            .section-icon .icon { width: 14px; height: 14px; }
+            .section.has-content .section-icon {
+                background: var(--brand-50);
+                color: var(--brand-600);
+            }
+            .section.is-treino .section-icon {
+                background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
+                color: white;
+                font-family: var(--font-mono);
+                font-size: 11px;
+                font-weight: 800;
+                box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset;
+            }
+            .section-title-area { flex: 1; min-width: 0; }
+            .section-title {
+                font-family: var(--font-body);
+                font-size: 13.5px; font-weight: 700;
+                color: var(--gray-900);
+                letter-spacing: -0.012em;
+            }
+            .section-sub {
+                font-size: 11px;
+                color: var(--gray-500);
+                margin-top: 1px;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                font-family: var(--font-mono);
+                font-weight: 500;
+            }
+            .section-counter {
+                font-family: var(--font-mono);
+                font-size: 10px; font-weight: 700;
+                padding: 2px 7px;
+                border-radius: 999px;
+                background: var(--gray-100);
+                color: var(--gray-600);
+                flex-shrink: 0;
+            }
+            .section.has-content .section-counter,
+            .section.is-treino .section-counter:not([data-empty="1"]) {
+                background: var(--brand-100);
+                color: var(--brand-700);
+                border: 1px solid var(--brand-200);
+            }
+            .section-chevron {
+                color: var(--gray-400);
+                transition: transform 0.2s;
+                flex-shrink: 0;
+                width: 14px; height: 14px;
+            }
+            .section.open .section-chevron { transform: rotate(180deg); }
+            .section-body { padding: 12px 13px; display: none; }
+            .section.open .section-body { display: block; }
+
+            /* Campos dentro das seções mobile */
+            .section-body .field-label {
+                display: block;
+                font-size: 11px; font-weight: 600;
+                color: var(--gray-600);
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                margin-bottom: 5px;
+            }
+            .section-body .field-label + .field-label,
+            .section-body select + .field-label,
+            .section-body input + .field-label {
+                margin-top: 12px;
+            }
+            .section-body .field-select,
+            .section-body .field-input {
+                width: 100%;
+                padding: 10px 12px;
+                border: 1px solid var(--gray-200);
+                border-radius: 9px;
+                background: white;
+                font-size: 14px;
+                color: var(--gray-900);
+                font-family: inherit;
+                appearance: none;
+                -webkit-appearance: none;
+            }
+            .section-body .field-select {
+                background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+                background-repeat: no-repeat;
+                background-position: right 12px center;
+                padding-right: 32px;
+            }
+            .section-body .field-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            .section-body .field-range {
+                display: flex; align-items: center; gap: 10px;
+            }
+            .section-body .field-range input[type="range"] { flex: 1; }
+            .section-body .field-range-value {
+                font-family: var(--font-mono);
+                font-size: 13px; font-weight: 700;
+                color: var(--brand-600);
+                min-width: 18px; text-align: center;
+            }
+            .section-body .field-toggles {
+                display: flex; flex-direction: column; gap: 8px;
+                margin-top: 12px;
+            }
+            .section-body .field-toggle {
+                display: flex; align-items: center; gap: 8px;
+                font-size: 13px; color: var(--gray-700);
+                cursor: pointer;
+            }
+            .section-body .field-hint {
+                font-size: 11px; color: var(--gray-400);
+                margin-top: 6px;
+                font-family: var(--font-mono);
+            }
+
+            /* Placeholder dos treinos T1-T5 (etapa 10 substitui) */
+            .treino-placeholder {
+                font-size: 12px;
+                color: var(--gray-400);
+                font-family: var(--font-mono);
+                padding: 14px 4px;
+                text-align: center;
+            }
+
+            /* ── Botão da bottom bar do gerador (≤768px) ── */
+            .bb-action {
+                flex: 1;
+                height: var(--bb-action-h);
+                border-radius: var(--bb-radius);
+                font-size: 13.5px;
+                font-weight: 700;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                padding: 0 16px;
+                transition: all 0.15s;
+                min-width: 0;
+                letter-spacing: -0.005em;
+                font-family: inherit;
+                border: none;
+                cursor: pointer;
+            }
+            .bb-action.primary {
+                background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
+                color: white;
+                box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 10px rgba(232,93,4,0.3);
+            }
+            .bb-action.primary:hover {
+                background: linear-gradient(180deg, var(--brand-600), #b4480c);
+            }
+            .bb-action.primary:disabled,
+            .bb-action.disabled {
+                background: var(--gray-200);
+                color: var(--gray-400);
+                cursor: not-allowed;
+                box-shadow: none;
+            }
+            .bb-action .spinner { width: 14px; height: 14px; }
         }
 
         /* ── Borda laranja no card editado (todos viewports) ── */

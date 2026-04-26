@@ -1,7 +1,31 @@
 {% extends "base.html" %}
+{% import "_mobile_section.html" as msec %}
+
+{% block bb_actions %}{% include "_mobile_bb_actions_gerador.html" %}{% endblock %}
+
 {% block content %}
 
 {% set MAX_TREINOS = 5 %}
+
+{# ═══════════════════════════════════════════════════════════════════
+   Topbar mobile do gerador (substitui o topbar-mobile global no mobile).
+   Eyebrow varia por contexto: nova_rotina / adicionar / substituir.
+═══════════════════════════════════════════════════════════════════ #}
+{% set _eyebrow_by_acao = {
+    'nova_rotina': 'Gerador · Nova rotina',
+    'adicionar': 'Gerador · + Treino',
+    'substituir': 'Gerador · Substituir',
+} %}
+{% set _gerador_eyebrow = _eyebrow_by_acao.get(ctx_acao, 'Gerador') %}
+<div class="gerador-mobile-topbar md:hidden">
+    <a href="/{% if ctx_aluno %}?aluno_id={{ ctx_aluno.id }}{% endif %}" class="topbar-back" aria-label="Voltar">
+        <svg class="icon"><use href="#i-arrow-left"/></svg>
+    </a>
+    <div class="topbar-title-area">
+        <div class="topbar-eyebrow">{{ _gerador_eyebrow }}</div>
+        <div class="topbar-title" id="m-topbar-title">{{ ctx_aluno.nome if ctx_aluno else 'Selecione um aluno' }}</div>
+    </div>
+</div>
 
 {% if ctx_acao %}
 {% set ctx_icone = {'substituir': 'i-replace', 'adicionar': 'i-plus'}.get(ctx_acao, 'i-dumbbell') %}
@@ -32,7 +56,8 @@
 {% endif %}
 
 <!-- ═══ Layout 2 colunas (lg) / stack (mobile) ═══ -->
-<div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 lg:gap-6 pb-24 lg:pb-6">
+<!-- Desktop (≥md): grid 2 colunas ─ Mobile (<md): bloco abaixo (`#gerador-mobile`) substitui esta UI -->
+<div class="hidden md:grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 lg:gap-6 pb-24 lg:pb-6">
 
     <!-- ── SIDEBAR ESQUERDA: aluno + histórico + config + ação ── -->
     <aside class="space-y-4 order-1">
@@ -261,6 +286,139 @@
 
 
 </div>
+
+{# ═══════════════════════════════════════════════════════════════════
+   GERADOR MOBILE (<md) — etapa 9 redesign 02
+   Shell + seções colapsáveis Aluno e Configurações + placeholders T1-T5.
+   Inputs aqui são CONTROLLERS sem `name`: JS espelha pros inputs do
+   bloco desktop acima (que mantém os `name` que o backend espera).
+   Etiqueta da rotina é exclusiva do mobile (campo novo, name="etiqueta_rotina").
+═══════════════════════════════════════════════════════════════════ #}
+{% set _mob_aluno_open = (ctx_acao == '') and (not ctx_aluno) %}
+{% set _mob_config_open = (ctx_acao in ('', 'nova_rotina')) %}
+{% set _mob_aluno_has = ctx_aluno is not none %}
+<div id="gerador-mobile" class="gerador-mobile md:hidden">
+
+    {# ── Seção Aluno ── #}
+    {{ msec.open(
+        id='msec-aluno',
+        icon='i-users',
+        title='Aluno',
+        sub=(ctx_aluno.nome ~ (' · ' ~ ctx_aluno.nivel if ctx_aluno.nivel else '') if ctx_aluno else 'Selecione um aluno'),
+        open=_mob_aluno_open,
+        has_content=_mob_aluno_has
+    ) }}
+        {% if ctx_acao and ctx_aluno %}
+        <div class="aluno-fixo-chip">
+            <svg class="icon"><use href="#i-lock"/></svg>
+            <span class="aluno-fixo-chip-nome">{{ ctx_aluno.nome }}</span>
+            <span class="aluno-fixo-chip-hint">fixo</span>
+        </div>
+        {% else %}
+        <label class="field-label" for="m-sel-aluno">Aluno / Turma</label>
+        <select class="field-select" id="m-sel-aluno"
+                onchange="onMobileAlunoChange(this.value)">
+            <option value="">— selecione —</option>
+            {% for a in alunos %}
+            <option value="{{ a.nome }}" {% if ctx_aluno and ctx_aluno.nome == a.nome %}selected{% endif %}>{{ a.nome }}</option>
+            {% endfor %}
+            {% if nomes_hist %}
+            <optgroup label="Do histórico">
+                {% for n in nomes_hist %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+            </optgroup>
+            {% endif %}
+        </select>
+        {% endif %}
+
+        <div id="m-evitar-hist-wrap" class="hidden" style="margin-top: 12px;">
+            <label class="field-label" for="m-sel-evitar-ultimos">Evitar exerc. dos últimos</label>
+            <select class="field-select" id="m-sel-evitar-ultimos"
+                    data-mirror="#sel-evitar-ultimos">
+                <option value="0">Desativado</option>
+                <option value="1" selected>1 período</option>
+                <option value="2">2 períodos</option>
+                <option value="3">3 períodos</option>
+            </select>
+        </div>
+    {{ msec.close() }}
+
+    {# ── Seção Configurações gerais ── #}
+    {{ msec.open(
+        id='msec-config',
+        icon='i-sliders',
+        title='Configurações gerais',
+        sub='3 treinos · superset · cx 5',
+        open=_mob_config_open,
+        has_content=True
+    ) }}
+        <label class="field-label" for="m-etiqueta-rotina">Etiqueta da rotina</label>
+        <input type="text" class="field-input" id="m-etiqueta-rotina"
+               name="etiqueta_rotina"
+               placeholder="ex: Hipertrofia Abr/26"
+               autocomplete="off"
+               maxlength="60">
+
+        <label class="field-label" for="m-n-treinos" style="margin-top: 12px;">Nº de treinos</label>
+        <div class="field-row">
+            <select class="field-select" id="m-n-treinos"
+                    data-mirror="#n_treinos"
+                    {% if ctx_acao in ('substituir', 'adicionar') %}disabled{% endif %}>
+                {% for i in range(1, MAX_TREINOS + 1) %}
+                <option value="{{ i }}" {% if ctx_acao in ('substituir', 'adicionar') and i == 1 %}selected{% endif %}>{{ i }}</option>
+                {% endfor %}
+            </select>
+            <select class="field-select" id="m-tamanho-bloco"
+                    data-mirror="select[name=tamanho_bloco]">
+                <option value="1">1 (simples)</option>
+                <option value="2" selected>2 (super séries)</option>
+                <option value="3">3 (tri-sets)</option>
+            </select>
+        </div>
+        <div class="field-row" style="margin-top: 4px;">
+            <span class="field-label" style="margin-bottom: 0; align-self: end; padding-bottom: 4px;">treinos</span>
+            <span class="field-label" style="margin-bottom: 0; align-self: end; padding-bottom: 4px;">por bloco</span>
+        </div>
+
+        <label class="field-label" for="m-max-cx" style="margin-top: 14px;">Complexidade máxima</label>
+        <div class="field-range">
+            <input type="range" id="m-max-cx" min="1" max="5" step="1" value="5"
+                   data-mirror="input[name=max_complexidade]"
+                   oninput="document.getElementById('m-max-cx-val').textContent = this.value">
+            <span class="field-range-value" id="m-max-cx-val">5</span>
+        </div>
+
+        <div class="field-toggles">
+            <label class="field-toggle">
+                <input type="checkbox" id="m-variar-entre" data-mirror="input[name=variar_entre]">
+                Evitar similaridade entre treinos
+            </label>
+            <label class="field-toggle">
+                <input type="checkbox" id="m-evitar-agonistas" checked data-mirror="input[name=evitar_agonistas]">
+                Evitar agonistas no mesmo bloco
+            </label>
+        </div>
+    {{ msec.close() }}
+
+    {# ── Seções de treino (placeholders) — Etapa 10 preenche ── #}
+    {% set _n_default = 1 if ctx_acao in ('substituir', 'adicionar') else 3 %}
+    {% for t in range(MAX_TREINOS) %}
+    {{ msec.open(
+        id='msec-treino-' ~ t,
+        icon_text='T' ~ (t + 1),
+        title='Treino ' ~ (t + 1),
+        sub='Sem configuração',
+        counter='0',
+        is_treino=True,
+        open=False
+    ) }}
+        <div class="treino-placeholder">
+            Configuração de demandas — disponível em breve (etapa 10).
+            <br><span style="font-size: 10px; opacity: 0.7;">Use o desktop para configurar este treino por enquanto.</span>
+        </div>
+    {{ msec.close() }}
+    {% endfor %}
+
+</div>
 </form>
 </div>
 
@@ -292,9 +450,10 @@
     </div>
 </div>
 
-<!-- MOBILE: barra fixa (context-aware) -->
-<div id="mobile-bar" class="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 p-3 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
-    <div id="mobile-bar-inner" class="flex gap-2">
+<!-- MOBILE: barra fixa antiga — substituída pela bb global do redesign 02 (ver base.html / _mobile_bb_actions_gerador.html).
+     Mantida apenas em md (≥md e <lg) para o caso de panel-resultado precisar do toggle Configurar/Ver. -->
+<div id="mobile-bar" class="hidden md:max-lg:flex fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 p-3 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
+    <div id="mobile-bar-inner" class="flex gap-2 w-full">
         <button type="submit" form="form-config" id="mobile-btn-gerar"
                 class="flex-1 px-4 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer"
                 {% if sessoes %}style="display:none"{% endif %}>
@@ -1081,8 +1240,131 @@ function showPanel(panel) {
     }
 }
 
+// ════════════════════════════════════════════════════════════════
+// MOBILE GERADOR (etapa 9 redesign 02)
+// ════════════════════════════════════════════════════════════════
+
+// Toggle expand/collapse de uma .section ao clicar no .section-head.
+// Ignora cliques em inputs/links/buttons internos.
+function toggleSection(headEl) {
+    const sec = headEl.closest('.section');
+    if (!sec) return;
+    sec.classList.toggle('open');
+    // Após abrir/fechar, ressincroniza o sub das seções fechadas
+    updateMobileSubs();
+}
+
+// Espelha o valor de um input mobile (data-mirror=...) para o input desktop
+// equivalente, dispara o evento 'change' nele e atualiza os subs.
+function mirrorToDesktop(mobileEl) {
+    const sel = mobileEl.dataset.mirror;
+    if (!sel) return;
+    const target = document.querySelector(sel);
+    if (!target) return;
+    if (mobileEl.type === 'checkbox') {
+        target.checked = mobileEl.checked;
+    } else {
+        target.value = mobileEl.value;
+    }
+    target.dispatchEvent(new Event('change', { bubbles: true }));
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    updateMobileSubs();
+}
+
+// Sentido inverso: quando o desktop muda (ex: carregar do histórico), refletir no mobile.
+function mirrorFromDesktop() {
+    document.querySelectorAll('#gerador-mobile [data-mirror]').forEach(mEl => {
+        const target = document.querySelector(mEl.dataset.mirror);
+        if (!target) return;
+        if (mEl.type === 'checkbox') {
+            mEl.checked = target.checked;
+        } else if (mEl.value !== target.value) {
+            mEl.value = target.value;
+        }
+    });
+    const cxVal = document.getElementById('m-max-cx-val');
+    const cxInp = document.getElementById('m-max-cx');
+    if (cxVal && cxInp) cxVal.textContent = cxInp.value;
+    updateMobileSubs();
+}
+
+// Atualiza o subtítulo de cada seção fechada com o resumo dos campos atuais.
+function updateMobileSubs() {
+    // Aluno
+    const alunoSec = document.getElementById('msec-aluno');
+    if (alunoSec) {
+        const sub = alunoSec.querySelector('[data-section-sub]');
+        const sel = document.getElementById('m-sel-aluno');
+        const evitar = document.getElementById('m-sel-evitar-ultimos');
+        const evitarWrap = document.getElementById('m-evitar-hist-wrap');
+        if (sub) {
+            const nome = sel ? sel.value : '';
+            const partes = [];
+            if (nome) partes.push(nome);
+            if (evitar && evitarWrap && !evitarWrap.classList.contains('hidden') && evitar.value !== '0') {
+                const lbl = evitar.options[evitar.selectedIndex]?.text || '';
+                partes.push('evitar ' + lbl.toLowerCase());
+            }
+            sub.textContent = partes.length ? partes.join(' · ') : 'Selecione um aluno';
+            alunoSec.classList.toggle('has-content', !!nome);
+        }
+    }
+    // Configurações
+    const cfgSec = document.getElementById('msec-config');
+    if (cfgSec) {
+        const sub = cfgSec.querySelector('[data-section-sub]');
+        const n = document.getElementById('m-n-treinos')?.value || '3';
+        const tb = document.getElementById('m-tamanho-bloco');
+        const cx = document.getElementById('m-max-cx')?.value || '5';
+        const tbLabel = ({'1': 'simples', '2': 'superset', '3': 'tri-set'})[tb?.value || '2'];
+        if (sub) sub.textContent = `${n} treino${n === '1' ? '' : 's'} · ${tbLabel} · cx ${cx}`;
+    }
+}
+
+// Bind dos inputs mobile → desktop
+function bindMobileMirrors() {
+    document.querySelectorAll('#gerador-mobile [data-mirror]').forEach(el => {
+        const evt = (el.type === 'range') ? 'input' : 'change';
+        el.addEventListener(evt, () => mirrorToDesktop(el));
+    });
+}
+
+// Aluno mobile: dispara o fluxo do desktop (carrega histórico, etc)
+function onMobileAlunoChange(nome) {
+    // Espelha pro select desktop (dispara onAlunoChange via change handler do _aluno_dropdown)
+    const desktopSel = document.getElementById('sel-aluno');
+    if (desktopSel) {
+        desktopSel.value = nome;
+        desktopSel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    // Garante que o handler global rode (caso o select desktop seja outro tipo)
+    if (typeof onAlunoChange === 'function') onAlunoChange(nome);
+    // Atualiza título do topbar mobile imediatamente
+    const tbTitle = document.getElementById('m-topbar-title');
+    if (tbTitle) tbTitle.textContent = nome || 'Selecione um aluno';
+    updateMobileSubs();
+    // O bloco "evitar últimos N períodos" é sincronizado por MutationObserver (init).
+}
+
+// Observa o evitar-hist-wrap do desktop e espelha visibilidade no mobile.
+function watchEvitarHistWrap() {
+    const desktopWrap = document.getElementById('evitar-hist-wrap');
+    const mobileWrap = document.getElementById('m-evitar-hist-wrap');
+    if (!desktopWrap || !mobileWrap) return;
+    const sync = () => {
+        mobileWrap.classList.toggle('hidden', desktopWrap.classList.contains('hidden'));
+        updateMobileSubs();
+    };
+    new MutationObserver(sync).observe(desktopWrap, { attributes: true, attributeFilter: ['class'] });
+    sync();
+}
+
 // Init
 onChangeNTreinos();
+bindMobileMirrors();
+mirrorFromDesktop();
+watchEvitarHistWrap();
+updateMobileSubs();
 </script>
 
 {% endblock %}
