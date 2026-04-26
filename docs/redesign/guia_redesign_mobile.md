@@ -249,7 +249,7 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 
 ---
 
-## Etapa 6 · Treino card mobile · header em 1 linha + 3 ações
+## Etapa 6 · Treino card mobile · header em 1 linha + 3 ações ✅
 
 **Mockup:** `mockup_mobile_hub.html` · cenário B + `mockup_mobile_aux.html` · Auxiliar 2
 
@@ -354,6 +354,9 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 ---
 
 ## Etapa 9 · Gerador mobile · estrutura tela única (Aluno + Configs)
+
+> **TODO (decidido na Etapa 6):** adicionar campo "Etiqueta da rotina" na seção "Configurações gerais". Hoje só existe etiqueta dos treinos individuais; rotinas geradas via gerador nascem sem etiqueta. Edit inline já existe no card aluno do HUB, mas garantir input no gerador faz a rotina nascer com etiqueta de cara.
+
 
 **Mockup:** `mockup_mobile_gerador.html` · variante A2 estado 1
 

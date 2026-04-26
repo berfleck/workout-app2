@@ -373,10 +373,92 @@
         .sheet-item-sub { font-size: 11.5px; color: var(--gray-500); margin-top: 1px; line-height: 1.35; }
         .sheet-item-arrow { color: var(--gray-300); flex-shrink: 0; width: 14px; height: 14px; }
         .sheet-item.active .sheet-item-arrow { color: var(--brand-500); }
+        .sheet-item.danger .sheet-item-title { color: var(--red-600); }
+        .sheet-item.danger .sheet-item-icon { background: var(--red-50); color: var(--red-600); }
+        .sheet-item.danger:hover { background: var(--red-50); }
         .sheet-divider { height: 1px; background: var(--gray-200); margin: 4px 12px; }
 
         /* trava o scroll do body quando o sheet está aberto */
         body.sheet-open { overflow: hidden; }
+
+        /* ── Treino card · novo header (T1 badge + nome) ── redesign 02 ── */
+        .treino-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+        .treino-num-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gray-100);
+            color: var(--gray-500);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 7px;
+            border-radius: 5px;
+            letter-spacing: -0.02em;
+            flex-shrink: 0;
+        }
+        .treino-nome-display {
+            color: var(--gray-900);
+            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: -0.01em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+        /* Header keep flexible: titulo-linha à esquerda, kebab à direita */
+        .treino-card.modo-visualizar .treino-titulo-linha { min-width: 0; }
+        .treino-card.modo-visualizar .treino-acoes { flex-shrink: 0; }
+        /* Kebab "active" enquanto sheet aberto: fundo preto */
+        .treino-acoes [data-open-treino-kebab].is-open {
+            background: var(--gray-900) !important;
+            color: white !important;
+            border-color: var(--gray-900) !important;
+        }
+        @media (max-width: 768px) {
+            .treino-nome-display { font-size: 14.5px; }
+            .treino-num-badge { font-size: 10.5px; padding: 2.5px 6px; }
+        }
+
+        /* ── Etiqueta da rotina inline editável ── redesign 02 ── */
+        .etiqueta-inline-input {
+            display: block;
+            width: 100%;
+            background: transparent;
+            border: 0;
+            padding: 3px 7px;
+            margin-left: -7px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--gray-600);
+            letter-spacing: -0.005em;
+            transition: background 0.15s, box-shadow 0.15s;
+        }
+        .etiqueta-inline-input:hover { background: var(--gray-100); }
+        .etiqueta-inline-input:focus {
+            outline: none;
+            background: var(--brand-50);
+            box-shadow: 0 0 0 1px var(--brand-200);
+            color: var(--brand-700);
+        }
+        .etiqueta-inline-input::placeholder {
+            color: var(--gray-400);
+            font-weight: 500;
+            font-style: italic;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        @media (max-width: 768px) {
+            .etiqueta-inline-input { font-size: 11.5px; }
+        }
     </style>
     <style>
         /* Design tokens */
@@ -1129,6 +1211,8 @@
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
     <symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol>
+    <symbol id="i-more-vertical" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
     <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
     <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
@@ -1290,6 +1374,85 @@ function _topbarSelecionarAluno(id) {
     window.location.href = url.toString();
 }
 
+// ── Action sheet do kebab do treino (mobile, via delegação) ──
+document.addEventListener('DOMContentLoaded', function() {
+    const sheet = document.getElementById('treino-kebab-sheet');
+    if (!sheet) return;
+    const titleEl = sheet.querySelector('[data-kebab-title]');
+    const pngLink = sheet.querySelector('[data-kebab-png]');
+    const substituirLink = sheet.querySelector('[data-kebab-substituir]');
+    const editarBtn = sheet.querySelector('[data-kebab-editar]');
+    const removerBtn = sheet.querySelector('[data-kebab-remover]');
+    let currentBtn = null;
+    let currentCtx = null;
+
+    function open(btn) {
+        currentBtn = btn;
+        currentCtx = {
+            idx: btn.dataset.treinoIdx,
+            num: btn.dataset.treinoNum,
+            nome: btn.dataset.treinoNome,
+            alunoId: btn.dataset.alunoId,
+            alunoNome: btn.dataset.alunoNome,
+        };
+        if (titleEl) titleEl.textContent = currentCtx.nome || ('Treino ' + currentCtx.num);
+        if (pngLink) pngLink.href = '/treino/' + currentCtx.idx + '/png/' + encodeURIComponent(currentCtx.alunoNome || 'Aluno');
+        if (substituirLink) substituirLink.href = '/gerador?aluno_id=' + currentCtx.alunoId + '&acao=substituir&treino=' + currentCtx.idx;
+        sheet.classList.add('is-open');
+        sheet.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('sheet-open');
+        btn.classList.add('is-open');
+    }
+    function close() {
+        sheet.classList.remove('is-open');
+        sheet.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('sheet-open');
+        if (currentBtn) currentBtn.classList.remove('is-open');
+        currentBtn = null;
+        currentCtx = null;
+    }
+
+    document.addEventListener('click', function(e) {
+        const opener = e.target.closest('[data-open-treino-kebab]');
+        if (opener) { e.preventDefault(); open(opener); return; }
+    });
+    sheet.addEventListener('click', function(e) {
+        if (e.target === sheet || e.target.closest('[data-close-treino-kebab]')) close();
+    });
+    if (editarBtn) {
+        editarBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (!currentCtx) return;
+            const ctx = currentCtx;
+            close();
+            htmx.ajax('POST', '/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.idx + '/editar-inline', {
+                target: '#treino-' + ctx.idx,
+                swap: 'innerHTML'
+            });
+        });
+    }
+    if (removerBtn) {
+        removerBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            if (!currentCtx) return;
+            const ctx = currentCtx;
+            const ok = await window.appConfirm(
+                'Remover Treino ' + ctx.num + ' da rotina? Esta ação não pode ser desfeita.',
+                { okLabel: 'Remover', danger: true }
+            );
+            if (!ok) return;
+            close();
+            htmx.ajax('DELETE', '/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.idx, {
+                target: '#rotina-display',
+                swap: 'innerHTML'
+            });
+        });
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sheet.classList.contains('is-open')) close();
+    });
+});
+
 // ── Bottom sheet de navegação (mobile) ──
 document.addEventListener('DOMContentLoaded', function() {
     const sheet = document.getElementById('nav-sheet');
@@ -1378,6 +1541,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </nav>
 
 {% include "_mobile_nav_sheet.html" %}
+{% include "_mobile_treino_kebab_sheet.html" %}
 
 <!-- Toast global de autosave -->
 <div class="autosave-toast" id="autosave-toast"><svg class="icon"><use href="#i-check"/></svg> Prescrição salva</div>

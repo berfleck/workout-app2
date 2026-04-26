@@ -5,35 +5,22 @@
     <div class="aluno-badge-row">
         <div class="w-11 h-11 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white grid place-items-center font-bold text-sm shrink-0 max-md:w-[38px] max-md:h-[38px] max-md:text-[13px]">{{ iniciais }}</div>
         <div class="flex-1 min-w-0">
-            <div class="flex items-baseline flex-wrap gap-x-2 max-md:flex-nowrap max-md:items-center max-md:gap-x-1.5">
-                <span class="text-base font-semibold text-gray-900 max-md:text-[14.5px] max-md:truncate max-md:min-w-0">{{ aluno.nome }}</span>
-                {# Mobile: chip da etiqueta inline (truncado) #}
-                {% if rotina and rotina.etiqueta %}
-                <span class="hidden max-md:inline-block max-md:shrink-0 max-md:max-w-[120px] max-md:truncate text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-mono uppercase tracking-wide">{{ rotina.etiqueta }}</span>
-                {% endif %}
-                {# Desktop: meta completa (nivel · objetivo · N treinos · criada há X) #}
-                <span class="text-xs text-gray-500 max-md:hidden">
-                    {% if aluno.get('nivel') %}{{ aluno.nivel|capitalize }}{% endif %}
-                    {% if aluno.get('objetivo') %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ aluno.objetivo|capitalize }}{% endif %}
-                    {% if rotina and rotina.sessoes %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ rotina.sessoes|length }} treino{{ 's' if rotina.sessoes|length > 1 else '' }}{% endif %}
-                    {% if rotina %}
-                    {% set ref_data = rotina.data_atualizada or rotina.data %}
-                    {% set ref_label = 'atualizada' if rotina.data_atualizada else 'criada' %}
-                    {% if ref_data %}{% set rel = tempo_relativo(ref_data) %}{% if rel %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ ref_label }} {{ rel }}{% endif %}{% endif %}
-                    {% endif %}
-                </span>
-            </div>
-            {# Mobile: meta condensada (N treinos · 2d) em linha separada compacta #}
-            <div class="hidden max-md:block text-[11px] text-gray-500 font-mono mt-0.5 truncate">
-                {% set ref_data = rotina.data_atualizada or rotina.data if rotina else None %}
-                {% set rel = tempo_relativo(ref_data) if ref_data else None %}
-                {% if rotina and rotina.sessoes %}{{ rotina.sessoes|length }} treino{{ 's' if rotina.sessoes|length > 1 else '' }}{% endif %}
-                {% if rotina and rotina.sessoes and rel %}<span class="text-gray-300 mx-1">·</span>{% endif %}
-                {% if rel %}{{ rel }}{% endif %}
-            </div>
-            {# Desktop: chip da etiqueta em linha separada #}
-            {% if rotina and rotina.etiqueta %}
-            <div class="mt-1 max-md:hidden"><span class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">{{ rotina.etiqueta }}</span></div>
+            <div class="text-base font-semibold text-gray-900 max-md:text-[14.5px] truncate">{{ aluno.nome }}</div>
+            {# Etiqueta editável inline (autosave on-blur). Quando ha rascunho,
+               o input grava em rascunho_etiqueta; senao, atualiza historico. #}
+            {% if rotina %}
+            {% if eh_rascunho %}{% set etiqueta_atual = etiqueta_rascunho or rotina.etiqueta or '' %}{% else %}{% set etiqueta_atual = rotina.etiqueta or '' %}{% endif %}
+            <input type="text"
+                   name="etiqueta"
+                   value="{{ etiqueta_atual }}"
+                   placeholder="+ adicionar etiqueta da rotina"
+                   class="etiqueta-inline-input mt-0.5"
+                   maxlength="60"
+                   hx-post="/hub/rotina/{{ aluno_id }}/etiqueta"
+                   hx-trigger="blur changed delay:200ms, keydown[key=='Enter'] consume"
+                   hx-swap="none"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                   aria-label="Etiqueta da rotina">
             {% endif %}
         </div>
         {% if rotina %}

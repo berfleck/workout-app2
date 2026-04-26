@@ -1,0 +1,52 @@
+{# Action sheet global do kebab do treino card. Único elemento; o tap em
+   qualquer botão kebab popula data-treino-idx via JS. Ações apontam pro
+   treino daquele idx no aluno atual. #}
+<div class="sheet-overlay" id="treino-kebab-sheet" data-treino-kebab aria-hidden="true">
+    <div class="sheet" role="dialog" aria-label="Ações do treino">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Ações</div>
+                <div class="sheet-title" data-kebab-title>Treino</div>
+            </div>
+            <button type="button" class="sheet-close" data-close-treino-kebab aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <div class="sheet-list">
+            <button type="button" class="sheet-item" data-kebab-editar>
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-pencil"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Editar treino</div>
+                    <div class="sheet-item-sub">Trocar exercícios, reordenar blocos</div>
+                </div>
+                <svg class="sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+            </button>
+            <a class="sheet-item" data-kebab-substituir href="#">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-rotate-ccw"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Substituir treino</div>
+                    <div class="sheet-item-sub">Gerar um treino novo do zero</div>
+                </div>
+                <svg class="sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+            </a>
+            <a class="sheet-item" data-kebab-png href="#" target="_blank" rel="noopener">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-image"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Baixar PNG</div>
+                    <div class="sheet-item-sub">Imagem do treino para compartilhar</div>
+                </div>
+                <svg class="sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+            </a>
+            {# TODO mobile-v2: Duplicar para outro treino — endpoint nao existe ainda #}
+            <div class="sheet-divider"></div>
+            <button type="button" class="sheet-item danger" data-kebab-remover>
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-trash"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Remover treino</div>
+                    <div class="sheet-item-sub">Esta ação não pode ser desfeita</div>
+                </div>
+            </button>
+        </div>
+    </div>
+</div>

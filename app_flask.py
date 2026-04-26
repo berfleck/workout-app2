@@ -24,7 +24,7 @@ from database import (
     salvar_etiqueta_rascunho, carregar_etiqueta_rascunho,
     salvar_intent_rascunho, carregar_intent_rascunho,
     carregar_historico, carregar_registro, salvar_historico_registro,
-    atualizar_historico_registro, deletar_historico,
+    atualizar_historico_registro, atualizar_etiqueta_historico, deletar_historico,
     buscar_historico_por_aluno, nomes_unicos_historico,
 )
 
@@ -925,6 +925,20 @@ def hub_etiqueta_rascunho(aluno_id):
     """Salva a etiqueta do rascunho (autosave on-blur). Não re-renderiza nada."""
     etiqueta = (request.form.get("etiqueta", "") or "").strip()
     salvar_etiqueta_rascunho(aluno_id, etiqueta)
+    return ("", 204)
+
+
+@app.route("/hub/rotina/<int:aluno_id>/etiqueta", methods=["POST"])
+def hub_etiqueta_rotina(aluno_id):
+    """Edit inline da etiqueta da rotina ativa (ou do rascunho, se houver).
+    Autosave on-blur — não re-renderiza nada."""
+    etiqueta = (request.form.get("etiqueta", "") or "").strip()
+    if carregar_rascunho(aluno_id):
+        salvar_etiqueta_rascunho(aluno_id, etiqueta)
+    else:
+        rotina_reg = carregar_rotina_ativa(aluno_id)
+        if rotina_reg:
+            atualizar_etiqueta_historico(rotina_reg["id"], etiqueta)
     return ("", 204)
 
 
