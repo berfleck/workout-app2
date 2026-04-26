@@ -119,7 +119,7 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 
 ---
 
-## Etapa 2 · Bottom bar contextual (estrutura base)
+## Etapa 2 · Bottom bar contextual (estrutura base) ✅
 
 **Mockup:** `mockup_mobile_hub.html` · cenário B (visualizando)
 

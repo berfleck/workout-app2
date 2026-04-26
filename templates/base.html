@@ -158,7 +158,6 @@
         @media (max-width: 768px) {
             .topbar-mobile {
                 display: flex; align-items: center; gap: 10px;
-                position: sticky; top: 0; z-index: 30;
                 padding: 10px 14px 12px;
                 background: white;
                 border-bottom: 1px solid var(--gray-200);
@@ -207,8 +206,50 @@
             .mobile-menu-btn { display: none !important; }
             .sidebar { display: none !important; }
             /* Main não precisa de pt-14 no mobile (topbar-mobile já ocupa o topo) */
-            main.app-main { padding-top: 0 !important; }
+            main.app-main { padding-top: 0 !important; padding-bottom: calc(var(--bb-height) + 16px); }
             main.app-main > div { padding-top: 16px !important; }
+        }
+
+        /* ── Bottom bar contextual (≤768px) ── redesign 02 ── */
+        .bb { display: none; }
+        @media (max-width: 768px) {
+            .bb {
+                display: flex; align-items: center; gap: 8px;
+                position: fixed; left: 0; right: 0; bottom: 0;
+                z-index: var(--z-bottom-bar);
+                padding: 10px 12px calc(14px + env(safe-area-inset-bottom, 0px));
+                background: rgba(255,255,255,0.82);
+                backdrop-filter: blur(16px) saturate(1.4);
+                -webkit-backdrop-filter: blur(16px) saturate(1.4);
+                border-top: 1px solid rgba(201,192,173,0.45);
+            }
+            .bb-nav {
+                width: var(--bb-action-h); height: var(--bb-action-h);
+                border-radius: var(--bb-radius);
+                background: white;
+                border: 1px solid var(--gray-200);
+                color: var(--gray-700);
+                display: grid; place-items: center;
+                flex-shrink: 0;
+                cursor: pointer;
+                transition: background 0.15s, color 0.15s;
+            }
+            .bb-nav:hover { background: var(--gray-50); color: var(--brand-500); }
+            .bb-nav.active { background: var(--gray-900); color: white; border-color: var(--gray-900); }
+            .bb-nav .icon { width: 18px; height: 18px; }
+            .bb-actions {
+                flex: 1;
+                display: flex; align-items: center; gap: 8px;
+                min-width: 0;
+            }
+            .bb-empty-hint {
+                flex: 1;
+                font-family: var(--font-mono);
+                font-size: 11px;
+                color: var(--gray-400);
+                text-align: center;
+                letter-spacing: 0.02em;
+            }
         }
     </style>
     <style>
@@ -222,6 +263,19 @@
             --red-50: #fef2f2; --red-100: #fee2e2; --red-500: #ef4444; --red-600: #dc2626; --red-700: #b91c1c;
             --font-body: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
             --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+            /* Bottom bar e sheets (mobile) — redesign 02 */
+            --bb-height: 70px;
+            --bb-action-h: 46px;
+            --bb-radius: 12px;
+            --sheet-max-h: 80%;
+            --sheet-radius: 24px;
+            --drawer-width: 92%;
+            --drawer-radius: 24px;
+            --z-bottom-bar: 40;
+            --z-drawer: 60;
+            --z-sheet-overlay: 70;
+            --z-sheet: 71;
         }
 
         /* HTMX indicators */
@@ -1141,6 +1195,16 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <!-- Mobile sidebar overlay -->
 <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
+
+{# Bottom bar contextual (≤768px). Slot esquerdo fixo (menu); slot direito sobrescrevível via {% block bb_actions %} nas páginas filhas. Estrutura espelhada em _mobile_bottom_bar.html (referência standalone). #}
+<nav class="bb" data-bb aria-label="Ações da página">
+    <button type="button" class="bb-nav" data-open-nav-sheet aria-label="Menu">
+        <svg class="icon"><use href="#i-grid"/></svg>
+    </button>
+    <div class="bb-actions" data-bb-actions>
+        {% block bb_actions %}<span class="bb-empty-hint">selecione aluno · ações virão</span>{% endblock %}
+    </div>
+</nav>
 
 <!-- Toast global de autosave -->
 <div class="autosave-toast" id="autosave-toast"><svg class="icon"><use href="#i-check"/></svg> Prescrição salva</div>
