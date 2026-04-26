@@ -157,7 +157,7 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 
 ---
 
-## Etapa 3 · Bottom sheet de navegação
+## Etapa 3 · Bottom sheet de navegação ✅
 
 **Mockup:** `mockup_mobile_aux.html` · Auxiliar 1
 

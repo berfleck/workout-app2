@@ -48,7 +48,13 @@ def _inject_topbar_aluno():
     alunos = carregar_alunos()
     sel_id = session.get("aluno_id")
     aluno = next((a for a in alunos if a["id"] == sel_id), None) if sel_id else None
-    return {"_topbar_alunos": alunos, "_topbar_aluno": aluno}
+    sem_rotina = sum(1 for a in alunos if not a.get("rotina_ativa_id"))
+    return {
+        "_topbar_alunos": alunos,
+        "_topbar_aluno": aluno,
+        "_nav_alunos_total": len(alunos),
+        "_nav_sem_rotina": sem_rotina,
+    }
 
 
 # ══════════════════════════════════════════════════════════════

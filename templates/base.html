@@ -251,6 +251,100 @@
                 letter-spacing: 0.02em;
             }
         }
+
+        /* ── Bottom sheets (mobile) ── redesign 02 ── */
+        .sheet-overlay {
+            position: fixed; inset: 0;
+            background: rgba(15, 12, 8, 0.5);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            z-index: var(--z-sheet-overlay);
+            display: none;
+            align-items: flex-end;
+        }
+        .sheet-overlay.is-open { display: flex; animation: bbSheetFade 0.25s ease; }
+        @keyframes bbSheetFade { from { opacity: 0; } to { opacity: 1; } }
+        .sheet {
+            width: 100%;
+            background: white;
+            border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+            box-shadow: 0 -16px 40px rgba(0,0,0,0.18);
+            padding: 0 0 calc(18px + env(safe-area-inset-bottom, 0px));
+            max-height: var(--sheet-max-h);
+            display: flex;
+            flex-direction: column;
+            z-index: var(--z-sheet);
+        }
+        .sheet-overlay.is-open .sheet { animation: bbSheetSlide 0.32s cubic-bezier(0.32, 0.72, 0, 1); }
+        @keyframes bbSheetSlide { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .sheet-grabber {
+            width: 36px; height: 4px;
+            background: var(--gray-300);
+            border-radius: 2px;
+            margin: 8px auto 4px;
+            flex-shrink: 0;
+        }
+        .sheet-head {
+            padding: 14px 18px 12px;
+            display: flex; align-items: center; gap: 10px;
+            border-bottom: 1px solid var(--gray-200);
+            flex-shrink: 0;
+        }
+        .sheet-head-info { flex: 1; min-width: 0; }
+        .sheet-eyebrow { font-family: var(--font-mono); font-size: 9px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+        .sheet-title { font-size: 16px; font-weight: 700; color: var(--gray-900); margin-top: 1px; letter-spacing: -0.014em; }
+        .sheet-close {
+            width: 32px; height: 32px; border-radius: 8px;
+            background: var(--gray-100); color: var(--gray-700);
+            display: grid; place-items: center;
+            flex-shrink: 0; cursor: pointer;
+            border: none;
+            transition: background 0.15s;
+        }
+        .sheet-close:hover { background: var(--gray-200); }
+        .sheet-close .icon { width: 14px; height: 14px; }
+        .sheet-list { padding: 8px 10px; overflow-y: auto; }
+        .sheet-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px;
+            border-radius: 11px;
+            cursor: pointer;
+            transition: background 0.15s;
+            width: 100%;
+            text-align: left;
+            text-decoration: none;
+            color: inherit;
+            background: transparent;
+            border: none;
+            font-family: inherit;
+        }
+        .sheet-item:hover { background: var(--gray-50); }
+        .sheet-item.active { background: var(--brand-50); }
+        .sheet-item.active .sheet-item-title { color: var(--brand-600); }
+        .sheet-item.active .sheet-item-icon {
+            background: linear-gradient(135deg, var(--brand-500) 0%, #b4480c 100%);
+            color: white;
+            box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 8px rgba(232,93,4,0.3);
+        }
+        .sheet-item-icon {
+            width: 40px; height: 40px;
+            border-radius: 11px;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            display: grid; place-items: center;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .sheet-item-icon .icon { width: 18px; height: 18px; }
+        .sheet-item-text { flex: 1; min-width: 0; }
+        .sheet-item-title { font-size: 14.5px; font-weight: 700; color: var(--gray-900); letter-spacing: -0.012em; }
+        .sheet-item-sub { font-size: 11.5px; color: var(--gray-500); margin-top: 1px; line-height: 1.35; }
+        .sheet-item-arrow { color: var(--gray-300); flex-shrink: 0; width: 14px; height: 14px; }
+        .sheet-item.active .sheet-item-arrow { color: var(--brand-500); }
+        .sheet-divider { height: 1px; background: var(--gray-200); margin: 4px 12px; }
+
+        /* trava o scroll do body quando o sheet está aberto */
+        body.sheet-open { overflow: hidden; }
     </style>
     <style>
         /* Design tokens */
@@ -985,6 +1079,8 @@
     <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol>
     <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
     <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
@@ -1145,6 +1241,33 @@ function _topbarSelecionarAluno(id) {
     url.searchParams.set('aluno_id', id);
     window.location.href = url.toString();
 }
+
+// ── Bottom sheet de navegação (mobile) ──
+document.addEventListener('DOMContentLoaded', function() {
+    const sheet = document.getElementById('nav-sheet');
+    if (!sheet) return;
+    const navBtn = document.querySelector('.bb [data-open-nav-sheet]');
+
+    function open() {
+        sheet.classList.add('is-open');
+        sheet.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('sheet-open');
+        if (navBtn) navBtn.classList.add('active');
+    }
+    function close() {
+        sheet.classList.remove('is-open');
+        sheet.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('sheet-open');
+        if (navBtn) navBtn.classList.remove('active');
+    }
+    if (navBtn) navBtn.addEventListener('click', open);
+    sheet.addEventListener('click', e => {
+        if (e.target === sheet || e.target.closest('[data-close-nav-sheet]')) close();
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && sheet.classList.contains('is-open')) close();
+    });
+});
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.sidebar a').forEach(function(a) {
         a.addEventListener('click', function() {
@@ -1205,6 +1328,8 @@ document.addEventListener('DOMContentLoaded', function() {
         {% block bb_actions %}<span class="bb-empty-hint">selecione aluno · ações virão</span>{% endblock %}
     </div>
 </nav>
+
+{% include "_mobile_nav_sheet.html" %}
 
 <!-- Toast global de autosave -->
 <div class="autosave-toast" id="autosave-toast"><svg class="icon"><use href="#i-check"/></svg> Prescrição salva</div>
