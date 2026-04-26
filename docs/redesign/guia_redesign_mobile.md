@@ -1,10 +1,68 @@
 # Guia de redesign mobile — BF Treinamento (redesign 02)
 
-> **Para o Claude Code:** este documento + os 3 arquivos HTML em `docs/redesign/mobile/` são a fonte da verdade do redesign mobile. Antes de implementar qualquer etapa, leia este guia inteiro e o mockup HTML correspondente. Os mockups são a referência visual final — qualquer divergência entre o que está descrito aqui e o que está nos mockups, **o mockup vence.**
+> **Para o Claude Code:** este documento + os 3 arquivos HTML em `docs/redesign/` (não `mobile/`) são a fonte da verdade do redesign mobile. Antes de implementar qualquer etapa, leia este guia inteiro e o mockup HTML correspondente. Os mockups são a referência visual final — qualquer divergência entre o que está descrito aqui e o que está nos mockups, **o mockup vence.**
 >
 > **Pergunte se tiver dúvida.** Antes de começar uma etapa, se você não estiver 100% certo sobre comportamento, posicionamento ou estado, **pare e pergunte ao usuário** em vez de inferir. Não tem problema fazer 2-3 perguntas seguidas para travar a etapa antes de codar.
 >
 > **Commit ao fim de cada etapa.** Cada etapa deste guia deve terminar com um commit no GitHub seguindo o padrão `mobile(<escopo>): <descrição curta>`. A lista exata de mensagens de commit está em cada etapa.
+
+---
+
+## 🚦 Estado atual (handoff entre sessões)
+
+**Branch ativa:** `mobile-redesign-02` (NÃO mergeada em main)
+
+**Etapas concluídas:** 1-8 ✅ · **Próxima:** Etapa 9 (gerador mobile · estrutura)
+
+**Commits feitos (mais recente primeiro):**
+- `d17da38` mobile(hub): modo edicao inline com banner + bottom bar focada
+- `6440e86` mobile(rascunho): banner compacto + acoes na bottom bar
+- `fae8fd5` mobile(treino-card): header com badge T1 + nome + kebab unico
+- `ad0a28a` mobile(hub): adiciona acoes contextuais na bottom bar (visualizando)
+- `0a303ec` mobile(hub): compacta card do aluno para 1 linha
+- `4202a30` mobile(nav): adiciona bottom sheet de navegacao
+- `bacb7b2` mobile(bottom-bar): adiciona estrutura base da bottom bar contextual
+- `86d6e0f` mobile(topbar): simplifica topbar para logo + pill do aluno
+- `98715a6` docs(mobile): adiciona guia + 3 mockups
+
+### Decisões importantes tomadas (que divergem do guia original)
+
+1. **Topbar mobile:** `position: relative` (rola com o conteúdo), não `sticky`. Decisão pra preservar espaço vertical útil.
+2. **Persistência do aluno entre páginas:** via `session["aluno_id"]` + `before_request` que captura `?aluno_id=X` (ou limpa se vazio). Logo BF aponta pra `/?aluno_id=` (limpa seleção).
+3. **Bottom bar inline em base.html, não via include:** blocos Jinja dentro de `{% include %}` não são overridables; partial `_mobile_bottom_bar.html` mantido como referência standalone.
+4. **Bottom bar do HUB (Etapa 5):** invertida vs mockup — "Nova rotina" e "+ Treino" como 2 splits **simétricos** (laranja claro `--brand-100`, texto preto), não assimétricos. Chevron de cada um abre menu com "Manual" (Com gerador é o tap default).
+5. **Treino card (Etapa 6):** TODOS os botões dentro do kebab, **inclusive Editar/Substituir**. Header tem só badge T1 + nome (custom ou "Treino N"). Aplicado em ambos viewports.
+6. **Etiqueta da rotina (Etapa 6):** virou input editável inline **no card aluno** (auto-save on-blur), não mais só no banner de rascunho. Backend: `POST /hub/rotina/<id>/etiqueta`. **TODO Etapa 9:** adicionar campo equivalente na seção Configurações do gerador (rotinas geradas nascerem com etiqueta).
+7. **Bottom bar reativa (Etapa 7):** `_mobile_bb_actions_hub.html` partial + endpoint `GET /_mobile_bb_actions` + JS hook em `htmx:afterSwap` re-fetcha quando rotina-display/draft-banner/treino-* mudam. Só dispara quando `body[data-active-page="hub"]`.
+8. **Modo edição (Etapa 8):** `body.body--em-edicao` toggleda via JS (não `:has()` — `:has()` re-avaliava CSS a cada mudança de classe interna do SortableJS, **quebrava drag-and-drop**). Esconde card aluno + banner rascunho. Bottom bar reduz a Descartar (vermelho) + Aceitar (verde).
+9. **Aceitar vs Salvar:** "Aceitar" sai edição mantendo rascunho (vira modo rascunho na bb com Salvar/Descartar). Não confundir.
+10. **Bandeja de etiqueta dropada do mobile:** etiqueta do banner de rascunho mobile foi removida — já é editável inline no card aluno.
+
+### Arquivos novos criados nesta branch
+
+- `templates/_mobile_bottom_bar.html` (referência standalone)
+- `templates/_mobile_nav_sheet.html` (sheet Hub/Alunos/Histórico)
+- `templates/_mobile_treino_kebab_sheet.html` (action sheet do `...` por treino)
+- `templates/_mobile_bb_actions_hub.html` (partial das ações da bb no HUB; usado tanto inline quanto via re-fetch)
+
+### Endpoints novos
+
+- `GET /_mobile_bb_actions` — re-fetch das ações da bb (HUB only)
+- `POST /hub/rotina/<aluno_id>/etiqueta` — autosave da etiqueta inline (rascunho ou histórico)
+- `POST /hub/rotina/<aluno_id>/concluir-edicao` — sai modo edição mantendo rascunho
+
+### Context processor (`_inject_topbar_aluno`)
+
+Expõe pra todos os templates: `_topbar_alunos`, `_topbar_aluno`, `_topbar_tem_rotina`, `_topbar_eh_rascunho`, `_topbar_intent`, `_topbar_alteracoes`, `_topbar_em_edicao`, `_nav_alunos_total`, `_nav_sem_rotina`.
+
+### Bug histórico evitar
+
+- **`:has()` durante drag:** SortableJS adiciona/remove classes (`sortable-ghost`, `sortable-chosen`) constantemente durante o drag. Selectors com `:has()` re-avaliam o CSS inteiro a cada mudança e travam o drag. Use classe JS no body em vez de `body:has()`.
+- **`}` órfã:** quando adicionar bloco de CSS dentro de `<style>`, conferir abertura/fechamento de chaves — uma `}` extra fecha o `<style>` prematuramente e quebra TUDO depois.
+- **Blocks dentro de includes não são overridables** pelo template extending (Jinja). Pra slots dinâmicos, defina `{% block %}` direto em base.html.
+- **JS dentro de `<script>` no meio do body** roda no parse-time, antes do DOM completo. Use `DOMContentLoaded` ou delegação via `document.addEventListener`.
+
+---
 
 ---
 
@@ -356,6 +414,51 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 ## Etapa 9 · Gerador mobile · estrutura tela única (Aluno + Configs)
 
 > **TODO (decidido na Etapa 6):** adicionar campo "Etiqueta da rotina" na seção "Configurações gerais". Hoje só existe etiqueta dos treinos individuais; rotinas geradas via gerador nascem sem etiqueta. Edit inline já existe no card aluno do HUB, mas garantir input no gerador faz a rotina nascer com etiqueta de cara.
+
+### 📋 Plano detalhado (handoff entre sessões)
+
+**Mockup:** `docs/redesign/mockup_mobile_gerador.html` · variante A2 estado 1 (linhas 708-833 do mockup)
+
+**Escopo:** apenas a estrutura/shell + seções Aluno e Config. Os treinos T1-T5 e o drawer ficam pra Etapa 10.
+
+**O que mexer:**
+
+- **Novo `templates/_mobile_section.html`:** componente colapsável reutilizável. Estrutura:
+  - `[ícone] [título + sub] [counter opcional] [chevron]`
+  - Estados: `closed` (default), `open` (body visível)
+  - Modificador `has-content` (ícone laranja quando preenchido)
+- **`templates/treinos.html`:** envolver layout desktop com `max-md:hidden`; adicionar bloco mobile com:
+  - Topbar custom: seta back + eyebrow ("Gerador · Nova rotina" / "Gerador · Substituir" / etc) + título com nome do aluno
+  - Seção 1: **Aluno** — select de aluno (já existe) + select "Evitar exercícios dos últimos N períodos"
+  - Seção 2: **Configurações gerais** — Nº treinos, Exerc/bloco, Complexidade máx, toggles (Evitar similaridade, Evitar agonistas) + **input de Etiqueta da rotina** (TODO Etapa 6)
+  - Treinos T1-T5: **placeholders** (Etapa 10 preenche)
+- **CSS no `base.html`:** `.section`, `.section-head`, `.section-body`, `.section-icon`, `.section-counter`, `.section-chevron`, `.section.has-content`, `.topbar-back`, `.topbar-title-area`, `.topbar-eyebrow`, `.topbar-title`
+- **Bottom bar do gerador:** novo `_mobile_bb_actions_gerador.html` com **Gerar treinos** full-width laranja
+  - `treinos.html` define `{% block bb_actions %}{% include "_mobile_bb_actions_gerador.html" %}{% endblock %}`
+- **JS:** toggle expand/collapse das seções (click no head)
+
+### ❓ Perguntas pendentes (esperando resposta do usuário)
+
+> Antes de codar a Etapa 9, fazer estas perguntas. As respostas sugeridas estão entre parênteses pra orientar a discussão.
+
+1. **Configurações abertas/fechadas por contexto?**
+   - Sugerido: Nova rotina → Aluno fechada + Config **aberta**; + Treino → ambas **fechadas**; Substituir → ambas **fechadas** (config travada em Nº=1)
+
+2. **"Evitar exercícios dos últimos N períodos" — Aluno ou Configurações?**
+   - Sugerido: **Aluno** (info histórica do aluno)
+
+3. **Botão Gerar desabilitado até quando?**
+   - Sugerido: **sempre habilitado** (mantém UX consistente com desktop)
+
+4. **Etiqueta da rotina — Aluno ou Configurações?**
+   - Sugerido: **Configurações** (metadado da geração, junto com N treinos / complexidade)
+
+5. **Sub das seções fechadas (resumo "3 treinos · superset · cx 5")?**
+   - Sugerido: **(a)** renderizar com valores atuais via JS após cada mudança (mais reativo)
+
+6. **Escopo do refactor (Etapa 9 sozinha ou junta com 10)?**
+   - Sugerido: **(a) Etapa 9 só shell** + Aluno/Config (placeholders pros treinos) — etapas pequenas, commits limpos, reduz risco
+
 
 
 **Mockup:** `mockup_mobile_gerador.html` · variante A2 estado 1
