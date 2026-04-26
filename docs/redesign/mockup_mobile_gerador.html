@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup mobile · Gerador — BF Treinamento</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Bricolage+Grotesque:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --brand-500: #e85d04; --brand-600: #d4520a; --brand-700: #b4480c;
+    --brand-50: #fff7ed; --brand-100: #fff3e6; --brand-200: #ffe0c2;
+    --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
+    --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937; --gray-900: #111827;
+    --green-500: #22c55e; --green-600: #16a34a; --green-700: #15803d;
+    --amber-50: #fffbeb; --amber-100: #fef3c7; --amber-200: #fde68a; --amber-500: #f59e0b; --amber-600: #d97706; --amber-700: #b45309;
+    --red-50: #fef2f2; --red-100: #fee2e2; --red-600: #dc2626;
+    --blue-50: #eff6ff; --blue-100: #dbeafe; --blue-600: #2563eb; --blue-700: #1d4ed8;
+    --canvas-paper: #f0ebe0; --canvas-ink: #2a2418; --canvas-rule: #c9c0ad;
+    --font-body: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --font-display: 'Bricolage Grotesque', ui-sans-serif, sans-serif;
+}
+
+html, body { height: 100%; }
+body {
+    font-family: var(--font-body);
+    color: var(--canvas-ink);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    background:
+        radial-gradient(900px 600px at 18% -8%, rgba(232,93,4,0.12) 0%, transparent 55%),
+        radial-gradient(800px 700px at 110% 20%, rgba(232,93,4,0.06) 0%, transparent 50%),
+        linear-gradient(180deg, #f0ebe0 0%, #e2dccb 100%);
+    background-attachment: fixed;
+    position: relative;
+    padding-bottom: 80px;
+}
+body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.55'/%3E%3C/svg%3E");
+    opacity: 0.18; pointer-events: none; z-index: 1; mix-blend-mode: multiply;
+}
+body > * { position: relative; z-index: 2; }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+.icon { width: 16px; height: 16px; stroke-width: 2; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.icon-sm { width: 13px; height: 13px; }
+.icon-xs { width: 11px; height: 11px; stroke-width: 2.2; }
+
+/* Top control bar */
+.control-bar { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.85); backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4); border-bottom: 1px solid rgba(201,192,173,0.55); }
+.control-inner { max-width: 1600px; margin: 0 auto; padding: 14px 28px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.control-title-group { display: flex; align-items: center; gap: 12px; }
+.control-logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-700) 100%); color: white; display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 13px; box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 4px 12px rgba(232,93,4,0.3); letter-spacing: -0.02em; }
+.control-title { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--canvas-ink); letter-spacing: -0.01em; }
+.control-sub { font-size: 11px; color: var(--gray-500); margin-top: 1px; font-family: var(--font-mono); font-weight: 500; }
+.cross-links { display: flex; gap: 6px; margin-left: auto; padding: 4px; background: rgba(255,255,255,0.6); border: 1px solid rgba(201,192,173,0.55); border-radius: 11px; }
+.cross-link { padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--gray-600); border-radius: 8px; text-decoration: none; transition: all 0.18s ease; letter-spacing: -0.005em; }
+.cross-link:hover { background: white; color: var(--canvas-ink); }
+.cross-link.current { color: white; background: var(--canvas-ink); box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+
+/* Page intro */
+.page-intro { max-width: 1100px; margin: 0 auto; padding: 56px 28px 8px; position: relative; }
+.page-intro .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--brand-700); text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 14px; padding: 5px 12px; background: var(--brand-100); border: 1px solid var(--brand-200); border-radius: 999px; }
+.page-intro .eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: var(--brand-500); box-shadow: 0 0 0 3px rgba(232,93,4,0.18); }
+.page-intro h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 42px); font-weight: 700; color: var(--canvas-ink); line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 14px; max-width: 780px; }
+.page-intro h1 em { font-style: italic; color: var(--brand-600); font-weight: 600; }
+.page-intro .lede { font-size: 15px; color: var(--gray-700); line-height: 1.6; max-width: 680px; }
+.page-intro .lede strong { color: var(--canvas-ink); font-weight: 600; }
+.page-intro .meta-line { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(201,192,173,0.7); font-family: var(--font-mono); font-size: 11px; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+.page-intro .meta-line span { display: inline-flex; align-items: center; gap: 6px; }
+.page-intro .meta-line span::before { content: ''; width: 4px; height: 4px; background: var(--brand-500); transform: rotate(45deg); }
+
+/* Variant divider */
+.variant-section {
+    max-width: 1600px; margin: 56px auto 0; padding: 0 28px;
+}
+.variant-header {
+    margin-bottom: 28px;
+    padding: 18px 22px;
+    background: white;
+    border: 1px solid rgba(201,192,173,0.7);
+    border-radius: 14px;
+    display: flex; align-items: center; gap: 18px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 8px -2px rgba(42,36,24,0.08);
+}
+.variant-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 22px;
+    flex-shrink: 0;
+    letter-spacing: -0.02em;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 4px 12px rgba(232,93,4,0.3);
+}
+.variant-info { flex: 1; min-width: 0; }
+.variant-eyebrow { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--brand-700); text-transform: uppercase; letter-spacing: 0.16em; }
+.variant-name { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--canvas-ink); letter-spacing: -0.018em; margin-top: 2px; line-height: 1.15; }
+.variant-desc { font-size: 13px; color: var(--gray-600); line-height: 1.55; margin-top: 6px; max-width: 720px; }
+.variant-pros {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--gray-600);
+}
+.variant-pros .pro { display: inline-flex; align-items: center; gap: 5px; }
+.variant-pros .pro::before { content: '+'; color: var(--green-600); font-weight: 700; }
+.variant-pros .con { display: inline-flex; align-items: center; gap: 5px; }
+.variant-pros .con::before { content: '−'; color: var(--gray-400); font-weight: 700; }
+
+/* Stage */
+.stage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 56px 32px; align-items: start; }
+.scenario { display: flex; flex-direction: column; align-items: center; gap: 16px; animation: fadeUp 0.7s ease backwards; }
+.scenario:nth-child(1) { animation-delay: 0.05s; }
+.scenario:nth-child(2) { animation-delay: 0.18s; }
+.scenario:nth-child(3) { animation-delay: 0.31s; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.scenario-label { text-align: center; max-width: 380px; }
+.scenario-num { display: inline-block; font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--brand-700); letter-spacing: 0.18em; text-transform: uppercase; padding: 3px 10px; background: var(--brand-50); border: 1px solid var(--brand-200); border-radius: 999px; margin-bottom: 8px; }
+.scenario-name { font-family: var(--font-display); font-size: 18px; font-weight: 700; color: var(--canvas-ink); letter-spacing: -0.015em; line-height: 1.15; }
+.scenario-desc { font-size: 12px; color: var(--gray-600); margin-top: 6px; line-height: 1.55; }
+
+/* Phone */
+.phone { width: 380px; height: 760px; background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%); border-radius: 46px; padding: 11px; position: relative; flex-shrink: 0; box-shadow: 0 0 0 1.5px #3a3a3a, 0 1px 0 0 rgba(255,255,255,0.08) inset, 0 28px 60px -16px rgba(42,36,24,0.4), 0 12px 28px -8px rgba(42,36,24,0.18); }
+.phone::before { content: ''; position: absolute; left: -2px; top: 140px; width: 3px; height: 56px; background: linear-gradient(90deg, #1a1a1a, #2a2a2a); border-radius: 2px 0 0 2px; }
+.phone::after { content: ''; position: absolute; right: -2px; top: 180px; width: 3px; height: 80px; background: linear-gradient(270deg, #1a1a1a, #2a2a2a); border-radius: 0 2px 2px 0; }
+.phone-screen { width: 100%; height: 100%; background: var(--gray-50); border-radius: 35px; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.phone-notch { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 116px; height: 28px; background: #050505; border-radius: 0 0 18px 18px; z-index: 50; }
+.phone-notch::after { content: ''; position: absolute; top: 9px; right: 22px; width: 8px; height: 8px; border-radius: 999px; background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #050505 70%); box-shadow: 0 0 0 1px #1a1a1a; }
+
+/* Status bar */
+.status-bar { height: 44px; flex-shrink: 0; padding: 14px 26px 0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; color: var(--gray-900); }
+.status-bar-time { font-family: var(--font-mono); letter-spacing: -0.02em; }
+.status-bar-icons { display: flex; gap: 5px; align-items: center; color: var(--gray-800); }
+
+/* Topbar (gerador) */
+.topbar-mobile { flex-shrink: 0; padding: 10px 14px 12px; background: white; border-bottom: 1px solid var(--gray-200); display: flex; align-items: center; gap: 10px; }
+.topbar-back { width: 34px; height: 34px; border-radius: 9px; color: var(--gray-700); display: grid; place-items: center; flex-shrink: 0; background: var(--gray-100); transition: all 0.15s; }
+.topbar-back:hover { background: var(--gray-200); }
+.topbar-title-area { flex: 1; min-width: 0; }
+.topbar-eyebrow { font-family: var(--font-mono); font-size: 9px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+.topbar-title { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--gray-900); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.012em; }
+.topbar-action-btn { width: 34px; height: 34px; border-radius: 9px; color: var(--gray-700); display: grid; place-items: center; flex-shrink: 0; background: var(--gray-100); position: relative; transition: all 0.15s; }
+.topbar-action-btn:hover { background: var(--gray-200); }
+.topbar-action-btn .badge { position: absolute; top: 4px; right: 4px; min-width: 14px; height: 14px; border-radius: 999px; background: var(--brand-500); color: white; font-family: var(--font-mono); font-size: 9px; font-weight: 700; display: grid; place-items: center; padding: 0 3px; border: 1.5px solid white; }
+
+/* Content */
+.content { flex: 1; overflow-y: auto; padding: 12px 14px 100px; position: relative; }
+.content::-webkit-scrollbar { width: 0; }
+
+/* ═══════ Sections (colapsáveis) ═══════ */
+.section { background: white; border: 1px solid var(--gray-200); border-radius: 13px; margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset; }
+.section-head { padding: 11px 13px; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: background 0.15s; }
+.section-head:hover { background: var(--gray-50); }
+.section.open .section-head { border-bottom: 1px solid var(--gray-200); background: var(--gray-50); }
+.section-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--gray-100); color: var(--gray-500); display: grid; place-items: center; flex-shrink: 0; }
+.section.has-content .section-icon { background: var(--brand-50); color: var(--brand-600); }
+.section.is-treino .section-icon { background: linear-gradient(180deg, var(--brand-500), var(--brand-600)); color: white; font-family: var(--font-mono); font-size: 11px; font-weight: 800; box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset; }
+.section-title-area { flex: 1; min-width: 0; }
+.section-title { font-family: var(--font-display); font-size: 13.5px; font-weight: 700; color: var(--gray-900); letter-spacing: -0.012em; }
+.section-sub { font-size: 11px; color: var(--gray-500); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-weight: 500; }
+.section-counter { font-family: var(--font-mono); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--gray-100); color: var(--gray-600); flex-shrink: 0; }
+.section.has-content .section-counter { background: var(--brand-100); color: var(--brand-700); border: 1px solid var(--brand-200); }
+.section-chevron { color: var(--gray-400); transition: transform 0.2s; flex-shrink: 0; }
+.section.open .section-chevron { transform: rotate(180deg); }
+.section-body { padding: 12px 13px; display: none; }
+.section.open .section-body { display: block; }
+
+/* Form fields */
+.field-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.field-row:last-child { margin-bottom: 0; }
+.field { flex: 1; min-width: 0; }
+.field-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; display: block; }
+.field-select { width: 100%; padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--gray-900); font-family: inherit; background: white; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 28px; letter-spacing: -0.005em; }
+.range-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.range-input { flex: 1; accent-color: var(--brand-500); }
+.range-value { font-family: var(--font-mono); font-weight: 700; color: var(--brand-700); font-size: 14px; min-width: 16px; text-align: center; }
+.toggle-row { display: flex; flex-direction: column; gap: 4px; }
+.check-line { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12px; color: var(--gray-700); cursor: pointer; }
+.check-line input { accent-color: var(--brand-500); }
+
+/* Mode switch */
+.mode-switch { display: inline-flex; background: var(--gray-100); border-radius: 9px; padding: 3px; margin-bottom: 12px; width: 100%; }
+.mode-btn { flex: 1; padding: 7px 10px; border-radius: 6.5px; font-size: 12px; font-weight: 600; color: var(--gray-500); transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.mode-btn.active { background: white; color: var(--gray-900); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
+/* Region cards */
+.regiao-card { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+.regiao-card.has-selected { border-color: var(--brand-500); background: white; }
+.regiao-head { padding: 9px 11px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.regiao-head:hover { background: white; }
+.regiao-card.open .regiao-head { background: white; border-bottom: 1px solid var(--gray-200); }
+.regiao-icon { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; flex-shrink: 0; }
+.regiao-icon.upper  { background: #ffe4e6; color: #9f1239; }
+.regiao-icon.lower  { background: #d1fae5; color: #065f46; }
+.regiao-icon.core   { background: #f3e8ff; color: #6b21a8; }
+.regiao-icon.cardio { background: #fef9c3; color: #854d0e; }
+.regiao-title { font-family: var(--font-display); font-size: 12.5px; font-weight: 700; color: var(--gray-900); flex: 1; letter-spacing: -0.01em; }
+.regiao-summary { font-family: var(--font-mono); font-size: 10px; color: var(--gray-400); font-weight: 600; flex-shrink: 0; }
+.regiao-card.has-selected .regiao-summary { color: var(--brand-600); }
+.regiao-chevron { color: var(--gray-400); transition: transform 0.2s; flex-shrink: 0; }
+.regiao-card.open .regiao-chevron { transform: rotate(90deg); }
+.regiao-body { padding: 10px 11px; display: none; }
+.regiao-card.open .regiao-body { display: block; }
+
+.subregiao-block { margin-bottom: 10px; }
+.subregiao-block:last-child { margin-bottom: 0; }
+.subregiao-label { font-family: var(--font-mono); font-size: 9px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.subregiao-add-all { font-family: var(--font-mono); font-size: 9px; padding: 1.5px 6px; border-radius: 4px; background: var(--gray-100); color: var(--gray-600); font-weight: 700; cursor: pointer; transition: all 0.15s; }
+.subregiao-add-all:hover { background: var(--brand-100); color: var(--brand-700); }
+.padroes-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.padrao-tag { font-size: 11px; padding: 4px 8px; border-radius: 7px; background: white; border: 1px solid var(--gray-200); color: var(--gray-600); cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; letter-spacing: -0.005em; }
+.padrao-tag:hover { border-color: var(--brand-300); color: var(--brand-600); }
+.padrao-tag.selected { background: var(--brand-50); border-color: var(--brand-500); color: var(--brand-700); font-weight: 700; }
+.padrao-tag .tag-count { font-family: var(--font-mono); font-size: 9px; font-weight: 800; padding: 0 4px; border-radius: 3px; background: var(--brand-500); color: white; margin-left: 2px; }
+
+/* Demandas */
+.demandas-list { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 10px; padding: 9px 11px; margin-top: 10px; }
+.demandas-head { display: flex; align-items: center; gap: 6px; padding-bottom: 7px; border-bottom: 1px solid var(--gray-200); margin-bottom: 7px; }
+.demandas-title { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.08em; flex: 1; }
+.demandas-total { font-family: var(--font-mono); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--brand-500); color: white; }
+.demanda-item { display: flex; align-items: center; gap: 6px; padding: 5px 0; font-size: 11px; }
+.demanda-item:not(:last-child) { border-bottom: 1px dashed var(--gray-200); }
+.demanda-name { flex: 1; min-width: 0; color: var(--gray-700); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.demanda-counter { display: inline-flex; align-items: center; background: white; border: 1px solid var(--gray-200); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+.demanda-counter button { width: 22px; height: 22px; color: var(--gray-500); display: grid; place-items: center; transition: all 0.1s; }
+.demanda-counter button:hover { background: var(--gray-100); color: var(--brand-600); }
+.demanda-counter span { width: 22px; text-align: center; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--gray-900); }
+.demanda-remove { width: 22px; height: 22px; color: var(--gray-400); display: grid; place-items: center; border-radius: 5px; flex-shrink: 0; }
+.demanda-remove:hover { background: var(--red-50); color: var(--red-600); }
+.demanda-empty { padding: 14px 0; text-align: center; font-size: 11px; color: var(--gray-400); font-style: italic; }
+
+/* Big "abrir drawer" button (Variant 2) */
+.open-drawer-btn {
+    width: 100%;
+    padding: 14px 14px;
+    border: 2px dashed var(--gray-300);
+    background: white;
+    border-radius: 12px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+    transition: all 0.18s;
+    margin-top: 10px;
+    text-align: left;
+}
+.open-drawer-btn:hover { border-color: var(--brand-500); background: var(--brand-50); }
+.open-drawer-icon {
+    width: 36px; height: 36px;
+    border-radius: 9px;
+    background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
+    color: white;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 8px rgba(232,93,4,0.25);
+}
+.open-drawer-info { flex: 1; min-width: 0; }
+.open-drawer-title { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--gray-900); letter-spacing: -0.012em; }
+.open-drawer-sub { font-size: 11px; color: var(--gray-600); margin-top: 1px; }
+.open-drawer-arrow { color: var(--gray-400); flex-shrink: 0; }
+
+/* ═══════ DRAWER (Variant 2) ═══════ */
+.drawer-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 12, 8, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 60;
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+}
+.drawer-panel {
+    width: 92%;
+    background: white;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: -8px 0 30px rgba(0,0,0,0.18);
+    border-radius: 24px 0 0 24px;
+    overflow: hidden;
+    animation: slideIn 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+.drawer-head {
+    padding: 14px 14px 12px;
+    border-bottom: 1px solid var(--gray-200);
+    background: linear-gradient(180deg, var(--brand-50) 0%, white 100%);
+    display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+}
+.drawer-head-icon {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+    color: white;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 2px 6px rgba(232,93,4,0.3);
+}
+.drawer-head-info { flex: 1; min-width: 0; }
+.drawer-head-eyebrow { font-family: var(--font-mono); font-size: 9px; color: var(--brand-700); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+.drawer-head-title { font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--gray-900); letter-spacing: -0.012em; margin-top: 1px; }
+.drawer-close {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    color: var(--gray-500);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.drawer-close:hover { background: var(--gray-100); color: var(--gray-900); }
+
+.drawer-counter {
+    padding: 10px 14px;
+    background: var(--brand-50);
+    border-bottom: 1px solid var(--brand-100);
+    display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+}
+.drawer-counter-label { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--brand-700); text-transform: uppercase; letter-spacing: 0.08em; flex: 1; }
+.drawer-counter-value { font-family: var(--font-mono); font-size: 14px; font-weight: 800; color: var(--brand-700); }
+
+.drawer-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px 90px;
+}
+
+.drawer-foot {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--gray-200);
+    padding: 10px 12px 14px;
+    display: flex; gap: 8px;
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.04);
+}
+.drawer-foot button { flex: 1; height: 44px; border-radius: 11px; font-size: 13.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s; letter-spacing: -0.005em; }
+.drawer-foot .btn-secondary { background: white; border: 1px solid var(--gray-200); color: var(--gray-700); }
+.drawer-foot .btn-secondary:hover { background: var(--gray-50); border-color: var(--gray-300); }
+.drawer-foot .btn-primary { background: linear-gradient(180deg, var(--brand-500), var(--brand-600)); color: white; box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 10px rgba(232,93,4,0.3); }
+.drawer-foot .btn-primary:hover { background: linear-gradient(180deg, var(--brand-600), var(--brand-700)); }
+
+/* Treino card (resultado) */
+.treino-card { background: white; border: 1px solid var(--gray-200); border-radius: 16px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset; }
+.treino-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.treino-num { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--gray-400); flex-shrink: 0; letter-spacing: 0.04em; padding: 2px 5px; background: var(--gray-100); border-radius: 4px; }
+.treino-name { font-family: var(--font-display); font-size: 14.5px; font-weight: 700; color: var(--gray-900); flex-shrink: 0; letter-spacing: -0.012em; }
+.regiao-chips-row { display: flex; gap: 3px; flex-wrap: nowrap; overflow: hidden; flex: 1; min-width: 0; }
+.reg-chip { font-family: var(--font-mono); font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; flex-shrink: 0; }
+.reg-peito { background: #ffe4e6; color: #9f1239; }
+.reg-costas { background: #e0f2fe; color: #075985; }
+.reg-ombro { background: #fef3c7; color: #92400e; }
+.reg-bracos { background: #ede9fe; color: #5b21b6; }
+.reg-perna-ant { background: #d1fae5; color: #065f46; }
+.reg-perna-post { background: #ccfbf1; color: #115e59; }
+.reg-core { background: #f3e8ff; color: #6b21a8; }
+.treino-acoes { display: flex; gap: 1px; flex-shrink: 0; margin-left: auto; }
+.act-btn { width: 30px; height: 30px; border-radius: 7px; color: var(--gray-500); display: grid; place-items: center; transition: all 0.15s; }
+.act-btn:hover { background: var(--gray-100); color: var(--brand-500); }
+
+.bloco { background: var(--gray-50); border-radius: 10px; padding: 8px 10px 9px; margin-bottom: 6px; border: 1px solid var(--gray-100); }
+.bloco:last-child { margin-bottom: 0; }
+.bloco-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.bloco-chip { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(180deg, var(--brand-500), var(--brand-600)); color: white; font-family: var(--font-mono); font-weight: 800; font-size: 10px; display: grid; place-items: center; flex-shrink: 0; box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset; }
+.bloco-label { font-family: var(--font-mono); font-size: 9px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+.exercicio { display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 9px; border-left: 2.5px solid var(--brand-500); margin-bottom: 3px; }
+.exercicio:last-child { margin-bottom: 0; }
+.exercicio-info { flex: 1; min-width: 0; }
+.exercicio-nome { font-size: 13px; font-weight: 500; color: var(--gray-900); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.005em; }
+.exercicio-prefix { font-family: var(--font-mono); color: var(--gray-400); font-weight: 600; margin-right: 5px; font-size: 11px; }
+.prescr { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--brand-700); background: var(--brand-100); padding: 2.5px 6px; border-radius: 4px; flex-shrink: 0; white-space: nowrap; letter-spacing: -0.01em; border: 1px solid rgba(232,93,4,0.15); }
+
+/* Histórico mini */
+.hist-mini { background: var(--blue-50); border: 1px solid var(--blue-100); border-radius: 10px; padding: 8px 11px; font-size: 11px; color: var(--blue-700); display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.hist-mini .icon { color: var(--blue-600); }
+.hist-mini-text { flex: 1; line-height: 1.4; }
+.hist-mini b { font-weight: 700; }
+
+/* Bottom bar */
+.bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); border-top: 1px solid var(--gray-200); padding: 10px 12px 14px; display: flex; gap: 8px; align-items: center; box-shadow: 0 -8px 24px rgba(0,0,0,0.04); }
+.bb-nav { width: 46px; height: 46px; border-radius: 12px; background: var(--gray-100); color: var(--gray-700); display: grid; place-items: center; flex-shrink: 0; transition: all 0.15s; }
+.bb-nav:hover { background: var(--gray-200); color: var(--gray-900); }
+.bb-nav .icon { width: 20px; height: 20px; }
+.bb-action { flex: 1; height: 46px; border-radius: 12px; font-size: 13.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; transition: all 0.15s; min-width: 0; letter-spacing: -0.005em; }
+.bb-action.primary { background: linear-gradient(180deg, var(--brand-500), var(--brand-600)); color: white; box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 10px rgba(232,93,4,0.3); }
+.bb-action.primary:hover { background: linear-gradient(180deg, var(--brand-600), var(--brand-700)); }
+.bb-action.secondary { background: white; border: 1px solid var(--gray-200); color: var(--gray-700); }
+.bb-action.secondary:hover { background: var(--gray-50); border-color: var(--gray-300); }
+.bb-action.success { background: linear-gradient(180deg, var(--green-500), var(--green-600)); color: white; box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 10px rgba(34,197,94,0.25); }
+.bb-action.disabled { background: var(--gray-200); color: var(--gray-400); cursor: not-allowed; box-shadow: none; }
+
+/* Notes */
+.notes-section { max-width: 1100px; margin: 64px auto 0; padding: 0 28px; }
+.notes-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--brand-700); text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 12px; }
+.notes-eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--canvas-rule); }
+.notes-title { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--canvas-ink); letter-spacing: -0.02em; margin-bottom: 20px; }
+.notes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.annotation { background: white; border: 1px solid var(--gray-200); border-radius: 12px; padding: 14px 16px; font-size: 12px; color: var(--gray-700); line-height: 1.6; box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 6px -2px rgba(0,0,0,0.04); }
+.annotation b { color: var(--canvas-ink); font-weight: 700; }
+.annotation .anno-title { display: flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--canvas-ink); letter-spacing: -0.012em; margin-bottom: 6px; }
+.annotation .anno-title .icon-bullet { width: 18px; height: 18px; border-radius: 5px; background: var(--brand-100); color: var(--brand-700); display: grid; place-items: center; font-family: var(--font-mono); font-weight: 800; font-size: 9px; flex-shrink: 0; }
+.annotation hr { border: 0; border-top: 1px dashed var(--gray-200); margin: 8px 0 6px; }
+.annotation .micro { font-family: var(--font-mono); font-size: 10px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.08em; }
+.annotation .micro b { color: var(--gray-700); }
+
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-clipboard-list" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+    <symbol id="i-replace" viewBox="0 0 24 24"><path d="M14 4c0-1.1.9-2 2-2"/><path d="M20 2c1.1 0 2 .9 2 2"/><path d="M22 8c0 1.1-.9 2-2 2"/><path d="M16 10c-1.1 0-2-.9-2-2"/><path d="m3 7 3 3 3-3"/><path d="M6 10V5c0-1.7 1.3-3 3-3h1"/><rect x="2" y="14" width="8" height="8" rx="2"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="i-more-vertical" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m6.08 9.5-3.5 1.6a1 1 0 0 0 0 1.81l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9a1 1 0 0 0 0-1.83l-3.5-1.59"/><path d="m6.08 14.5-3.5 1.6a1 1 0 0 0 0 1.81l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9a1 1 0 0 0 0-1.83l-3.5-1.59"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="2" y="14" width="3" height="6" rx="0.5"/><rect x="7" y="10" width="3" height="10" rx="0.5"/><rect x="12" y="6" width="3" height="14" rx="0.5"/><rect x="17" y="2" width="3" height="18" rx="0.5"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></symbol>
+    <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2" y="6" width="18" height="12" rx="2.5"/><line x1="22" x2="22" y1="11" y2="13"/><rect x="4" y="8" width="14" height="8" rx="1.2" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<div class="control-bar">
+    <div class="control-inner">
+        <div class="control-title-group">
+            <div class="control-logo">BF</div>
+            <div>
+                <div class="control-title">Mockup mobile · Gerador</div>
+                <div class="control-sub">redesign 02 · 2 variantes + resultado</div>
+            </div>
+        </div>
+        <div class="cross-links">
+            <a href="mockup_mobile_hub.html" class="cross-link">HUB</a>
+            <a href="mockup_mobile_gerador.html" class="cross-link current">Gerador</a>
+            <a href="mockup_mobile_aux.html" class="cross-link">Auxiliares</a>
+        </div>
+    </div>
+</div>
+
+<div class="page-intro">
+    <span class="eyebrow">Redesign mobile · 02</span>
+    <h1>Gerador no celular: <em>tela única</em> ou <em>drawer lateral</em>?</h1>
+    <p class="lede">Duas estratégias para o mesmo problema — escolher demandas para cada treino sem perder contexto. <strong>A1</strong> empilha tudo numa tela só, com regiões expandindo inline. <strong>A2</strong> mantém o main limpo (só lista de demandas) e abre um drawer focado para escolher os padrões. O resultado depois de <em>Gerar</em> é igual nas duas — o que muda é só a entrada.</p>
+    <div class="meta-line">
+        <span>Modo · Hierarquia + Template</span>
+        <span>Bottom bar · Gerar (1 ação)</span>
+        <span>Drawer · 92% width · slide-in</span>
+        <span>Análogo · drawer de substituição</span>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--                         VARIANTE 1                           -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="variant-section">
+    <div class="variant-header">
+        <div class="variant-badge">A1</div>
+        <div class="variant-info">
+            <div class="variant-eyebrow">Variante 1</div>
+            <div class="variant-name">Tela única vertical · seções colapsáveis</div>
+            <div class="variant-desc">Aluno · Configurações · T1 · T2 · T3 empilhados. Cada treino expande inline e mostra hierarquia/template + cards de região com tags de padrões selecionáveis. Resumo de demandas dentro do próprio treino.</div>
+            <div class="variant-pros">
+                <span class="pro">familiar (igual ao desktop)</span>
+                <span class="pro">tudo em 1 scroll</span>
+                <span class="con">muita rolagem</span>
+                <span class="con">contexto fica longe</span>
+            </div>
+        </div>
+    </div>
+    <div class="stage-grid">
+
+        <!-- Cenário A1 -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">A1 · estado</div>
+                <div class="scenario-name">Configurando T1 · seções abertas</div>
+                <div class="scenario-desc">Aluno e T1 abertos, configs fechadas. Tags de padrão clicáveis. Demandas resumidas no fim do treino. Bottom bar com Gerar.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons"><svg class="icon icon-xs"><use href="#i-signal"/></svg><svg class="icon icon-xs"><use href="#i-wifi"/></svg><svg class="icon icon-sm"><use href="#i-battery"/></svg></span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <button class="topbar-back"><svg class="icon icon-sm"><use href="#i-arrow-left"/></svg></button>
+                        <div class="topbar-title-area">
+                            <div class="topbar-eyebrow">Gerador · Nova rotina</div>
+                            <div class="topbar-title">Bernardo Fleck</div>
+                        </div>
+                    </div>
+                    <div class="content">
+
+                        <!-- Aluno (aberto) -->
+                        <div class="section open has-content">
+                            <div class="section-head">
+                                <div class="section-icon"><svg class="icon icon-sm"><use href="#i-users"/></svg></div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Aluno</div>
+                                    <div class="section-sub">Bernardo Fleck · interm.</div>
+                                </div>
+                                <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+                            </div>
+                            <div class="section-body">
+                                <select class="field-select"><option>Bernardo Fleck</option></select>
+                                <label class="field-label" style="margin-top: 10px;">Evitar exercícios dos últimos</label>
+                                <select class="field-select"><option>1 período</option></select>
+                            </div>
+                        </div>
+
+                        <!-- Configs (fechado, com resumo) -->
+                        <div class="section has-content">
+                            <div class="section-head">
+                                <div class="section-icon"><svg class="icon icon-sm"><use href="#i-sliders"/></svg></div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Configurações gerais</div>
+                                    <div class="section-sub">3 treinos · superset · cx 5</div>
+                                </div>
+                                <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+                            </div>
+                        </div>
+
+                        <!-- T1 aberto -->
+                        <div class="section open is-treino">
+                            <div class="section-head">
+                                <div class="section-icon">T1</div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Treino 1</div>
+                                    <div class="section-sub">Hierarquia · 5 padrões</div>
+                                </div>
+                                <span class="section-counter">5</span>
+                                <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+                            </div>
+                            <div class="section-body">
+                                <div class="mode-switch">
+                                    <button class="mode-btn active"><svg class="icon icon-xs"><use href="#i-layers"/></svg> Hierarquia</button>
+                                    <button class="mode-btn"><svg class="icon icon-xs"><use href="#i-clipboard-list"/></svg> Template</button>
+                                </div>
+
+                                <div class="regiao-card has-selected open">
+                                    <div class="regiao-head">
+                                        <div class="regiao-icon upper"><svg class="icon icon-xs"><use href="#i-target"/></svg></div>
+                                        <div class="regiao-title">Upper</div>
+                                        <div class="regiao-summary">3 selec.</div>
+                                        <svg class="icon icon-xs regiao-chevron"><use href="#i-chevron-right"/></svg>
+                                    </div>
+                                    <div class="regiao-body">
+                                        <div class="subregiao-block">
+                                            <div class="subregiao-label">
+                                                <span style="flex:1;">Peito</span>
+                                                <span class="subregiao-add-all">+ todos</span>
+                                            </div>
+                                            <div class="padroes-tags">
+                                                <span class="padrao-tag selected">empurrar comp. <span class="tag-count">2</span></span>
+                                                <span class="padrao-tag">empurrar isol.</span>
+                                            </div>
+                                        </div>
+                                        <div class="subregiao-block">
+                                            <div class="subregiao-label">
+                                                <span style="flex:1;">Ombro</span>
+                                                <span class="subregiao-add-all">+ todos</span>
+                                            </div>
+                                            <div class="padroes-tags">
+                                                <span class="padrao-tag selected">ombro comp. <span class="tag-count">1</span></span>
+                                                <span class="padrao-tag">ombro isol.</span>
+                                                <span class="padrao-tag selected">posterior <span class="tag-count">1</span></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="regiao-card">
+                                    <div class="regiao-head">
+                                        <div class="regiao-icon lower"><svg class="icon icon-xs"><use href="#i-zap"/></svg></div>
+                                        <div class="regiao-title">Lower</div>
+                                        <div class="regiao-summary">—</div>
+                                        <svg class="icon icon-xs regiao-chevron"><use href="#i-chevron-right"/></svg>
+                                    </div>
+                                </div>
+                                <div class="regiao-card">
+                                    <div class="regiao-head">
+                                        <div class="regiao-icon core"><svg class="icon icon-xs"><use href="#i-target"/></svg></div>
+                                        <div class="regiao-title">Core</div>
+                                        <div class="regiao-summary">—</div>
+                                        <svg class="icon icon-xs regiao-chevron"><use href="#i-chevron-right"/></svg>
+                                    </div>
+                                </div>
+
+                                <div class="demandas-list">
+                                    <div class="demandas-head">
+                                        <span class="demandas-title">Demandas configuradas</span>
+                                        <span class="demandas-total">5 ex</span>
+                                    </div>
+                                    <div class="demanda-item">
+                                        <span class="reg-chip reg-peito">Peito</span>
+                                        <span class="demanda-name">empurrar comp.</span>
+                                        <div class="demanda-counter">
+                                            <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button><span>2</span><button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                        </div>
+                                        <button class="demanda-remove"><svg class="icon icon-xs"><use href="#i-x"/></svg></button>
+                                    </div>
+                                    <div class="demanda-item">
+                                        <span class="reg-chip reg-ombro">Ombro</span>
+                                        <span class="demanda-name">ombro comp.</span>
+                                        <div class="demanda-counter">
+                                            <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button><span>1</span><button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                        </div>
+                                        <button class="demanda-remove"><svg class="icon icon-xs"><use href="#i-x"/></svg></button>
+                                    </div>
+                                    <div class="demanda-item">
+                                        <span class="reg-chip reg-ombro">Ombro</span>
+                                        <span class="demanda-name">posterior</span>
+                                        <div class="demanda-counter">
+                                            <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button><span>1</span><button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                        </div>
+                                        <button class="demanda-remove"><svg class="icon icon-xs"><use href="#i-x"/></svg></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- T2 e T3 fechados -->
+                        <div class="section is-treino">
+                            <div class="section-head">
+                                <div class="section-icon">T2</div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Treino 2</div>
+                                    <div class="section-sub">Sem configuração</div>
+                                </div>
+                                <span class="section-counter">0</span>
+                                <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+                            </div>
+                        </div>
+                        <div class="section is-treino">
+                            <div class="section-head">
+                                <div class="section-icon">T3</div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Treino 3</div>
+                                    <div class="section-sub">Sem configuração</div>
+                                </div>
+                                <span class="section-counter">0</span>
+                                <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-bar">
+                        <button class="bb-nav"><svg class="icon"><use href="#i-grid"/></svg></button>
+                        <button class="bb-action primary"><svg class="icon icon-sm"><use href="#i-zap"/></svg> Gerar treinos</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--                         VARIANTE 2                           -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="variant-section">
+    <div class="variant-header">
+        <div class="variant-badge">A2</div>
+        <div class="variant-info">
+            <div class="variant-eyebrow">Variante 2</div>
+            <div class="variant-name">Lista de demandas no main · drawer lateral para escolher</div>
+            <div class="variant-desc">Cada treino mostra <strong>só a lista de demandas configuradas</strong> + 1 botão grande "Adicionar demandas". Ao tocar, abre um drawer lateral (mesmo padrão do drawer de substituição) com hierarquia/template e os cards de região. O drawer tem footer próprio com Cancelar/Aplicar.</div>
+            <div class="variant-pros">
+                <span class="pro">main fica curto</span>
+                <span class="pro">contexto sempre visível</span>
+                <span class="pro">multi-treino fácil de navegar</span>
+                <span class="con">+ 1 toque para ver padrões</span>
+            </div>
+        </div>
+    </div>
+    <div class="stage-grid">
+
+        <!-- Cenário B1 · Main com drawer FECHADO -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">A2 · estado 1</div>
+                <div class="scenario-name">Main · lista de demandas + CTA</div>
+                <div class="scenario-desc">Treinos como cards compactos. Cada um mostra demandas já configuradas e um botão grande para abrir o drawer.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons"><svg class="icon icon-xs"><use href="#i-signal"/></svg><svg class="icon icon-xs"><use href="#i-wifi"/></svg><svg class="icon icon-sm"><use href="#i-battery"/></svg></span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <button class="topbar-back"><svg class="icon icon-sm"><use href="#i-arrow-left"/></svg></button>
+                        <div class="topbar-title-area">
+                            <div class="topbar-eyebrow">Gerador · Nova rotina</div>
+                            <div class="topbar-title">Bernardo Fleck</div>
+                        </div>
+                    </div>
+                    <div class="content">
+
+                        <!-- Aluno + Configs colapsadas (mesmo da V1) -->
+                        <div class="section has-content">
+                            <div class="section-head">
+                                <div class="section-icon"><svg class="icon icon-sm"><use href="#i-users"/></svg></div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Aluno</div>
+                                    <div class="section-sub">Bernardo Fleck · interm.</div>
+                                </div>
+                                <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+                            </div>
+                        </div>
+
+                        <div class="section has-content">
+                            <div class="section-head">
+                                <div class="section-icon"><svg class="icon icon-sm"><use href="#i-sliders"/></svg></div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Configurações gerais</div>
+                                    <div class="section-sub">3 treinos · superset · cx 5</div>
+                                </div>
+                                <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+                            </div>
+                        </div>
+
+                        <!-- T1 aberto, mas só com demandas + CTA -->
+                        <div class="section open is-treino">
+                            <div class="section-head">
+                                <div class="section-icon">T1</div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Treino 1</div>
+                                    <div class="section-sub">Hierarquia · 3 padrões</div>
+                                </div>
+                                <span class="section-counter">5</span>
+                                <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+                            </div>
+                            <div class="section-body">
+                                <div class="demandas-list" style="margin-top: 0;">
+                                    <div class="demandas-head">
+                                        <span class="demandas-title">Demandas configuradas</span>
+                                        <span class="demandas-total">5 ex</span>
+                                    </div>
+                                    <div class="demanda-item">
+                                        <span class="reg-chip reg-peito">Peito</span>
+                                        <span class="demanda-name">empurrar comp.</span>
+                                        <div class="demanda-counter">
+                                            <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button><span>2</span><button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                        </div>
+                                        <button class="demanda-remove"><svg class="icon icon-xs"><use href="#i-x"/></svg></button>
+                                    </div>
+                                    <div class="demanda-item">
+                                        <span class="reg-chip reg-ombro">Ombro</span>
+                                        <span class="demanda-name">ombro comp.</span>
+                                        <div class="demanda-counter">
+                                            <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button><span>1</span><button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                        </div>
+                                        <button class="demanda-remove"><svg class="icon icon-xs"><use href="#i-x"/></svg></button>
+                                    </div>
+                                    <div class="demanda-item">
+                                        <span class="reg-chip reg-ombro">Ombro</span>
+                                        <span class="demanda-name">posterior</span>
+                                        <div class="demanda-counter">
+                                            <button><svg class="icon icon-xs"><use href="#i-minus"/></svg></button><span>1</span><button><svg class="icon icon-xs"><use href="#i-plus"/></svg></button>
+                                        </div>
+                                        <button class="demanda-remove"><svg class="icon icon-xs"><use href="#i-x"/></svg></button>
+                                    </div>
+                                </div>
+
+                                <button class="open-drawer-btn">
+                                    <div class="open-drawer-icon"><svg class="icon icon-sm"><use href="#i-target"/></svg></div>
+                                    <div class="open-drawer-info">
+                                        <div class="open-drawer-title">Adicionar demandas</div>
+                                        <div class="open-drawer-sub">Hierarquia ou template</div>
+                                    </div>
+                                    <svg class="icon icon-sm open-drawer-arrow"><use href="#i-chevron-right"/></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- T2 fechado -->
+                        <div class="section is-treino">
+                            <div class="section-head">
+                                <div class="section-icon">T2</div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Treino 2</div>
+                                    <div class="section-sub">Sem configuração</div>
+                                </div>
+                                <span class="section-counter">0</span>
+                                <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+                            </div>
+                        </div>
+                        <div class="section is-treino">
+                            <div class="section-head">
+                                <div class="section-icon">T3</div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Treino 3</div>
+                                    <div class="section-sub">Sem configuração</div>
+                                </div>
+                                <span class="section-counter">0</span>
+                                <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-bar">
+                        <button class="bb-nav"><svg class="icon"><use href="#i-grid"/></svg></button>
+                        <button class="bb-action primary"><svg class="icon icon-sm"><use href="#i-zap"/></svg> Gerar treinos</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cenário B2 · Main com drawer ABERTO -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">A2 · estado 2</div>
+                <div class="scenario-name">Drawer aberto · escolhendo padrões</div>
+                <div class="scenario-desc">Slide-in da direita ocupando 92% da tela. Hierarquia/Template no topo + cards de região. Footer próprio com Cancelar/Aplicar. Mesmo padrão do drawer de substituição.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons"><svg class="icon icon-xs"><use href="#i-signal"/></svg><svg class="icon icon-xs"><use href="#i-wifi"/></svg><svg class="icon icon-sm"><use href="#i-battery"/></svg></span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <button class="topbar-back"><svg class="icon icon-sm"><use href="#i-arrow-left"/></svg></button>
+                        <div class="topbar-title-area">
+                            <div class="topbar-eyebrow">Gerador · Nova rotina</div>
+                            <div class="topbar-title">Bernardo Fleck</div>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <!-- conteúdo do main "atrás" do overlay -->
+                        <div class="section is-treino" style="opacity: 0.3;">
+                            <div class="section-head">
+                                <div class="section-icon">T1</div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Treino 1</div>
+                                    <div class="section-sub">Hierarquia · 5 padrões</div>
+                                </div>
+                                <span class="section-counter">5</span>
+                            </div>
+                        </div>
+                        <div class="section is-treino" style="opacity: 0.3;">
+                            <div class="section-head">
+                                <div class="section-icon">T2</div>
+                                <div class="section-title-area">
+                                    <div class="section-title">Treino 2</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DRAWER -->
+                    <div class="drawer-overlay">
+                        <div class="drawer-panel">
+                            <div class="drawer-head">
+                                <div class="drawer-head-icon"><svg class="icon icon-sm"><use href="#i-target"/></svg></div>
+                                <div class="drawer-head-info">
+                                    <div class="drawer-head-eyebrow">Treino 1 · demandas</div>
+                                    <div class="drawer-head-title">Hierarquia</div>
+                                </div>
+                                <button class="drawer-close"><svg class="icon icon-sm"><use href="#i-x"/></svg></button>
+                            </div>
+
+                            <div class="drawer-counter">
+                                <span class="drawer-counter-label">Total selecionado</span>
+                                <span class="drawer-counter-value">5 ex</span>
+                            </div>
+
+                            <div class="drawer-content">
+                                <div class="mode-switch">
+                                    <button class="mode-btn active"><svg class="icon icon-xs"><use href="#i-layers"/></svg> Hierarquia</button>
+                                    <button class="mode-btn"><svg class="icon icon-xs"><use href="#i-clipboard-list"/></svg> Template</button>
+                                </div>
+
+                                <div class="regiao-card has-selected open">
+                                    <div class="regiao-head">
+                                        <div class="regiao-icon upper"><svg class="icon icon-xs"><use href="#i-target"/></svg></div>
+                                        <div class="regiao-title">Upper</div>
+                                        <div class="regiao-summary">3 selec.</div>
+                                        <svg class="icon icon-xs regiao-chevron"><use href="#i-chevron-right"/></svg>
+                                    </div>
+                                    <div class="regiao-body">
+                                        <div class="subregiao-block">
+                                            <div class="subregiao-label">
+                                                <span style="flex:1;">Peito</span>
+                                                <span class="subregiao-add-all">+ todos</span>
+                                            </div>
+                                            <div class="padroes-tags">
+                                                <span class="padrao-tag selected">empurrar comp. <span class="tag-count">2</span></span>
+                                                <span class="padrao-tag">empurrar isol.</span>
+                                            </div>
+                                        </div>
+                                        <div class="subregiao-block">
+                                            <div class="subregiao-label">
+                                                <span style="flex:1;">Costas</span>
+                                                <span class="subregiao-add-all">+ todos</span>
+                                            </div>
+                                            <div class="padroes-tags">
+                                                <span class="padrao-tag">remadas</span>
+                                                <span class="padrao-tag">puxadas</span>
+                                            </div>
+                                        </div>
+                                        <div class="subregiao-block">
+                                            <div class="subregiao-label">
+                                                <span style="flex:1;">Ombro</span>
+                                                <span class="subregiao-add-all">+ todos</span>
+                                            </div>
+                                            <div class="padroes-tags">
+                                                <span class="padrao-tag selected">ombro comp. <span class="tag-count">1</span></span>
+                                                <span class="padrao-tag">ombro isol.</span>
+                                                <span class="padrao-tag selected">posterior <span class="tag-count">1</span></span>
+                                            </div>
+                                        </div>
+                                        <div class="subregiao-block">
+                                            <div class="subregiao-label">
+                                                <span style="flex:1;">Braços</span>
+                                                <span class="subregiao-add-all">+ todos</span>
+                                            </div>
+                                            <div class="padroes-tags">
+                                                <span class="padrao-tag">bíceps</span>
+                                                <span class="padrao-tag">tríceps comp.</span>
+                                                <span class="padrao-tag">tríceps isol.</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="regiao-card">
+                                    <div class="regiao-head">
+                                        <div class="regiao-icon lower"><svg class="icon icon-xs"><use href="#i-zap"/></svg></div>
+                                        <div class="regiao-title">Lower</div>
+                                        <div class="regiao-summary">—</div>
+                                        <svg class="icon icon-xs regiao-chevron"><use href="#i-chevron-right"/></svg>
+                                    </div>
+                                </div>
+                                <div class="regiao-card">
+                                    <div class="regiao-head">
+                                        <div class="regiao-icon core"><svg class="icon icon-xs"><use href="#i-target"/></svg></div>
+                                        <div class="regiao-title">Core</div>
+                                        <div class="regiao-summary">—</div>
+                                        <svg class="icon icon-xs regiao-chevron"><use href="#i-chevron-right"/></svg>
+                                    </div>
+                                </div>
+                                <div class="regiao-card">
+                                    <div class="regiao-head">
+                                        <div class="regiao-icon cardio"><svg class="icon icon-xs"><use href="#i-zap"/></svg></div>
+                                        <div class="regiao-title">Cardio</div>
+                                        <div class="regiao-summary">—</div>
+                                        <svg class="icon icon-xs regiao-chevron"><use href="#i-chevron-right"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="drawer-foot">
+                                <button class="btn-secondary">Cancelar</button>
+                                <button class="btn-primary"><svg class="icon icon-sm"><use href="#i-check"/></svg> Aplicar (5)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--                       RESULTADO (compartilhado)              -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="variant-section">
+    <div class="variant-header">
+        <div class="variant-badge" style="background: linear-gradient(135deg, var(--green-500), var(--green-700)); box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 4px 12px rgba(34,197,94,0.3);">→</div>
+        <div class="variant-info">
+            <div class="variant-eyebrow">Tela compartilhada</div>
+            <div class="variant-name">Resultado · após "Gerar"</div>
+            <div class="variant-desc">Mesma tela em ambas as variantes. Treinos como cards (igual ao HUB) com 3 ações no header. Bottom bar troca para <strong>Configurar</strong> (volta) e <strong>Salvar</strong>. Mini banner azul lembra quantos exercícios estão sendo evitados pelo histórico.</div>
+        </div>
+    </div>
+    <div class="stage-grid" style="grid-template-columns: 1fr; max-width: 460px; margin: 0 auto;">
+
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">Resultado</div>
+                <div class="scenario-name">3 treinos gerados</div>
+                <div class="scenario-desc">Pronto para revisar. Toques de Editar/Substituir/Kebab por treino. Salvar publica para o aluno.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons"><svg class="icon icon-xs"><use href="#i-signal"/></svg><svg class="icon icon-xs"><use href="#i-wifi"/></svg><svg class="icon icon-sm"><use href="#i-battery"/></svg></span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <button class="topbar-back"><svg class="icon icon-sm"><use href="#i-arrow-left"/></svg></button>
+                        <div class="topbar-title-area">
+                            <div class="topbar-eyebrow">Resultado</div>
+                            <div class="topbar-title">3 treinos · Bernardo Fleck</div>
+                        </div>
+                    </div>
+                    <div class="content">
+
+                        <div class="hist-mini">
+                            <svg class="icon icon-sm"><use href="#i-clock"/></svg>
+                            <div class="hist-mini-text">Evitando <b>12 exercícios</b> dos últimos 1 períodos</div>
+                        </div>
+
+                        <div class="treino-card">
+                            <div class="treino-header">
+                                <span class="treino-num">T1</span>
+                                <span class="treino-name">Upper Push</span>
+                                <div class="regiao-chips-row">
+                                    <span class="reg-chip reg-peito">Peito</span>
+                                    <span class="reg-chip reg-ombro">Ombro</span>
+                                </div>
+                                <div class="treino-acoes">
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-pencil"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-rotate-ccw"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head"><span class="bloco-chip">A</span><span class="bloco-label">Bloco A</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A1</span>Supino reto barra</div></div><span class="prescr">4×8</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A2</span>Crucifixo halter</div></div><span class="prescr">3×12</span></div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head"><span class="bloco-chip">B</span><span class="bloco-label">Bloco B</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">B1</span>Desenv. halter</div></div><span class="prescr">3×10</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">B2</span>Elev. lateral</div></div><span class="prescr">3×15</span></div>
+                            </div>
+                        </div>
+
+                        <div class="treino-card">
+                            <div class="treino-header">
+                                <span class="treino-num">T2</span>
+                                <span class="treino-name">Upper Pull</span>
+                                <div class="regiao-chips-row">
+                                    <span class="reg-chip reg-costas">Costas</span>
+                                    <span class="reg-chip reg-bracos">Bíceps</span>
+                                </div>
+                                <div class="treino-acoes">
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-pencil"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-rotate-ccw"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head"><span class="bloco-chip">A</span><span class="bloco-label">Bloco A</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A1</span>Puxada alta</div></div><span class="prescr">4×10</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A2</span>Remada baixa</div></div><span class="prescr">3×12</span></div>
+                            </div>
+                        </div>
+
+                        <div class="treino-card">
+                            <div class="treino-header">
+                                <span class="treino-num">T3</span>
+                                <span class="treino-name">Lower</span>
+                                <div class="regiao-chips-row">
+                                    <span class="reg-chip reg-perna-ant">Quadr.</span>
+                                    <span class="reg-chip reg-perna-post">Posterior</span>
+                                </div>
+                                <div class="treino-acoes">
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-pencil"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-rotate-ccw"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head"><span class="bloco-chip">A</span><span class="bloco-label">Bloco A</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A1</span>Agachamento livre</div></div><span class="prescr">4×8</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-bar">
+                        <button class="bb-nav"><svg class="icon"><use href="#i-grid"/></svg></button>
+                        <button class="bb-action secondary" style="flex: 0 0 auto; padding: 0 14px;">
+                            <svg class="icon icon-sm"><use href="#i-arrow-left"/></svg> Configurar
+                        </button>
+                        <button class="bb-action success">
+                            <svg class="icon icon-sm"><use href="#i-check"/></svg> Salvar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notas -->
+<div class="notes-section">
+    <div class="notes-eyebrow">Comparativo · A1 vs A2</div>
+    <h2 class="notes-title">Qual escolher?</h2>
+    <div class="notes-grid">
+        <div class="annotation">
+            <div class="anno-title"><span class="icon-bullet">A1</span> Tela única vence quando…</div>
+            O personal usa rotinas <b>simples e curtas</b> (1-2 treinos). Tudo num scroll só, sem trocar de contexto. Familiar para quem já usa o desktop.
+            <hr>
+            <div class="micro"><b>Custo:</b> rolagem longa em rotinas de 4-5 treinos</div>
+        </div>
+        <div class="annotation">
+            <div class="anno-title"><span class="icon-bullet">A2</span> Drawer vence quando…</div>
+            O personal monta rotinas <b>de 3+ treinos</b>. Main fica curto, dá pra ver os 5 treinos no scroll. Drawer foca a atenção em uma tarefa só (escolher padrões).
+            <hr>
+            <div class="micro"><b>Bônus:</b> reusa o componente do drawer de substituição</div>
+        </div>
+        <div class="annotation">
+            <div class="anno-title"><span class="icon-bullet">⚙</span> Configurações iguais</div>
+            Aluno e Configurações gerais ficam idênticas nas duas variantes — sempre como seções colapsáveis no topo. Hierarquia/Template e cards de região também são reutilizáveis.
+            <hr>
+            <div class="micro"><b>Reutilização:</b> ~80% dos componentes</div>
+        </div>
+        <div class="annotation">
+            <div class="anno-title"><span class="icon-bullet">→</span> Resultado é igual</div>
+            Após Gerar, ambas levam para a mesma tela. Hist mini (azul) avisa exercícios evitados. Cards têm as 3 ações (Editar · Substituir · Kebab).
+            <hr>
+            <div class="micro"><b>Bottom bar:</b> Configurar · Salvar (verde)</div>
+        </div>
+        <div class="annotation">
+            <div class="anno-title"><span class="icon-bullet">≡</span> Substituir treino</div>
+            Quando vem do HUB para substituir T2 da rotina, o título vira "Gerador · Substituir". Aluno fica fixo (lock), Nº de treinos travado em 1. Ambas as variantes funcionam.
+            <hr>
+            <div class="micro"><b>Banner laranja:</b> "Substituindo T2 · outros preservados"</div>
+        </div>
+        <div class="annotation">
+            <div class="anno-title"><span class="icon-bullet">★</span> Recomendação</div>
+            Ir com a <b>A2 (drawer)</b>. Personal trabalha com várias rotinas de 3-4 treinos, e ver todos juntos importa mais que ver os padrões abertos. Fluxo se conecta visualmente com o drawer de substituição já existente.
+            <hr>
+            <div class="micro"><b>Implementação:</b> sua decisão final no guia .md</div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

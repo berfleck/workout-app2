@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup mobile · HUB — BF Treinamento</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Bricolage+Grotesque:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    /* App brand (mantido fiel ao app) */
+    --brand-500: #e85d04;
+    --brand-600: #d4520a;
+    --brand-700: #b4480c;
+    --brand-50: #fff7ed;
+    --brand-100: #fff3e6;
+    --brand-200: #ffe0c2;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --green-500: #22c55e;
+    --green-600: #16a34a;
+    --green-700: #15803d;
+    --amber-50: #fffbeb;
+    --amber-100: #fef3c7;
+    --amber-200: #fde68a;
+    --amber-500: #f59e0b;
+    --amber-600: #d97706;
+    --amber-700: #b45309;
+    --red-50: #fef2f2;
+    --red-100: #fee2e2;
+    --red-600: #dc2626;
+    /* Editorial canvas (fora dos phones) */
+    --canvas-paper: #f0ebe0;
+    --canvas-paper-dark: #d8d2c2;
+    --canvas-ink: #2a2418;
+    --canvas-rule: #c9c0ad;
+    --canvas-warm: #e85d04;
+    --font-body: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --font-display: 'Bricolage Grotesque', ui-sans-serif, sans-serif;
+}
+
+html, body { height: 100%; }
+body {
+    font-family: var(--font-body);
+    color: var(--canvas-ink);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    /* Layered atmospheric background */
+    background:
+        radial-gradient(900px 600px at 18% -8%, rgba(232,93,4,0.12) 0%, transparent 55%),
+        radial-gradient(800px 700px at 110% 20%, rgba(232,93,4,0.06) 0%, transparent 50%),
+        linear-gradient(180deg, #f0ebe0 0%, #e2dccb 100%);
+    background-attachment: fixed;
+    position: relative;
+    padding-bottom: 80px;
+}
+/* Grain overlay */
+body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.55'/%3E%3C/svg%3E");
+    opacity: 0.18;
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: multiply;
+}
+body > * { position: relative; z-index: 2; }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+.icon { width: 16px; height: 16px; stroke-width: 2; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.icon-sm { width: 13px; height: 13px; }
+.icon-xs { width: 11px; height: 11px; stroke-width: 2.2; }
+
+/* ════════════════ Top control bar ════════════════ */
+.control-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    border-bottom: 1px solid rgba(201,192,173,0.55);
+}
+.control-inner {
+    max-width: 1600px; margin: 0 auto;
+    padding: 14px 28px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+}
+.control-title-group { display: flex; align-items: center; gap: 12px; }
+.control-logo {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-700) 100%);
+    color: white;
+    display: grid; place-items: center;
+    font-family: var(--font-display);
+    font-weight: 800; font-size: 13px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 4px 12px rgba(232,93,4,0.3);
+    letter-spacing: -0.02em;
+}
+.control-title {
+    font-family: var(--font-display);
+    font-size: 15px; font-weight: 700;
+    color: var(--canvas-ink);
+    letter-spacing: -0.01em;
+}
+.control-sub {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 1px;
+    font-family: var(--font-mono);
+    font-weight: 500;
+}
+
+.cross-links { display: flex; gap: 6px; margin-left: auto; padding: 4px; background: rgba(255,255,255,0.6); border: 1px solid rgba(201,192,173,0.55); border-radius: 11px; }
+.cross-link {
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-600);
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.18s ease;
+    letter-spacing: -0.005em;
+}
+.cross-link:hover { background: white; color: var(--canvas-ink); }
+.cross-link.current {
+    color: white;
+    background: var(--canvas-ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+/* ════════════════ Page intro (editorial) ════════════════ */
+.page-intro {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 56px 28px 8px;
+    position: relative;
+}
+.page-intro .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--brand-700);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 14px;
+    padding: 5px 12px;
+    background: var(--brand-100);
+    border: 1px solid var(--brand-200);
+    border-radius: 999px;
+}
+.page-intro .eyebrow::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 999px;
+    background: var(--brand-500);
+    box-shadow: 0 0 0 3px rgba(232,93,4,0.18);
+}
+.page-intro h1 {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 42px);
+    font-weight: 700;
+    color: var(--canvas-ink);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    margin-bottom: 14px;
+    max-width: 720px;
+}
+.page-intro h1 em {
+    font-style: italic;
+    color: var(--brand-600);
+    font-weight: 600;
+}
+.page-intro .lede {
+    font-size: 15px;
+    color: var(--gray-700);
+    line-height: 1.6;
+    max-width: 660px;
+}
+.page-intro .lede strong { color: var(--canvas-ink); font-weight: 600; }
+.page-intro .meta-line {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(201,192,173,0.7);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+}
+.page-intro .meta-line span { display: inline-flex; align-items: center; gap: 6px; }
+.page-intro .meta-line span::before {
+    content: '';
+    width: 4px; height: 4px;
+    background: var(--brand-500);
+    transform: rotate(45deg);
+}
+
+/* ════════════════ Stage ════════════════ */
+.stage { max-width: 1600px; margin: 0 auto; padding: 32px 28px 60px; }
+.stage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 56px 32px;
+    align-items: start;
+}
+
+.scenario {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 16px;
+    animation: fadeUp 0.7s ease backwards;
+}
+.scenario:nth-child(1) { animation-delay: 0.05s; }
+.scenario:nth-child(2) { animation-delay: 0.18s; }
+.scenario:nth-child(3) { animation-delay: 0.31s; }
+.scenario:nth-child(4) { animation-delay: 0.44s; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+.scenario-label {
+    text-align: center;
+    max-width: 380px;
+    position: relative;
+}
+.scenario-num {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--brand-700);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    background: var(--brand-50);
+    border: 1px solid var(--brand-200);
+    border-radius: 999px;
+    margin-bottom: 8px;
+}
+.scenario-name {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--canvas-ink);
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+}
+.scenario-desc {
+    font-size: 12px;
+    color: var(--gray-600);
+    margin-top: 6px;
+    line-height: 1.55;
+}
+
+/* ════════════════ Phone frame ════════════════ */
+.phone {
+    width: 380px;
+    height: 760px;
+    background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+    border-radius: 46px;
+    padding: 11px;
+    position: relative;
+    flex-shrink: 0;
+    box-shadow:
+        0 0 0 1.5px #3a3a3a,
+        0 1px 0 0 rgba(255,255,255,0.08) inset,
+        0 28px 60px -16px rgba(42,36,24,0.4),
+        0 12px 28px -8px rgba(42,36,24,0.18);
+}
+/* Side button (volume hint) */
+.phone::before {
+    content: '';
+    position: absolute;
+    left: -2px; top: 140px;
+    width: 3px; height: 56px;
+    background: linear-gradient(90deg, #1a1a1a, #2a2a2a);
+    border-radius: 2px 0 0 2px;
+}
+.phone::after {
+    content: '';
+    position: absolute;
+    right: -2px; top: 180px;
+    width: 3px; height: 80px;
+    background: linear-gradient(270deg, #1a1a1a, #2a2a2a);
+    border-radius: 0 2px 2px 0;
+}
+.phone-screen {
+    width: 100%; height: 100%;
+    background: var(--gray-50);
+    border-radius: 35px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+.phone-notch {
+    position: absolute;
+    top: 8px; left: 50%; transform: translateX(-50%);
+    width: 116px; height: 28px;
+    background: #050505;
+    border-radius: 0 0 18px 18px;
+    z-index: 50;
+}
+.phone-notch::after {
+    content: '';
+    position: absolute;
+    top: 9px; right: 22px;
+    width: 8px; height: 8px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #050505 70%);
+    box-shadow: 0 0 0 1px #1a1a1a;
+}
+
+/* Status bar */
+.status-bar {
+    height: 44px; flex-shrink: 0;
+    padding: 14px 26px 0;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 14px; font-weight: 600;
+    color: var(--gray-900);
+}
+.status-bar-time { font-family: var(--font-mono); letter-spacing: -0.02em; }
+.status-bar-icons { display: flex; gap: 5px; align-items: center; color: var(--gray-800); }
+
+/* ════════════════ App topbar (within phone) ════════════════ */
+.topbar-mobile {
+    flex-shrink: 0;
+    padding: 10px 14px 12px;
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex; align-items: center; gap: 10px;
+}
+.topbar-logo {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-700) 100%);
+    color: white;
+    display: grid; place-items: center;
+    font-family: var(--font-display);
+    font-weight: 800; font-size: 12px;
+    flex-shrink: 0;
+    letter-spacing: -0.02em;
+    box-shadow: 0 2px 6px rgba(232,93,4,0.25);
+}
+.aluno-pill {
+    flex: 1;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px 8px 11px;
+    background: var(--gray-100);
+    border-radius: 999px;
+    font-size: 13px; font-weight: 600;
+    color: var(--gray-900);
+    min-width: 0;
+    transition: background 0.15s;
+}
+.aluno-pill .icon { color: var(--gray-500); }
+.aluno-pill .pill-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.005em; }
+.aluno-pill .pill-caret { color: var(--gray-400); flex-shrink: 0; }
+.aluno-pill.placeholder { color: var(--gray-500); font-weight: 500; }
+
+/* ════════════════ Content scroll area ════════════════ */
+.content { flex: 1; overflow-y: auto; padding: 12px 14px 100px; }
+.content::-webkit-scrollbar { width: 0; }
+
+/* Empty state */
+.empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center;
+    padding: 80px 24px 32px;
+    gap: 14px;
+}
+.empty-icon-wrap {
+    width: 64px; height: 64px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, var(--gray-100), var(--gray-50));
+    border: 1px solid var(--gray-200);
+    color: var(--gray-400);
+    display: grid; place-items: center;
+    box-shadow: 0 1px 0 white inset, 0 6px 14px -8px rgba(0,0,0,0.08);
+}
+.empty-icon-wrap .icon { width: 28px; height: 28px; stroke-width: 1.8; }
+.empty-title {
+    font-family: var(--font-display);
+    font-size: 17px; font-weight: 600;
+    color: var(--gray-800);
+    letter-spacing: -0.015em;
+    margin-top: 4px;
+}
+.empty-sub {
+    font-size: 12.5px;
+    color: var(--gray-500);
+    max-width: 240px;
+    line-height: 1.55;
+}
+.empty-sub b { color: var(--gray-700); font-weight: 600; }
+
+/* ════════════════ Aluno bar ════════════════ */
+.aluno-bar {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 14px;
+    padding: 11px 12px;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 1px 2px rgba(0,0,0,0.02);
+}
+.avatar {
+    width: 38px; height: 38px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-700) 100%);
+    color: white;
+    display: grid; place-items: center;
+    font-family: var(--font-display);
+    font-weight: 700; font-size: 13px;
+    flex-shrink: 0;
+    letter-spacing: -0.02em;
+    box-shadow: 0 1px 3px rgba(232,93,4,0.3);
+}
+.aluno-info { flex: 1; min-width: 0; }
+.aluno-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.aluno-name {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--gray-900);
+    letter-spacing: -0.01em;
+}
+.aluno-tag {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1.5px 6px;
+    border-radius: 4px;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+.aluno-meta {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+}
+.aluno-meta .dot { color: var(--gray-300); margin: 0 5px; }
+
+.periodo-toggle {
+    display: inline-flex;
+    background: var(--gray-100);
+    border-radius: 9px;
+    padding: 2.5px;
+    flex-shrink: 0;
+}
+.periodo-btn {
+    width: 28px; height: 28px;
+    border-radius: 6.5px;
+    color: var(--gray-400);
+    display: grid; place-items: center;
+    transition: all 0.15s;
+}
+.periodo-btn.active {
+    background: white;
+    color: var(--gray-800);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+/* ════════════════ Treino card ════════════════ */
+.treino-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 16px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.treino-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+}
+.treino-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gray-400);
+    flex-shrink: 0;
+    letter-spacing: 0.04em;
+    padding: 2px 5px;
+    background: var(--gray-100);
+    border-radius: 4px;
+}
+.treino-name {
+    font-family: var(--font-display);
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--gray-900);
+    flex-shrink: 0;
+    letter-spacing: -0.012em;
+}
+.regiao-chips {
+    display: flex; gap: 3px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    flex: 1;
+    min-width: 0;
+}
+.reg-chip {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.reg-peito        { background: #ffe4e6; color: #9f1239; }
+.reg-costas       { background: #e0f2fe; color: #075985; }
+.reg-ombro        { background: #fef3c7; color: #92400e; }
+.reg-bracos       { background: #ede9fe; color: #5b21b6; }
+.reg-perna-ant    { background: #d1fae5; color: #065f46; }
+.reg-perna-post   { background: #ccfbf1; color: #115e59; }
+.reg-core         { background: #f3e8ff; color: #6b21a8; }
+.treino-acoes {
+    display: flex; gap: 1px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+.act-btn {
+    width: 30px; height: 30px;
+    border-radius: 7px;
+    color: var(--gray-500);
+    display: grid; place-items: center;
+    transition: all 0.15s;
+}
+.act-btn:hover { background: var(--gray-100); color: var(--brand-500); }
+
+/* Bloco */
+.bloco {
+    background: var(--gray-50);
+    border-radius: 10px;
+    padding: 8px 10px 9px;
+    margin-bottom: 6px;
+    border: 1px solid var(--gray-100);
+}
+.bloco:last-child { margin-bottom: 0; }
+.bloco-head {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 6px;
+}
+.bloco-chip {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
+    color: white;
+    font-family: var(--font-mono);
+    font-weight: 800; font-size: 10px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset;
+}
+.bloco-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+}
+
+.exercicio {
+    display: flex; align-items: center;
+    gap: 8px;
+    padding: 4px 0 4px 9px;
+    border-left: 2.5px solid var(--brand-500);
+    margin-bottom: 3px;
+}
+.exercicio:last-child { margin-bottom: 0; }
+.exercicio-info { flex: 1; min-width: 0; }
+.exercicio-nome {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-900);
+    line-height: 1.3;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    letter-spacing: -0.005em;
+}
+.exercicio-prefix {
+    font-family: var(--font-mono);
+    color: var(--gray-400);
+    font-weight: 600;
+    margin-right: 5px;
+    font-size: 11px;
+}
+.prescr {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--brand-700);
+    background: var(--brand-100);
+    padding: 2.5px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: -0.01em;
+    border: 1px solid rgba(232,93,4,0.15);
+}
+
+/* Banner rascunho */
+.draft-banner {
+    background: linear-gradient(135deg, var(--amber-50), var(--amber-100));
+    border: 1px solid var(--amber-200);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.5) inset;
+}
+.draft-icon {
+    width: 32px; height: 32px;
+    border-radius: 9px;
+    background: linear-gradient(180deg, var(--amber-500), var(--amber-600));
+    color: white;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    position: relative;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 2px 6px rgba(245,158,11,0.3);
+}
+.draft-icon::after {
+    content: '';
+    position: absolute;
+    top: -2px; right: -2px;
+    width: 10px; height: 10px;
+    background: var(--amber-500);
+    border: 2px solid var(--amber-50);
+    border-radius: 999px;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: 0.7; } }
+.draft-info { flex: 1; min-width: 0; }
+.draft-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--amber-700);
+    display: flex; align-items: center; gap: 6px;
+    letter-spacing: -0.005em;
+}
+.draft-count {
+    font-family: var(--font-mono);
+    background: white;
+    color: var(--amber-700);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1.5px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--amber-200);
+}
+.draft-sub {
+    font-size: 10.5px;
+    color: var(--amber-600);
+    margin-top: 1px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.draft-toggle {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    color: var(--amber-700);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.draft-toggle:hover { background: rgba(245,158,11,0.15); }
+
+/* Banner edição */
+.edit-banner {
+    background: linear-gradient(135deg, var(--brand-50), var(--brand-100));
+    border: 1px solid var(--brand-200);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.5) inset;
+}
+.edit-banner-icon {
+    width: 32px; height: 32px;
+    border-radius: 9px;
+    background: linear-gradient(180deg, var(--brand-500), var(--brand-700));
+    color: white;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 2px 6px rgba(232,93,4,0.3);
+}
+.edit-banner-info { flex: 1; min-width: 0; }
+.edit-banner-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--brand-700);
+    letter-spacing: -0.005em;
+}
+.edit-banner-sub {
+    font-size: 10.5px;
+    color: var(--brand-600);
+    opacity: 0.85;
+    margin-top: 1px;
+}
+
+.treino-card.editing {
+    border-color: var(--brand-200);
+    box-shadow: 0 0 0 4px rgba(232,93,4,0.06), 0 1px 0 rgba(255,255,255,0.6) inset;
+}
+
+.exercicio.editing-row {
+    background: white;
+    border-radius: 0 8px 8px 0;
+    padding: 5px 8px 5px 8px;
+    border-left: 2.5px solid var(--brand-500);
+}
+.drag-grip {
+    width: 16px;
+    color: var(--gray-300);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    cursor: grab;
+}
+.ex-kebab {
+    width: 24px; height: 24px;
+    border-radius: 5px;
+    color: var(--gray-400);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+}
+.ex-kebab:hover { background: var(--gray-100); color: var(--gray-700); }
+
+.add-ex-row {
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    padding: 6px;
+    margin-top: 6px;
+    border: 1px dashed var(--gray-300);
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-500);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.add-ex-row:hover { border-color: var(--brand-500); color: var(--brand-600); background: var(--brand-50); }
+
+.novo-bloco-card {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 16px 10px;
+    margin-top: 10px;
+    border: 2px dashed var(--gray-300);
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.novo-bloco-card:hover { border-color: var(--brand-500); background: var(--brand-50); }
+.novo-bloco-icon {
+    width: 28px; height: 28px;
+    border-radius: 999px;
+    background: var(--gray-100);
+    color: var(--gray-500);
+    display: grid; place-items: center;
+}
+.novo-bloco-titulo {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gray-700);
+    letter-spacing: -0.01em;
+}
+.novo-bloco-sub { font-size: 10px; color: var(--gray-500); }
+
+/* ════════════════ Bottom bar ════════════════ */
+.bottom-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border-top: 1px solid var(--gray-200);
+    padding: 10px 12px 14px;
+    display: flex; gap: 8px;
+    align-items: center;
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.04);
+}
+.bb-nav {
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+}
+.bb-nav:hover { background: var(--gray-200); color: var(--gray-900); }
+.bb-nav .icon { width: 20px; height: 20px; }
+.bb-nav .nav-dot {
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 6px; height: 6px;
+    border-radius: 999px;
+    background: var(--brand-500);
+    border: 1.5px solid white;
+}
+
+.bb-action {
+    flex: 1;
+    height: 46px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px;
+    padding: 0 16px;
+    transition: all 0.15s;
+    min-width: 0;
+    letter-spacing: -0.005em;
+}
+.bb-action.primary {
+    background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
+    color: white;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 10px rgba(232,93,4,0.3);
+}
+.bb-action.primary:hover { background: linear-gradient(180deg, var(--brand-600), var(--brand-700)); }
+.bb-action.success {
+    background: linear-gradient(180deg, var(--green-500), var(--green-600));
+    color: white;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 10px rgba(34,197,94,0.25);
+}
+.bb-action.danger-ghost {
+    background: white;
+    border: 1px solid var(--red-100);
+    color: var(--red-600);
+}
+.bb-split {
+    display: inline-flex;
+    flex: 1;
+    height: 46px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
+    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 10px rgba(232,93,4,0.3);
+}
+.bb-split.success {
+    background: linear-gradient(180deg, var(--green-500), var(--green-600));
+    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 10px rgba(34,197,94,0.25);
+}
+.bb-split-main {
+    flex: 1;
+    color: white;
+    font-size: 13.5px;
+    font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background 0.15s;
+    letter-spacing: -0.005em;
+}
+.bb-split-main:hover { background: rgba(0,0,0,0.08); }
+.bb-split-caret {
+    width: 38px;
+    color: white;
+    border-left: 1px solid rgba(255,255,255,0.25);
+    display: grid; place-items: center;
+    transition: background 0.15s;
+}
+.bb-split-caret:hover { background: rgba(0,0,0,0.08); }
+.bb-icon-action {
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    color: var(--gray-700);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+}
+.bb-icon-action:hover { background: var(--gray-50); border-color: var(--gray-300); color: var(--canvas-ink); }
+.bb-empty-hint {
+    flex: 1;
+    font-size: 11px;
+    color: var(--gray-400);
+    text-align: center;
+    font-weight: 500;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+/* ════════════════ Notas finais ════════════════ */
+.notes-section {
+    max-width: 1100px;
+    margin: 64px auto 0;
+    padding: 0 28px;
+}
+.notes-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--brand-700);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 12px;
+}
+.notes-eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--canvas-rule); }
+.notes-title {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--canvas-ink);
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+}
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+}
+.annotation {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 12px;
+    color: var(--gray-700);
+    line-height: 1.6;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 6px -2px rgba(0,0,0,0.04);
+}
+.annotation b { color: var(--canvas-ink); font-weight: 700; }
+.annotation .anno-title {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--canvas-ink);
+    letter-spacing: -0.012em;
+    margin-bottom: 6px;
+}
+.annotation .anno-title .icon-bullet {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    background: var(--brand-100);
+    color: var(--brand-700);
+    display: grid; place-items: center;
+    font-family: var(--font-mono);
+    font-weight: 800;
+    font-size: 9px;
+    flex-shrink: 0;
+}
+.annotation hr {
+    border: 0;
+    border-top: 1px dashed var(--gray-200);
+    margin: 8px 0 6px;
+}
+.annotation .micro {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.annotation .micro b { color: var(--gray-700); }
+
+</style>
+</head>
+<body>
+
+<!-- Lucide icons -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-more-vertical" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="i-columns" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-grip-vertical" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="2" y="14" width="3" height="6" rx="0.5"/><rect x="7" y="10" width="3" height="10" rx="0.5"/><rect x="12" y="6" width="3" height="14" rx="0.5"/><rect x="17" y="2" width="3" height="18" rx="0.5"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></symbol>
+    <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2" y="6" width="18" height="12" rx="2.5"/><line x1="22" x2="22" y1="11" y2="13"/><rect x="4" y="8" width="14" height="8" rx="1.2" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<div class="control-bar">
+    <div class="control-inner">
+        <div class="control-title-group">
+            <div class="control-logo">BF</div>
+            <div>
+                <div class="control-title">Mockup mobile · HUB</div>
+                <div class="control-sub">redesign 02 · 4 cenários · ~380px</div>
+            </div>
+        </div>
+        <div class="cross-links">
+            <a href="mockup_mobile_hub.html" class="cross-link current">HUB</a>
+            <a href="mockup_mobile_gerador.html" class="cross-link">Gerador</a>
+            <a href="mockup_mobile_aux.html" class="cross-link">Auxiliares</a>
+        </div>
+    </div>
+</div>
+
+<div class="page-intro">
+    <span class="eyebrow">Redesign mobile · 02</span>
+    <h1>O HUB enxuto. Um <em>polegar</em>, três cenários, zero rolagem desperdiçada.</h1>
+    <p class="lede">Quatro estados da página principal em ~380px. <strong>Sem sidebar, sem hambúrguer, sem títulos decorativos.</strong> A bottom bar fica fixa: slot esquerdo para o menu, direita muda conforme o contexto. Cada elemento que sobreviveu ao corte ganhou uma justificativa funcional.</p>
+    <div class="meta-line">
+        <span>Stack · Flask + HTMX</span>
+        <span>Viewport · 380×760</span>
+        <span>Audiência · personal trainer</span>
+        <span>Goal · poucos toques</span>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="stage-grid">
+
+        <!-- ═══════ Cenário A · Sem aluno ═══════ -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">Cenário A</div>
+                <div class="scenario-name">HUB sem aluno selecionado</div>
+                <div class="scenario-desc">Estado de entrada limpíssimo. Pill do aluno + estado vazio. Bottom bar mostra só o menu — sem ações irrelevantes ocupando espaço.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons">
+                            <svg class="icon icon-xs"><use href="#i-signal"/></svg>
+                            <svg class="icon icon-xs"><use href="#i-wifi"/></svg>
+                            <svg class="icon icon-sm"><use href="#i-battery"/></svg>
+                        </span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <div class="topbar-logo">BF</div>
+                        <div class="aluno-pill placeholder">
+                            <svg class="icon"><use href="#i-users"/></svg>
+                            <span class="pill-name">Selecionar aluno…</span>
+                            <svg class="icon icon-sm pill-caret"><use href="#i-chevron-down"/></svg>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div class="empty-state">
+                            <div class="empty-icon-wrap">
+                                <svg class="icon"><use href="#i-dumbbell"/></svg>
+                            </div>
+                            <div class="empty-title">Selecione um aluno</div>
+                            <div class="empty-sub">Toque em <b>"Selecionar aluno"</b> no topo para ver a rotina ativa.</div>
+                        </div>
+                    </div>
+                    <div class="bottom-bar">
+                        <button class="bb-nav" aria-label="Menu">
+                            <svg class="icon"><use href="#i-grid"/></svg>
+                        </button>
+                        <div class="bb-empty-hint">selecione aluno · ações virão</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Cenário B · Visualizando ═══════ -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">Cenário B</div>
+                <div class="scenario-name">Rotina ativa · visualizando</div>
+                <div class="scenario-desc">Card aluno em 1 linha (avatar + nome + chip da etiqueta + meta condensada + toggle de período). Treino card com header em 1 linha + 3 ações. Bottom bar com split <b>+ Treino</b> e <b>Nova rotina</b> isolada.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons">
+                            <svg class="icon icon-xs"><use href="#i-signal"/></svg>
+                            <svg class="icon icon-xs"><use href="#i-wifi"/></svg>
+                            <svg class="icon icon-sm"><use href="#i-battery"/></svg>
+                        </span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <div class="topbar-logo">BF</div>
+                        <div class="aluno-pill">
+                            <svg class="icon"><use href="#i-users"/></svg>
+                            <span class="pill-name">Bernardo Fleck</span>
+                            <svg class="icon icon-sm pill-caret"><use href="#i-chevron-down"/></svg>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div class="aluno-bar">
+                            <div class="avatar">BF</div>
+                            <div class="aluno-info">
+                                <div class="aluno-name-row">
+                                    <span class="aluno-name">Bernardo Fleck</span>
+                                    <span class="aluno-tag">Abr · Hipertrofia</span>
+                                </div>
+                                <div class="aluno-meta">interm. <span class="dot">·</span> 4 treinos <span class="dot">·</span> 2d</div>
+                            </div>
+                            <div class="periodo-toggle">
+                                <button class="periodo-btn active" title="Atual"><svg class="icon icon-sm"><use href="#i-eye"/></svg></button>
+                                <button class="periodo-btn" title="Anterior"><svg class="icon icon-sm"><use href="#i-clock"/></svg></button>
+                                <button class="periodo-btn" title="Comparar"><svg class="icon icon-sm"><use href="#i-columns"/></svg></button>
+                            </div>
+                        </div>
+
+                        <div class="treino-card">
+                            <div class="treino-header">
+                                <span class="treino-num">T1</span>
+                                <span class="treino-name">Upper Push</span>
+                                <div class="regiao-chips">
+                                    <span class="reg-chip reg-peito">Peito</span>
+                                    <span class="reg-chip reg-ombro">Ombro</span>
+                                </div>
+                                <div class="treino-acoes">
+                                    <button class="act-btn" title="Editar"><svg class="icon icon-sm"><use href="#i-pencil"/></svg></button>
+                                    <button class="act-btn" title="Substituir"><svg class="icon icon-sm"><use href="#i-rotate-ccw"/></svg></button>
+                                    <button class="act-btn" title="Mais"><svg class="icon icon-sm"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head"><span class="bloco-chip">A</span><span class="bloco-label">Bloco A</span></div>
+                                <div class="exercicio">
+                                    <div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A1</span>Supino reto barra</div></div>
+                                    <span class="prescr">4×8 · RIR2</span>
+                                </div>
+                                <div class="exercicio">
+                                    <div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A2</span>Crucifixo halter</div></div>
+                                    <span class="prescr">3×12 · RIR1</span>
+                                </div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head"><span class="bloco-chip">B</span><span class="bloco-label">Bloco B</span></div>
+                                <div class="exercicio">
+                                    <div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">B1</span>Desenvolvimento halter</div></div>
+                                    <span class="prescr">3×10</span>
+                                </div>
+                                <div class="exercicio">
+                                    <div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">B2</span>Elevação lateral</div></div>
+                                    <span class="prescr">3×15</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="treino-card">
+                            <div class="treino-header">
+                                <span class="treino-num">T2</span>
+                                <span class="treino-name">Upper Pull</span>
+                                <div class="regiao-chips">
+                                    <span class="reg-chip reg-costas">Costas</span>
+                                    <span class="reg-chip reg-bracos">Bíceps</span>
+                                </div>
+                                <div class="treino-acoes">
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-pencil"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-rotate-ccw"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head"><span class="bloco-chip">A</span><span class="bloco-label">Bloco A</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A1</span>Puxada alta</div></div><span class="prescr">4×10</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A2</span>Remada baixa</div></div><span class="prescr">3×12</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-bar">
+                        <button class="bb-nav"><svg class="icon"><use href="#i-grid"/></svg></button>
+                        <div class="bb-split">
+                            <button class="bb-split-main">
+                                <svg class="icon"><use href="#i-plus"/></svg> Treino
+                            </button>
+                            <button class="bb-split-caret"><svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>
+                        </div>
+                        <button class="bb-icon-action" title="Nova rotina">
+                            <svg class="icon"><use href="#i-rotate-ccw"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Cenário C · Rascunho ═══════ -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">Cenário C</div>
+                <div class="scenario-name">Rascunho ativo (sem editar)</div>
+                <div class="scenario-desc">Banner de rascunho em 1 faixa só. <b>Salvar</b> e <b>Descartar</b> sobem para a bottom bar — espaço útil preservado. Etiqueta editável aparece só ao expandir o banner.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons">
+                            <svg class="icon icon-xs"><use href="#i-signal"/></svg>
+                            <svg class="icon icon-xs"><use href="#i-wifi"/></svg>
+                            <svg class="icon icon-sm"><use href="#i-battery"/></svg>
+                        </span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <div class="topbar-logo">BF</div>
+                        <div class="aluno-pill">
+                            <svg class="icon"><use href="#i-users"/></svg>
+                            <span class="pill-name">Bernardo Fleck</span>
+                            <svg class="icon icon-sm pill-caret"><use href="#i-chevron-down"/></svg>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div class="aluno-bar">
+                            <div class="avatar">BF</div>
+                            <div class="aluno-info">
+                                <div class="aluno-name-row">
+                                    <span class="aluno-name">Bernardo Fleck</span>
+                                </div>
+                                <div class="aluno-meta">interm. <span class="dot">·</span> 4 treinos <span class="dot">·</span> 2d</div>
+                            </div>
+                            <div class="periodo-toggle">
+                                <button class="periodo-btn active"><svg class="icon icon-sm"><use href="#i-eye"/></svg></button>
+                                <button class="periodo-btn"><svg class="icon icon-sm"><use href="#i-clock"/></svg></button>
+                                <button class="periodo-btn"><svg class="icon icon-sm"><use href="#i-columns"/></svg></button>
+                            </div>
+                        </div>
+
+                        <div class="draft-banner">
+                            <div class="draft-icon">
+                                <svg class="icon icon-sm"><use href="#i-pencil"/></svg>
+                            </div>
+                            <div class="draft-info">
+                                <div class="draft-title">Rascunho <span class="draft-count">3 alterações</span></div>
+                                <div class="draft-sub">Não publicado · toque para detalhes</div>
+                            </div>
+                            <button class="draft-toggle">
+                                <svg class="icon icon-sm"><use href="#i-chevron-down"/></svg>
+                            </button>
+                        </div>
+
+                        <div class="treino-card">
+                            <div class="treino-header">
+                                <span class="treino-num">T1</span>
+                                <span class="treino-name">Upper Push</span>
+                                <div class="regiao-chips">
+                                    <span class="reg-chip reg-peito">Peito</span>
+                                    <span class="reg-chip reg-ombro">Ombro</span>
+                                </div>
+                                <div class="treino-acoes">
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-pencil"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-rotate-ccw"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head"><span class="bloco-chip">A</span><span class="bloco-label">Bloco A</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A1</span>Supino inclinado halter</div></div><span class="prescr">4×8 · RIR2</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A2</span>Crucifixo halter</div></div><span class="prescr">3×12 · RIR1</span></div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head"><span class="bloco-chip">B</span><span class="bloco-label">Bloco B</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">B1</span>Desenvolvimento halter</div></div><span class="prescr">3×10</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">B2</span>Elevação lateral</div></div><span class="prescr">3×15</span></div>
+                            </div>
+                        </div>
+
+                        <div class="treino-card">
+                            <div class="treino-header">
+                                <span class="treino-num">T2</span>
+                                <span class="treino-name">Upper Pull</span>
+                                <div class="regiao-chips"><span class="reg-chip reg-costas">Costas</span></div>
+                                <div class="treino-acoes">
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-pencil"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-rotate-ccw"/></svg></button>
+                                    <button class="act-btn"><svg class="icon icon-sm"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head"><span class="bloco-chip">A</span><span class="bloco-label">Bloco A</span></div>
+                                <div class="exercicio"><div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A1</span>Puxada alta</div></div><span class="prescr">4×10</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-bar">
+                        <button class="bb-nav"><svg class="icon"><use href="#i-grid"/></svg></button>
+                        <button class="bb-action danger-ghost" style="flex: 0 0 auto; padding: 0 14px;">
+                            <svg class="icon icon-sm"><use href="#i-trash"/></svg>
+                        </button>
+                        <div class="bb-split success">
+                            <button class="bb-split-main">
+                                <svg class="icon icon-sm"><use href="#i-check"/></svg> Salvar
+                            </button>
+                            <button class="bb-split-caret"><svg class="icon icon-sm"><use href="#i-chevron-down"/></svg></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Cenário D · Editando ═══════ -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">Cenário D</div>
+                <div class="scenario-name">Editando T1 inline</div>
+                <div class="scenario-desc">Banner de modo edição substitui o card aluno (foco). Card editado tem borda laranja sutil. Cada exercício tem drag-handle + kebab. Bottom bar fica só com "Concluir edição".</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons">
+                            <svg class="icon icon-xs"><use href="#i-signal"/></svg>
+                            <svg class="icon icon-xs"><use href="#i-wifi"/></svg>
+                            <svg class="icon icon-sm"><use href="#i-battery"/></svg>
+                        </span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <div class="topbar-logo">BF</div>
+                        <div class="aluno-pill">
+                            <svg class="icon"><use href="#i-users"/></svg>
+                            <span class="pill-name">Bernardo Fleck</span>
+                            <svg class="icon icon-sm pill-caret"><use href="#i-chevron-down"/></svg>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div class="edit-banner">
+                            <div class="edit-banner-icon">
+                                <svg class="icon icon-sm"><use href="#i-pencil"/></svg>
+                            </div>
+                            <div class="edit-banner-info">
+                                <div class="edit-banner-title">Editando T1 · Upper Push</div>
+                                <div class="edit-banner-sub">Salvo automaticamente como rascunho</div>
+                            </div>
+                        </div>
+
+                        <div class="treino-card editing">
+                            <div class="treino-header">
+                                <span class="treino-num">T1</span>
+                                <span class="treino-name">Upper Push</span>
+                                <div class="regiao-chips">
+                                    <span class="reg-chip reg-peito">Peito</span>
+                                    <span class="reg-chip reg-ombro">Ombro</span>
+                                </div>
+                            </div>
+                            <div class="bloco">
+                                <div class="bloco-head">
+                                    <span class="bloco-chip">A</span>
+                                    <span class="bloco-label">Bloco A</span>
+                                    <button class="act-btn" style="margin-left:auto; width:24px; height:24px;"><svg class="icon icon-xs"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                                <div class="exercicio editing-row">
+                                    <div class="drag-grip"><svg class="icon icon-sm"><use href="#i-grip-vertical"/></svg></div>
+                                    <div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A1</span>Supino reto barra</div></div>
+                                    <span class="prescr">4×8</span>
+                                    <button class="ex-kebab"><svg class="icon icon-xs"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                                <div class="exercicio editing-row">
+                                    <div class="drag-grip"><svg class="icon icon-sm"><use href="#i-grip-vertical"/></svg></div>
+                                    <div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">A2</span>Crucifixo halter</div></div>
+                                    <span class="prescr">3×12</span>
+                                    <button class="ex-kebab"><svg class="icon icon-xs"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                                <div class="add-ex-row">
+                                    <svg class="icon icon-xs"><use href="#i-plus"/></svg> Adicionar exercício
+                                </div>
+                            </div>
+
+                            <div class="bloco">
+                                <div class="bloco-head">
+                                    <span class="bloco-chip">B</span>
+                                    <span class="bloco-label">Bloco B</span>
+                                    <button class="act-btn" style="margin-left:auto; width:24px; height:24px;"><svg class="icon icon-xs"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                                <div class="exercicio editing-row">
+                                    <div class="drag-grip"><svg class="icon icon-sm"><use href="#i-grip-vertical"/></svg></div>
+                                    <div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">B1</span>Desenv. halter</div></div>
+                                    <span class="prescr">3×10</span>
+                                    <button class="ex-kebab"><svg class="icon icon-xs"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                                <div class="exercicio editing-row">
+                                    <div class="drag-grip"><svg class="icon icon-sm"><use href="#i-grip-vertical"/></svg></div>
+                                    <div class="exercicio-info"><div class="exercicio-nome"><span class="exercicio-prefix">B2</span>Elevação lateral</div></div>
+                                    <span class="prescr">3×15</span>
+                                    <button class="ex-kebab"><svg class="icon icon-xs"><use href="#i-more-vertical"/></svg></button>
+                                </div>
+                                <div class="add-ex-row">
+                                    <svg class="icon icon-xs"><use href="#i-plus"/></svg> Adicionar exercício
+                                </div>
+                            </div>
+
+                            <div class="novo-bloco-card">
+                                <div class="novo-bloco-icon"><svg class="icon icon-sm"><use href="#i-plus"/></svg></div>
+                                <div class="novo-bloco-titulo">Novo bloco</div>
+                                <div class="novo-bloco-sub">Adicionar bloco C</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-bar">
+                        <button class="bb-nav"><svg class="icon"><use href="#i-grid"/></svg></button>
+                        <button class="bb-action primary">
+                            <svg class="icon icon-sm"><use href="#i-check"/></svg> Concluir edição
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Notas finais -->
+    <div class="notes-section">
+        <div class="notes-eyebrow">Notas de design</div>
+        <h2 class="notes-title">O que mudou — e por quê.</h2>
+        <div class="notes-grid">
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">01</span> Topbar enxuta</div>
+                Logo BF (34px) + pill do aluno (clicável, abre seletor). <b>Sem hambúrguer</b> — navegação foi pra bottom bar.
+                <hr>
+                <div class="micro"><b>Removido:</b> "Painel principal", "Gerenciamento das rotinas de treino"</div>
+            </div>
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">02</span> Card aluno em 1 linha</div>
+                Avatar + nome + chip da etiqueta inline + meta condensada (<code>interm. · 4 treinos · 2d</code>) em mono. Toggle de período como 3 ícones sem label, à direita.
+                <hr>
+                <div class="micro"><b>Antes:</b> 11 elementos · ~120px de altura</div>
+            </div>
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">03</span> Treino card · header em 1 linha</div>
+                <code>T1</code> + nome + chips de região (truncados se passar) + 3 ícones (Editar · Substituir · Kebab). Hoje quebra em 2 linhas no mobile.
+                <hr>
+                <div class="micro"><b>Kebab abre:</b> Regerar · Baixar PNG · Remover</div>
+            </div>
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">04</span> Banner de rascunho em 1 faixa</div>
+                Etiqueta + botões saem da tela e vão para a bottom bar quando há rascunho. Tocar no chevron expande para mostrar lista de alterações + input de etiqueta.
+                <hr>
+                <div class="micro"><b>Antes:</b> 3 faixas (~110px) · <b>Agora:</b> 1 faixa (44px)</div>
+            </div>
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">05</span> Modo edição focado</div>
+                Banner de edição <b>substitui</b> o card aluno (não acumula). Card editado tem borda laranja sutil. Bottom bar reduz a 1 ação.
+                <hr>
+                <div class="micro"><b>Cada exercício:</b> drag handle + kebab (resto no menu)</div>
+            </div>
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">06</span> Bottom bar contextual</div>
+                Slot fixo à esquerda (menu) sempre presente. Direita varia: <b>+ Treino · Nova rotina</b> → <b>Descartar · Salvar</b> → <b>Concluir edição</b>.
+                <hr>
+                <div class="micro"><b>Split buttons</b> mantêm "Manual" sem poluir</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
