@@ -315,7 +315,7 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 
 ---
 
-## Etapa 8 · Modo edição inline · banner substitui card aluno
+## Etapa 8 · Modo edição inline · banner substitui card aluno ✅
 
 **Mockup:** `mockup_mobile_hub.html` · cenário D
 

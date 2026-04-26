@@ -4,6 +4,17 @@
    pelo endpoint GET /_mobile_bb_actions (re-fetch via HTMX). #}
 {% if not _topbar_aluno %}
     <span class="bb-empty-hint">selecione um aluno</span>
+{% elif _topbar_em_edicao %}
+    {# Modo edição: Descartar (vermelho) + Aceitar (verde) #}
+    <button type="button" class="bb-text-action bb-danger-text" data-bb-descartar
+            data-aluno-id="{{ _topbar_aluno.id }}">
+        <svg class="icon"><use href="#i-trash"/></svg> Descartar
+    </button>
+    <button type="button" class="bb-text-action bb-success"
+            hx-post="/hub/rotina/{{ _topbar_aluno.id }}/concluir-edicao"
+            hx-target="#rotina-display" hx-swap="innerHTML">
+        <svg class="icon"><use href="#i-check"/></svg> Aceitar
+    </button>
 {% elif _topbar_eh_rascunho %}
     {% set caso_a = _topbar_tem_rotina and _topbar_alteracoes > 0 and _topbar_intent != 'nova-rotina' %}
     <button type="button" class="bb-icon-action bb-danger-ghost" data-bb-descartar

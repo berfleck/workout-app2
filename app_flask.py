@@ -66,6 +66,7 @@ def _inject_topbar_aluno():
             intent = carregar_intent_rascunho(aluno["id"]) or ""
             if tem_publicada:
                 alteracoes = len(diff_rascunho_vs_publicada(aluno["id"]))
+    em_edicao = bool(edicao_hub and aluno and edicao_hub.get("aluno_id") == aluno["id"])
     return {
         "_topbar_alunos": alunos,
         "_topbar_aluno": aluno,
@@ -73,6 +74,7 @@ def _inject_topbar_aluno():
         "_topbar_eh_rascunho": eh_rascunho,
         "_topbar_intent": intent,
         "_topbar_alteracoes": alteracoes,
+        "_topbar_em_edicao": em_edicao,
         "_nav_alunos_total": len(alunos),
         "_nav_sem_rotina": sem_rotina,
     }
@@ -966,8 +968,20 @@ def hub_etiqueta_rotina(aluno_id):
 
 @app.route("/hub/rotina/<int:aluno_id>/descartar-rascunho", methods=["POST"])
 def hub_descartar_rascunho(aluno_id):
-    """Descarta o rascunho e volta para a última rotina salva."""
+    """Descarta o rascunho e volta para a última rotina salva. Encerra edição se ativa."""
+    global edicao_hub
     limpar_rascunho(aluno_id)
+    if edicao_hub and edicao_hub.get("aluno_id") == aluno_id:
+        edicao_hub = None
+    return hub_rotina_render(aluno_id, "atual")
+
+
+@app.route("/hub/rotina/<int:aluno_id>/concluir-edicao", methods=["POST"])
+def hub_concluir_edicao(aluno_id):
+    """Encerra o modo edição inline (mantém alterações como rascunho) e volta a visualização."""
+    global edicao_hub
+    if edicao_hub and edicao_hub.get("aluno_id") == aluno_id:
+        edicao_hub = None
     return hub_rotina_render(aluno_id, "atual")
 
 
