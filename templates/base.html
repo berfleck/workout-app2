@@ -152,6 +152,64 @@
         .sidebar-link { @apply w-10 h-10 rounded-lg flex items-center justify-center text-lg text-gray-400 hover:bg-gray-100 hover:text-brand-500 transition mb-1; }
         .sidebar-link.active { @apply bg-brand-50 text-brand-500; }
         .mobile-menu-btn { @apply lg:hidden fixed top-3 left-3 z-40 w-10 h-10 bg-white border border-gray-200 rounded-lg shadow-sm grid place-items-center text-gray-600 hover:text-brand-500 cursor-pointer; }
+
+        /* ── Mobile topbar (≤768px) ── redesign 02 ── */
+        .topbar-mobile { display: none; }
+        @media (max-width: 768px) {
+            .topbar-mobile {
+                display: flex; align-items: center; gap: 10px;
+                position: sticky; top: 0; z-index: 30;
+                padding: 10px 14px 12px;
+                background: white;
+                border-bottom: 1px solid var(--gray-200);
+            }
+            .topbar-mobile-logo {
+                width: 34px; height: 34px;
+                border-radius: 9px;
+                background: linear-gradient(135deg, var(--brand-500) 0%, #b4480c 100%);
+                color: white;
+                display: grid; place-items: center;
+                font-weight: 800; font-size: 12px;
+                flex-shrink: 0;
+                letter-spacing: -0.02em;
+                box-shadow: 0 2px 6px rgba(232,93,4,0.25);
+                text-decoration: none;
+            }
+            .aluno-pill-wrap {
+                position: relative;
+                flex: 1;
+                min-width: 0;
+            }
+            .aluno-pill {
+                display: flex; align-items: center; gap: 8px;
+                padding: 8px 12px 8px 11px;
+                background: var(--gray-100);
+                border-radius: 999px;
+                font-size: 13px; font-weight: 600;
+                color: var(--gray-900);
+                min-width: 0;
+                cursor: pointer;
+            }
+            .aluno-pill .icon { color: var(--gray-500); width: 14px; height: 14px; flex-shrink: 0; }
+            .aluno-pill .pill-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.005em; }
+            .aluno-pill .pill-caret { color: var(--gray-400); flex-shrink: 0; width: 13px; height: 13px; }
+            .aluno-pill.placeholder { color: var(--gray-500); font-weight: 500; }
+            .aluno-pill-select {
+                position: absolute; inset: 0;
+                width: 100%; height: 100%;
+                opacity: 0; cursor: pointer;
+                font-size: 16px; /* evita zoom no iOS */
+                appearance: none;
+                background: transparent;
+                border: 0;
+            }
+            /* Esconde sidebar e botão hambúrguer no mobile real */
+            .mobile-menu-btn { display: none !important; }
+            .sidebar { display: none !important; }
+            /* Main não precisa de pt-14 no mobile (topbar-mobile já ocupa o topo) */
+            main.app-main { padding-top: 0 !important; }
+            main.app-main > div { padding-top: 16px !important; }
+        }
     </style>
     <style>
         /* Design tokens */
@@ -923,8 +981,26 @@
     <a href="/historico" class="sidebar-link {% if active_page == 'historico' %}active{% endif %}" title="Histórico"><svg class="icon"><use href="#i-book"/></svg></a>
 </nav>
 
+<!-- Topbar mobile (visível só ≤768px) -->
+<div class="topbar-mobile lg:ml-[60px]">
+    <a href="/" class="topbar-mobile-logo" aria-label="Início">BF</a>
+    <label class="aluno-pill-wrap">
+        <span class="aluno-pill {% if not _topbar_aluno %}placeholder{% endif %}">
+            <svg class="icon"><use href="#i-users"/></svg>
+            <span class="pill-name">{% if _topbar_aluno %}{{ _topbar_aluno.nome }}{% else %}Selecionar aluno…{% endif %}</span>
+            <svg class="icon pill-caret"><use href="#i-chevron-down"/></svg>
+        </span>
+        <select class="aluno-pill-select" onchange="_topbarSelecionarAluno(this.value)" aria-label="Selecionar aluno">
+            <option value="">Selecionar aluno…</option>
+            {% for a in _topbar_alunos %}
+            <option value="{{ a.id }}" {% if _topbar_aluno and _topbar_aluno.id == a.id %}selected{% endif %}>{{ a.nome }}</option>
+            {% endfor %}
+        </select>
+    </label>
+</div>
+
 <!-- Main content -->
-<main class="lg:ml-[60px] pt-14 lg:pt-0 min-h-screen">
+<main class="app-main lg:ml-[60px] pt-14 lg:pt-0 min-h-screen">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-7 pb-5 bg-gray-50 min-h-screen shadow-[0_0_0_1px_rgba(0,0,0,0.03)]">
         {% block content %}{% endblock %}
     </div>
@@ -1007,6 +1083,13 @@ function toggleMobileSidebar() {
     const overlay = document.getElementById('sidebar-overlay');
     sidebar.classList.toggle('open');
     overlay.classList.toggle('active');
+}
+
+function _topbarSelecionarAluno(id) {
+    if (!id) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('aluno_id', id);
+    window.location.href = url.toString();
 }
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.sidebar a').forEach(function(a) {

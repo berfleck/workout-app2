@@ -2,7 +2,7 @@
 BF Treinamento — Versão Flask + HTMX (completa)
 """
 
-from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify
+from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify, session
 import os, random, json, copy, io, zipfile, unicodedata, secrets
 from pathlib import Path
 from datetime import datetime
@@ -30,6 +30,26 @@ from database import (
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "bf-treinamento-dev")
+
+
+# ══════════════════════════════════════════════════════════════
+# TOPBAR MOBILE — persistência do aluno selecionado entre páginas
+# ══════════════════════════════════════════════════════════════
+
+@app.before_request
+def _track_aluno_selecionado():
+    aluno_id = request.args.get("aluno_id", type=int)
+    if aluno_id:
+        session["aluno_id"] = aluno_id
+
+
+@app.context_processor
+def _inject_topbar_aluno():
+    alunos = carregar_alunos()
+    sel_id = session.get("aluno_id")
+    aluno = next((a for a in alunos if a["id"] == sel_id), None) if sel_id else None
+    return {"_topbar_alunos": alunos, "_topbar_aluno": aluno}
+
 
 # ══════════════════════════════════════════════════════════════
 # DADOS
