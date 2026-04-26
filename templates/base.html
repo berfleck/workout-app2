@@ -250,6 +250,38 @@
                 text-align: center;
                 letter-spacing: 0.02em;
             }
+
+            /* Split-buttons na bb: laranja claro (brand-100) + texto preto.
+               Estilo herdado de .split-btn.primary (desktop); menu abre pra CIMA. */
+            .bb .split-btn {
+                flex: 1;
+                min-width: 0;
+                height: var(--bb-action-h);
+                border-radius: var(--bb-radius);
+            }
+            .bb .split-btn .split-btn-main { border-radius: var(--bb-radius) 0 0 var(--bb-radius); }
+            .bb .split-btn .split-btn-caret { border-radius: 0 var(--bb-radius) var(--bb-radius) 0; }
+            .bb .split-btn-main {
+                flex: 1;
+                min-width: 0;
+                justify-content: center;
+                padding: 0 12px;
+                font-size: 14px;
+                font-weight: 700;
+                letter-spacing: -0.01em;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .bb .split-btn-caret { padding: 0 12px; }
+            .bb .split-btn-main .icon, .bb .split-btn-caret .icon { width: 15px; height: 15px; }
+            .bb .split-btn-menu {
+                top: auto;
+                bottom: calc(100% + 6px);
+                right: 0;
+                min-width: 160px;
+                box-shadow: 0 -4px 16px rgba(0,0,0,0.10);
+            }
         }
 
         /* ── Bottom sheets (mobile) ── redesign 02 ── */
@@ -1252,9 +1284,9 @@ function toggleMobileSidebar() {
 }
 
 function _topbarSelecionarAluno(id) {
-    if (!id) return;
     const url = new URL(window.location.href);
-    url.searchParams.set('aluno_id', id);
+    // id vazio = limpar seleção (backend trata ?aluno_id= vazio como pop session)
+    url.searchParams.set('aluno_id', id || '');
     window.location.href = url.toString();
 }
 

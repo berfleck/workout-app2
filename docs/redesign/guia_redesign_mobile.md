@@ -222,7 +222,7 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 
 ---
 
-## Etapa 5 · Bottom bar contextual no HUB (estado: visualizando)
+## Etapa 5 · Bottom bar contextual no HUB (estado: visualizando) ✅
 
 **Mockup:** `mockup_mobile_hub.html` · cenário B
 

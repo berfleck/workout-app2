@@ -38,9 +38,14 @@ app.secret_key = os.environ.get("SECRET_KEY", "bf-treinamento-dev")
 
 @app.before_request
 def _track_aluno_selecionado():
+    if "aluno_id" not in request.args:
+        return
     aluno_id = request.args.get("aluno_id", type=int)
     if aluno_id:
         session["aluno_id"] = aluno_id
+    else:
+        # ?aluno_id= (vazio) limpa a seleção
+        session.pop("aluno_id", None)
 
 
 @app.context_processor
@@ -52,6 +57,7 @@ def _inject_topbar_aluno():
     return {
         "_topbar_alunos": alunos,
         "_topbar_aluno": aluno,
+        "_topbar_tem_rotina": bool(aluno and aluno.get("rotina_ativa_id")),
         "_nav_alunos_total": len(alunos),
         "_nav_sem_rotina": sem_rotina,
     }
