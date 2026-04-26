@@ -1,0 +1,127 @@
+{# Drawer de demandas mobile (Etapa 10 redesign 02).
+   Slide-in da direita, ocupa 92% da largura. Renderizado uma única vez
+   fora do form-config; é reusado para qualquer treino via dataset.t.
+
+   Estado:
+     - Checkboxes do drawer não têm `name` — JS espelha pra/dos checkboxes
+       do bloco desktop (mantendo `gerar_sessao_por_demandas` intacto no backend).
+
+   Variáveis esperadas no contexto: regioes, regioes_labels, subregioes,
+   subregioes_labels, padroes_ordem, padroes_labels, templates, MAX_TREINOS.
+#}
+{% set regiao_icones = {'upper': 'i-dumbbell', 'lower': 'i-target', 'core': 'i-flame', 'cardio': 'i-heart'} %}
+
+<div id="mob-demands-overlay" class="mob-demands-overlay md:hidden" onclick="closeDemandsDrawer(event)" aria-hidden="true">
+    <aside id="mob-demands-drawer" class="mob-demands-drawer" role="dialog" aria-modal="true" aria-label="Demandas do treino" data-t="0" onclick="event.stopPropagation()">
+        <div class="mob-drawer-head">
+            <div class="mob-drawer-head-icon">
+                <svg class="icon icon-sm"><use href="#i-target"/></svg>
+            </div>
+            <div class="mob-drawer-head-info">
+                <div class="mob-drawer-head-eyebrow" id="mob-drawer-eyebrow">Treino 1 · demandas</div>
+                <div class="mob-drawer-head-title" id="mob-drawer-title">Hierarquia</div>
+            </div>
+            <button type="button" class="mob-drawer-close" onclick="closeDemandsDrawer()" aria-label="Fechar">
+                <svg class="icon icon-sm"><use href="#i-x"/></svg>
+            </button>
+        </div>
+
+        <div class="mob-drawer-counter">
+            <span class="mob-drawer-counter-label">Total selecionado</span>
+            <span class="mob-drawer-counter-value" id="mob-drawer-total">0 ex</span>
+        </div>
+
+        <div class="mob-drawer-content">
+            {# ── Mode switch ── #}
+            <div class="mode-switch">
+                <button type="button" class="mode-btn active" data-mode="hierarquia" onclick="setDrawerMode('hierarquia')">
+                    <svg class="icon icon-xs"><use href="#i-layers"/></svg> Hierarquia
+                </button>
+                <button type="button" class="mode-btn" data-mode="template" onclick="setDrawerMode('template')">
+                    <svg class="icon icon-xs"><use href="#i-clipboard"/></svg> Template
+                </button>
+            </div>
+
+            {# ── Modo Hierarquia (default) ── #}
+            <div id="mob-drawer-hierarquia">
+                {% for regiao in regioes %}
+                <div class="mob-regiao-card" data-regiao="{{ regiao }}" id="m-reg-card-{{ regiao }}">
+                    <div class="mob-regiao-head" onclick="toggleDrawerRegiao('{{ regiao }}')">
+                        <div class="mob-regiao-icon {{ regiao }}"><svg class="icon icon-xs"><use href="#{{ regiao_icones.get(regiao, 'i-dumbbell') }}"/></svg></div>
+                        <div class="mob-regiao-title">{{ regioes_labels[regiao] }}</div>
+                        <div class="mob-regiao-summary" data-summary>—</div>
+                        <svg class="icon icon-xs mob-regiao-chevron"><use href="#i-chevron-right"/></svg>
+                    </div>
+                    <div class="mob-regiao-body">
+                        {# Checkbox "região inteira" — toggle via tag dedicada no header das subregiões #}
+                        <input type="checkbox" class="mob-reg-chk" data-regiao="{{ regiao }}" hidden onchange="onMobDemandasChange()">
+
+                        <div class="mob-subregiao-block">
+                            <div class="mob-subregiao-label">
+                                <span style="flex:1;">{{ regioes_labels[regiao] }} inteira</span>
+                            </div>
+                            <div class="mob-padroes-tags">
+                                <button type="button" class="mob-padrao-tag mob-regiao-toggle" data-regiao="{{ regiao }}"
+                                        onclick="toggleMobRegiao('{{ regiao }}')">
+                                    <svg class="icon icon-xs"><use href="#i-target"/></svg> região inteira
+                                </button>
+                            </div>
+                        </div>
+
+                        {% for subregiao in subregioes.get(regiao, []) %}
+                        <div class="mob-subregiao-block" data-subregiao="{{ subregiao }}">
+                            <input type="checkbox" class="mob-sub-chk" data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}" hidden onchange="onMobDemandasChange()">
+                            <div class="mob-subregiao-label">
+                                <span style="flex:1;">{{ subregioes_labels[subregiao] }}</span>
+                                <button type="button" class="mob-subregiao-toggle" data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}"
+                                        onclick="toggleMobSubregiao('{{ subregiao }}', '{{ regiao }}')">subregião</button>
+                            </div>
+                            <div class="mob-padroes-tags">
+                                {% if subregiao == 'perna_anterior' %}
+                                <label class="mob-padrao-tag">
+                                    <input type="checkbox" class="mob-lat-chk" data-padrao="squat" data-lat="bilateral" data-subregiao="perna_anterior" data-regiao="lower" onchange="onMobDemandasChange()">
+                                    agach. bilateral
+                                </label>
+                                <label class="mob-padrao-tag">
+                                    <input type="checkbox" class="mob-lat-chk" data-padrao="squat" data-lat="unilateral" data-subregiao="perna_anterior" data-regiao="lower" onchange="onMobDemandasChange()">
+                                    agach. unilateral
+                                </label>
+                                {% else %}
+                                {% for pad in padroes_ordem.get(subregiao, []) %}
+                                <label class="mob-padrao-tag">
+                                    <input type="checkbox" class="mob-pad-chk" data-padrao="{{ pad }}" data-subregiao="{{ subregiao }}" data-regiao="{{ regiao }}" onchange="onMobDemandasChange()">
+                                    {{ padroes_labels.get(pad, pad) }}
+                                </label>
+                                {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {# ── Modo Template ── #}
+            <div id="mob-drawer-template" style="display:none;">
+                <div class="mob-tmpl-list">
+                    {% for tmpl in templates %}
+                    <button type="button" class="mob-tmpl-card" onclick="selectTemplateMobile('{{ tmpl }}')">
+                        <div class="mob-tmpl-name">{{ tmpl }}</div>
+                        <svg class="icon icon-sm mob-tmpl-arrow"><use href="#i-chevron-right"/></svg>
+                    </button>
+                    {% endfor %}
+                </div>
+                <p class="mob-tmpl-hint">Selecionar um template aplica a configuração e fecha o drawer.</p>
+            </div>
+        </div>
+
+        <div class="mob-drawer-foot">
+            <button type="button" class="mob-drawer-btn-secondary" onclick="closeDemandsDrawer()">Cancelar</button>
+            <button type="button" class="mob-drawer-btn-primary" onclick="applyDemandsDrawer()">
+                <svg class="icon icon-sm"><use href="#i-check"/></svg>
+                <span>Aplicar </span><span id="mob-drawer-apply-count">(0)</span>
+            </button>
+        </div>
+    </aside>
+</div>

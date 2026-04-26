@@ -399,8 +399,7 @@
         </div>
     {{ msec.close() }}
 
-    {# ── Seções de treino (placeholders) — Etapa 10 preenche ── #}
-    {% set _n_default = 1 if ctx_acao in ('substituir', 'adicionar') else 3 %}
+    {# ── Seções de treino (T1-T5) ── etapa 10 ── #}
     {% for t in range(MAX_TREINOS) %}
     {{ msec.open(
         id='msec-treino-' ~ t,
@@ -409,12 +408,25 @@
         sub='Sem configuração',
         counter='0',
         is_treino=True,
-        open=False
+        open=(t == 0)
     ) }}
-        <div class="treino-placeholder">
-            Configuração de demandas — disponível em breve (etapa 10).
-            <br><span style="font-size: 10px; opacity: 0.7;">Use o desktop para configurar este treino por enquanto.</span>
+        {# Lista de demandas configuradas (renderizada via JS quando há demandas) #}
+        <div class="mob-demandas-list" id="mob-demandas-list-{{ t }}">
+            <div class="mob-demandas-empty">
+                <span class="mob-demandas-empty-strong">Nenhuma demanda configurada</span>
+                Toque em "Adicionar demandas" abaixo
+            </div>
         </div>
+
+        {# CTA grande: abre o drawer #}
+        <button type="button" class="mob-open-drawer-btn" onclick="openDemandsDrawer({{ t }})">
+            <div class="mob-open-drawer-icon"><svg class="icon"><use href="#i-target"/></svg></div>
+            <div class="mob-open-drawer-info">
+                <div class="mob-open-drawer-title">Adicionar demandas</div>
+                <div class="mob-open-drawer-sub">Hierarquia ou template</div>
+            </div>
+            <svg class="icon mob-open-drawer-arrow"><use href="#i-chevron-right"/></svg>
+        </button>
     {{ msec.close() }}
     {% endfor %}
 
@@ -471,6 +483,9 @@
         </button>
     </div>
 </div>
+
+{# Drawer mobile de demandas (etapa 10) — uma única instância, reusada por todos os treinos #}
+{% include "_mobile_demands_drawer.html" %}
 
 {% endblock %}
 
@@ -1359,12 +1374,376 @@ function watchEvitarHistWrap() {
     sync();
 }
 
+// ════════════════════════════════════════════════════════════════
+// MOBILE GERADOR · DEMANDAS T1-T5 + DRAWER (etapa 10 redesign 02)
+// ════════════════════════════════════════════════════════════════
+
+// Hook em updateTotal para também atualizar a lista mobile e a seção mobile do treino
+const __origUpdateTotal = window.updateTotal;
+window.updateTotal = function(t) {
+    __origUpdateTotal(t);
+    renderMobileDemandasList(t);
+    updateMobileTreinoSection(t);
+};
+
+// Calcula total de exercícios do treino t (lê inputs hidden do desktop)
+function getTreinoTotal(t) {
+    const tab = document.getElementById('tab-' + t);
+    if (!tab) return 0;
+    const modo = (tab.querySelector('#input-modo-' + t) || {}).value;
+    let total = 0;
+    if (modo === 'template') {
+        tab.querySelectorAll(`input[name^="epp_${t}_"]`).forEach(inp => total += parseInt(inp.value) || 0);
+    } else {
+        tab.querySelectorAll(`input[name^="dem_qtd_${t}_"]`).forEach(inp => total += parseInt(inp.value) || 0);
+    }
+    return total;
+}
+
+// Atualiza counter + sub da seção mobile do treino t (sem mexer no body)
+function updateMobileTreinoSection(t) {
+    const sec = document.getElementById('msec-treino-' + t);
+    if (!sec) return;
+    const total = getTreinoTotal(t);
+    const counter = sec.querySelector('[data-section-counter]');
+    if (counter) {
+        counter.textContent = total;
+        counter.dataset.empty = total === 0 ? '1' : '0';
+    }
+    sec.classList.toggle('has-content', total > 0);
+
+    const sub = sec.querySelector('[data-section-sub]');
+    if (sub) {
+        const tab = document.getElementById('tab-' + t);
+        const modo = (tab && tab.querySelector('#input-modo-' + t) || {}).value || 'hierarquia';
+        if (total === 0) {
+            sub.textContent = 'Sem configuração';
+        } else {
+            const partes = [];
+            if (modo === 'template') {
+                const tmpl = (tab.querySelector('#input-template-' + t) || {}).value;
+                if (tmpl) partes.push(tmpl);
+                else partes.push('Template');
+            } else {
+                const nDems = tab.querySelectorAll(`input[name^="dem_nivel_${t}_"]`).length;
+                partes.push('Hierarquia · ' + nDems + (nDems === 1 ? ' grupo' : ' grupos'));
+            }
+            sub.textContent = partes.join(' · ');
+        }
+    }
+}
+
+// Re-renderiza a lista mobile de demandas do treino t lendo o estado do desktop
+function renderMobileDemandasList(t) {
+    const list = document.getElementById('mob-demandas-list-' + t);
+    if (!list) return;
+    const tab = document.getElementById('tab-' + t);
+    if (!tab) return;
+
+    const modo = (tab.querySelector('#input-modo-' + t) || {}).value || 'hierarquia';
+    const total = getTreinoTotal(t);
+
+    if (total === 0) {
+        list.innerHTML = `<div class="mob-demandas-empty">
+            <span class="mob-demandas-empty-strong">Nenhuma demanda configurada</span>
+            Toque em "Adicionar demandas" abaixo
+        </div>`;
+        return;
+    }
+
+    let rows = '';
+    if (modo === 'template') {
+        const tmpl = (tab.querySelector('#input-template-' + t) || {}).value || '—';
+        const epps = tab.querySelectorAll(`input[name^="epp_${t}_"]`);
+        epps.forEach(inp => {
+            const pad = inp.name.substring(('epp_' + t + '_').length);
+            const val = parseInt(inp.value) || 0;
+            if (val === 0) return;
+            const label = PADROES_LABELS[pad] || pad;
+            rows += `<div class="mob-demanda-item">
+                ${chipForPadrao(pad)}
+                <span class="mob-demanda-name">${label}</span>
+                <div class="mob-demanda-counter">
+                    <button type="button" onclick="bumpMobileEpp(${t}, '${pad}', -1)"><svg class="icon"><use href="#i-minus"/></svg></button>
+                    <span>${val}</span>
+                    <button type="button" onclick="bumpMobileEpp(${t}, '${pad}', 1)"><svg class="icon"><use href="#i-plus"/></svg></button>
+                </div>
+            </div>`;
+        });
+        list.innerHTML = `<div class="mob-demandas-head">
+            <span class="mob-demandas-title">Template · ${tmpl}</span>
+            <span class="mob-demandas-total">${total} ex</span>
+        </div>${rows}`;
+        return;
+    }
+
+    // Modo hierarquia: lê dem_nivel_/dem_escopo_/dem_qtd_
+    const nivels = tab.querySelectorAll(`input[name^="dem_nivel_${t}_"]`);
+    nivels.forEach(nInp => {
+        const idx = nInp.name.substring(('dem_nivel_' + t + '_').length);
+        const eInp = tab.querySelector(`input[name="dem_escopo_${t}_${idx}"]`);
+        const qInp = tab.querySelector(`input[name="dem_qtd_${t}_${idx}"]`);
+        if (!eInp || !qInp) return;
+        const nivel = nInp.value, escopo = eInp.value;
+        const qtd = parseInt(qInp.value) || 0;
+        if (qtd === 0) return;
+        const label = labelForDemanda(nivel, escopo);
+        rows += `<div class="mob-demanda-item">
+            ${chipFor(nivel, escopo)}
+            <span class="mob-demanda-name">${label}</span>
+            <div class="mob-demanda-counter">
+                <button type="button" onclick="bumpMobileDem(${t}, '${idx}', -1)"><svg class="icon"><use href="#i-minus"/></svg></button>
+                <span>${qtd}</span>
+                <button type="button" onclick="bumpMobileDem(${t}, '${idx}', 1)"><svg class="icon"><use href="#i-plus"/></svg></button>
+            </div>
+            <button type="button" class="mob-demanda-remove" onclick="removerDemandaMobile(${t}, '${nivel}', '${escopo}')" title="Remover"><svg class="icon"><use href="#i-x"/></svg></button>
+        </div>`;
+    });
+
+    list.innerHTML = `<div class="mob-demandas-head">
+        <span class="mob-demandas-title">Demandas configuradas</span>
+        <span class="mob-demandas-total">${total} ex</span>
+    </div>${rows}`;
+}
+
+function labelForDemanda(nivel, escopo) {
+    if (nivel === 'padrao') return PADROES_LABELS[escopo] || escopo;
+    if (nivel === 'subregiao') return SUBREGIOES_LABELS_JS[escopo] || escopo;
+    if (nivel === 'regiao') return (REGIOES_LABELS_JS[escopo] || escopo) + ' (inteira)';
+    return escopo;
+}
+
+function chipFor(nivel, escopo) {
+    if (nivel === 'padrao') return chipForPadrao(escopo);
+    if (nivel === 'subregiao') {
+        const lab = SUBREGIOES_LABELS_JS[escopo] || escopo;
+        return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${lab}</span>`;
+    }
+    if (nivel === 'regiao') {
+        const cor = {core: 'core', cardio: 'cardio'}[escopo];
+        const lab = REGIOES_LABELS_JS[escopo] || escopo;
+        if (cor) return `<span class="reg-chip reg-chip-${cor}">${lab}</span>`;
+        return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${lab}</span>`;
+    }
+    return '';
+}
+
+function chipForPadrao(pad) {
+    const c = PADRAO_PARA_CHIP_JS[pad];
+    if (c) return `<span class="reg-chip reg-chip-${c[1]}">${c[0]}</span>`;
+    return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${pad}</span>`;
+}
+
+// Wrappers que delegam para os bumpers do desktop
+function bumpMobileDem(t, idx, delta) {
+    bumpQtd(t, `dem_qtd_${t}_${idx}`, delta);
+}
+function bumpMobileEpp(t, pad, delta) {
+    bumpQtd(t, `epp_${t}_${pad}`, delta);
+}
+function removerDemandaMobile(t, nivel, escopo) {
+    removerDemanda(t, nivel, escopo);
+}
+
+// ── Drawer ───────────────────────────────────────────────────────
+function openDemandsDrawer(t) {
+    const overlay = document.getElementById('mob-demands-overlay');
+    const drawer = document.getElementById('mob-demands-drawer');
+    if (!overlay || !drawer) return;
+    drawer.dataset.t = t;
+    document.getElementById('mob-drawer-eyebrow').textContent = `Treino ${t + 1} · demandas`;
+
+    // Sync state from desktop tab `t` para o drawer
+    syncDesktopToDrawer(t);
+
+    // Início no modo hierarquia (mesmo que o desktop esteja em template)
+    setDrawerMode('hierarquia');
+
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sheet-open');
+}
+
+function closeDemandsDrawer(e) {
+    if (e && e.target && e.target.id !== 'mob-demands-overlay') return;
+    const overlay = document.getElementById('mob-demands-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('sheet-open');
+}
+
+function setDrawerMode(mode) {
+    const drawer = document.getElementById('mob-demands-drawer');
+    if (!drawer) return;
+    document.getElementById('mob-drawer-title').textContent = mode === 'template' ? 'Template' : 'Hierarquia';
+    drawer.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    document.getElementById('mob-drawer-hierarquia').style.display = mode === 'hierarquia' ? '' : 'none';
+    document.getElementById('mob-drawer-template').style.display = mode === 'template' ? '' : 'none';
+}
+
+// Copia checkboxes desktop → drawer (estado do treino t)
+function syncDesktopToDrawer(t) {
+    const tab = document.getElementById('tab-' + t);
+    const drawer = document.getElementById('mob-demands-drawer');
+    if (!tab || !drawer) return;
+
+    // Reset all drawer checkboxes
+    drawer.querySelectorAll('.mob-reg-chk, .mob-sub-chk, .mob-pad-chk, .mob-lat-chk').forEach(c => c.checked = false);
+
+    // Copia estado dos checkboxes desktop equivalentes (mesmos data-attrs)
+    tab.querySelectorAll('.reg-chk:checked').forEach(src => {
+        const dst = drawer.querySelector(`.mob-reg-chk[data-regiao="${src.dataset.regiao}"]`);
+        if (dst) dst.checked = true;
+    });
+    tab.querySelectorAll('.sub-chk:checked').forEach(src => {
+        const dst = drawer.querySelector(`.mob-sub-chk[data-subregiao="${src.dataset.subregiao}"]`);
+        if (dst) dst.checked = true;
+    });
+    tab.querySelectorAll('.pad-chk:checked').forEach(src => {
+        const dst = drawer.querySelector(`.mob-pad-chk[data-padrao="${src.dataset.padrao}"]`);
+        if (dst) dst.checked = true;
+    });
+    tab.querySelectorAll('.lat-chk:checked').forEach(src => {
+        const dst = drawer.querySelector(`.mob-lat-chk[data-padrao="${src.dataset.padrao}"][data-lat="${src.dataset.lat}"]`);
+        if (dst) dst.checked = true;
+    });
+
+    refreshDrawerVisuals();
+    updateDrawerCounters();
+}
+
+function applyDemandsDrawer() {
+    const drawer = document.getElementById('mob-demands-drawer');
+    if (!drawer) return;
+    const t = parseInt(drawer.dataset.t);
+    const tab = document.getElementById('tab-' + t);
+    if (!tab) return;
+
+    // Garante modo hierarquia no desktop
+    setModo(t, 'hierarquia');
+
+    // Reset desktop checkboxes
+    tab.querySelectorAll('.reg-chk, .sub-chk, .pad-chk, .lat-chk').forEach(c => c.checked = false);
+
+    // Copia drawer → desktop
+    drawer.querySelectorAll('.mob-reg-chk:checked').forEach(src => {
+        const dst = tab.querySelector(`.reg-chk[data-regiao="${src.dataset.regiao}"]`);
+        if (dst) dst.checked = true;
+    });
+    drawer.querySelectorAll('.mob-sub-chk:checked').forEach(src => {
+        const dst = tab.querySelector(`.sub-chk[data-subregiao="${src.dataset.subregiao}"]`);
+        if (dst) dst.checked = true;
+    });
+    drawer.querySelectorAll('.mob-pad-chk:checked').forEach(src => {
+        const dst = tab.querySelector(`.pad-chk[data-padrao="${src.dataset.padrao}"]`);
+        if (dst) dst.checked = true;
+    });
+    drawer.querySelectorAll('.mob-lat-chk:checked').forEach(src => {
+        const dst = tab.querySelector(`.lat-chk[data-padrao="${src.dataset.padrao}"][data-lat="${src.dataset.lat}"]`);
+        if (dst) dst.checked = true;
+    });
+
+    // Re-render desktop (cria dem_nivel_/dem_escopo_/dem_qtd_) e atualiza mobile (via hook em updateTotal)
+    updateDemandas(t);
+    closeDemandsDrawer();
+}
+
+// Toggle ao clicar na tag/área de uma região no drawer
+function toggleMobRegiao(regiao) {
+    const drawer = document.getElementById('mob-demands-drawer');
+    const chk = drawer.querySelector(`.mob-reg-chk[data-regiao="${regiao}"]`);
+    if (!chk) return;
+    chk.checked = !chk.checked;
+    if (chk.checked) {
+        drawer.querySelectorAll(`.mob-sub-chk[data-regiao="${regiao}"], .mob-pad-chk[data-regiao="${regiao}"], .mob-lat-chk[data-regiao="${regiao}"]`)
+            .forEach(c => c.checked = false);
+    }
+    refreshDrawerVisuals();
+    updateDrawerCounters();
+}
+function toggleMobSubregiao(subregiao, regiao) {
+    const drawer = document.getElementById('mob-demands-drawer');
+    const chk = drawer.querySelector(`.mob-sub-chk[data-subregiao="${subregiao}"]`);
+    if (!chk) return;
+    chk.checked = !chk.checked;
+    if (chk.checked) {
+        drawer.querySelectorAll(`.mob-pad-chk[data-subregiao="${subregiao}"], .mob-lat-chk[data-subregiao="${subregiao}"]`)
+            .forEach(c => c.checked = false);
+        const regChk = drawer.querySelector(`.mob-reg-chk[data-regiao="${regiao}"]`);
+        if (regChk) regChk.checked = false;
+    }
+    refreshDrawerVisuals();
+    updateDrawerCounters();
+}
+function toggleDrawerRegiao(regiao) {
+    const card = document.getElementById('m-reg-card-' + regiao);
+    if (card) card.classList.toggle('open');
+}
+// Listener no drawer pra refletir cliques nas labels (.mob-padrao-tag com input dentro)
+function onMobDemandasChange() {
+    refreshDrawerVisuals();
+    updateDrawerCounters();
+}
+
+function refreshDrawerVisuals() {
+    const drawer = document.getElementById('mob-demands-drawer');
+    drawer.querySelectorAll('.mob-regiao-card').forEach(card => {
+        const reg = card.dataset.regiao;
+        const regCheck = !!card.querySelector('.mob-reg-chk:checked');
+        const anyChild = !!card.querySelector('.mob-sub-chk:checked, .mob-pad-chk:checked, .mob-lat-chk:checked');
+        card.classList.toggle('has-selected', regCheck || anyChild);
+        const regToggle = card.querySelector('.mob-regiao-toggle');
+        if (regToggle) regToggle.classList.toggle('selected', regCheck);
+        const summary = card.querySelector('[data-summary]');
+        if (summary) {
+            if (regCheck) {
+                summary.textContent = 'região inteira';
+            } else {
+                const n = card.querySelectorAll('.mob-sub-chk:checked, .mob-pad-chk:checked, .mob-lat-chk:checked').length;
+                summary.textContent = n > 0 ? (n + ' selec.') : '—';
+            }
+        }
+        card.querySelectorAll('.mob-subregiao-block[data-subregiao]').forEach(block => {
+            const sub = block.dataset.subregiao;
+            const subChecked = !!block.querySelector('.mob-sub-chk:checked');
+            const subToggle = block.querySelector('.mob-subregiao-toggle');
+            if (subToggle) subToggle.classList.toggle('active', subChecked);
+        });
+    });
+}
+
+function updateDrawerCounters() {
+    const drawer = document.getElementById('mob-demands-drawer');
+    let total = 0;
+    drawer.querySelectorAll('.mob-pad-chk:checked').forEach(() => total += 1);
+    drawer.querySelectorAll('.mob-lat-chk:checked').forEach(() => total += 1);
+    drawer.querySelectorAll('.mob-sub-chk:checked').forEach(() => total += 2);
+    drawer.querySelectorAll('.mob-reg-chk:checked').forEach(() => total += 2);
+    document.getElementById('mob-drawer-total').textContent = total + ' ex';
+    document.getElementById('mob-drawer-apply-count').textContent = '(' + total + ')';
+}
+
+function selectTemplateMobile(nome) {
+    const drawer = document.getElementById('mob-demands-drawer');
+    if (!drawer) return;
+    const t = parseInt(drawer.dataset.t);
+    setModo(t, 'template');
+    selectTemplate(t, nome);
+    closeDemandsDrawer();
+}
+
 // Init
 onChangeNTreinos();
 bindMobileMirrors();
 mirrorFromDesktop();
 watchEvitarHistWrap();
 updateMobileSubs();
+// Render inicial das seções de treino mobile (caso histórico já tenha sido carregado)
+for (let t = 0; t < MAX_TREINOS; t++) {
+    renderMobileDemandasList(t);
+    updateMobileTreinoSection(t);
+}
 </script>
 
 {% endblock %}
