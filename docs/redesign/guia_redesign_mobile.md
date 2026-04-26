@@ -12,9 +12,10 @@
 
 **Branch ativa:** `mobile-redesign-02` (NÃO mergeada em main)
 
-**Etapas concluídas:** 1-8 ✅ · **Próxima:** Etapa 9 (gerador mobile · estrutura)
+**Etapas concluídas:** 1-9 ✅ · **Próxima:** Etapa 10 (gerador mobile · seções de treinos T1-T5 + drawer lateral)
 
 **Commits feitos (mais recente primeiro):**
+- `8b3cf89` mobile(gerador): adiciona estrutura tela unica com secoes colapsaveis
 - `d17da38` mobile(hub): modo edicao inline com banner + bottom bar focada
 - `6440e86` mobile(rascunho): banner compacto + acoes na bottom bar
 - `fae8fd5` mobile(treino-card): header com badge T1 + nome + kebab unico
@@ -37,6 +38,7 @@
 8. **Modo edição (Etapa 8):** `body.body--em-edicao` toggleda via JS (não `:has()` — `:has()` re-avaliava CSS a cada mudança de classe interna do SortableJS, **quebrava drag-and-drop**). Esconde card aluno + banner rascunho. Bottom bar reduz a Descartar (vermelho) + Aceitar (verde).
 9. **Aceitar vs Salvar:** "Aceitar" sai edição mantendo rascunho (vira modo rascunho na bb com Salvar/Descartar). Não confundir.
 10. **Bandeja de etiqueta dropada do mobile:** etiqueta do banner de rascunho mobile foi removida — já é editável inline no card aluno.
+11. **Gerador mobile (Etapa 9):** desktop e mobile coexistem na mesma página (`hidden md:grid` no desktop / `md:hidden` no bloco mobile). Inputs mobile são **controllers sem `name`**: JS espelha pros inputs do bloco desktop equivalente (que mantém os `name` que o backend espera). Único campo com `name` próprio no mobile: `etiqueta_rotina` (NEW). Topbar global (`.topbar-mobile` em base.html) é escondido no gerador via `body[data-active-page="gerador"]` — gerador renderiza sua própria topbar custom (back + eyebrow + nome do aluno). `#mobile-bar` antigo restrito ao breakpoint md (≥md e <lg) — não interfere mais com a bb global em <md.
 
 ### Arquivos novos criados nesta branch
 
@@ -44,6 +46,8 @@
 - `templates/_mobile_nav_sheet.html` (sheet Hub/Alunos/Histórico)
 - `templates/_mobile_treino_kebab_sheet.html` (action sheet do `...` por treino)
 - `templates/_mobile_bb_actions_hub.html` (partial das ações da bb no HUB; usado tanto inline quanto via re-fetch)
+- `templates/_mobile_section.html` (macros `open()`/`close()` da seção colapsável do gerador)
+- `templates/_mobile_bb_actions_gerador.html` (slot direito da bb no gerador: Gerar treinos)
 
 ### Endpoints novos
 
@@ -411,7 +415,7 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 
 ---
 
-## Etapa 9 · Gerador mobile · estrutura tela única (Aluno + Configs)
+## Etapa 9 · Gerador mobile · estrutura tela única (Aluno + Configs) ✅
 
 > **TODO (decidido na Etapa 6):** adicionar campo "Etiqueta da rotina" na seção "Configurações gerais". Hoje só existe etiqueta dos treinos individuais; rotinas geradas via gerador nascem sem etiqueta. Edit inline já existe no card aluno do HUB, mas garantir input no gerador faz a rotina nascer com etiqueta de cara.
 
