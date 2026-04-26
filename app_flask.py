@@ -54,10 +54,25 @@ def _inject_topbar_aluno():
     sel_id = session.get("aluno_id")
     aluno = next((a for a in alunos if a["id"] == sel_id), None) if sel_id else None
     sem_rotina = sum(1 for a in alunos if not a.get("rotina_ativa_id"))
+    # Estado do rascunho do aluno selecionado (drives reactividade da bb mobile)
+    eh_rascunho = False
+    tem_publicada = False
+    intent = ""
+    alteracoes = 0
+    if aluno:
+        eh_rascunho = bool(carregar_rascunho(aluno["id"]))
+        tem_publicada = bool(aluno.get("rotina_ativa_id"))
+        if eh_rascunho:
+            intent = carregar_intent_rascunho(aluno["id"]) or ""
+            if tem_publicada:
+                alteracoes = len(diff_rascunho_vs_publicada(aluno["id"]))
     return {
         "_topbar_alunos": alunos,
         "_topbar_aluno": aluno,
-        "_topbar_tem_rotina": bool(aluno and aluno.get("rotina_ativa_id")),
+        "_topbar_tem_rotina": tem_publicada,
+        "_topbar_eh_rascunho": eh_rascunho,
+        "_topbar_intent": intent,
+        "_topbar_alteracoes": alteracoes,
         "_nav_alunos_total": len(alunos),
         "_nav_sem_rotina": sem_rotina,
     }
@@ -926,6 +941,13 @@ def hub_etiqueta_rascunho(aluno_id):
     etiqueta = (request.form.get("etiqueta", "") or "").strip()
     salvar_etiqueta_rascunho(aluno_id, etiqueta)
     return ("", 204)
+
+
+@app.route("/_mobile_bb_actions")
+def mobile_bb_actions():
+    """Re-fetch do conteudo do slot direito da bb (hub). Re-renderiza o partial
+    com base no estado atual do rascunho via context_processor."""
+    return render_template("_mobile_bb_actions_hub.html")
 
 
 @app.route("/hub/rotina/<int:aluno_id>/etiqueta", methods=["POST"])

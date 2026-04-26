@@ -12,6 +12,22 @@
 {% else %}
     {% set badge_texto = total_alteracoes ~ ' alterações' %}
 {% endif %}
+{# Banner mobile compacto (1 faixa) — botoes Salvar/Descartar vivem na bb #}
+<div class="draft-banner-mobile" id="draft-banner-mobile-{{ aluno_id }}">
+    <div class="draft-mobile-row" onclick="toggleDraftMobileDetail('{{ aluno_id }}')">
+        <span class="draft-mobile-pulse"></span>
+        <svg class="icon draft-mobile-icon"><use href="#i-pencil"/></svg>
+        <span class="draft-mobile-title">Rascunho · {{ badge_texto }}</span>
+        {% if tem_rotina_publicada and total_alteracoes > 0 and not eh_nova_rotina %}
+        <svg class="icon draft-mobile-chevron"><use href="#i-chevron-down"/></svg>
+        {% endif %}
+    </div>
+    {% if tem_rotina_publicada and total_alteracoes > 0 and not eh_nova_rotina %}
+    <div class="draft-mobile-detail" id="draft-mobile-detail-{{ aluno_id }}">
+        <div class="changes-empty">Carregando…</div>
+    </div>
+    {% endif %}
+</div>
 <div class="draft-banner" id="draft-banner-inner-{{ aluno_id }}">
     <div class="draft-banner-top">
         <div class="draft-info">
@@ -87,6 +103,17 @@ function toggleDraftDetail(alunoId) {
     var b = document.getElementById('draft-banner-inner-' + alunoId);
     if (!b) return;
     var d = document.getElementById('draft-changes-detail-' + alunoId);
+    var jaExpanded = b.classList.contains('expanded');
+    b.classList.toggle('expanded');
+    if (!jaExpanded && d && !d.dataset.loaded) {
+        htmx.ajax('GET', '/hub/rotina/' + alunoId + '/alteracoes', {target: '#' + d.id, swap: 'innerHTML'});
+        d.dataset.loaded = '1';
+    }
+}
+function toggleDraftMobileDetail(alunoId) {
+    var b = document.getElementById('draft-banner-mobile-' + alunoId);
+    if (!b) return;
+    var d = document.getElementById('draft-mobile-detail-' + alunoId);
     var jaExpanded = b.classList.contains('expanded');
     b.classList.toggle('expanded');
     if (!jaExpanded && d && !d.dataset.loaded) {

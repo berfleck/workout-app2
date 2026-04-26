@@ -283,7 +283,7 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 
 ---
 
-## Etapa 7 · Banner de rascunho compacto + ações na bottom bar
+## Etapa 7 · Banner de rascunho compacto + ações na bottom bar ✅
 
 **Mockup:** `mockup_mobile_hub.html` · cenário C
 
