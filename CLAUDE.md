@@ -129,7 +129,7 @@ Fluxo: selecionar exercícios (similaridade) → ordenar compostos primeiro → 
 
 ## Redesign mobile (em progresso · branch `mobile-redesign-02`)
 
-Etapas 1-9 de 12 concluídas. Ver `docs/redesign/guia_redesign_mobile.md` (seção "🚦 Estado atual") para handoff completo + lista de commits + decisões importantes. Próxima: **Etapa 10 (gerador mobile · seções de treinos T1-T5 + drawer lateral)**.
+Etapas 1-10 de 12 concluídas. Ver `docs/redesign/guia_redesign_mobile.md` (seção "🚦 Estado atual") para handoff completo + lista de commits + decisões importantes. Próxima: **Etapa 11 (lista de alunos mobile)**.
 
 ### O que mudou já no app (impacto fora do mobile)
 
