@@ -192,7 +192,7 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 
 ---
 
-## Etapa 4 · Compactação do card do aluno (HUB)
+## Etapa 4 · Compactação do card do aluno (HUB) ✅
 
 **Mockup:** `mockup_mobile_hub.html` · cenário B
 

@@ -749,7 +749,23 @@
         }
         .aluno-toggle { flex-shrink: 0; }
         @media (max-width: 639px) {
-            .aluno-toggle { width: 100%; justify-content: flex-start; margin-top: 4px; }
+            .aluno-toggle:not(.aluno-toggle-mobile) { width: 100%; justify-content: flex-start; margin-top: 4px; }
+        }
+        /* Mobile: 3 botões só com ícone, em linha junto do nome */
+        @media (max-width: 768px) {
+            .aluno-toggle-mobile { padding: 2.5px; border-radius: 9px; flex-shrink: 0; }
+            .aluno-toggle-mobile button {
+                width: 28px; height: 28px;
+                padding: 0; gap: 0;
+                border-radius: 6.5px;
+                color: var(--gray-400);
+                justify-content: center;
+            }
+            .aluno-toggle-mobile button .icon { width: 13px; height: 13px; }
+            .aluno-toggle-mobile button.active {
+                background: white; color: var(--gray-800);
+                box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+            }
         }
 
         /* Lado a lado com diff visual */
