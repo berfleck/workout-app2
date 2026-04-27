@@ -129,7 +129,7 @@ Fluxo: selecionar exercícios (similaridade) → ordenar compostos primeiro → 
 
 ## Redesign mobile (em progresso · branch `mobile-redesign-02`)
 
-Etapas 1-10 de 12 concluídas. Ver `docs/redesign/guia_redesign_mobile.md` (seção "🚦 Estado atual") para handoff completo + lista de commits + decisões importantes. Próxima: **Etapa 11 (lista de alunos mobile)**.
+Etapas 1-11 de 12 concluídas. Ver `docs/redesign/guia_redesign_mobile.md` (seção "🚦 Estado atual") para handoff completo + lista de commits + decisões importantes. Próxima: **Etapa 12 (histórico mobile · timeline por período)**.
 
 ### O que mudou já no app (impacto fora do mobile)
 

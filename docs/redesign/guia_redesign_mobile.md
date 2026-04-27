@@ -12,9 +12,13 @@
 
 **Branch ativa:** `mobile-redesign-02` (NÃO mergeada em main)
 
-**Etapas concluídas:** 1-10 ✅ (refinada pós-feedback) · **Próxima:** Etapa 11 (lista de alunos mobile)
+**Etapas concluídas:** 1-11 ✅ · **Próxima:** Etapa 12 (histórico mobile · timeline por período)
 
 **Commits feitos (mais recente primeiro):**
+- `a040a3b` mobile(alunos): lista mobile com filtros, busca e agrupamento (etapa 11)
+- `83b34d3` mobile(gerador): CTA compacto + sheet "Copiar de..." entre treinos
+- `cfb6ae9` mobile(gerador): cores upper/lower + separa squat bilat/uni no chip
+- `45996bf` mobile(gerador): refinamentos UX pos-feedback (rodada 2)
 - `074603b` mobile(gerador): n_treinos emergente das demandas configuradas
 - `540dd3f` mobile(drawer): hierarquia compacta com cores por nivel
 - `88b0d65` mobile(gerador): UI quick wins pos-feedback
@@ -564,7 +568,7 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 
 ---
 
-## Etapa 11 · Lista de alunos mobile
+## Etapa 11 · Lista de alunos mobile ✅
 
 **Mockup:** `mockup_mobile_aux.html` · Auxiliar 3
 
