@@ -1406,6 +1406,25 @@ function renderMobileDemandasList(t) {
         const nivel = nInp.value, escopo = eInp.value;
         const qtd = parseInt(qInp.value) || 0;
         if (qtd === 0) return;
+
+        // Caso especial: squat → renderiza 1 chip por lateralidade ativa (cada um com counter próprio)
+        if (escopo === 'squat' && nivel === 'padrao') {
+            const biChk = tab.querySelector('.lat-chk[data-padrao="squat"][data-lat="bilateral"]');
+            const uniChk = tab.querySelector('.lat-chk[data-padrao="squat"][data-lat="unilateral"]');
+            if (biChk?.checked || uniChk?.checked) {
+                if (biChk?.checked) {
+                    const biVal = parseInt(tab.querySelector(`input[name="squat_bi_${t}"]`)?.value || '0');
+                    rows += renderSquatLatRow(t, 'bilateral', biVal);
+                }
+                if (uniChk?.checked) {
+                    const uniVal = parseInt(tab.querySelector(`input[name="squat_uni_${t}"]`)?.value || '0');
+                    rows += renderSquatLatRow(t, 'unilateral', uniVal);
+                }
+                return; // já renderizou squat — pula chip agregado
+            }
+            // se não tem lateralidade marcada, cai no fluxo normal abaixo (chip único agachamento)
+        }
+
         rows += `<div class="mob-demanda-item">
             ${chipDemandaLabel(nivel, escopo)}
             <div class="mob-demanda-counter">
@@ -1431,10 +1450,18 @@ const SUBREGIAO_SLUG = {
     core: 'core', cardio: 'cardio'
 };
 
+// Labels curtos pra regiões (cabem melhor em chip)
+const REGIAO_LABEL_CURTO = {
+    upper: 'Membros Sup.',
+    lower: 'Membros Inf.',
+    core: 'Core',
+    cardio: 'Cardio'
+};
+
 function labelForDemanda(nivel, escopo) {
     if (nivel === 'padrao') return PADROES_LABELS[escopo] || escopo;
     if (nivel === 'subregiao') return SUBREGIOES_LABELS_JS[escopo] || escopo;
-    if (nivel === 'regiao') return (REGIOES_LABELS_JS[escopo] || escopo) + ' (toda)';
+    if (nivel === 'regiao') return REGIAO_LABEL_CURTO[escopo] || REGIOES_LABELS_JS[escopo] || escopo;
     return escopo;
 }
 
@@ -1445,7 +1472,7 @@ function slugForDemanda(nivel, escopo) {
         return c ? c[1] : null;
     }
     if (nivel === 'subregiao') return SUBREGIAO_SLUG[escopo] || null;
-    if (nivel === 'regiao') return ({core: 'core', cardio: 'cardio'})[escopo] || null;
+    if (nivel === 'regiao') return escopo; // upper/lower/core/cardio — todos têm reg-chip-{escopo}
     return null;
 }
 
@@ -1473,6 +1500,25 @@ function bumpMobileEpp(t, pad, delta) {
 }
 function removerDemandaMobile(t, nivel, escopo) {
     removerDemanda(t, nivel, escopo);
+}
+
+// Squat com lateralidade: 1 chip por lat ativa (bilateral / unilateral),
+// counter próprio que mexe em squat_bi_{t} ou squat_uni_{t} (bumpQtd já recalcula
+// dem_qtd total do squat). Remover usa removerLat do desktop.
+function renderSquatLatRow(t, lat, val) {
+    const isBi = lat === 'bilateral';
+    const inputName = isBi ? `squat_bi_${t}` : `squat_uni_${t}`;
+    const label = isBi ? 'Agach. Bilat.' : 'Agach. Uni.';
+    const chip = `<span class="reg-chip reg-chip-perna-ant mob-demanda-chip">${label}</span>`;
+    return `<div class="mob-demanda-item">
+        ${chip}
+        <div class="mob-demanda-counter">
+            <button type="button" onclick="bumpQtd(${t}, '${inputName}', -1)"><svg class="icon"><use href="#i-minus"/></svg></button>
+            <span>${val}</span>
+            <button type="button" onclick="bumpQtd(${t}, '${inputName}', 1)"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </div>
+        <button type="button" class="mob-demanda-remove" onclick="removerLat(${t}, '${lat}')" title="Remover"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>`;
 }
 
 // ── Drawer ───────────────────────────────────────────────────────
