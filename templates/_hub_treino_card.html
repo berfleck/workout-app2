@@ -18,7 +18,8 @@
             {% endif %}
         </div>
         <div class="treino-acoes">
-            <button type="button" class="btn btn-sm btn-icon" title="Mais ações"
+            {# Mobile: kebab que abre action sheet #}
+            <button type="button" class="btn btn-sm btn-icon md:hidden" title="Mais ações"
                     data-open-treino-kebab
                     data-treino-idx="{{ idx }}"
                     data-treino-num="{{ idx + 1 }}"
@@ -26,6 +27,20 @@
                     data-aluno-id="{{ aluno_id }}"
                     data-aluno-nome="{{ aluno.nome if aluno else 'Aluno' }}"
                     aria-label="Mais ações"><svg class="icon"><use href="#i-more-vertical"/></svg></button>
+
+            {# Desktop: ações visíveis no card #}
+            <button class="btn btn-sm btn-icon hidden md:inline-flex" title="Editar"
+                    hx-post="/hub/rotina/{{ aluno_id }}/treino/{{ idx }}/editar-inline"
+                    hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-pencil"/></svg></button>
+            <a class="btn btn-sm btn-icon hidden md:inline-flex" title="Substituir treino"
+               href="/gerador?aluno_id={{ aluno_id }}&acao=substituir&treino={{ idx }}"><svg class="icon"><use href="#i-rotate-ccw"/></svg></a>
+            <a class="btn btn-sm btn-icon hidden md:inline-flex" title="Baixar PNG"
+               href="/treino/{{ idx }}/png/{{ (aluno.nome if aluno else 'Aluno') | urlencode }}"
+               target="_blank" rel="noopener"><svg class="icon"><use href="#i-download"/></svg></a>
+            <button type="button" class="btn btn-sm btn-icon hidden md:inline-flex" title="Remover treino"
+                    hx-delete="/hub/rotina/{{ aluno_id }}/treino/{{ idx }}"
+                    hx-target="#rotina-display" hx-swap="innerHTML"
+                    hx-confirm="Remover Treino {{ idx + 1 }} da rotina? Esta ação não pode ser desfeita."><svg class="icon"><use href="#i-trash"/></svg></button>
         </div>
     </div>
     {% for bloco in sessao.blocos %}
