@@ -1265,11 +1265,14 @@ def gerar():
 
         all_configs.append(cfg)
 
-    # Validate
-    vazios = [i+1 for i, c in enumerate(all_configs)
-              if not c.get("padroes") and not c.get("demandas")]
-    if vazios:
-        return f"<p class='aviso'>Selecione categorias no(s) Treino(s) {', '.join(str(x) for x in vazios)}.</p>"
+    # Filtra treinos vazios — n_treinos vira emergente das demandas configuradas.
+    # Mantém mapeamento orig_idx → new_idx pra preservar nomes customizados.
+    kept_indices = [i for i, c in enumerate(all_configs)
+                    if c.get("padroes") or c.get("demandas")]
+    if not kept_indices:
+        return "<p class='aviso'>Selecione categorias em pelo menos um treino antes de gerar.</p>"
+    all_configs = [all_configs[i] for i in kept_indices]
+    n_treinos = len(all_configs)
 
     banco_gerar = list(banco)
 
@@ -1343,12 +1346,13 @@ def gerar():
 
     sessoes_ativas = gerar_multiplos_treinos(banco_gerar, all_configs, variar_entre_treinos=variar)
 
-    # Aplica nome customizado por treino (sobrescreve sessao.tipo se usuário digitou)
-    for t in range(min(n_treinos, len(sessoes_ativas))):
-        nome_custom = (request.form.get(f"nome_{t}", "") or "").strip()
+    # Aplica nome customizado por treino (sobrescreve sessao.tipo se usuário digitou).
+    # Usa orig_idx pra ler nome_{N} do form mesmo após filtrar treinos vazios.
+    for new_idx, orig_idx in enumerate(kept_indices[:len(sessoes_ativas)]):
+        nome_custom = (request.form.get(f"nome_{orig_idx}", "") or "").strip()
         if nome_custom:
-            sessoes_ativas[t].tipo = nome_custom
-            all_configs[t]["nome_custom"] = nome_custom
+            sessoes_ativas[new_idx].tipo = nome_custom
+            all_configs[new_idx]["nome_custom"] = nome_custom
 
     configs_geradas = all_configs
     opcoes_globais = {
