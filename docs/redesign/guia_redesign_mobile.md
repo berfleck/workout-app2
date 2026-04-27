@@ -12,9 +12,10 @@
 
 **Branch ativa:** `mobile-redesign-02` (NÃO mergeada em main)
 
-**Etapas concluídas:** 1-11 ✅ · **Próxima:** Etapa 12 (histórico mobile · timeline por período)
+**Etapas concluídas:** 1-12 ✅ 🎉 · **Próxima:** QA pass final + decidir se vale Etapa 13 opcional (modo Substituir treino) ou ir pro PR
 
 **Commits feitos (mais recente primeiro):**
+- `bbe1f35` mobile(historico): timeline por periodo + sheets de filtro/detalhe (etapa 12)
 - `a040a3b` mobile(alunos): lista mobile com filtros, busca e agrupamento (etapa 11)
 - `83b34d3` mobile(gerador): CTA compacto + sheet "Copiar de..." entre treinos
 - `cfb6ae9` mobile(gerador): cores upper/lower + separa squat bilat/uni no chip
@@ -606,7 +607,7 @@ Adicione estes ao bloco existente de tokens (provavelmente em `base.html` ou `to
 
 ---
 
-## Etapa 12 · Histórico mobile · timeline por período
+## Etapa 12 · Histórico mobile · timeline por período ✅
 
 **Mockup:** `mockup_mobile_aux.html` · Auxiliar 4
 
