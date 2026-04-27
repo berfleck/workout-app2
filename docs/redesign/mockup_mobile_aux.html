@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup mobile · Auxiliares — BF Treinamento</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Bricolage+Grotesque:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --brand-500: #e85d04; --brand-600: #d4520a; --brand-700: #b4480c;
+    --brand-50: #fff7ed; --brand-100: #fff3e6; --brand-200: #ffe0c2;
+    --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
+    --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937; --gray-900: #111827;
+    --green-500: #22c55e; --green-600: #16a34a; --green-700: #15803d;
+    --amber-50: #fffbeb; --amber-100: #fef3c7; --amber-200: #fde68a; --amber-500: #f59e0b; --amber-600: #d97706; --amber-700: #b45309;
+    --red-50: #fef2f2; --red-100: #fee2e2; --red-500: #ef4444; --red-600: #dc2626;
+    --blue-50: #eff6ff; --blue-100: #dbeafe; --blue-200: #bfdbfe; --blue-600: #2563eb; --blue-700: #1d4ed8;
+    --canvas-paper: #f0ebe0; --canvas-ink: #2a2418; --canvas-rule: #c9c0ad;
+    --font-body: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --font-display: 'Bricolage Grotesque', ui-sans-serif, sans-serif;
+}
+
+html, body { height: 100%; }
+body {
+    font-family: var(--font-body);
+    color: var(--canvas-ink);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    background:
+        radial-gradient(900px 600px at 18% -8%, rgba(232,93,4,0.12) 0%, transparent 55%),
+        radial-gradient(800px 700px at 110% 20%, rgba(232,93,4,0.06) 0%, transparent 50%),
+        linear-gradient(180deg, #f0ebe0 0%, #e2dccb 100%);
+    background-attachment: fixed;
+    position: relative;
+    padding-bottom: 80px;
+}
+body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.55'/%3E%3C/svg%3E");
+    opacity: 0.18; pointer-events: none; z-index: 1; mix-blend-mode: multiply;
+}
+body > * { position: relative; z-index: 2; }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+.icon { width: 16px; height: 16px; stroke-width: 2; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.icon-sm { width: 13px; height: 13px; }
+.icon-xs { width: 11px; height: 11px; stroke-width: 2.2; }
+.icon-lg { width: 22px; height: 22px; }
+
+/* Top control bar */
+.control-bar { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.85); backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4); border-bottom: 1px solid rgba(201,192,173,0.55); }
+.control-inner { max-width: 1600px; margin: 0 auto; padding: 14px 28px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.control-title-group { display: flex; align-items: center; gap: 12px; }
+.control-logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-700) 100%); color: white; display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 13px; box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 4px 12px rgba(232,93,4,0.3); letter-spacing: -0.02em; }
+.control-title { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--canvas-ink); letter-spacing: -0.01em; }
+.control-sub { font-size: 11px; color: var(--gray-500); margin-top: 1px; font-family: var(--font-mono); font-weight: 500; }
+.cross-links { display: flex; gap: 6px; margin-left: auto; padding: 4px; background: rgba(255,255,255,0.6); border: 1px solid rgba(201,192,173,0.55); border-radius: 11px; }
+.cross-link { padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--gray-600); border-radius: 8px; text-decoration: none; transition: all 0.18s ease; letter-spacing: -0.005em; }
+.cross-link:hover { background: white; color: var(--canvas-ink); }
+.cross-link.current { color: white; background: var(--canvas-ink); box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+
+/* Page intro */
+.page-intro { max-width: 1100px; margin: 0 auto; padding: 56px 28px 8px; position: relative; }
+.page-intro .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--brand-700); text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 14px; padding: 5px 12px; background: var(--brand-100); border: 1px solid var(--brand-200); border-radius: 999px; }
+.page-intro .eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: var(--brand-500); box-shadow: 0 0 0 3px rgba(232,93,4,0.18); }
+.page-intro h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 42px); font-weight: 700; color: var(--canvas-ink); line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 14px; max-width: 780px; }
+.page-intro h1 em { font-style: italic; color: var(--brand-600); font-weight: 600; }
+.page-intro .lede { font-size: 15px; color: var(--gray-700); line-height: 1.6; max-width: 680px; }
+.page-intro .lede strong { color: var(--canvas-ink); font-weight: 600; }
+.page-intro .meta-line { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(201,192,173,0.7); font-family: var(--font-mono); font-size: 11px; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+.page-intro .meta-line span { display: inline-flex; align-items: center; gap: 6px; }
+.page-intro .meta-line span::before { content: ''; width: 4px; height: 4px; background: var(--brand-500); transform: rotate(45deg); }
+
+/* Stage */
+.stage { max-width: 1600px; margin: 0 auto; padding: 32px 28px 60px; }
+.stage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 56px 32px; align-items: start; }
+.scenario { display: flex; flex-direction: column; align-items: center; gap: 16px; animation: fadeUp 0.7s ease backwards; }
+.scenario:nth-child(1) { animation-delay: 0.05s; }
+.scenario:nth-child(2) { animation-delay: 0.18s; }
+.scenario:nth-child(3) { animation-delay: 0.31s; }
+.scenario:nth-child(4) { animation-delay: 0.44s; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.scenario-label { text-align: center; max-width: 380px; }
+.scenario-num { display: inline-block; font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--brand-700); letter-spacing: 0.18em; text-transform: uppercase; padding: 3px 10px; background: var(--brand-50); border: 1px solid var(--brand-200); border-radius: 999px; margin-bottom: 8px; }
+.scenario-name { font-family: var(--font-display); font-size: 18px; font-weight: 700; color: var(--canvas-ink); letter-spacing: -0.015em; line-height: 1.15; }
+.scenario-desc { font-size: 12px; color: var(--gray-600); margin-top: 6px; line-height: 1.55; }
+
+/* Phone */
+.phone { width: 380px; height: 760px; background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%); border-radius: 46px; padding: 11px; position: relative; flex-shrink: 0; box-shadow: 0 0 0 1.5px #3a3a3a, 0 1px 0 0 rgba(255,255,255,0.08) inset, 0 28px 60px -16px rgba(42,36,24,0.4), 0 12px 28px -8px rgba(42,36,24,0.18); }
+.phone::before { content: ''; position: absolute; left: -2px; top: 140px; width: 3px; height: 56px; background: linear-gradient(90deg, #1a1a1a, #2a2a2a); border-radius: 2px 0 0 2px; }
+.phone::after { content: ''; position: absolute; right: -2px; top: 180px; width: 3px; height: 80px; background: linear-gradient(270deg, #1a1a1a, #2a2a2a); border-radius: 0 2px 2px 0; }
+.phone-screen { width: 100%; height: 100%; background: var(--gray-50); border-radius: 35px; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.phone-notch { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 116px; height: 28px; background: #050505; border-radius: 0 0 18px 18px; z-index: 50; }
+.phone-notch::after { content: ''; position: absolute; top: 9px; right: 22px; width: 8px; height: 8px; border-radius: 999px; background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #050505 70%); box-shadow: 0 0 0 1px #1a1a1a; }
+
+.status-bar { height: 44px; flex-shrink: 0; padding: 14px 26px 0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; color: var(--gray-900); }
+.status-bar-time { font-family: var(--font-mono); letter-spacing: -0.02em; }
+.status-bar-icons { display: flex; gap: 5px; align-items: center; color: var(--gray-800); }
+
+/* Topbar */
+.topbar-mobile { flex-shrink: 0; padding: 10px 14px 12px; background: white; border-bottom: 1px solid var(--gray-200); display: flex; align-items: center; gap: 10px; }
+.topbar-logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-700) 100%); color: white; display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 12px; flex-shrink: 0; letter-spacing: -0.02em; box-shadow: 0 2px 6px rgba(232,93,4,0.25); }
+.topbar-title-area { flex: 1; min-width: 0; }
+.topbar-eyebrow { font-family: var(--font-mono); font-size: 9px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+.topbar-title { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--gray-900); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.012em; }
+.topbar-action-btn { width: 34px; height: 34px; border-radius: 9px; color: var(--gray-700); display: grid; place-items: center; flex-shrink: 0; background: var(--gray-100); transition: all 0.15s; }
+.topbar-action-btn:hover { background: var(--gray-200); }
+.aluno-pill { flex: 1; display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 11px; background: var(--gray-100); border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--gray-900); min-width: 0; }
+.aluno-pill .icon { color: var(--gray-500); }
+.aluno-pill .pill-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.005em; }
+.aluno-pill .pill-caret { color: var(--gray-400); flex-shrink: 0; }
+
+/* Search bar */
+.search-bar { flex: 1; display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 11px; background: var(--gray-100); border-radius: 999px; font-size: 13px; color: var(--gray-500); min-width: 0; }
+.search-bar .icon { color: var(--gray-400); }
+.search-bar input { background: none; border: none; outline: none; flex: 1; font-size: 13px; font-family: inherit; color: var(--gray-900); min-width: 0; }
+.search-bar input::placeholder { color: var(--gray-400); }
+
+/* Content */
+.content { flex: 1; overflow-y: auto; padding: 12px 14px 100px; position: relative; }
+.content::-webkit-scrollbar { width: 0; }
+
+/* ═══════ Treino card (re-uso) ═══════ */
+.aluno-bar { background: white; border: 1px solid var(--gray-200); border-radius: 14px; padding: 11px 12px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 1px 2px rgba(0,0,0,0.02); }
+.avatar { width: 38px; height: 38px; border-radius: 999px; background: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-700) 100%); color: white; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 13px; flex-shrink: 0; letter-spacing: -0.02em; box-shadow: 0 1px 3px rgba(232,93,4,0.3); }
+.avatar.gray { background: linear-gradient(135deg, var(--gray-500) 0%, var(--gray-700) 100%); box-shadow: 0 1px 3px rgba(75,85,99,0.3); }
+.avatar.blue { background: linear-gradient(135deg, var(--blue-600) 0%, var(--blue-700) 100%); box-shadow: 0 1px 3px rgba(37,99,235,0.3); }
+.avatar.green { background: linear-gradient(135deg, var(--green-500) 0%, var(--green-700) 100%); box-shadow: 0 1px 3px rgba(34,197,94,0.3); }
+.avatar.amber { background: linear-gradient(135deg, var(--amber-500) 0%, var(--amber-700) 100%); box-shadow: 0 1px 3px rgba(245,158,11,0.3); }
+.aluno-info { flex: 1; min-width: 0; }
+.aluno-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.aluno-name { font-size: 14.5px; font-weight: 700; color: var(--gray-900); letter-spacing: -0.01em; }
+.aluno-tag { font-family: var(--font-mono); font-size: 9px; font-weight: 700; padding: 1.5px 6px; border-radius: 4px; background: var(--gray-100); color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0; }
+.aluno-meta { font-size: 11px; color: var(--gray-500); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-weight: 500; letter-spacing: -0.01em; }
+.aluno-meta .dot { color: var(--gray-300); margin: 0 5px; }
+
+.treino-card { background: white; border: 1px solid var(--gray-200); border-radius: 16px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset; }
+.treino-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.treino-num { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--gray-400); flex-shrink: 0; letter-spacing: 0.04em; padding: 2px 5px; background: var(--gray-100); border-radius: 4px; }
+.treino-name { font-family: var(--font-display); font-size: 14.5px; font-weight: 700; color: var(--gray-900); flex-shrink: 0; letter-spacing: -0.012em; }
+.regiao-chips { display: flex; gap: 3px; flex-wrap: nowrap; overflow: hidden; flex: 1; min-width: 0; }
+.reg-chip { font-family: var(--font-mono); font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; flex-shrink: 0; }
+.reg-peito { background: #ffe4e6; color: #9f1239; }
+.reg-costas { background: #e0f2fe; color: #075985; }
+.reg-ombro { background: #fef3c7; color: #92400e; }
+.reg-bracos { background: #ede9fe; color: #5b21b6; }
+.reg-perna-ant { background: #d1fae5; color: #065f46; }
+.reg-perna-post { background: #ccfbf1; color: #115e59; }
+.reg-core { background: #f3e8ff; color: #6b21a8; }
+.treino-acoes { display: flex; gap: 1px; flex-shrink: 0; margin-left: auto; }
+.act-btn { width: 30px; height: 30px; border-radius: 7px; color: var(--gray-500); display: grid; place-items: center; transition: all 0.15s; position: relative; }
+.act-btn:hover { background: var(--gray-100); color: var(--brand-500); }
+.act-btn.active { background: var(--gray-900); color: white; }
+
+.bloco { background: var(--gray-50); border-radius: 10px; padding: 8px 10px 9px; margin-bottom: 6px; border: 1px solid var(--gray-100); }
+.bloco:last-child { margin-bottom: 0; }
+.bloco-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.bloco-chip { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(180deg, var(--brand-500), var(--brand-600)); color: white; font-family: var(--font-mono); font-weight: 800; font-size: 10px; display: grid; place-items: center; flex-shrink: 0; box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset; }
+.bloco-label { font-family: var(--font-mono); font-size: 9px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+.exercicio { display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 9px; border-left: 2.5px solid var(--brand-500); margin-bottom: 3px; }
+.exercicio:last-child { margin-bottom: 0; }
+.exercicio-info { flex: 1; min-width: 0; }
+.exercicio-nome { font-size: 13px; font-weight: 500; color: var(--gray-900); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.005em; }
+.exercicio-prefix { font-family: var(--font-mono); color: var(--gray-400); font-weight: 600; margin-right: 5px; font-size: 11px; }
+.prescr { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--brand-700); background: var(--brand-100); padding: 2.5px 6px; border-radius: 4px; flex-shrink: 0; white-space: nowrap; letter-spacing: -0.01em; border: 1px solid rgba(232,93,4,0.15); }
+
+/* ═══════ Bottom Sheet (overlay) ═══════ */
+.sheet-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 12, 8, 0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 60;
+    display: flex;
+    align-items: flex-end;
+    animation: fadeIn 0.25s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.sheet {
+    width: 100%;
+    background: white;
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -16px 40px rgba(0,0,0,0.18);
+    padding: 0 0 18px;
+    animation: slideUp 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: 80%;
+    display: flex;
+    flex-direction: column;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.sheet-grabber {
+    width: 36px; height: 4px;
+    background: var(--gray-300);
+    border-radius: 2px;
+    margin: 8px auto 4px;
+    flex-shrink: 0;
+}
+
+.sheet-head {
+    padding: 14px 18px 12px;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--gray-200);
+    flex-shrink: 0;
+}
+.sheet-head-info { flex: 1; min-width: 0; }
+.sheet-eyebrow { font-family: var(--font-mono); font-size: 9px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+.sheet-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--gray-900); margin-top: 1px; letter-spacing: -0.014em; }
+.sheet-close { width: 32px; height: 32px; border-radius: 8px; background: var(--gray-100); color: var(--gray-700); display: grid; place-items: center; flex-shrink: 0; transition: all 0.15s; }
+.sheet-close:hover { background: var(--gray-200); }
+
+.sheet-list {
+    padding: 8px 10px;
+    overflow-y: auto;
+}
+.sheet-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 12px;
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.15s;
+    width: 100%;
+    text-align: left;
+}
+.sheet-item:hover { background: var(--gray-50); }
+.sheet-item.active { background: var(--brand-50); }
+.sheet-item.active .sheet-item-title { color: var(--brand-700); }
+.sheet-item.active .sheet-item-icon { background: var(--brand-500); color: white; box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 8px rgba(232,93,4,0.3); }
+.sheet-item.danger .sheet-item-title { color: var(--red-600); }
+.sheet-item.danger .sheet-item-icon { background: var(--red-50); color: var(--red-600); }
+.sheet-item.danger:hover { background: var(--red-50); }
+
+.sheet-item-icon {
+    width: 40px; height: 40px;
+    border-radius: 11px;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.sheet-item-text { flex: 1; min-width: 0; }
+.sheet-item-title {
+    font-family: var(--font-display);
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--gray-900);
+    letter-spacing: -0.012em;
+}
+.sheet-item-sub {
+    font-size: 11.5px;
+    color: var(--gray-500);
+    margin-top: 1px;
+    line-height: 1.35;
+}
+.sheet-item-arrow { color: var(--gray-300); flex-shrink: 0; }
+.sheet-item.active .sheet-item-arrow { color: var(--brand-500); }
+.sheet-divider { height: 1px; background: var(--gray-200); margin: 4px 12px; }
+
+/* ═══════ Lista de alunos ═══════ */
+.section-title-list {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin: 12px 4px 8px;
+    display: flex; align-items: center; gap: 8px;
+}
+.section-title-list::after { content: ''; flex: 1; height: 1px; background: var(--gray-200); }
+.section-title-list .count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--gray-100);
+    color: var(--gray-600);
+    font-weight: 700;
+}
+
+.aluno-list-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 13px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset;
+}
+.aluno-list-card:hover { border-color: var(--brand-200); }
+.aluno-list-card.active {
+    border-color: var(--brand-500);
+    background: var(--brand-50);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 0 0 3px rgba(232,93,4,0.08);
+}
+.aluno-list-info { flex: 1; min-width: 0; }
+.aluno-list-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.aluno-list-name {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gray-900);
+    letter-spacing: -0.012em;
+}
+.status-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+.status-dot.green { background: var(--green-500); box-shadow: 0 0 0 3px rgba(34,197,94,0.18); }
+.status-dot.amber { background: var(--amber-500); box-shadow: 0 0 0 3px rgba(245,158,11,0.18); }
+.status-dot.gray { background: var(--gray-400); }
+.aluno-list-meta {
+    font-size: 11.5px;
+    color: var(--gray-600);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    letter-spacing: -0.005em;
+    font-weight: 500;
+}
+.aluno-list-meta .dot { color: var(--gray-300); margin: 0 5px; }
+.aluno-list-tags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.list-tag {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+.list-tag.brand { background: var(--brand-50); color: var(--brand-700); border: 1px solid var(--brand-100); }
+.aluno-list-arrow { color: var(--gray-300); flex-shrink: 0; }
+
+.filter-bar {
+    display: flex; gap: 6px;
+    padding-bottom: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -14px 8px;
+    padding-left: 14px;
+    padding-right: 14px;
+}
+.filter-bar::-webkit-scrollbar { display: none; }
+.filter-chip {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 6px 11px;
+    border-radius: 999px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    color: var(--gray-600);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    letter-spacing: -0.005em;
+}
+.filter-chip:hover { border-color: var(--gray-300); }
+.filter-chip.active { background: var(--canvas-ink); color: white; border-color: var(--canvas-ink); }
+.filter-chip .chip-count {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    margin-left: 4px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.08);
+    color: inherit;
+    font-weight: 700;
+}
+.filter-chip.active .chip-count { background: rgba(255,255,255,0.18); }
+
+/* ═══════ Histórico timeline ═══════ */
+.hist-period-header {
+    display: flex; align-items: center; gap: 12px;
+    margin: 20px 4px 10px;
+}
+.hist-period-header:first-child { margin-top: 4px; }
+.hist-period-header .period-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--gray-900);
+    color: white;
+    letter-spacing: -0.005em;
+    flex-shrink: 0;
+}
+.hist-period-header .period-num.current {
+    background: var(--brand-500);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 2px 6px rgba(232,93,4,0.3);
+}
+.hist-period-header .period-label {
+    font-family: var(--font-display);
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--gray-900);
+    letter-spacing: -0.012em;
+    flex: 1;
+    min-width: 0;
+}
+.hist-period-header .period-tag {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--brand-50);
+    color: var(--brand-700);
+    border: 1px solid var(--brand-100);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+.hist-period-header .period-date {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--gray-500);
+    flex-shrink: 0;
+    font-weight: 600;
+}
+
+.hist-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 13px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.hist-card:hover { border-color: var(--gray-300); }
+.hist-card.current {
+    border-color: var(--brand-200);
+    background: linear-gradient(180deg, white 0%, #fffaf2 100%);
+}
+.hist-card-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px;
+}
+.hist-card-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--gray-100);
+    color: var(--gray-600);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: -0.02em;
+}
+.hist-card.current .hist-card-icon {
+    background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+    color: white;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 2px 6px rgba(232,93,4,0.3);
+}
+.hist-card-info { flex: 1; min-width: 0; }
+.hist-card-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hist-card-name {
+    font-family: var(--font-display);
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--gray-900);
+    letter-spacing: -0.012em;
+}
+.hist-card-meta {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 1px;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+}
+.hist-card-meta .dot { color: var(--gray-300); margin: 0 4px; }
+.hist-stats {
+    display: flex; gap: 4px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+.hist-stat-chip {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.hist-card-arrow { color: var(--gray-300); flex-shrink: 0; }
+
+.hist-mini-treinos {
+    display: flex; gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+.mini-treino-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    font-size: 10.5px;
+    color: var(--gray-700);
+    font-weight: 500;
+}
+.mini-treino-pill .mini-num {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--gray-400);
+    font-size: 9.5px;
+}
+
+/* Bottom bar */
+.bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); border-top: 1px solid var(--gray-200); padding: 10px 12px 14px; display: flex; gap: 8px; align-items: center; box-shadow: 0 -8px 24px rgba(0,0,0,0.04); z-index: 5; }
+.bb-nav { width: 46px; height: 46px; border-radius: 12px; background: var(--gray-100); color: var(--gray-700); display: grid; place-items: center; flex-shrink: 0; transition: all 0.15s; position: relative; }
+.bb-nav:hover { background: var(--gray-200); color: var(--gray-900); }
+.bb-nav.active { background: var(--canvas-ink); color: white; }
+.bb-nav .icon { width: 20px; height: 20px; }
+.bb-action { flex: 1; height: 46px; border-radius: 12px; font-size: 13.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; transition: all 0.15s; min-width: 0; letter-spacing: -0.005em; }
+.bb-action.primary { background: linear-gradient(180deg, var(--brand-500), var(--brand-600)); color: white; box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 10px rgba(232,93,4,0.3); }
+.bb-icon-action { width: 46px; height: 46px; border-radius: 12px; background: white; border: 1px solid var(--gray-200); color: var(--gray-700); display: grid; place-items: center; flex-shrink: 0; }
+.bb-empty-hint { flex: 1; font-size: 11px; color: var(--gray-400); text-align: center; font-weight: 500; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* Notes */
+.notes-section { max-width: 1100px; margin: 64px auto 0; padding: 0 28px; }
+.notes-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--brand-700); text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 12px; }
+.notes-eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--canvas-rule); }
+.notes-title { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--canvas-ink); letter-spacing: -0.02em; margin-bottom: 20px; }
+.notes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.annotation { background: white; border: 1px solid var(--gray-200); border-radius: 12px; padding: 14px 16px; font-size: 12px; color: var(--gray-700); line-height: 1.6; box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 6px -2px rgba(0,0,0,0.04); }
+.annotation b { color: var(--canvas-ink); font-weight: 700; }
+.annotation .anno-title { display: flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--canvas-ink); letter-spacing: -0.012em; margin-bottom: 6px; }
+.annotation .anno-title .icon-bullet { width: 18px; height: 18px; border-radius: 5px; background: var(--brand-100); color: var(--brand-700); display: grid; place-items: center; font-family: var(--font-mono); font-weight: 800; font-size: 9px; flex-shrink: 0; }
+.annotation hr { border: 0; border-top: 1px dashed var(--gray-200); margin: 8px 0 6px; }
+.annotation .micro { font-family: var(--font-mono); font-size: 10px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.08em; }
+.annotation .micro b { color: var(--gray-700); }
+
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+    <symbol id="i-more-vertical" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="i-columns" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+    <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+    <symbol id="i-bar-chart" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="2" y="14" width="3" height="6" rx="0.5"/><rect x="7" y="10" width="3" height="10" rx="0.5"/><rect x="12" y="6" width="3" height="14" rx="0.5"/><rect x="17" y="2" width="3" height="18" rx="0.5"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></symbol>
+    <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2" y="6" width="18" height="12" rx="2.5"/><line x1="22" x2="22" y1="11" y2="13"/><rect x="4" y="8" width="14" height="8" rx="1.2" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<div class="control-bar">
+    <div class="control-inner">
+        <div class="control-title-group">
+            <div class="control-logo">BF</div>
+            <div>
+                <div class="control-title">Mockup mobile · Auxiliares</div>
+                <div class="control-sub">redesign 02 · 4 cenários · ~380px</div>
+            </div>
+        </div>
+        <div class="cross-links">
+            <a href="mockup_mobile_hub.html" class="cross-link">HUB</a>
+            <a href="mockup_mobile_gerador.html" class="cross-link">Gerador</a>
+            <a href="mockup_mobile_aux.html" class="cross-link current">Auxiliares</a>
+        </div>
+    </div>
+</div>
+
+<div class="page-intro">
+    <span class="eyebrow">Redesign mobile · 02</span>
+    <h1>Os <em>cantos invisíveis</em> que sustentam o app.</h1>
+    <p class="lede">Quatro telas/estados que aparecem só quando o personal toca em algo: o <strong>menu de navegação</strong>, o <strong>kebab do treino</strong>, a <strong>lista de alunos</strong> e o <strong>histórico</strong>. Bottom sheets em vez de pop-ups. Listas com filtros chip-based. Timeline cronológica para o histórico.</p>
+    <div class="meta-line">
+        <span>Bottom sheet · 80% max</span>
+        <span>Listas · cards de 1 toque</span>
+        <span>Histórico · agrupado por período</span>
+        <span>Padrão · slide-up sheet</span>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="stage-grid">
+
+        <!-- ═══════ Cenário 1: Bottom sheet de navegação ═══════ -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">Auxiliar 1</div>
+                <div class="scenario-name">Bottom sheet de navegação</div>
+                <div class="scenario-desc">Aparece ao tocar no slot esquerdo da bottom bar. Lista limpa: Hub · Alunos · Histórico. Item ativo destacado em laranja. Botão de Configurações no rodapé como divisor.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons"><svg class="icon icon-xs"><use href="#i-signal"/></svg><svg class="icon icon-xs"><use href="#i-wifi"/></svg><svg class="icon icon-sm"><use href="#i-battery"/></svg></span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <div class="topbar-logo">BF</div>
+                        <div class="aluno-pill">
+                            <svg class="icon"><use href="#i-users"/></svg>
+                            <span class="pill-name">Bernardo Fleck</span>
+                            <svg class="icon icon-sm pill-caret"><use href="#i-chevron-down"/></svg>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <!-- Background reduzido (ofuscado) do HUB -->
+                        <div style="opacity: 0.4;">
+                            <div class="aluno-bar">
+                                <div class="avatar">BF</div>
+                                <div class="aluno-info">
+                                    <div class="aluno-name-row"><span class="aluno-name">Bernardo Fleck</span></div>
+                                    <div class="aluno-meta">interm. <span class="dot">·</span> 4 treinos</div>
+                                </div>
+                            </div>
+                            <div class="treino-card">
+                                <div class="treino-header">
+                                    <span class="treino-num">T1</span>
+                                    <span class="treino-name">Upper Push</span>
+                                    <div class="regiao-chips">
+                                        <span class="reg-chip reg-peito">Peito</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sheet overlay -->
+                    <div class="sheet-overlay">
+                        <div class="sheet">
+                            <div class="sheet-grabber"></div>
+                            <div class="sheet-head">
+                                <div class="sheet-head-info">
+                                    <div class="sheet-eyebrow">Navegar</div>
+                                    <div class="sheet-title">BF Treinamento</div>
+                                </div>
+                                <button class="sheet-close"><svg class="icon icon-sm"><use href="#i-x"/></svg></button>
+                            </div>
+                            <div class="sheet-list">
+                                <button class="sheet-item active">
+                                    <div class="sheet-item-icon"><svg class="icon icon-lg"><use href="#i-home"/></svg></div>
+                                    <div class="sheet-item-text">
+                                        <div class="sheet-item-title">Hub</div>
+                                        <div class="sheet-item-sub">Rotinas e treinos do aluno atual</div>
+                                    </div>
+                                    <svg class="icon icon-sm sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+                                </button>
+                                <button class="sheet-item">
+                                    <div class="sheet-item-icon"><svg class="icon icon-lg"><use href="#i-users"/></svg></div>
+                                    <div class="sheet-item-text">
+                                        <div class="sheet-item-title">Alunos</div>
+                                        <div class="sheet-item-sub">12 ativos · 3 sem rotina</div>
+                                    </div>
+                                    <svg class="icon icon-sm sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+                                </button>
+                                <button class="sheet-item">
+                                    <div class="sheet-item-icon"><svg class="icon icon-lg"><use href="#i-archive"/></svg></div>
+                                    <div class="sheet-item-text">
+                                        <div class="sheet-item-title">Histórico</div>
+                                        <div class="sheet-item-sub">Rotinas anteriores por período</div>
+                                    </div>
+                                    <svg class="icon icon-sm sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+                                </button>
+                                <div class="sheet-divider"></div>
+                                <button class="sheet-item">
+                                    <div class="sheet-item-icon" style="background: var(--gray-100); color: var(--gray-500);"><svg class="icon icon-sm" style="width: 18px; height: 18px;"><use href="#i-bar-chart"/></svg></div>
+                                    <div class="sheet-item-text">
+                                        <div class="sheet-item-title">Sair</div>
+                                        <div class="sheet-item-sub">Encerrar sessão</div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bottom-bar">
+                        <button class="bb-nav active"><svg class="icon"><use href="#i-grid"/></svg></button>
+                        <button class="bb-action primary"><svg class="icon icon-sm"><use href="#i-plus"/></svg> Treino</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Cenário 2: Kebab do treino aberto ═══════ -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">Auxiliar 2</div>
+                <div class="scenario-name">Kebab do treino · action sheet</div>
+                <div class="scenario-desc">Aparece ao tocar no <code>⋮</code> do treino card. Mostra ações secundárias que não couberam no header (Regerar · Baixar PNG · Duplicar) e ações destrutivas separadas (Remover) em vermelho.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons"><svg class="icon icon-xs"><use href="#i-signal"/></svg><svg class="icon icon-xs"><use href="#i-wifi"/></svg><svg class="icon icon-sm"><use href="#i-battery"/></svg></span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <div class="topbar-logo">BF</div>
+                        <div class="aluno-pill">
+                            <svg class="icon"><use href="#i-users"/></svg>
+                            <span class="pill-name">Bernardo Fleck</span>
+                            <svg class="icon icon-sm pill-caret"><use href="#i-chevron-down"/></svg>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div style="opacity: 0.4;">
+                            <div class="aluno-bar">
+                                <div class="avatar">BF</div>
+                                <div class="aluno-info">
+                                    <div class="aluno-name-row"><span class="aluno-name">Bernardo Fleck</span></div>
+                                    <div class="aluno-meta">interm. <span class="dot">·</span> 4 treinos</div>
+                                </div>
+                            </div>
+                            <div class="treino-card">
+                                <div class="treino-header">
+                                    <span class="treino-num">T1</span>
+                                    <span class="treino-name">Upper Push</span>
+                                    <div class="regiao-chips">
+                                        <span class="reg-chip reg-peito">Peito</span>
+                                        <span class="reg-chip reg-ombro">Ombro</span>
+                                    </div>
+                                    <div class="treino-acoes">
+                                        <button class="act-btn"><svg class="icon icon-sm"><use href="#i-pencil"/></svg></button>
+                                        <button class="act-btn"><svg class="icon icon-sm"><use href="#i-rotate-ccw"/></svg></button>
+                                        <button class="act-btn active"><svg class="icon icon-sm"><use href="#i-more-vertical"/></svg></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sheet-overlay">
+                        <div class="sheet">
+                            <div class="sheet-grabber"></div>
+                            <div class="sheet-head">
+                                <div class="sheet-head-info">
+                                    <div class="sheet-eyebrow">Treino · T1 Upper Push</div>
+                                    <div class="sheet-title">Mais ações</div>
+                                </div>
+                                <button class="sheet-close"><svg class="icon icon-sm"><use href="#i-x"/></svg></button>
+                            </div>
+                            <div class="sheet-list">
+                                <button class="sheet-item">
+                                    <div class="sheet-item-icon"><svg class="icon icon-sm" style="width: 18px; height: 18px;"><use href="#i-refresh-cw"/></svg></div>
+                                    <div class="sheet-item-text">
+                                        <div class="sheet-item-title">Regerar treino</div>
+                                        <div class="sheet-item-sub">Mantém demandas, troca exercícios</div>
+                                    </div>
+                                </button>
+                                <button class="sheet-item">
+                                    <div class="sheet-item-icon"><svg class="icon icon-sm" style="width: 18px; height: 18px;"><use href="#i-image"/></svg></div>
+                                    <div class="sheet-item-text">
+                                        <div class="sheet-item-title">Baixar PNG</div>
+                                        <div class="sheet-item-sub">Cartão pronto para enviar ao aluno</div>
+                                    </div>
+                                </button>
+                                <button class="sheet-item">
+                                    <div class="sheet-item-icon"><svg class="icon icon-sm" style="width: 18px; height: 18px;"><use href="#i-columns"/></svg></div>
+                                    <div class="sheet-item-text">
+                                        <div class="sheet-item-title">Duplicar para outro treino</div>
+                                        <div class="sheet-item-sub">Copia este treino para T2, T3…</div>
+                                    </div>
+                                </button>
+                                <div class="sheet-divider"></div>
+                                <button class="sheet-item danger">
+                                    <div class="sheet-item-icon"><svg class="icon icon-sm" style="width: 18px; height: 18px;"><use href="#i-trash"/></svg></div>
+                                    <div class="sheet-item-text">
+                                        <div class="sheet-item-title">Remover treino</div>
+                                        <div class="sheet-item-sub">Os outros treinos são preservados</div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bottom-bar">
+                        <button class="bb-nav"><svg class="icon"><use href="#i-grid"/></svg></button>
+                        <button class="bb-action primary"><svg class="icon icon-sm"><use href="#i-plus"/></svg> Treino</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Cenário 3: Lista de alunos ═══════ -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">Auxiliar 3</div>
+                <div class="scenario-name">Lista de alunos</div>
+                <div class="scenario-desc">Busca no topo. Filtros chip-based em scroll horizontal. Cards com avatar + status dot + meta condensada + tags. Aluno ativo destacado em laranja. Bottom bar com <b>+ Aluno</b>.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons"><svg class="icon icon-xs"><use href="#i-signal"/></svg><svg class="icon icon-xs"><use href="#i-wifi"/></svg><svg class="icon icon-sm"><use href="#i-battery"/></svg></span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <div class="topbar-logo">BF</div>
+                        <div class="search-bar">
+                            <svg class="icon icon-sm"><use href="#i-search"/></svg>
+                            <input type="text" placeholder="Buscar aluno…">
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div class="filter-bar">
+                            <button class="filter-chip active">Todos <span class="chip-count">12</span></button>
+                            <button class="filter-chip">Ativos <span class="chip-count">9</span></button>
+                            <button class="filter-chip">Sem rotina <span class="chip-count">3</span></button>
+                            <button class="filter-chip">Hipertrofia <span class="chip-count">7</span></button>
+                            <button class="filter-chip">Iniciante <span class="chip-count">4</span></button>
+                        </div>
+
+                        <div class="section-title-list">
+                            Atual <span class="count">1</span>
+                        </div>
+                        <div class="aluno-list-card active">
+                            <div class="avatar">BF</div>
+                            <div class="aluno-list-info">
+                                <div class="aluno-list-name-row">
+                                    <span class="status-dot green"></span>
+                                    <span class="aluno-list-name">Bernardo Fleck</span>
+                                </div>
+                                <div class="aluno-list-meta">interm. <span class="dot">·</span> 4 treinos <span class="dot">·</span> atualizado há 2d</div>
+                                <div class="aluno-list-tags">
+                                    <span class="list-tag brand">Hipertrofia</span>
+                                    <span class="list-tag">Abr · 24</span>
+                                </div>
+                            </div>
+                            <svg class="icon icon-sm aluno-list-arrow"><use href="#i-chevron-right"/></svg>
+                        </div>
+
+                        <div class="section-title-list">
+                            Outros ativos <span class="count">8</span>
+                        </div>
+
+                        <div class="aluno-list-card">
+                            <div class="avatar blue">JS</div>
+                            <div class="aluno-list-info">
+                                <div class="aluno-list-name-row">
+                                    <span class="status-dot green"></span>
+                                    <span class="aluno-list-name">João Silva</span>
+                                </div>
+                                <div class="aluno-list-meta">avanç. <span class="dot">·</span> 5 treinos <span class="dot">·</span> 1d</div>
+                                <div class="aluno-list-tags">
+                                    <span class="list-tag">Força</span>
+                                </div>
+                            </div>
+                            <svg class="icon icon-sm aluno-list-arrow"><use href="#i-chevron-right"/></svg>
+                        </div>
+
+                        <div class="aluno-list-card">
+                            <div class="avatar green">MR</div>
+                            <div class="aluno-list-info">
+                                <div class="aluno-list-name-row">
+                                    <span class="status-dot green"></span>
+                                    <span class="aluno-list-name">Marina Rocha</span>
+                                </div>
+                                <div class="aluno-list-meta">iniciante <span class="dot">·</span> 3 treinos <span class="dot">·</span> 4d</div>
+                                <div class="aluno-list-tags">
+                                    <span class="list-tag">Hipertrofia</span>
+                                </div>
+                            </div>
+                            <svg class="icon icon-sm aluno-list-arrow"><use href="#i-chevron-right"/></svg>
+                        </div>
+
+                        <div class="aluno-list-card">
+                            <div class="avatar amber">PS</div>
+                            <div class="aluno-list-info">
+                                <div class="aluno-list-name-row">
+                                    <span class="status-dot amber"></span>
+                                    <span class="aluno-list-name">Paulo Santana</span>
+                                </div>
+                                <div class="aluno-list-meta">interm. <span class="dot">·</span> 4 treinos <span class="dot">·</span> 12d</div>
+                                <div class="aluno-list-tags">
+                                    <span class="list-tag">Cardio + Hip.</span>
+                                </div>
+                            </div>
+                            <svg class="icon icon-sm aluno-list-arrow"><use href="#i-chevron-right"/></svg>
+                        </div>
+
+                        <div class="aluno-list-card">
+                            <div class="avatar gray">AC</div>
+                            <div class="aluno-list-info">
+                                <div class="aluno-list-name-row">
+                                    <span class="status-dot green"></span>
+                                    <span class="aluno-list-name">Ana Costa</span>
+                                </div>
+                                <div class="aluno-list-meta">avanç. <span class="dot">·</span> 5 treinos <span class="dot">·</span> hoje</div>
+                                <div class="aluno-list-tags">
+                                    <span class="list-tag">Força</span>
+                                </div>
+                            </div>
+                            <svg class="icon icon-sm aluno-list-arrow"><use href="#i-chevron-right"/></svg>
+                        </div>
+
+                        <div class="section-title-list">
+                            Sem rotina <span class="count">3</span>
+                        </div>
+
+                        <div class="aluno-list-card">
+                            <div class="avatar gray">RM</div>
+                            <div class="aluno-list-info">
+                                <div class="aluno-list-name-row">
+                                    <span class="status-dot gray"></span>
+                                    <span class="aluno-list-name">Rafael Martins</span>
+                                </div>
+                                <div class="aluno-list-meta">iniciante <span class="dot">·</span> sem rotina ativa</div>
+                            </div>
+                            <svg class="icon icon-sm aluno-list-arrow"><use href="#i-chevron-right"/></svg>
+                        </div>
+                    </div>
+                    <div class="bottom-bar">
+                        <button class="bb-nav"><svg class="icon"><use href="#i-grid"/></svg></button>
+                        <button class="bb-action primary"><svg class="icon icon-sm"><use href="#i-plus"/></svg> Aluno</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Cenário 4: Histórico ═══════ -->
+        <div class="scenario">
+            <div class="scenario-label">
+                <div class="scenario-num">Auxiliar 4</div>
+                <div class="scenario-name">Histórico · timeline por período</div>
+                <div class="scenario-desc">Agrupado por período (Abr 24, Mar 24…). Período atual destacado em laranja. Cada item mostra etiqueta + data + stats compactos + mini pills dos treinos. Toque abre o detalhe.</div>
+            </div>
+            <div class="phone">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="status-bar">
+                        <span class="status-bar-time">9:41</span>
+                        <span class="status-bar-icons"><svg class="icon icon-xs"><use href="#i-signal"/></svg><svg class="icon icon-xs"><use href="#i-wifi"/></svg><svg class="icon icon-sm"><use href="#i-battery"/></svg></span>
+                    </div>
+                    <div class="topbar-mobile">
+                        <div class="topbar-logo">BF</div>
+                        <div class="aluno-pill">
+                            <svg class="icon"><use href="#i-users"/></svg>
+                            <span class="pill-name">Bernardo Fleck</span>
+                            <svg class="icon icon-sm pill-caret"><use href="#i-chevron-down"/></svg>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div class="filter-bar">
+                            <button class="filter-chip active">Todos</button>
+                            <button class="filter-chip">2024</button>
+                            <button class="filter-chip">2023</button>
+                            <button class="filter-chip"><svg class="icon icon-xs" style="display: inline; vertical-align: middle; margin-right: 3px;"><use href="#i-filter"/></svg> Filtros</button>
+                        </div>
+
+                        <!-- Período atual -->
+                        <div class="hist-period-header">
+                            <span class="period-num current">2024</span>
+                            <span class="period-label">Abril</span>
+                            <span class="period-tag">Atual</span>
+                            <span class="period-date">24/04</span>
+                        </div>
+
+                        <div class="hist-card current">
+                            <div class="hist-card-head">
+                                <div class="hist-card-icon">P1</div>
+                                <div class="hist-card-info">
+                                    <div class="hist-card-row">
+                                        <span class="hist-card-name">Hipertrofia · Abril</span>
+                                    </div>
+                                    <div class="hist-card-meta">há 2d <span class="dot">·</span> 3 ajustes salvos</div>
+                                </div>
+                                <svg class="icon icon-sm hist-card-arrow"><use href="#i-chevron-right"/></svg>
+                            </div>
+                            <div class="hist-stats">
+                                <span class="hist-stat-chip">4 treinos</span>
+                                <span class="hist-stat-chip">22 ex</span>
+                                <span class="hist-stat-chip">cx 5</span>
+                            </div>
+                            <div class="hist-mini-treinos">
+                                <span class="mini-treino-pill"><span class="mini-num">T1</span> Upper Push</span>
+                                <span class="mini-treino-pill"><span class="mini-num">T2</span> Upper Pull</span>
+                                <span class="mini-treino-pill"><span class="mini-num">T3</span> Lower</span>
+                                <span class="mini-treino-pill"><span class="mini-num">T4</span> Full</span>
+                            </div>
+                        </div>
+
+                        <!-- Período anterior -->
+                        <div class="hist-period-header">
+                            <span class="period-num">2024</span>
+                            <span class="period-label">Março</span>
+                            <span class="period-date">04/03</span>
+                        </div>
+
+                        <div class="hist-card">
+                            <div class="hist-card-head">
+                                <div class="hist-card-icon">P2</div>
+                                <div class="hist-card-info">
+                                    <div class="hist-card-row">
+                                        <span class="hist-card-name">Hipertrofia · Março</span>
+                                    </div>
+                                    <div class="hist-card-meta">04/03 → 24/04 <span class="dot">·</span> 6 ajustes</div>
+                                </div>
+                                <svg class="icon icon-sm hist-card-arrow"><use href="#i-chevron-right"/></svg>
+                            </div>
+                            <div class="hist-stats">
+                                <span class="hist-stat-chip">4 treinos</span>
+                                <span class="hist-stat-chip">20 ex</span>
+                            </div>
+                            <div class="hist-mini-treinos">
+                                <span class="mini-treino-pill"><span class="mini-num">T1</span> Push A</span>
+                                <span class="mini-treino-pill"><span class="mini-num">T2</span> Pull A</span>
+                                <span class="mini-treino-pill"><span class="mini-num">T3</span> Legs A</span>
+                            </div>
+                        </div>
+
+                        <!-- Período mais antigo -->
+                        <div class="hist-period-header">
+                            <span class="period-num">2024</span>
+                            <span class="period-label">Fevereiro</span>
+                            <span class="period-date">02/02</span>
+                        </div>
+
+                        <div class="hist-card">
+                            <div class="hist-card-head">
+                                <div class="hist-card-icon">P3</div>
+                                <div class="hist-card-info">
+                                    <div class="hist-card-row">
+                                        <span class="hist-card-name">Adaptação</span>
+                                    </div>
+                                    <div class="hist-card-meta">02/02 → 04/03 <span class="dot">·</span> 2 ajustes</div>
+                                </div>
+                                <svg class="icon icon-sm hist-card-arrow"><use href="#i-chevron-right"/></svg>
+                            </div>
+                            <div class="hist-stats">
+                                <span class="hist-stat-chip">3 treinos</span>
+                                <span class="hist-stat-chip">15 ex</span>
+                                <span class="hist-stat-chip">cx 3</span>
+                            </div>
+                        </div>
+
+                        <div class="hist-period-header">
+                            <span class="period-num">2024</span>
+                            <span class="period-label">Janeiro</span>
+                            <span class="period-date">08/01</span>
+                        </div>
+
+                        <div class="hist-card">
+                            <div class="hist-card-head">
+                                <div class="hist-card-icon">P4</div>
+                                <div class="hist-card-info">
+                                    <div class="hist-card-row">
+                                        <span class="hist-card-name">Início — Avaliação</span>
+                                    </div>
+                                    <div class="hist-card-meta">08/01 → 02/02</div>
+                                </div>
+                                <svg class="icon icon-sm hist-card-arrow"><use href="#i-chevron-right"/></svg>
+                            </div>
+                            <div class="hist-stats">
+                                <span class="hist-stat-chip">2 treinos</span>
+                                <span class="hist-stat-chip">10 ex</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-bar">
+                        <button class="bb-nav"><svg class="icon"><use href="#i-grid"/></svg></button>
+                        <button class="bb-icon-action" title="Filtrar"><svg class="icon"><use href="#i-filter"/></svg></button>
+                        <button class="bb-icon-action" title="Comparar"><svg class="icon"><use href="#i-columns"/></svg></button>
+                        <div class="bb-empty-hint">toque num período</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Notas finais -->
+    <div class="notes-section">
+        <div class="notes-eyebrow">Notas de design · auxiliares</div>
+        <h2 class="notes-title">Padrões reutilizáveis</h2>
+        <div class="notes-grid">
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">01</span> Bottom sheet padrão</div>
+                Slide-up de 80% max-height. Sempre tem grabber (4px) + header com eyebrow/título/close + lista de itens (40px icon + título + sub). Animação <code>cubic-bezier(0.32, 0.72, 0, 1)</code>.
+                <hr>
+                <div class="micro"><b>Reuso:</b> nav · kebab · seletor de aluno</div>
+            </div>
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">02</span> Item ativo é evidente</div>
+                Background <code>brand-50</code> + texto <code>brand-700</code> + ícone com gradient laranja sólido. Funciona tanto pro item de navegação quanto pra opção atual de qualquer sheet.
+                <hr>
+                <div class="micro"><b>Estado destrutivo:</b> texto vermelho + ícone <code>red-50</code></div>
+            </div>
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">03</span> Filtros chip horizontal</div>
+                Scroll horizontal (sem scrollbar visível). Chip ativo fica <code>canvas-ink</code>. Chips inativos têm contagem em badge cinza escuro. Substituem dropdowns que ocupariam mais espaço vertical.
+                <hr>
+                <div class="micro"><b>Aplicação:</b> alunos · histórico · busca</div>
+            </div>
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">04</span> Lista de alunos</div>
+                Cards de 1 toque (toda a área é clicável). Avatar tematizado por inicial. Status dot (verde/âmbar/cinza) ao lado do nome. Meta em mono comprime "interm. · 4 treinos · há 2d".
+                <hr>
+                <div class="micro"><b>Aluno atual:</b> destacado em laranja, no topo</div>
+            </div>
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">05</span> Histórico timeline</div>
+                Agrupado por mês. Período atual destacado (laranja + tag "Atual"). Cada card tem stats compactos + mini pills dos treinos pra preview rápido sem abrir.
+                <hr>
+                <div class="micro"><b>Bottom bar:</b> Filtrar · Comparar (lado a lado)</div>
+            </div>
+            <div class="annotation">
+                <div class="anno-title"><span class="icon-bullet">06</span> Feedback visual no kebab</div>
+                Botão kebab fica preto sólido (<code>active</code>) enquanto a sheet está aberta. Garante que o personal entende qual treino está sendo configurado.
+                <hr>
+                <div class="micro"><b>Mesmo padrão:</b> menu da bottom bar</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

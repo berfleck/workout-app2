@@ -1,0 +1,41 @@
+{# Bottom sheet de navegação (mobile ≤768px). Abre via [data-open-nav-sheet] da bottom bar. #}
+<div class="sheet-overlay" id="nav-sheet" data-nav-sheet aria-hidden="true">
+    <div class="sheet" role="dialog" aria-label="Navegação">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Navegar</div>
+                <div class="sheet-title">BF Treinamento</div>
+            </div>
+            <button type="button" class="sheet-close" data-close-nav-sheet aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <div class="sheet-list">
+            <a href="/" class="sheet-item {% if active_page == 'hub' %}active{% endif %}">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-home"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Hub</div>
+                    <div class="sheet-item-sub">Rotinas e treinos do aluno atual</div>
+                </div>
+                <svg class="sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+            </a>
+            <a href="/alunos" class="sheet-item {% if active_page == 'alunos' %}active{% endif %}">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-users"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Alunos</div>
+                    <div class="sheet-item-sub">{{ _nav_alunos_total }} ativos · {{ _nav_sem_rotina }} sem rotina</div>
+                </div>
+                <svg class="sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+            </a>
+            <a href="/historico" class="sheet-item {% if active_page == 'historico' %}active{% endif %}">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-archive"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Histórico</div>
+                    <div class="sheet-item-sub">Rotinas anteriores por período</div>
+                </div>
+                <svg class="sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+            </a>
+        </div>
+    </div>
+</div>

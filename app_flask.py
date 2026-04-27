@@ -2,7 +2,7 @@
 BF Treinamento — Versão Flask + HTMX (completa)
 """
 
-from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify
+from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify, session
 import os, random, json, copy, io, zipfile, unicodedata, secrets
 from pathlib import Path
 from datetime import datetime
@@ -24,12 +24,61 @@ from database import (
     salvar_etiqueta_rascunho, carregar_etiqueta_rascunho,
     salvar_intent_rascunho, carregar_intent_rascunho,
     carregar_historico, carregar_registro, salvar_historico_registro,
-    atualizar_historico_registro, deletar_historico,
+    atualizar_historico_registro, atualizar_etiqueta_historico, deletar_historico,
     buscar_historico_por_aluno, nomes_unicos_historico,
 )
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "bf-treinamento-dev")
+
+
+# ══════════════════════════════════════════════════════════════
+# TOPBAR MOBILE — persistência do aluno selecionado entre páginas
+# ══════════════════════════════════════════════════════════════
+
+@app.before_request
+def _track_aluno_selecionado():
+    if "aluno_id" not in request.args:
+        return
+    aluno_id = request.args.get("aluno_id", type=int)
+    if aluno_id:
+        session["aluno_id"] = aluno_id
+    else:
+        # ?aluno_id= (vazio) limpa a seleção
+        session.pop("aluno_id", None)
+
+
+@app.context_processor
+def _inject_topbar_aluno():
+    alunos = carregar_alunos()
+    sel_id = session.get("aluno_id")
+    aluno = next((a for a in alunos if a["id"] == sel_id), None) if sel_id else None
+    sem_rotina = sum(1 for a in alunos if not a.get("rotina_ativa_id"))
+    # Estado do rascunho do aluno selecionado (drives reactividade da bb mobile)
+    eh_rascunho = False
+    tem_publicada = False
+    intent = ""
+    alteracoes = 0
+    if aluno:
+        eh_rascunho = bool(carregar_rascunho(aluno["id"]))
+        tem_publicada = bool(aluno.get("rotina_ativa_id"))
+        if eh_rascunho:
+            intent = carregar_intent_rascunho(aluno["id"]) or ""
+            if tem_publicada:
+                alteracoes = len(diff_rascunho_vs_publicada(aluno["id"]))
+    em_edicao = bool(edicao_hub and aluno and edicao_hub.get("aluno_id") == aluno["id"])
+    return {
+        "_topbar_alunos": alunos,
+        "_topbar_aluno": aluno,
+        "_topbar_tem_rotina": tem_publicada,
+        "_topbar_eh_rascunho": eh_rascunho,
+        "_topbar_intent": intent,
+        "_topbar_alteracoes": alteracoes,
+        "_topbar_em_edicao": em_edicao,
+        "_nav_alunos_total": len(alunos),
+        "_nav_sem_rotina": sem_rotina,
+    }
+
 
 # ══════════════════════════════════════════════════════════════
 # DADOS
@@ -896,10 +945,43 @@ def hub_etiqueta_rascunho(aluno_id):
     return ("", 204)
 
 
+@app.route("/_mobile_bb_actions")
+def mobile_bb_actions():
+    """Re-fetch do conteudo do slot direito da bb (hub). Re-renderiza o partial
+    com base no estado atual do rascunho via context_processor."""
+    return render_template("_mobile_bb_actions_hub.html")
+
+
+@app.route("/hub/rotina/<int:aluno_id>/etiqueta", methods=["POST"])
+def hub_etiqueta_rotina(aluno_id):
+    """Edit inline da etiqueta da rotina ativa (ou do rascunho, se houver).
+    Autosave on-blur — não re-renderiza nada."""
+    etiqueta = (request.form.get("etiqueta", "") or "").strip()
+    if carregar_rascunho(aluno_id):
+        salvar_etiqueta_rascunho(aluno_id, etiqueta)
+    else:
+        rotina_reg = carregar_rotina_ativa(aluno_id)
+        if rotina_reg:
+            atualizar_etiqueta_historico(rotina_reg["id"], etiqueta)
+    return ("", 204)
+
+
 @app.route("/hub/rotina/<int:aluno_id>/descartar-rascunho", methods=["POST"])
 def hub_descartar_rascunho(aluno_id):
-    """Descarta o rascunho e volta para a última rotina salva."""
+    """Descarta o rascunho e volta para a última rotina salva. Encerra edição se ativa."""
+    global edicao_hub
     limpar_rascunho(aluno_id)
+    if edicao_hub and edicao_hub.get("aluno_id") == aluno_id:
+        edicao_hub = None
+    return hub_rotina_render(aluno_id, "atual")
+
+
+@app.route("/hub/rotina/<int:aluno_id>/concluir-edicao", methods=["POST"])
+def hub_concluir_edicao(aluno_id):
+    """Encerra o modo edição inline (mantém alterações como rascunho) e volta a visualização."""
+    global edicao_hub
+    if edicao_hub and edicao_hub.get("aluno_id") == aluno_id:
+        edicao_hub = None
     return hub_rotina_render(aluno_id, "atual")
 
 
@@ -1183,11 +1265,14 @@ def gerar():
 
         all_configs.append(cfg)
 
-    # Validate
-    vazios = [i+1 for i, c in enumerate(all_configs)
-              if not c.get("padroes") and not c.get("demandas")]
-    if vazios:
-        return f"<p class='aviso'>Selecione categorias no(s) Treino(s) {', '.join(str(x) for x in vazios)}.</p>"
+    # Filtra treinos vazios — n_treinos vira emergente das demandas configuradas.
+    # Mantém mapeamento orig_idx → new_idx pra preservar nomes customizados.
+    kept_indices = [i for i, c in enumerate(all_configs)
+                    if c.get("padroes") or c.get("demandas")]
+    if not kept_indices:
+        return "<p class='aviso'>Selecione categorias em pelo menos um treino antes de gerar.</p>"
+    all_configs = [all_configs[i] for i in kept_indices]
+    n_treinos = len(all_configs)
 
     banco_gerar = list(banco)
 
@@ -1261,12 +1346,13 @@ def gerar():
 
     sessoes_ativas = gerar_multiplos_treinos(banco_gerar, all_configs, variar_entre_treinos=variar)
 
-    # Aplica nome customizado por treino (sobrescreve sessao.tipo se usuário digitou)
-    for t in range(min(n_treinos, len(sessoes_ativas))):
-        nome_custom = (request.form.get(f"nome_{t}", "") or "").strip()
+    # Aplica nome customizado por treino (sobrescreve sessao.tipo se usuário digitou).
+    # Usa orig_idx pra ler nome_{N} do form mesmo após filtrar treinos vazios.
+    for new_idx, orig_idx in enumerate(kept_indices[:len(sessoes_ativas)]):
+        nome_custom = (request.form.get(f"nome_{orig_idx}", "") or "").strip()
         if nome_custom:
-            sessoes_ativas[t].tipo = nome_custom
-            all_configs[t]["nome_custom"] = nome_custom
+            sessoes_ativas[new_idx].tipo = nome_custom
+            all_configs[new_idx]["nome_custom"] = nome_custom
 
     configs_geradas = all_configs
     opcoes_globais = {
@@ -1754,6 +1840,39 @@ def historico_page():
         busca_lower = busca.lower()
         registros = [r for r in registros if busca_lower in (r.get("etiqueta") or "").lower()]
     alunos_historico = nomes_unicos_historico()
+
+    # Enriquecimento (mobile): periodo, ano, flag rotina ativa, mini pills
+    from datetime import datetime
+    MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+    alunos_atuais = carregar_alunos()
+    rotina_ativa_por_aluno = {a["nome"]: a.get("rotina_ativa_id") for a in alunos_atuais}
+    anos_disponiveis = set()
+    for idx, r in enumerate(registros):
+        data_ref = r.get("data_atualizada") or r.get("data_salvo") or r.get("data") or ""
+        ano, mes_num, dia = "", 0, ""
+        if data_ref:
+            try:
+                dt = datetime.strptime(data_ref.split(" ")[0], "%d/%m/%Y")
+                ano = str(dt.year)
+                mes_num = dt.month
+                dia = dt.strftime("%d/%m")
+                anos_disponiveis.add(ano)
+            except (ValueError, IndexError):
+                pass
+        r["_ano"] = ano
+        r["_mes_label"] = MESES[mes_num] if mes_num else "Sem data"
+        r["_grupo"] = f"{ano}-{mes_num:02d}" if ano and mes_num else "sem-data"
+        r["_data_curta"] = dia
+        r["_eh_ativa"] = rotina_ativa_por_aluno.get(r.get("aluno")) == r.get("id")
+        r["_p_label"] = f"P{idx + 1}"
+        # Mini pills dos treinos: lê sessoes e extrai .tipo (max 5)
+        sessoes = r.get("sessoes", []) or []
+        r["_mini_pills"] = [
+            {"n": i + 1, "nome": (s.get("tipo") or f"Treino {i+1}")[:18]}
+            for i, s in enumerate(sessoes[:5])
+        ]
+
     is_htmx = request.headers.get("HX-Request") == "true"
     if is_htmx:
         return render_template("historico.html", historico=registros,
@@ -1767,7 +1886,8 @@ def historico_page():
                            padroes_labels=PADROES_LABELS,
                            alunos_historico=alunos_historico,
                            aluno_filtro=aluno_filtro,
-                           busca=busca)
+                           busca=busca,
+                           anos_disponiveis=sorted(anos_disponiveis, reverse=True))
 
 @app.route("/aluno-historico")
 def aluno_historico():
@@ -2006,6 +2126,32 @@ def alunos_page():
     alunos = carregar_alunos()
     if is_htmx:
         return render_template("alunos.html", alunos=alunos)
+    # Enriquecimento (mobile): n_treinos, data_atualizada, dias_atras p/ status dot
+    from datetime import datetime
+    hoje = datetime.now()
+    for a in alunos:
+        a["_n_treinos"] = 0
+        a["_atualizado_label"] = ""
+        a["_dias_atras"] = None
+        rid = a.get("rotina_ativa_id")
+        if not rid:
+            continue
+        reg = carregar_registro(rid)
+        if not reg:
+            continue
+        a["_n_treinos"] = reg.get("n_treinos", 0) or len(reg.get("sessoes", []))
+        data_ref = reg.get("data_atualizada") or reg.get("data_salvo") or reg.get("data") or ""
+        if data_ref:
+            try:
+                dt = datetime.strptime(data_ref.split(" ")[0], "%d/%m/%Y")
+                dias = (hoje - dt).days
+                a["_dias_atras"] = dias
+                if dias == 0: a["_atualizado_label"] = "hoje"
+                elif dias == 1: a["_atualizado_label"] = "1d"
+                elif dias < 30: a["_atualizado_label"] = f"{dias}d"
+                else: a["_atualizado_label"] = f"{dias // 30}m"
+            except (ValueError, IndexError):
+                pass
     return render_template("alunos_page.html", active_page="alunos", alunos=alunos)
 
 @app.route("/alunos/novo", methods=["POST"])

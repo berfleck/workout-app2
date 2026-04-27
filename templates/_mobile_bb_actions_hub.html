@@ -1,0 +1,73 @@
+{# Conteudo do slot direito da bottom bar quando o aluno esta no HUB.
+   Reage ao estado: sem aluno / aluno+visualizando / aluno+rascunho.
+   Renderizado tanto inline pelo {% block bb_actions %} de hub.html quanto
+   pelo endpoint GET /_mobile_bb_actions (re-fetch via HTMX). #}
+{% if not _topbar_aluno %}
+    <span class="bb-empty-hint">selecione um aluno</span>
+{% elif _topbar_em_edicao %}
+    {# Modo edição: Descartar (vermelho) + Aceitar (verde) #}
+    <button type="button" class="bb-text-action bb-danger-text" data-bb-descartar
+            data-aluno-id="{{ _topbar_aluno.id }}">
+        <svg class="icon"><use href="#i-trash"/></svg> Descartar
+    </button>
+    <button type="button" class="bb-text-action bb-success"
+            hx-post="/hub/rotina/{{ _topbar_aluno.id }}/concluir-edicao"
+            hx-target="#rotina-display" hx-swap="innerHTML">
+        <svg class="icon"><use href="#i-check"/></svg> Aceitar
+    </button>
+{% elif _topbar_eh_rascunho %}
+    {% set caso_a = _topbar_tem_rotina and _topbar_alteracoes > 0 and _topbar_intent != 'nova-rotina' %}
+    <button type="button" class="bb-icon-action bb-danger-ghost" data-bb-descartar
+            data-aluno-id="{{ _topbar_aluno.id }}"
+            aria-label="Descartar rascunho">
+        <svg class="icon"><use href="#i-trash"/></svg>
+    </button>
+    {% if caso_a %}
+    <button type="button" class="bb-text-action bb-success"
+            hx-post="/hub/rotina/{{ _topbar_aluno.id }}/salvar-rotina"
+            hx-target="#rotina-display" hx-swap="innerHTML"
+            hx-vals='{"modo":"atualizar"}'>
+        <svg class="icon"><use href="#i-save"/></svg> Atualizar
+    </button>
+    {% endif %}
+    <button type="button" class="bb-text-action bb-success-light"
+            hx-post="/hub/rotina/{{ _topbar_aluno.id }}/salvar-rotina"
+            hx-target="#rotina-display" hx-swap="innerHTML"
+            hx-vals='{"modo":"nova"}'>
+        <svg class="icon"><use href="#i-save"/></svg> Nova rotina
+    </button>
+{% else %}
+    {# Visualizando: + Rotina + Treino splits (etapa 5) #}
+    <div class="split-btn primary">
+        <a class="split-btn-main" href="/gerador?aluno_id={{ _topbar_aluno.id }}&acao=nova_rotina">
+            <svg class="icon"><use href="#i-plus"/></svg> Rotina
+        </a>
+        <button type="button" class="split-btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Outras opções de nova rotina">
+            <svg class="icon split-btn-caret-icon"><use href="#i-chevron-down"/></svg>
+        </button>
+        <div class="split-btn-menu" role="menu">
+            <button type="button" role="menuitem"
+                    hx-post="/hub/rotina/{{ _topbar_aluno.id }}/nova-rotina-manual"
+                    hx-target="#rotina-display" hx-swap="innerHTML">
+                <svg class="icon"><use href="#i-pencil"/></svg> Manual
+            </button>
+        </div>
+    </div>
+    {% if _topbar_tem_rotina %}
+    <div class="split-btn primary">
+        <a class="split-btn-main" href="/gerador?aluno_id={{ _topbar_aluno.id }}&acao=adicionar">
+            <svg class="icon"><use href="#i-plus"/></svg> Treino
+        </a>
+        <button type="button" class="split-btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Outras opções de adicionar treino">
+            <svg class="icon split-btn-caret-icon"><use href="#i-chevron-down"/></svg>
+        </button>
+        <div class="split-btn-menu" role="menu">
+            <button type="button" role="menuitem"
+                    hx-post="/hub/rotina/{{ _topbar_aluno.id }}/criar-manual"
+                    hx-target="#rotina-display" hx-swap="innerHTML">
+                <svg class="icon"><use href="#i-pencil"/></svg> Manual
+            </button>
+        </div>
+    </div>
+    {% endif %}
+{% endif %}

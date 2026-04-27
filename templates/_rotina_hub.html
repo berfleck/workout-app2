@@ -1,37 +1,38 @@
 {% if aluno %}
 {% set partes = aluno.nome.split() %}
 {% set iniciais = (partes[0][0] ~ (partes[-1][0] if partes|length > 1 else '')) | upper %}
-<div class="aluno-badge bg-white border border-gray-200 rounded-xl px-4 py-3.5 mb-4">
+<div class="aluno-badge bg-white border border-gray-200 rounded-xl px-4 py-3.5 mb-4 max-md:px-3 max-md:py-2.5">
     <div class="aluno-badge-row">
-        <div class="w-11 h-11 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white grid place-items-center font-bold text-sm shrink-0">{{ iniciais }}</div>
+        <div class="w-11 h-11 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white grid place-items-center font-bold text-sm shrink-0 max-md:w-[38px] max-md:h-[38px] max-md:text-[13px]">{{ iniciais }}</div>
         <div class="flex-1 min-w-0">
-            <div class="flex items-baseline flex-wrap gap-x-2">
-                <span class="text-base font-semibold text-gray-900">{{ aluno.nome }}</span>
-                <span class="text-xs text-gray-500">
-                    {% if aluno.get('nivel') %}{{ aluno.nivel|capitalize }}{% endif %}
-                    {% if aluno.get('objetivo') %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ aluno.objetivo|capitalize }}{% endif %}
-                    {% if rotina and rotina.sessoes %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ rotina.sessoes|length }} treino{{ 's' if rotina.sessoes|length > 1 else '' }}{% endif %}
-                    {% if rotina %}
-                    {% set ref_data = rotina.data_atualizada or rotina.data %}
-                    {% set ref_label = 'atualizada' if rotina.data_atualizada else 'criada' %}
-                    {% if ref_data %}{% set rel = tempo_relativo(ref_data) %}{% if rel %}<span class="inline-block w-[3px] h-[3px] rounded-full bg-gray-300 align-middle mx-1.5"></span>{{ ref_label }} {{ rel }}{% endif %}{% endif %}
-                    {% endif %}
-                </span>
-            </div>
-            {% if rotina and rotina.etiqueta %}
-            <div class="mt-1"><span class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">{{ rotina.etiqueta }}</span></div>
+            <div class="text-base font-semibold text-gray-900 max-md:text-[14.5px] truncate">{{ aluno.nome }}</div>
+            {# Etiqueta editável inline (autosave on-blur). Quando ha rascunho,
+               o input grava em rascunho_etiqueta; senao, atualiza historico. #}
+            {% if rotina %}
+            {% if eh_rascunho %}{% set etiqueta_atual = etiqueta_rascunho or rotina.etiqueta or '' %}{% else %}{% set etiqueta_atual = rotina.etiqueta or '' %}{% endif %}
+            <input type="text"
+                   name="etiqueta"
+                   value="{{ etiqueta_atual }}"
+                   placeholder="+ adicionar etiqueta da rotina"
+                   class="etiqueta-inline-input mt-0.5"
+                   maxlength="60"
+                   hx-post="/hub/rotina/{{ aluno_id }}/etiqueta"
+                   hx-trigger="blur changed delay:200ms, keydown[key=='Enter'] consume"
+                   hx-swap="none"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                   aria-label="Etiqueta da rotina">
             {% endif %}
         </div>
         {% if rotina %}
-        <div class="view-mode-switch aluno-toggle">
-            <button type="button" class="{% if periodo == 'atual' %}active{% endif %}" onclick="hubTogglePeriodo('atual')" title="Atual">
-                <svg class="icon icon-xs"><use href="#i-eye"/></svg> Atual
+        <div class="view-mode-switch aluno-toggle aluno-toggle-mobile">
+            <button type="button" class="{% if periodo == 'atual' %}active{% endif %}" onclick="hubTogglePeriodo('atual')" title="Atual" aria-label="Atual">
+                <svg class="icon icon-xs"><use href="#i-eye"/></svg><span class="max-md:hidden"> Atual</span>
             </button>
-            <button type="button" class="{% if periodo == 'anterior' %}active{% endif %}" onclick="hubTogglePeriodo('anterior')" title="Anterior">
-                <svg class="icon icon-xs"><use href="#i-clock"/></svg> Anterior
+            <button type="button" class="{% if periodo == 'anterior' %}active{% endif %}" onclick="hubTogglePeriodo('anterior')" title="Anterior" aria-label="Anterior">
+                <svg class="icon icon-xs"><use href="#i-clock"/></svg><span class="max-md:hidden"> Anterior</span>
             </button>
-            <button type="button" class="{% if periodo == 'comparar' %}active{% endif %}" onclick="hubTogglePeriodo('comparar')" title="Lado a lado">
-                <svg class="icon icon-xs"><use href="#i-columns"/></svg> Lado a lado
+            <button type="button" class="{% if periodo == 'comparar' %}active{% endif %}" onclick="hubTogglePeriodo('comparar')" title="Lado a lado" aria-label="Lado a lado">
+                <svg class="icon icon-xs"><use href="#i-columns"/></svg><span class="max-md:hidden"> Lado a lado</span>
             </button>
         </div>
         {% endif %}
@@ -41,7 +42,8 @@
 
 {% if aluno_id %}
 {% set confirm_manual = 'Você tem alterações não salvas. Descartar e começar uma nova rotina manual?' if eh_rascunho else '' %}
-<div class="flex flex-wrap gap-2 mb-4">
+{# Botões grandes só no desktop; no mobile vão pra bottom bar (etapa 5) #}
+<div class="flex flex-wrap gap-2 mb-4 max-md:hidden">
     {% if rotina %}
     <!-- + Treino: adicionar treino (com gerador / manual) -->
     <div class="split-btn primary">

@@ -1,13 +1,58 @@
 {% extends "base.html" %}
+{% import "_mobile_section.html" as msec %}
+
+{% block bb_actions %}{% include "_mobile_bb_actions_gerador.html" %}{% endblock %}
+
 {% block content %}
 
 {% set MAX_TREINOS = 5 %}
+
+{# ═══════════════════════════════════════════════════════════════════
+   Topbar mobile do gerador (substitui o topbar-mobile global no mobile).
+   Eyebrow varia por contexto: nova_rotina / adicionar / substituir.
+═══════════════════════════════════════════════════════════════════ #}
+{% set _eyebrow_by_acao = {
+    'nova_rotina': 'Gerador · Nova rotina',
+    'adicionar': 'Gerador · + Treino',
+    'substituir': 'Gerador · Substituir',
+} %}
+{% set _gerador_eyebrow = _eyebrow_by_acao.get(ctx_acao, 'Gerador') %}
+{# Em modo restrito (substituir/adicionar) o titulo principal vira "Treino N"
+   ou "Novo treino" pra deixar o contexto cristalino (substitui o nome do aluno). #}
+{% if ctx_acao == 'substituir' %}
+    {% set _gerador_titulo_mobile = 'Treino ' ~ ((ctx_treino_idx or 0) + 1) %}
+{% elif ctx_acao == 'adicionar' %}
+    {% set _gerador_titulo_mobile = 'Novo treino' %}
+{% else %}
+    {% set _gerador_titulo_mobile = ctx_aluno.nome if ctx_aluno else 'Selecione um aluno' %}
+{% endif %}
+<div class="gerador-mobile-topbar md:hidden">
+    <a href="/{% if ctx_aluno %}?aluno_id={{ ctx_aluno.id }}{% endif %}" class="topbar-back" aria-label="Voltar">
+        <svg class="icon"><use href="#i-arrow-left"/></svg>
+    </a>
+    <div class="topbar-title-area">
+        <div class="topbar-eyebrow">{{ _gerador_eyebrow }}{% if ctx_aluno and ctx_acao in ('substituir', 'adicionar') %} · {{ ctx_aluno.nome }}{% endif %}</div>
+        <div class="topbar-title" id="m-topbar-title">{{ _gerador_titulo_mobile }}</div>
+    </div>
+</div>
+
+{# Banner amber compacto mobile (substituir/adicionar) — esclarece o contexto restrito #}
+{% if ctx_acao in ('substituir', 'adicionar') %}
+<div class="gerador-ctx-banner md:hidden">
+    <svg class="icon"><use href="#{{ 'i-replace' if ctx_acao == 'substituir' else 'i-plus' }}"/></svg>
+    <span>
+        {% if ctx_acao == 'substituir' %}Substituindo Treino {{ (ctx_treino_idx or 0) + 1 }} · outros preservados
+        {% else %}Adicionando 1 treino à rotina atual{% endif %}
+    </span>
+</div>
+{% endif %}
 
 {% if ctx_acao %}
 {% set ctx_icone = {'substituir': 'i-replace', 'adicionar': 'i-plus'}.get(ctx_acao, 'i-dumbbell') %}
 {% set ctx_titulo = {'substituir': 'Substituindo Treino ' ~ ((ctx_treino_idx or 0) + 1), 'adicionar': 'Adicionando treino à rotina'}.get(ctx_acao, 'Gerando nova rotina') %}
 {% set ctx_subs = {'substituir': 'Os outros treinos da rotina serão preservados', 'adicionar': 'Será adicionado ao final da rotina atual'}.get(ctx_acao, 'A rotina atual será substituída') %}
-<div class="context-banner">
+{# Banner duplica info da topbar mobile — esconder em <md, manter no desktop #}
+<div class="context-banner hidden md:flex">
     <div class="context-info">
         <div class="context-icon"><svg class="icon"><use href="#{{ ctx_icone }}"/></svg></div>
         <div class="context-text">
@@ -32,7 +77,8 @@
 {% endif %}
 
 <!-- ═══ Layout 2 colunas (lg) / stack (mobile) ═══ -->
-<div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 lg:gap-6 pb-24 lg:pb-6">
+<!-- Desktop (≥md): grid 2 colunas ─ Mobile (<md): bloco abaixo (`#gerador-mobile`) substitui esta UI -->
+<div class="hidden md:grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 lg:gap-6 pb-24 lg:pb-6">
 
     <!-- ── SIDEBAR ESQUERDA: aluno + histórico + config + ação ── -->
     <aside class="space-y-4 order-1">
@@ -261,6 +307,101 @@
 
 
 </div>
+
+{# ═══════════════════════════════════════════════════════════════════
+   GERADOR MOBILE (<md) — etapa 9 redesign 02
+   Shell + seções colapsáveis Aluno e Configurações + placeholders T1-T5.
+   Inputs aqui são CONTROLLERS sem `name`: JS espelha pros inputs do
+   bloco desktop acima (que mantém os `name` que o backend espera).
+   Etiqueta da rotina é exclusiva do mobile (campo novo, name="etiqueta_rotina").
+═══════════════════════════════════════════════════════════════════ #}
+<div id="gerador-mobile" class="gerador-mobile md:hidden">
+
+    {# ── Nome da rotina (campo solto, acima do card de Configurações) ── #}
+    <input type="text" class="m-rotina-nome" id="m-etiqueta-rotina"
+           name="etiqueta_rotina"
+           placeholder="Nome da rotina (ex: 3x full body)"
+           autocomplete="off"
+           maxlength="60">
+
+    {# ── Seção Configurações ── inicia FECHADA (uso esporádico) ── #}
+    {{ msec.open(
+        id='msec-config',
+        icon='i-settings',
+        title='Configurações',
+        sub='cx 5',
+        open=False,
+        has_content=True
+    ) }}
+        <label class="field-label" for="m-max-cx">Complexidade máxima</label>
+        <div class="field-range">
+            <input type="range" id="m-max-cx" min="1" max="5" step="1" value="5"
+                   data-mirror="input[name=max_complexidade]"
+                   oninput="document.getElementById('m-max-cx-val').textContent = this.value">
+            <span class="field-range-value" id="m-max-cx-val">5</span>
+        </div>
+
+        <div id="m-evitar-hist-wrap" class="hidden" style="margin-top: 12px;">
+            <label class="field-label" for="m-sel-evitar-ultimos">Evitar exerc. dos últimos</label>
+            <select class="field-select" id="m-sel-evitar-ultimos"
+                    data-mirror="#sel-evitar-ultimos">
+                <option value="0">Desativado</option>
+                <option value="1" selected>1 período</option>
+                <option value="2">2 períodos</option>
+                <option value="3">3 períodos</option>
+            </select>
+        </div>
+
+        <div class="field-toggles">
+            <label class="field-toggle">
+                <input type="checkbox" id="m-variar-entre" data-mirror="input[name=variar_entre]">
+                Evitar similaridade entre treinos
+            </label>
+            <label class="field-toggle">
+                <input type="checkbox" id="m-evitar-agonistas" checked data-mirror="input[name=evitar_agonistas]">
+                Evitar agonistas no mesmo bloco
+            </label>
+        </div>
+    {{ msec.close() }}
+
+    {# ── Seções de treino ── #}
+    {# Em modo restrito (substituir/adicionar) renderiza só 1 treino — evita confusão e
+       exclui T2-T5 vazios que seriam descartados pelo backend de qualquer forma. #}
+    {% set _mob_treinos_visiveis = 1 if ctx_acao in ('substituir', 'adicionar') else MAX_TREINOS %}
+    {% for t in range(_mob_treinos_visiveis) %}
+    {{ msec.open(
+        id='msec-treino-' ~ t,
+        icon_text='T' ~ (t + 1),
+        title='Treino ' ~ (t + 1),
+        sub='Sem configuração',
+        counter='0',
+        is_treino=True,
+        open=(t == 0)
+    ) }}
+        {# Lista de demandas configuradas (renderizada via JS quando há demandas) #}
+        <div class="mob-demandas-list" id="mob-demandas-list-{{ t }}">
+            <div class="mob-demandas-empty">
+                <span class="mob-demandas-empty-strong">Nenhuma demanda configurada</span>
+                Toque em "Adicionar demandas" abaixo
+            </div>
+        </div>
+
+        {# CTAs compactos: adicionar + copiar de outro treino (este só aparece se houver fonte) #}
+        <div class="mob-treino-ctas">
+            <button type="button" class="mob-cta-btn mob-cta-add" onclick="openDemandsDrawer({{ t }})">
+                <svg class="icon"><use href="#i-plus"/></svg>
+                <span>Adicionar categorias</span>
+            </button>
+            <button type="button" class="mob-cta-btn mob-cta-copy" id="mob-copy-btn-{{ t }}"
+                    style="display:none" onclick="openCopyFromSheet({{ t }})" title="Copiar configuração de outro treino">
+                <svg class="icon"><use href="#i-copy"/></svg>
+                <span>Copiar de…</span>
+            </button>
+        </div>
+    {{ msec.close() }}
+    {% endfor %}
+
+</div>
 </form>
 </div>
 
@@ -292,9 +433,10 @@
     </div>
 </div>
 
-<!-- MOBILE: barra fixa (context-aware) -->
-<div id="mobile-bar" class="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 p-3 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
-    <div id="mobile-bar-inner" class="flex gap-2">
+<!-- MOBILE: barra fixa antiga — substituída pela bb global do redesign 02 (ver base.html / _mobile_bb_actions_gerador.html).
+     Mantida apenas em md (≥md e <lg) para o caso de panel-resultado precisar do toggle Configurar/Ver. -->
+<div id="mobile-bar" class="hidden md:max-lg:flex fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 p-3 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
+    <div id="mobile-bar-inner" class="flex gap-2 w-full">
         <button type="submit" form="form-config" id="mobile-btn-gerar"
                 class="flex-1 px-4 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer"
                 {% if sessoes %}style="display:none"{% endif %}>
@@ -310,6 +452,28 @@
                 style="display:none">
             Ver treinos →
         </button>
+    </div>
+</div>
+
+{# Drawer mobile de demandas (etapa 10) — uma única instância, reusada por todos os treinos #}
+{% include "_mobile_demands_drawer.html" %}
+
+{# Bottom sheet "Copiar configuração de…" (mobile) — lista treinos-fonte com categorias #}
+<div id="mob-copy-overlay" class="sheet-overlay md:hidden" onclick="closeCopyFromSheet(event)" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Copiar configuração" data-dest="0" onclick="event.stopPropagation()">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Copiar configuração</div>
+                <div class="sheet-title" id="mob-copy-title">Para Treino 1</div>
+            </div>
+            <button type="button" class="sheet-close" onclick="closeCopyFromSheet()" aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <div class="sheet-list" id="mob-copy-list">
+            {# preenchido por JS #}
+        </div>
     </div>
 </div>
 
@@ -1081,8 +1245,622 @@ function showPanel(panel) {
     }
 }
 
+// ════════════════════════════════════════════════════════════════
+// MOBILE GERADOR (etapa 9 redesign 02)
+// ════════════════════════════════════════════════════════════════
+
+// Toggle expand/collapse de uma .section ao clicar no .section-head.
+// Ignora cliques em inputs/links/buttons internos.
+function toggleSection(headEl) {
+    const sec = headEl.closest('.section');
+    if (!sec) return;
+    sec.classList.toggle('open');
+    // Após abrir/fechar, ressincroniza o sub das seções fechadas
+    updateMobileSubs();
+}
+
+// Espelha o valor de um input mobile (data-mirror=...) para o input desktop
+// equivalente, dispara o evento 'change' nele e atualiza os subs.
+function mirrorToDesktop(mobileEl) {
+    const sel = mobileEl.dataset.mirror;
+    if (!sel) return;
+    const target = document.querySelector(sel);
+    if (!target) return;
+    if (mobileEl.type === 'checkbox') {
+        target.checked = mobileEl.checked;
+    } else {
+        target.value = mobileEl.value;
+    }
+    target.dispatchEvent(new Event('change', { bubbles: true }));
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    updateMobileSubs();
+}
+
+// Sentido inverso: quando o desktop muda (ex: carregar do histórico), refletir no mobile.
+function mirrorFromDesktop() {
+    document.querySelectorAll('#gerador-mobile [data-mirror]').forEach(mEl => {
+        const target = document.querySelector(mEl.dataset.mirror);
+        if (!target) return;
+        if (mEl.type === 'checkbox') {
+            mEl.checked = target.checked;
+        } else if (mEl.value !== target.value) {
+            mEl.value = target.value;
+        }
+    });
+    const cxVal = document.getElementById('m-max-cx-val');
+    const cxInp = document.getElementById('m-max-cx');
+    if (cxVal && cxInp) cxVal.textContent = cxInp.value;
+    updateMobileSubs();
+}
+
+// Atualiza o subtítulo da seção Configurações com o resumo dos campos atuais.
+function updateMobileSubs() {
+    const cfgSec = document.getElementById('msec-config');
+    if (!cfgSec) return;
+    const sub = cfgSec.querySelector('[data-section-sub]');
+    if (!sub) return;
+    const cx = document.getElementById('m-max-cx')?.value || '5';
+    const evitar = document.getElementById('m-sel-evitar-ultimos');
+    const evitarWrap = document.getElementById('m-evitar-hist-wrap');
+    const partes = [`cx ${cx}`];
+    if (evitar && evitarWrap && !evitarWrap.classList.contains('hidden') && evitar.value !== '0') {
+        const lbl = evitar.options[evitar.selectedIndex]?.text || '';
+        partes.push('evitar ' + lbl.toLowerCase());
+    }
+    const variar = document.getElementById('m-variar-entre');
+    if (variar?.checked) partes.push('s/ similaridade');
+    sub.textContent = partes.join(' · ');
+}
+
+// Bind dos inputs mobile → desktop
+function bindMobileMirrors() {
+    document.querySelectorAll('#gerador-mobile [data-mirror]').forEach(el => {
+        const evt = (el.type === 'range') ? 'input' : 'change';
+        el.addEventListener(evt, () => mirrorToDesktop(el));
+    });
+}
+
+// Auto-carrega histórico do aluno do contexto (mobile não tem mais select de aluno).
+function autoCarregarHistAlunoContexto() {
+    const nome = document.getElementById('m-topbar-title')?.textContent?.trim();
+    if (!nome || nome === 'Selecione um aluno') return;
+    if (typeof onAlunoChange === 'function') onAlunoChange(nome);
+}
+
+// Observa o evitar-hist-wrap do desktop e espelha visibilidade no mobile.
+function watchEvitarHistWrap() {
+    const desktopWrap = document.getElementById('evitar-hist-wrap');
+    const mobileWrap = document.getElementById('m-evitar-hist-wrap');
+    if (!desktopWrap || !mobileWrap) return;
+    const sync = () => {
+        mobileWrap.classList.toggle('hidden', desktopWrap.classList.contains('hidden'));
+        updateMobileSubs();
+    };
+    new MutationObserver(sync).observe(desktopWrap, { attributes: true, attributeFilter: ['class'] });
+    sync();
+}
+
+// ════════════════════════════════════════════════════════════════
+// MOBILE GERADOR · DEMANDAS T1-T5 + DRAWER (etapa 10 redesign 02)
+// ════════════════════════════════════════════════════════════════
+
+// Hook em updateTotal para também atualizar a lista mobile e a seção mobile do treino
+const __origUpdateTotal = window.updateTotal;
+window.updateTotal = function(t) {
+    __origUpdateTotal(t);
+    renderMobileDemandasList(t);
+    updateMobileTreinoSection(t);
+    updateAllCopyButtonsVisibility();
+};
+
+// Mostra/esconde o botão "Copiar de…" de cada treino com base no estado dos demais.
+// Visível apenas se houver pelo menos UM outro treino com categorias configuradas.
+function updateAllCopyButtonsVisibility() {
+    const filledTreinos = [];
+    for (let s = 0; s < MAX_TREINOS; s++) {
+        if (getTreinoTotal(s) > 0) filledTreinos.push(s);
+    }
+    for (let t = 0; t < MAX_TREINOS; t++) {
+        const btn = document.getElementById('mob-copy-btn-' + t);
+        if (!btn) continue;
+        const hasOtherSource = filledTreinos.some(s => s !== t);
+        btn.style.display = hasOtherSource ? '' : 'none';
+    }
+}
+
+// Calcula total de exercícios do treino t (lê inputs hidden do desktop)
+function getTreinoTotal(t) {
+    const tab = document.getElementById('tab-' + t);
+    if (!tab) return 0;
+    const modo = (tab.querySelector('#input-modo-' + t) || {}).value;
+    let total = 0;
+    if (modo === 'template') {
+        tab.querySelectorAll(`input[name^="epp_${t}_"]`).forEach(inp => total += parseInt(inp.value) || 0);
+    } else {
+        tab.querySelectorAll(`input[name^="dem_qtd_${t}_"]`).forEach(inp => total += parseInt(inp.value) || 0);
+    }
+    return total;
+}
+
+// Atualiza counter + sub da seção mobile do treino t (sem mexer no body)
+function updateMobileTreinoSection(t) {
+    const sec = document.getElementById('msec-treino-' + t);
+    if (!sec) return;
+    const total = getTreinoTotal(t);
+    const counter = sec.querySelector('[data-section-counter]');
+    if (counter) {
+        counter.textContent = total;
+        counter.dataset.empty = total === 0 ? '1' : '0';
+    }
+    sec.classList.toggle('has-content', total > 0);
+
+    const sub = sec.querySelector('[data-section-sub]');
+    if (sub) {
+        const tab = document.getElementById('tab-' + t);
+        const modo = (tab && tab.querySelector('#input-modo-' + t) || {}).value || 'hierarquia';
+        if (total === 0) {
+            sub.textContent = 'Sem configuração';
+        } else {
+            const partes = [];
+            if (modo === 'template') {
+                const tmpl = (tab.querySelector('#input-template-' + t) || {}).value;
+                if (tmpl) partes.push(tmpl);
+                else partes.push('Template');
+            } else {
+                const nDems = tab.querySelectorAll(`input[name^="dem_nivel_${t}_"]`).length;
+                partes.push('Hierarquia · ' + nDems + (nDems === 1 ? ' grupo' : ' grupos'));
+            }
+            sub.textContent = partes.join(' · ');
+        }
+    }
+}
+
+// Re-renderiza a lista mobile de demandas do treino t lendo o estado do desktop
+function renderMobileDemandasList(t) {
+    const list = document.getElementById('mob-demandas-list-' + t);
+    if (!list) return;
+    const tab = document.getElementById('tab-' + t);
+    if (!tab) return;
+
+    const modo = (tab.querySelector('#input-modo-' + t) || {}).value || 'hierarquia';
+    const total = getTreinoTotal(t);
+
+    if (total === 0) {
+        list.innerHTML = `<div class="mob-demandas-empty">
+            <span class="mob-demandas-empty-strong">Nenhuma demanda configurada</span>
+            Toque em "Adicionar demandas" abaixo
+        </div>`;
+        return;
+    }
+
+    let rows = '';
+    if (modo === 'template') {
+        const tmpl = (tab.querySelector('#input-template-' + t) || {}).value || '—';
+        const epps = tab.querySelectorAll(`input[name^="epp_${t}_"]`);
+        epps.forEach(inp => {
+            const pad = inp.name.substring(('epp_' + t + '_').length);
+            const val = parseInt(inp.value) || 0;
+            if (val === 0) return;
+            rows += `<div class="mob-demanda-item">
+                ${chipForPadrao(pad)}
+                <div class="mob-demanda-counter">
+                    <button type="button" onclick="bumpMobileEpp(${t}, '${pad}', -1)"><svg class="icon"><use href="#i-minus"/></svg></button>
+                    <span>${val}</span>
+                    <button type="button" onclick="bumpMobileEpp(${t}, '${pad}', 1)"><svg class="icon"><use href="#i-plus"/></svg></button>
+                </div>
+            </div>`;
+        });
+        list.innerHTML = `<div class="mob-demandas-head">
+            <span class="mob-demandas-title">Template · ${tmpl}</span>
+            <span class="mob-demandas-total">${total} ex</span>
+        </div>${rows}`;
+        return;
+    }
+
+    // Modo hierarquia: lê dem_nivel_/dem_escopo_/dem_qtd_
+    const nivels = tab.querySelectorAll(`input[name^="dem_nivel_${t}_"]`);
+    nivels.forEach(nInp => {
+        const idx = nInp.name.substring(('dem_nivel_' + t + '_').length);
+        const eInp = tab.querySelector(`input[name="dem_escopo_${t}_${idx}"]`);
+        const qInp = tab.querySelector(`input[name="dem_qtd_${t}_${idx}"]`);
+        if (!eInp || !qInp) return;
+        const nivel = nInp.value, escopo = eInp.value;
+        const qtd = parseInt(qInp.value) || 0;
+        if (qtd === 0) return;
+
+        // Caso especial: squat → renderiza 1 chip por lateralidade ativa (cada um com counter próprio)
+        if (escopo === 'squat' && nivel === 'padrao') {
+            const biChk = tab.querySelector('.lat-chk[data-padrao="squat"][data-lat="bilateral"]');
+            const uniChk = tab.querySelector('.lat-chk[data-padrao="squat"][data-lat="unilateral"]');
+            if (biChk?.checked || uniChk?.checked) {
+                if (biChk?.checked) {
+                    const biVal = parseInt(tab.querySelector(`input[name="squat_bi_${t}"]`)?.value || '0');
+                    rows += renderSquatLatRow(t, 'bilateral', biVal);
+                }
+                if (uniChk?.checked) {
+                    const uniVal = parseInt(tab.querySelector(`input[name="squat_uni_${t}"]`)?.value || '0');
+                    rows += renderSquatLatRow(t, 'unilateral', uniVal);
+                }
+                return; // já renderizou squat — pula chip agregado
+            }
+            // se não tem lateralidade marcada, cai no fluxo normal abaixo (chip único agachamento)
+        }
+
+        rows += `<div class="mob-demanda-item">
+            ${chipDemandaLabel(nivel, escopo)}
+            <div class="mob-demanda-counter">
+                <button type="button" onclick="bumpMobileDem(${t}, '${idx}', -1)"><svg class="icon"><use href="#i-minus"/></svg></button>
+                <span>${qtd}</span>
+                <button type="button" onclick="bumpMobileDem(${t}, '${idx}', 1)"><svg class="icon"><use href="#i-plus"/></svg></button>
+            </div>
+            <button type="button" class="mob-demanda-remove" onclick="removerDemandaMobile(${t}, '${nivel}', '${escopo}')" title="Remover"><svg class="icon"><use href="#i-x"/></svg></button>
+        </div>`;
+    });
+
+    list.innerHTML = `<div class="mob-demandas-head">
+        <span class="mob-demandas-title">Demandas configuradas</span>
+        <span class="mob-demandas-total">${total} ex</span>
+    </div>${rows}`;
+}
+
+// Mapping subregião → slug do .reg-chip-* (consistente com base.html)
+const SUBREGIAO_SLUG = {
+    peito: 'peito', costas: 'costas', ombro: 'ombro', bracos: 'bracos',
+    perna_anterior: 'perna-ant', perna_posterior: 'perna-post',
+    adutores: 'adutores', panturrilha: 'panturrilha',
+    core: 'core', cardio: 'cardio'
+};
+
+// Labels curtos pra regiões (cabem melhor em chip)
+const REGIAO_LABEL_CURTO = {
+    upper: 'Membros Sup.',
+    lower: 'Membros Inf.',
+    core: 'Core',
+    cardio: 'Cardio'
+};
+
+function labelForDemanda(nivel, escopo) {
+    if (nivel === 'padrao') return PADROES_LABELS[escopo] || escopo;
+    if (nivel === 'subregiao') return SUBREGIOES_LABELS_JS[escopo] || escopo;
+    if (nivel === 'regiao') return REGIAO_LABEL_CURTO[escopo] || REGIOES_LABELS_JS[escopo] || escopo;
+    return escopo;
+}
+
+// Retorna o slug do chip pra colorir a demanda inteira com a cor do grupo correspondente.
+function slugForDemanda(nivel, escopo) {
+    if (nivel === 'padrao') {
+        const c = PADRAO_PARA_CHIP_JS[escopo];
+        return c ? c[1] : null;
+    }
+    if (nivel === 'subregiao') return SUBREGIAO_SLUG[escopo] || null;
+    if (nivel === 'regiao') return escopo; // upper/lower/core/cardio — todos têm reg-chip-{escopo}
+    return null;
+}
+
+// Renderiza UM chip colorido com a label da demanda inteira dentro
+function chipDemandaLabel(nivel, escopo) {
+    const label = labelForDemanda(nivel, escopo);
+    const slug = slugForDemanda(nivel, escopo);
+    if (slug) return `<span class="reg-chip reg-chip-${slug} mob-demanda-chip">${label}</span>`;
+    return `<span class="reg-chip mob-demanda-chip" style="background:var(--gray-100);color:var(--gray-700)">${label}</span>`;
+}
+
+function chipForPadrao(pad) {
+    const c = PADRAO_PARA_CHIP_JS[pad];
+    const label = PADROES_LABELS[pad] || pad;
+    if (c) return `<span class="reg-chip reg-chip-${c[1]} mob-demanda-chip">${label}</span>`;
+    return `<span class="reg-chip mob-demanda-chip" style="background:var(--gray-100);color:var(--gray-700)">${label}</span>`;
+}
+
+// Wrappers que delegam para os bumpers do desktop
+function bumpMobileDem(t, idx, delta) {
+    bumpQtd(t, `dem_qtd_${t}_${idx}`, delta);
+}
+function bumpMobileEpp(t, pad, delta) {
+    bumpQtd(t, `epp_${t}_${pad}`, delta);
+}
+function removerDemandaMobile(t, nivel, escopo) {
+    removerDemanda(t, nivel, escopo);
+}
+
+// Squat com lateralidade: 1 chip por lat ativa (bilateral / unilateral),
+// counter próprio que mexe em squat_bi_{t} ou squat_uni_{t} (bumpQtd já recalcula
+// dem_qtd total do squat). Remover usa removerLat do desktop.
+function renderSquatLatRow(t, lat, val) {
+    const isBi = lat === 'bilateral';
+    const inputName = isBi ? `squat_bi_${t}` : `squat_uni_${t}`;
+    const label = isBi ? 'Agach. Bilat.' : 'Agach. Uni.';
+    const chip = `<span class="reg-chip reg-chip-perna-ant mob-demanda-chip">${label}</span>`;
+    return `<div class="mob-demanda-item">
+        ${chip}
+        <div class="mob-demanda-counter">
+            <button type="button" onclick="bumpQtd(${t}, '${inputName}', -1)"><svg class="icon"><use href="#i-minus"/></svg></button>
+            <span>${val}</span>
+            <button type="button" onclick="bumpQtd(${t}, '${inputName}', 1)"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </div>
+        <button type="button" class="mob-demanda-remove" onclick="removerLat(${t}, '${lat}')" title="Remover"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>`;
+}
+
+// ── Drawer ───────────────────────────────────────────────────────
+function openDemandsDrawer(t) {
+    const overlay = document.getElementById('mob-demands-overlay');
+    const drawer = document.getElementById('mob-demands-drawer');
+    if (!overlay || !drawer) return;
+    drawer.dataset.t = t;
+    document.getElementById('mob-drawer-eyebrow').textContent = `Treino ${t + 1} · demandas`;
+
+    // Sync state from desktop tab `t` para o drawer
+    syncDesktopToDrawer(t);
+
+    // Início no modo hierarquia (mesmo que o desktop esteja em template)
+    setDrawerMode('hierarquia');
+
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sheet-open');
+}
+
+function closeDemandsDrawer(e) {
+    if (e && e.target && e.target.id !== 'mob-demands-overlay') return;
+    const overlay = document.getElementById('mob-demands-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('sheet-open');
+}
+
+function setDrawerMode(mode) {
+    const drawer = document.getElementById('mob-demands-drawer');
+    if (!drawer) return;
+    document.getElementById('mob-drawer-title').textContent = mode === 'template' ? 'Template' : 'Hierarquia';
+    drawer.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    document.getElementById('mob-drawer-hierarquia').style.display = mode === 'hierarquia' ? '' : 'none';
+    document.getElementById('mob-drawer-template').style.display = mode === 'template' ? '' : 'none';
+}
+
+// Copia checkboxes desktop → drawer (estado do treino t)
+function syncDesktopToDrawer(t) {
+    const tab = document.getElementById('tab-' + t);
+    const drawer = document.getElementById('mob-demands-drawer');
+    if (!tab || !drawer) return;
+
+    // Reset all drawer checkboxes
+    drawer.querySelectorAll('.mob-reg-chk, .mob-sub-chk, .mob-pad-chk, .mob-lat-chk').forEach(c => c.checked = false);
+
+    // Copia estado dos checkboxes desktop equivalentes (mesmos data-attrs)
+    tab.querySelectorAll('.reg-chk:checked').forEach(src => {
+        const dst = drawer.querySelector(`.mob-reg-chk[data-regiao="${src.dataset.regiao}"]`);
+        if (dst) dst.checked = true;
+    });
+    tab.querySelectorAll('.sub-chk:checked').forEach(src => {
+        const dst = drawer.querySelector(`.mob-sub-chk[data-subregiao="${src.dataset.subregiao}"]`);
+        if (dst) dst.checked = true;
+    });
+    tab.querySelectorAll('.pad-chk:checked').forEach(src => {
+        const dst = drawer.querySelector(`.mob-pad-chk[data-padrao="${src.dataset.padrao}"]`);
+        if (dst) dst.checked = true;
+    });
+    tab.querySelectorAll('.lat-chk:checked').forEach(src => {
+        const dst = drawer.querySelector(`.mob-lat-chk[data-padrao="${src.dataset.padrao}"][data-lat="${src.dataset.lat}"]`);
+        if (dst) dst.checked = true;
+    });
+
+    refreshDrawerVisuals();
+    updateDrawerCounters();
+}
+
+function applyDemandsDrawer() {
+    const drawer = document.getElementById('mob-demands-drawer');
+    if (!drawer) return;
+    const t = parseInt(drawer.dataset.t);
+    const tab = document.getElementById('tab-' + t);
+    if (!tab) return;
+
+    // Garante modo hierarquia no desktop
+    setModo(t, 'hierarquia');
+
+    // Reset desktop checkboxes
+    tab.querySelectorAll('.reg-chk, .sub-chk, .pad-chk, .lat-chk').forEach(c => c.checked = false);
+
+    // Copia drawer → desktop
+    drawer.querySelectorAll('.mob-reg-chk:checked').forEach(src => {
+        const dst = tab.querySelector(`.reg-chk[data-regiao="${src.dataset.regiao}"]`);
+        if (dst) dst.checked = true;
+    });
+    drawer.querySelectorAll('.mob-sub-chk:checked').forEach(src => {
+        const dst = tab.querySelector(`.sub-chk[data-subregiao="${src.dataset.subregiao}"]`);
+        if (dst) dst.checked = true;
+    });
+    drawer.querySelectorAll('.mob-pad-chk:checked').forEach(src => {
+        const dst = tab.querySelector(`.pad-chk[data-padrao="${src.dataset.padrao}"]`);
+        if (dst) dst.checked = true;
+    });
+    drawer.querySelectorAll('.mob-lat-chk:checked').forEach(src => {
+        const dst = tab.querySelector(`.lat-chk[data-padrao="${src.dataset.padrao}"][data-lat="${src.dataset.lat}"]`);
+        if (dst) dst.checked = true;
+    });
+
+    // Re-render desktop (cria dem_nivel_/dem_escopo_/dem_qtd_) e atualiza mobile (via hook em updateTotal)
+    updateDemandas(t);
+    closeDemandsDrawer();
+}
+
+// Toggle ao clicar na tag/área de uma região no drawer
+function toggleMobRegiao(regiao) {
+    const drawer = document.getElementById('mob-demands-drawer');
+    const chk = drawer.querySelector(`.mob-reg-chk[data-regiao="${regiao}"]`);
+    if (!chk) return;
+    chk.checked = !chk.checked;
+    if (chk.checked) {
+        drawer.querySelectorAll(`.mob-sub-chk[data-regiao="${regiao}"], .mob-pad-chk[data-regiao="${regiao}"], .mob-lat-chk[data-regiao="${regiao}"]`)
+            .forEach(c => c.checked = false);
+    }
+    refreshDrawerVisuals();
+    updateDrawerCounters();
+}
+function toggleMobSubregiao(subregiao, regiao) {
+    const drawer = document.getElementById('mob-demands-drawer');
+    const chk = drawer.querySelector(`.mob-sub-chk[data-subregiao="${subregiao}"]`);
+    if (!chk) return;
+    chk.checked = !chk.checked;
+    if (chk.checked) {
+        drawer.querySelectorAll(`.mob-pad-chk[data-subregiao="${subregiao}"], .mob-lat-chk[data-subregiao="${subregiao}"]`)
+            .forEach(c => c.checked = false);
+        const regChk = drawer.querySelector(`.mob-reg-chk[data-regiao="${regiao}"]`);
+        if (regChk) regChk.checked = false;
+    }
+    refreshDrawerVisuals();
+    updateDrawerCounters();
+}
+// Listener no drawer pra refletir cliques nas labels (.mob-pad-tag com input dentro)
+function onMobDemandasChange() {
+    refreshDrawerVisuals();
+    updateDrawerCounters();
+}
+
+function refreshDrawerVisuals() {
+    const drawer = document.getElementById('mob-demands-drawer');
+    drawer.querySelectorAll('.mob-rcard').forEach(card => {
+        const regCheck = !!card.querySelector('.mob-reg-chk:checked');
+        const anyChild = !!card.querySelector('.mob-sub-chk:checked, .mob-pad-chk:checked, .mob-lat-chk:checked');
+        card.classList.toggle('has-region-selected', regCheck);
+        const hint = card.querySelector('[data-summary]');
+        if (hint) {
+            if (regCheck) {
+                hint.textContent = 'região inteira selecionada';
+            } else if (anyChild) {
+                const n = card.querySelectorAll('.mob-sub-chk:checked, .mob-pad-chk:checked, .mob-lat-chk:checked').length;
+                hint.textContent = n + ' selec.';
+            } else {
+                hint.textContent = 'tap = região inteira';
+            }
+        }
+        card.querySelectorAll('.mob-srow[data-subregiao]').forEach(row => {
+            const subChecked = !!row.querySelector('.mob-sub-chk:checked');
+            const subTag = row.querySelector('.mob-sub-tag');
+            if (subTag) subTag.classList.toggle('active', subChecked);
+        });
+    });
+}
+
+function updateDrawerCounters() {
+    const drawer = document.getElementById('mob-demands-drawer');
+    let total = 0;
+    drawer.querySelectorAll('.mob-pad-chk:checked').forEach(() => total += 1);
+    drawer.querySelectorAll('.mob-lat-chk:checked').forEach(() => total += 1);
+    drawer.querySelectorAll('.mob-sub-chk:checked').forEach(() => total += 2);
+    drawer.querySelectorAll('.mob-reg-chk:checked').forEach(() => total += 2);
+    document.getElementById('mob-drawer-apply-count').textContent = '(' + total + ')';
+}
+
+function selectTemplateMobile(nome) {
+    const drawer = document.getElementById('mob-demands-drawer');
+    if (!drawer) return;
+    const t = parseInt(drawer.dataset.t);
+    setModo(t, 'template');
+    selectTemplate(t, nome);
+    closeDemandsDrawer();
+}
+
+// ── Sheet "Copiar configuração de…" ──────────────────────────────
+// Lista os outros treinos que JÁ têm categorias e copia ao tap.
+function openCopyFromSheet(destT) {
+    const overlay = document.getElementById('mob-copy-overlay');
+    const sheet = overlay.querySelector('.sheet');
+    sheet.dataset.dest = destT;
+    document.getElementById('mob-copy-title').textContent = `Para Treino ${destT + 1}`;
+
+    // Popula lista com treinos-fonte (que tenham total > 0 e não sejam o destino)
+    const list = document.getElementById('mob-copy-list');
+    let html = '';
+    for (let s = 0; s < MAX_TREINOS; s++) {
+        if (s === destT) continue;
+        const total = getTreinoTotal(s);
+        if (total === 0) continue;
+        html += `<button type="button" class="sheet-item" onclick="confirmCopyFrom(${s}, ${destT})">
+            <div class="sheet-item-icon">T${s + 1}</div>
+            <div class="sheet-item-text">
+                <div class="sheet-item-title">Treino ${s + 1}</div>
+                <div class="sheet-item-sub">${total} ${total === 1 ? 'exercício' : 'exercícios'}</div>
+                <div class="mob-copy-item-preview">${previewTreinoChips(s)}</div>
+            </div>
+            <svg class="icon sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+        </button>`;
+    }
+    if (!html) html = '<div class="mob-copy-empty">Nenhum outro treino com categorias.</div>';
+    list.innerHTML = html;
+
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sheet-open');
+}
+
+function closeCopyFromSheet(e) {
+    if (e && e.target && e.target.id !== 'mob-copy-overlay') return;
+    const overlay = document.getElementById('mob-copy-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('sheet-open');
+}
+
+// Renderiza chips de prévia (até 4) das categorias do treino src
+function previewTreinoChips(src) {
+    const tab = document.getElementById('tab-' + src);
+    if (!tab) return '';
+    const chips = [];
+    const modo = (tab.querySelector('#input-modo-' + src) || {}).value || 'hierarquia';
+    if (modo === 'template') {
+        const tmpl = (tab.querySelector('#input-template-' + src) || {}).value || 'Template';
+        chips.push(`<span class="reg-chip" style="background:var(--gray-100);color:var(--gray-700)">${tmpl}</span>`);
+    } else {
+        const nivels = tab.querySelectorAll(`input[name^="dem_nivel_${src}_"]`);
+        nivels.forEach(nInp => {
+            if (chips.length >= 4) return;
+            const idx = nInp.name.substring(('dem_nivel_' + src + '_').length);
+            const eInp = tab.querySelector(`input[name="dem_escopo_${src}_${idx}"]`);
+            if (!eInp) return;
+            chips.push(chipDemandaLabel(nInp.value, eInp.value));
+        });
+        const restantes = nivels.length - chips.length;
+        if (restantes > 0) chips.push(`<span class="reg-chip" style="background:var(--gray-100);color:var(--gray-500)">+${restantes}</span>`);
+    }
+    return chips.join('');
+}
+
+function confirmCopyFrom(src, dest) {
+    copiarConfigTreino(src, dest);
+    closeCopyFromSheet();
+    // Garante que a seção de destino esteja aberta pra dar feedback visual
+    const sec = document.getElementById('msec-treino-' + dest);
+    if (sec) sec.classList.add('open');
+}
+
 // Init
 onChangeNTreinos();
+bindMobileMirrors();
+mirrorFromDesktop();
+watchEvitarHistWrap();
+updateMobileSubs();
+// Mobile: auto-carrega histórico do aluno do contexto e força MAX_TREINOS no desktop
+// (treinos sem demandas serão filtrados pelo backend — commit C).
+// Em modo restrito (substituir/adicionar) o n_treinos já vem travado em 1 do backend.
+if (window.matchMedia('(max-width: 768px)').matches) {
+    autoCarregarHistAlunoContexto();
+    const nSel = document.getElementById('n_treinos');
+    {% if ctx_acao not in ('substituir', 'adicionar') %}
+    if (nSel && !nSel.disabled) { nSel.value = MAX_TREINOS; onChangeNTreinos(); }
+    {% endif %}
+}
+// Render inicial das seções de treino mobile (caso histórico já tenha sido carregado).
+// Itera só sobre seções mobile que de fato existem (ctx restrito = só T1).
+for (let t = 0; t < MAX_TREINOS; t++) {
+    if (!document.getElementById('msec-treino-' + t)) continue;
+    renderMobileDemandasList(t);
+    updateMobileTreinoSection(t);
+}
+updateAllCopyButtonsVisibility();
 </script>
 
 {% endblock %}

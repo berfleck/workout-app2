@@ -37,6 +37,12 @@ templates/
   historico.html          — Partial: filtros + lista do histórico
   historico_page.html     — Página completa: wrapper de histórico
 
+  # Mobile (redesign 02 — branch mobile-redesign-02, etapas 1-8 de 12 concluídas)
+  _mobile_bottom_bar.html       — Referência standalone do bottom bar mobile (não usado em runtime)
+  _mobile_nav_sheet.html        — Bottom sheet de navegação (Hub/Alunos/Histórico)
+  _mobile_treino_kebab_sheet.html — Action sheet do kebab do treino card (Editar/Substituir/PNG/Remover)
+  _mobile_bb_actions_hub.html   — Slot direito da bb no HUB (estados: vazio/visualizando/rascunho/edição)
+
 Gerados (gitignored): bf_treinamento.db, sessoes_salvas.json
 ```
 
@@ -120,6 +126,33 @@ Fluxo: selecionar exercícios (similaridade) → ordenar compostos primeiro → 
 - Botão download ZIP na UI (rota existe)
 - Lista de exercícios pausados por aluno
 - Sistema de referências manuais legado (`_referencia.html`, `_comparacao.html`) — remover quando confirmado que toggle de período + lado a lado cobrem todos os casos
+
+## Redesign mobile (em progresso · branch `mobile-redesign-02`)
+
+**Etapas 1-12 de 12 concluídas** 🎉. Ver `docs/redesign/guia_redesign_mobile.md` (seção "🚦 Estado atual") para handoff completo + lista de commits + decisões importantes. Próxima: QA pass final + abrir PR pra `main` (ou Etapa 13 opcional: modo "Substituir treino" no gerador).
+
+### O que mudou já no app (impacto fora do mobile)
+
+- **Endpoints novos:**
+  - `GET /_mobile_bb_actions` — re-fetch das ações da bb (HUB only)
+  - `POST /hub/rotina/<id>/etiqueta` — autosave da etiqueta da rotina (rascunho ou histórico)
+  - `POST /hub/rotina/<id>/concluir-edicao` — sai modo edição mantendo rascunho
+- **`descartar-rascunho`** agora também limpa `edicao_hub` global
+- **Função `database.atualizar_etiqueta_historico(reg_id, etiqueta)`** — UPDATE só da etiqueta
+- **Context processor `_inject_topbar_aluno`** (em `app_flask.py`) injeta em TODOS os templates: `_topbar_alunos`, `_topbar_aluno`, `_topbar_tem_rotina`, `_topbar_eh_rascunho`, `_topbar_intent`, `_topbar_alteracoes`, `_topbar_em_edicao`, `_nav_alunos_total`, `_nav_sem_rotina`
+- **`before_request` `_track_aluno_selecionado`:** `?aluno_id=X` na URL persiste na session; `?aluno_id=` (vazio) limpa
+- **`_hub_treino_card.html`:** header reescrito — agora badge "T1" + nome customizado (ou "Treino N" como fallback) + 1 único botão kebab `...` à direita (estado kebab no mobile via `body.body--em-edicao`)
+- **`_rotina_hub.html`:** card aluno simplificado — só nome + etiqueta editável inline (input com autosave). Removido nivel/objetivo/N treinos/data
+- **`base.html`:** body recebe `data-active-page="{{ active_page or '' }}"`. Tokens novos no `:root`: `--bb-height`, `--bb-action-h`, `--bb-radius`, `--sheet-*`, `--drawer-*`, `--z-*`. Mobile breakpoint = `768px` (sidebar/hambúrguer escondidos no mobile real)
+- **`_draft_banner.html`:** ganhou variante mobile compacta (1 linha amber com chevron expand pra alterações)
+- **`_treino_card.html`:** removido `<span class="edit-mode-sub">Alterações são salvas automaticamente</span>` (texto redundante no banner do card editado)
+
+### Bugs históricos a evitar (pra próximas etapas)
+
+- **`:has()` quebra drag do SortableJS** — re-avalia CSS a cada mudança de classe (`sortable-ghost`, `sortable-chosen`). Use classe JS no body.
+- **`}` órfã em `<style>`** fecha a tag prematuramente, descarta TUDO depois. Conferir abertura/fechamento ao adicionar blocos CSS.
+- **Blocks dentro de `{% include %}`** não são overridables pelo template extending (Jinja). Pra slots dinâmicos, defina `{% block %}` direto em base.html.
+- **Script no meio do body** roda no parse-time, antes do DOM completo. Use `DOMContentLoaded` ou delegação.
 
 ## Como rodar
 

@@ -1,0 +1,13 @@
+{# Estrutura de referência da bottom bar mobile.
+   A versão renderizada vive inline em base.html (limitação do Jinja:
+   blocks dentro de includes não são overridables pelo template extending).
+   Este arquivo serve como documentação isolada do componente e pode ser
+   usado em swaps HTMX futuros. #}
+<nav class="bb" data-bb aria-label="Ações da página">
+    <button type="button" class="bb-nav" data-open-nav-sheet aria-label="Menu">
+        <svg class="icon"><use href="#i-grid"/></svg>
+    </button>
+    <div class="bb-actions" data-bb-actions>
+        <span class="bb-empty-hint">selecione aluno · ações virão</span>
+    </div>
+</nav>

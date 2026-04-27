@@ -1,8 +1,15 @@
+{# Nome customizado existe quando o usuário digitou um label proprio (sessao.tipo
+   sem ' + ' e diferente de 'manual'); senão exibimos "Treino N". #}
+{% set _tipo = sessao.tipo if sessao else None %}
+{% set nome_custom = _tipo if _tipo and _tipo != 'manual' and ' + ' not in _tipo else None %}
+{% set nome_exibir = nome_custom or ('Treino ' ~ (idx + 1)) %}
 <div class="treino-card modo-visualizar">
     <div class="treino-header">
         <div class="treino-titulo-linha">
-            {% set sub = subtitulo_sessao(sessao) %}
-            <span class="treino-titulo">Treino {{ idx + 1 }}{% if sub %}<span class="treino-nome-inline"> · {{ sub }}</span>{% endif %}</span>
+            <div class="treino-title-row">
+                <span class="treino-num-badge">T{{ idx + 1 }}</span>
+                <span class="treino-nome-display">{{ nome_exibir }}</span>
+            </div>
             {% set chips = sessao_chips(sessao) %}
             {% if chips %}
             <div class="regiao-chips mt-1">
@@ -11,15 +18,14 @@
             {% endif %}
         </div>
         <div class="treino-acoes">
-            <button class="btn btn-sm btn-icon" title="Editar"
-                    hx-post="/hub/rotina/{{ aluno_id }}/treino/{{ idx }}/editar-inline"
-                    hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-pencil"/></svg></button>
-            <a href="/gerador?aluno_id={{ aluno_id }}&acao=substituir&treino={{ idx }}"
-               class="btn btn-sm btn-icon" title="Substituir treino inteiro"><svg class="icon"><use href="#i-rotate-ccw"/></svg></a>
-            <button class="btn btn-sm btn-icon" title="Remover treino"
-                    hx-delete="/hub/rotina/{{ aluno_id }}/treino/{{ idx }}"
-                    hx-target="#rotina-display" hx-swap="innerHTML"
-                    hx-confirm="Remover Treino {{ idx + 1 }} da rotina?"><svg class="icon"><use href="#i-x"/></svg></button>
+            <button type="button" class="btn btn-sm btn-icon" title="Mais ações"
+                    data-open-treino-kebab
+                    data-treino-idx="{{ idx }}"
+                    data-treino-num="{{ idx + 1 }}"
+                    data-treino-nome="{{ nome_exibir }}"
+                    data-aluno-id="{{ aluno_id }}"
+                    data-aluno-nome="{{ aluno.nome if aluno else 'Aluno' }}"
+                    aria-label="Mais ações"><svg class="icon"><use href="#i-more-vertical"/></svg></button>
         </div>
     </div>
     {% for bloco in sessao.blocos %}

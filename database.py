@@ -304,6 +304,14 @@ def atualizar_historico_registro(reg_id, data_atualizada, etiqueta, n_treinos, s
     con.close()
 
 
+def atualizar_etiqueta_historico(reg_id, etiqueta):
+    """Atualiza apenas a etiqueta de um registro do histórico."""
+    con = _conn()
+    con.execute("UPDATE historico SET etiqueta = ? WHERE id = ?", (etiqueta or "", reg_id))
+    con.commit()
+    con.close()
+
+
 def deletar_historico(reg_id):
     con = _conn()
     con.execute("DELETE FROM historico WHERE id = ?", (reg_id,))

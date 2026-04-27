@@ -1,0 +1,43 @@
+{#
+    Macros de seção colapsável mobile (Etapa 9 redesign 02).
+
+    Uso:
+      {% import "_mobile_section.html" as m %}
+      {{ m.open(id="sec-aluno", icon="i-users", title="Aluno", sub="...", open=True, has_content=True) }}
+        <select>...</select>
+      {{ m.close() }}
+
+    Variante treino:
+      {{ m.open(id="sec-treino-0", icon_text="T1", title="Treino 1", sub="Sem configuração", counter="0", is_treino=True) }}
+        <div>placeholder</div>
+      {{ m.close() }}
+#}
+
+{% macro open(id, title, sub='', icon=None, icon_text=None, counter=None,
+              open=False, has_content=False, is_treino=False) -%}
+{%- set _classes = ['section'] -%}
+{%- if open %}{% set _ = _classes.append('open') %}{% endif -%}
+{%- if has_content %}{% set _ = _classes.append('has-content') %}{% endif -%}
+{%- if is_treino %}{% set _ = _classes.append('is-treino') %}{% endif -%}
+<div class="{{ _classes|join(' ') }}" id="{{ id }}" data-section>
+    <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-icon">
+            {%- if is_treino and icon_text %}{{ icon_text }}
+            {%- elif icon %}<svg class="icon icon-sm"><use href="#{{ icon }}"/></svg>{%- endif %}
+        </div>
+        <div class="section-title-area">
+            <div class="section-title">{{ title }}</div>
+            <div class="section-sub" data-section-sub>{{ sub }}</div>
+        </div>
+        {%- if counter is not none %}
+        <span class="section-counter" data-section-counter>{{ counter }}</span>
+        {%- endif %}
+        <svg class="icon icon-sm section-chevron"><use href="#i-chevron-down"/></svg>
+    </div>
+    <div class="section-body">
+{%- endmacro %}
+
+{% macro close() -%}
+    </div>
+</div>
+{%- endmacro %}
