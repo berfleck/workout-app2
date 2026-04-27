@@ -1,6 +1,222 @@
 {% extends "base.html" %}
+
+{% block bb_actions %}
+<button type="button" class="bb-action secondary" onclick="openHistAlunoSheet()" style="flex-shrink:0; padding: 0 14px;">
+    <svg class="icon icon-sm"><use href="#i-users"/></svg>
+    <span id="hist-aluno-bb-label">Aluno</span>
+</button>
+<span class="bb-empty-hint" style="flex:1; text-align:left;">toque num período</span>
+{% endblock %}
+
 {% block content %}
-<div id="historico-content">
+
+{# ─── Desktop ─── #}
+<div id="historico-content" class="hidden md:block">
     {% include "historico.html" %}
 </div>
+
+{# ─── Mobile timeline ─── #}
+{% set _grupos = {} %}
+{% for r in historico %}
+    {% if r._grupo not in _grupos %}{% set _ = _grupos.update({r._grupo: {'mes': r._mes_label, 'ano': r._ano, 'data': r._data_curta, 'regs': []}}) %}{% endif %}
+    {% set _ = _grupos[r._grupo].regs.append(r) %}
+{% endfor %}
+
+<div id="historico-mobile" class="historico-mobile md:hidden">
+    {% if not historico %}
+    <div class="alunos-empty">
+        <svg class="icon" style="width:36px;height:36px;color:var(--gray-300)"><use href="#i-clipboard-list"/></svg>
+        <div class="alunos-empty-title">
+            {% if aluno_filtro or busca %}Nenhum registro encontrado{% else %}Nenhum treino salvo ainda{% endif %}
+        </div>
+        {% if not aluno_filtro and not busca %}
+        <div class="alunos-empty-sub">Gere um treino e salve no histórico para registrá-lo aqui.</div>
+        {% endif %}
+    </div>
+    {% else %}
+
+    {# Filtros chip — Todos + anos do dataset #}
+    <div class="hist-filter-bar">
+        <button type="button" class="hist-filter-chip active" data-ano="todos" onclick="setHistAnoFilter(this)">
+            Todos <span class="alunos-chip-count">{{ historico|length }}</span>
+        </button>
+        {% for ano in anos_disponiveis %}
+            {% set _count = historico | selectattr('_ano', 'equalto', ano) | list | length %}
+            <button type="button" class="hist-filter-chip" data-ano="{{ ano }}" onclick="setHistAnoFilter(this)">
+                {{ ano }} <span class="alunos-chip-count">{{ _count }}</span>
+            </button>
+        {% endfor %}
+        {% if aluno_filtro %}
+        <button type="button" class="hist-filter-chip is-active-pill" onclick="clearHistAlunoFilter()" title="Remover filtro de aluno">
+            <svg class="icon icon-xs"><use href="#i-users"/></svg> {{ aluno_filtro }}
+            <svg class="icon icon-xs"><use href="#i-x"/></svg>
+        </button>
+        {% endif %}
+    </div>
+
+    {% for grupo_key, grupo in _grupos.items() %}
+    {% set _eh_grupo_atual = grupo.regs | selectattr('_eh_ativa') | list | length > 0 %}
+    <div class="hist-period-header" data-ano="{{ grupo.ano }}">
+        <span class="hist-period-num{% if _eh_grupo_atual %} current{% endif %}">{{ grupo.ano or '?' }}</span>
+        <span class="hist-period-label">{{ grupo.mes }}</span>
+        {% if _eh_grupo_atual %}<span class="hist-period-tag">Atual</span>{% endif %}
+        <span class="hist-period-date">{{ grupo.data }}</span>
+    </div>
+
+    {% for reg in grupo.regs %}
+    <button type="button" class="hist-mob-card{% if reg._eh_ativa %} is-current{% endif %}"
+            data-ano="{{ reg._ano }}"
+            data-reg-id="{{ reg.id }}"
+            onclick="openHistDetalheSheet('{{ reg.id }}', '{{ (reg.etiqueta or 'Registro') | replace("'", '') }}', '{{ reg.aluno or '' }}')">
+        <div class="hist-mob-card-head">
+            <div class="hist-mob-card-icon">{{ reg._p_label }}</div>
+            <div class="hist-mob-card-info">
+                <div class="hist-mob-card-name">{{ reg.etiqueta or 'Sem etiqueta' }}</div>
+                <div class="hist-mob-card-meta">
+                    {%- if reg.aluno -%}{{ reg.aluno }} <span class="dot">·</span> {% endif -%}
+                    {{ reg._data_curta or 'sem data' }}
+                    {%- if reg.n_treinos %} <span class="dot">·</span> {{ reg.n_treinos }} treinos{% endif -%}
+                </div>
+            </div>
+            <svg class="icon icon-sm hist-mob-card-arrow"><use href="#i-chevron-right"/></svg>
+        </div>
+        {% if reg._mini_pills %}
+        <div class="hist-mob-pills">
+            {% for p in reg._mini_pills %}
+            <span class="hist-mob-pill"><span class="hist-mob-pill-num">T{{ p.n }}</span> {{ p.nome }}</span>
+            {% endfor %}
+            {% if reg.n_treinos and reg.n_treinos > 5 %}
+            <span class="hist-mob-pill" style="opacity:0.6">+{{ reg.n_treinos - 5 }}</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </button>
+    {% endfor %}
+    {% endfor %}
+
+    <div id="hist-no-results" class="alunos-empty" style="display:none;">
+        <svg class="icon" style="width:32px;height:32px;color:var(--gray-300)"><use href="#i-search"/></svg>
+        <div class="alunos-empty-title">Nada nesse ano</div>
+    </div>
+    {% endif %}
+</div>
+
+{# ─── Bottom sheet: filtro de aluno ─── #}
+<div id="hist-aluno-overlay" class="sheet-overlay md:hidden" onclick="closeHistAlunoSheet(event)" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Filtrar por aluno" onclick="event.stopPropagation()">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Filtrar por</div>
+                <div class="sheet-title">Aluno / Turma</div>
+            </div>
+            <button type="button" class="sheet-close" onclick="closeHistAlunoSheet()" aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <div class="sheet-list">
+            <button type="button" class="sheet-item{% if not aluno_filtro %} active{% endif %}" onclick="window.location='/historico'">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-users"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Todos</div>
+                    <div class="sheet-item-sub">Sem filtro de aluno</div>
+                </div>
+                <svg class="icon sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+            </button>
+            {% for nome in alunos_historico %}
+            <button type="button" class="sheet-item{% if nome == aluno_filtro %} active{% endif %}"
+                    onclick="window.location='/historico?aluno={{ nome | urlencode }}'">
+                <div class="sheet-item-icon">{{ (nome[:2] | upper) if nome else '?' }}</div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">{{ nome }}</div>
+                </div>
+                <svg class="icon sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{# ─── Bottom sheet: detalhe do registro (carregado via HTMX ao abrir) ─── #}
+<div id="hist-detalhe-overlay" class="sheet-overlay md:hidden" onclick="closeHistDetalheSheet(event)" aria-hidden="true">
+    <div class="sheet hist-detalhe-sheet" role="dialog" aria-modal="true" aria-label="Detalhe do registro" onclick="event.stopPropagation()">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow" id="hist-detalhe-eyebrow">Registro</div>
+                <div class="sheet-title" id="hist-detalhe-title">—</div>
+            </div>
+            <button type="button" class="sheet-close" onclick="closeHistDetalheSheet()" aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <div class="sheet-list" id="hist-detalhe-content">
+            {# preenchido via HTMX #}
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Histórico mobile · filtros + sheets ──
+function setHistAnoFilter(btn) {
+    document.querySelectorAll('.hist-filter-chip[data-ano]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const ano = btn.dataset.ano;
+    let visiveis = 0;
+    document.querySelectorAll('.hist-mob-card[data-ano]').forEach(card => {
+        const ok = ano === 'todos' || card.dataset.ano === ano;
+        card.style.display = ok ? '' : 'none';
+        if (ok) visiveis++;
+    });
+    // Esconde headers de período sem cards visíveis no filtro
+    document.querySelectorAll('.hist-period-header[data-ano]').forEach(h => {
+        const ok = ano === 'todos' || h.dataset.ano === ano;
+        h.style.display = ok ? '' : 'none';
+    });
+    const empty = document.getElementById('hist-no-results');
+    if (empty) empty.style.display = visiveis === 0 ? '' : 'none';
+}
+
+function openHistAlunoSheet() {
+    const overlay = document.getElementById('hist-aluno-overlay');
+    if (!overlay) return;
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sheet-open');
+}
+function closeHistAlunoSheet(e) {
+    if (e && e.target && e.target.id !== 'hist-aluno-overlay') return;
+    const overlay = document.getElementById('hist-aluno-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('sheet-open');
+}
+function clearHistAlunoFilter() {
+    window.location = '/historico';
+}
+
+function openHistDetalheSheet(regId, etiqueta, aluno) {
+    const overlay = document.getElementById('hist-detalhe-overlay');
+    const content = document.getElementById('hist-detalhe-content');
+    document.getElementById('hist-detalhe-title').textContent = etiqueta || 'Registro';
+    document.getElementById('hist-detalhe-eyebrow').textContent = aluno ? aluno : 'Registro';
+    content.innerHTML = '<div style="padding:24px;text-align:center;color:var(--gray-400);font-size:12px;">Carregando…</div>';
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sheet-open');
+    fetch('/historico/' + regId + '/ver')
+        .then(r => r.text())
+        .then(html => { content.innerHTML = html; })
+        .catch(() => { content.innerHTML = '<div class="erro">Erro ao carregar detalhes</div>'; });
+}
+function closeHistDetalheSheet(e) {
+    if (e && e.target && e.target.id !== 'hist-detalhe-overlay') return;
+    const overlay = document.getElementById('hist-detalhe-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('sheet-open');
+}
+</script>
 {% endblock %}

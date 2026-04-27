@@ -1840,6 +1840,39 @@ def historico_page():
         busca_lower = busca.lower()
         registros = [r for r in registros if busca_lower in (r.get("etiqueta") or "").lower()]
     alunos_historico = nomes_unicos_historico()
+
+    # Enriquecimento (mobile): periodo, ano, flag rotina ativa, mini pills
+    from datetime import datetime
+    MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+    alunos_atuais = carregar_alunos()
+    rotina_ativa_por_aluno = {a["nome"]: a.get("rotina_ativa_id") for a in alunos_atuais}
+    anos_disponiveis = set()
+    for idx, r in enumerate(registros):
+        data_ref = r.get("data_atualizada") or r.get("data_salvo") or r.get("data") or ""
+        ano, mes_num, dia = "", 0, ""
+        if data_ref:
+            try:
+                dt = datetime.strptime(data_ref.split(" ")[0], "%d/%m/%Y")
+                ano = str(dt.year)
+                mes_num = dt.month
+                dia = dt.strftime("%d/%m")
+                anos_disponiveis.add(ano)
+            except (ValueError, IndexError):
+                pass
+        r["_ano"] = ano
+        r["_mes_label"] = MESES[mes_num] if mes_num else "Sem data"
+        r["_grupo"] = f"{ano}-{mes_num:02d}" if ano and mes_num else "sem-data"
+        r["_data_curta"] = dia
+        r["_eh_ativa"] = rotina_ativa_por_aluno.get(r.get("aluno")) == r.get("id")
+        r["_p_label"] = f"P{idx + 1}"
+        # Mini pills dos treinos: lê sessoes e extrai .tipo (max 5)
+        sessoes = r.get("sessoes", []) or []
+        r["_mini_pills"] = [
+            {"n": i + 1, "nome": (s.get("tipo") or f"Treino {i+1}")[:18]}
+            for i, s in enumerate(sessoes[:5])
+        ]
+
     is_htmx = request.headers.get("HX-Request") == "true"
     if is_htmx:
         return render_template("historico.html", historico=registros,
@@ -1853,7 +1886,8 @@ def historico_page():
                            padroes_labels=PADROES_LABELS,
                            alunos_historico=alunos_historico,
                            aluno_filtro=aluno_filtro,
-                           busca=busca)
+                           busca=busca,
+                           anos_disponiveis=sorted(anos_disponiveis, reverse=True))
 
 @app.route("/aluno-historico")
 def aluno_historico():

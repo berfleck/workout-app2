@@ -1594,6 +1594,188 @@
                 background-position: right 12px center;
                 padding-right: 32px;
             }
+
+            /* ── Histórico mobile timeline (Etapa 12) ── */
+            body[data-active-page="historico"] main.app-main > div { padding-top: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
+            .historico-mobile { padding: 14px 14px 16px; }
+
+            .hist-filter-bar {
+                display: flex;
+                gap: 6px;
+                overflow-x: auto;
+                padding: 0 0 12px;
+                margin: 0 -14px 4px;
+                padding-left: 14px;
+                padding-right: 14px;
+                scrollbar-width: none;
+                -webkit-overflow-scrolling: touch;
+            }
+            .hist-filter-bar::-webkit-scrollbar { display: none; }
+            .hist-filter-chip {
+                flex-shrink: 0;
+                display: inline-flex; align-items: center;
+                gap: 5px;
+                padding: 6px 11px;
+                background: white;
+                border: 1px solid var(--gray-200);
+                border-radius: 999px;
+                font-size: 12.5px; font-weight: 600;
+                color: var(--gray-700);
+                cursor: pointer;
+                transition: all 0.15s;
+                font-family: inherit;
+                white-space: nowrap;
+            }
+            .hist-filter-chip:hover { border-color: var(--gray-400); }
+            .hist-filter-chip.active {
+                background: var(--gray-900);
+                border-color: var(--gray-900);
+                color: white;
+            }
+            .hist-filter-chip.active .alunos-chip-count {
+                background: rgba(255,255,255,0.18); color: white;
+            }
+            .hist-filter-chip.is-active-pill {
+                background: var(--brand-100);
+                border-color: var(--brand-300);
+                color: var(--brand-700);
+            }
+            .hist-filter-chip.is-active-pill .icon { width: 11px; height: 11px; }
+
+            /* Header de período (mês/ano) */
+            .hist-period-header {
+                display: flex; align-items: center; gap: 8px;
+                margin: 18px 0 8px;
+                padding: 0 2px;
+            }
+            .hist-period-num {
+                font-family: var(--font-mono);
+                font-size: 9.5px; font-weight: 800;
+                padding: 3px 7px;
+                border-radius: 5px;
+                background: var(--gray-900);
+                color: white;
+                letter-spacing: 0.04em;
+            }
+            .hist-period-num.current {
+                background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
+                box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 2px 6px rgba(232,93,4,0.30);
+            }
+            .hist-period-label {
+                font-size: 14px; font-weight: 700;
+                color: var(--gray-900);
+                letter-spacing: -0.012em;
+            }
+            .hist-period-tag {
+                font-family: var(--font-mono);
+                font-size: 9px; font-weight: 800;
+                padding: 2px 6px;
+                border-radius: 4px;
+                background: var(--brand-100);
+                color: var(--brand-700);
+                border: 1px solid var(--brand-200);
+                text-transform: uppercase; letter-spacing: 0.06em;
+            }
+            .hist-period-date {
+                font-family: var(--font-mono);
+                font-size: 10.5px; font-weight: 600;
+                color: var(--gray-400);
+                margin-left: auto;
+            }
+
+            /* Card de registro */
+            .hist-mob-card {
+                width: 100%;
+                background: white;
+                border: 1px solid var(--gray-200);
+                border-radius: 12px;
+                padding: 11px 12px;
+                margin-bottom: 6px;
+                cursor: pointer;
+                transition: all 0.15s;
+                font-family: inherit;
+                text-align: left;
+            }
+            .hist-mob-card:hover { border-color: var(--gray-300); }
+            .hist-mob-card.is-current {
+                border-color: var(--brand-500);
+                background: linear-gradient(135deg, var(--brand-50) 0%, #fff7ed 100%);
+                box-shadow: 0 2px 8px rgba(232,93,4,0.08);
+            }
+            .hist-mob-card-head {
+                display: flex; align-items: center; gap: 11px;
+            }
+            .hist-mob-card-icon {
+                width: 34px; height: 34px;
+                border-radius: 9px;
+                background: var(--gray-100);
+                color: var(--gray-700);
+                display: grid; place-items: center;
+                flex-shrink: 0;
+                font-family: var(--font-mono);
+                font-size: 11px; font-weight: 800;
+                letter-spacing: -0.02em;
+            }
+            .hist-mob-card.is-current .hist-mob-card-icon {
+                background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
+                color: white;
+                box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset;
+            }
+            .hist-mob-card-info { flex: 1; min-width: 0; }
+            .hist-mob-card-name {
+                font-size: 13.5px; font-weight: 700;
+                color: var(--gray-900);
+                letter-spacing: -0.012em;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            }
+            .hist-mob-card-meta {
+                font-family: var(--font-mono);
+                font-size: 11px;
+                color: var(--gray-500);
+                font-weight: 500;
+                margin-top: 2px;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            }
+            .hist-mob-card-meta .dot { color: var(--gray-300); margin: 0 4px; }
+            .hist-mob-card-arrow { color: var(--gray-300); flex-shrink: 0; width: 14px; height: 14px; }
+
+            .hist-mob-pills {
+                display: flex; flex-wrap: wrap; gap: 4px;
+                margin-top: 10px;
+                padding-left: 45px;
+            }
+            .hist-mob-pill {
+                display: inline-flex; align-items: center;
+                gap: 4px;
+                padding: 3px 8px;
+                background: var(--gray-100);
+                border-radius: 5px;
+                font-size: 10.5px;
+                font-weight: 600;
+                color: var(--gray-700);
+                letter-spacing: -0.005em;
+            }
+            .hist-mob-pill-num {
+                font-family: var(--font-mono);
+                font-size: 9px; font-weight: 800;
+                color: var(--brand-600);
+            }
+            .hist-mob-card.is-current .hist-mob-pill {
+                background: white;
+                border: 1px solid var(--brand-100);
+            }
+
+            /* Sheet de detalhe (mais alto) */
+            .hist-detalhe-sheet { max-height: 90%; }
+            .hist-detalhe-sheet .sheet-list { padding: 8px 14px 18px; }
+
+            /* bb-action.secondary (já existia parcialmente; reforça) */
+            .bb-action.secondary {
+                background: white;
+                border: 1px solid var(--gray-200);
+                color: var(--gray-700);
+            }
+            .bb-action.secondary:hover { background: var(--gray-50); border-color: var(--gray-300); }
         }
 
         /* ── Borda laranja no card editado (todos viewports) ── */
