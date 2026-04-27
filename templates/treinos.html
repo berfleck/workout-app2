@@ -363,15 +363,18 @@
             </div>
         </div>
 
-        {# CTA grande: abre o drawer #}
-        <button type="button" class="mob-open-drawer-btn" onclick="openDemandsDrawer({{ t }})">
-            <div class="mob-open-drawer-icon"><svg class="icon"><use href="#i-target"/></svg></div>
-            <div class="mob-open-drawer-info">
-                <div class="mob-open-drawer-title">Adicionar demandas</div>
-                <div class="mob-open-drawer-sub">Hierarquia ou template</div>
-            </div>
-            <svg class="icon mob-open-drawer-arrow"><use href="#i-chevron-right"/></svg>
-        </button>
+        {# CTAs compactos: adicionar + copiar de outro treino (este só aparece se houver fonte) #}
+        <div class="mob-treino-ctas">
+            <button type="button" class="mob-cta-btn mob-cta-add" onclick="openDemandsDrawer({{ t }})">
+                <svg class="icon"><use href="#i-plus"/></svg>
+                <span>Adicionar categorias</span>
+            </button>
+            <button type="button" class="mob-cta-btn mob-cta-copy" id="mob-copy-btn-{{ t }}"
+                    style="display:none" onclick="openCopyFromSheet({{ t }})" title="Copiar configuração de outro treino">
+                <svg class="icon"><use href="#i-copy"/></svg>
+                <span>Copiar de…</span>
+            </button>
+        </div>
     {{ msec.close() }}
     {% endfor %}
 
@@ -431,6 +434,25 @@
 
 {# Drawer mobile de demandas (etapa 10) — uma única instância, reusada por todos os treinos #}
 {% include "_mobile_demands_drawer.html" %}
+
+{# Bottom sheet "Copiar configuração de…" (mobile) — lista treinos-fonte com categorias #}
+<div id="mob-copy-overlay" class="sheet-overlay md:hidden" onclick="closeCopyFromSheet(event)" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Copiar configuração" data-dest="0" onclick="event.stopPropagation()">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Copiar configuração</div>
+                <div class="sheet-title" id="mob-copy-title">Para Treino 1</div>
+            </div>
+            <button type="button" class="sheet-close" onclick="closeCopyFromSheet()" aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <div class="sheet-list" id="mob-copy-list">
+            {# preenchido por JS #}
+        </div>
+    </div>
+</div>
 
 {% endblock %}
 
@@ -1305,7 +1327,23 @@ window.updateTotal = function(t) {
     __origUpdateTotal(t);
     renderMobileDemandasList(t);
     updateMobileTreinoSection(t);
+    updateAllCopyButtonsVisibility();
 };
+
+// Mostra/esconde o botão "Copiar de…" de cada treino com base no estado dos demais.
+// Visível apenas se houver pelo menos UM outro treino com categorias configuradas.
+function updateAllCopyButtonsVisibility() {
+    const filledTreinos = [];
+    for (let s = 0; s < MAX_TREINOS; s++) {
+        if (getTreinoTotal(s) > 0) filledTreinos.push(s);
+    }
+    for (let t = 0; t < MAX_TREINOS; t++) {
+        const btn = document.getElementById('mob-copy-btn-' + t);
+        if (!btn) continue;
+        const hasOtherSource = filledTreinos.some(s => s !== t);
+        btn.style.display = hasOtherSource ? '' : 'none';
+    }
+}
 
 // Calcula total de exercícios do treino t (lê inputs hidden do desktop)
 function getTreinoTotal(t) {
@@ -1702,6 +1740,80 @@ function selectTemplateMobile(nome) {
     closeDemandsDrawer();
 }
 
+// ── Sheet "Copiar configuração de…" ──────────────────────────────
+// Lista os outros treinos que JÁ têm categorias e copia ao tap.
+function openCopyFromSheet(destT) {
+    const overlay = document.getElementById('mob-copy-overlay');
+    const sheet = overlay.querySelector('.sheet');
+    sheet.dataset.dest = destT;
+    document.getElementById('mob-copy-title').textContent = `Para Treino ${destT + 1}`;
+
+    // Popula lista com treinos-fonte (que tenham total > 0 e não sejam o destino)
+    const list = document.getElementById('mob-copy-list');
+    let html = '';
+    for (let s = 0; s < MAX_TREINOS; s++) {
+        if (s === destT) continue;
+        const total = getTreinoTotal(s);
+        if (total === 0) continue;
+        html += `<button type="button" class="sheet-item" onclick="confirmCopyFrom(${s}, ${destT})">
+            <div class="sheet-item-icon">T${s + 1}</div>
+            <div class="sheet-item-text">
+                <div class="sheet-item-title">Treino ${s + 1}</div>
+                <div class="sheet-item-sub">${total} ${total === 1 ? 'exercício' : 'exercícios'}</div>
+                <div class="mob-copy-item-preview">${previewTreinoChips(s)}</div>
+            </div>
+            <svg class="icon sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+        </button>`;
+    }
+    if (!html) html = '<div class="mob-copy-empty">Nenhum outro treino com categorias.</div>';
+    list.innerHTML = html;
+
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sheet-open');
+}
+
+function closeCopyFromSheet(e) {
+    if (e && e.target && e.target.id !== 'mob-copy-overlay') return;
+    const overlay = document.getElementById('mob-copy-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('sheet-open');
+}
+
+// Renderiza chips de prévia (até 4) das categorias do treino src
+function previewTreinoChips(src) {
+    const tab = document.getElementById('tab-' + src);
+    if (!tab) return '';
+    const chips = [];
+    const modo = (tab.querySelector('#input-modo-' + src) || {}).value || 'hierarquia';
+    if (modo === 'template') {
+        const tmpl = (tab.querySelector('#input-template-' + src) || {}).value || 'Template';
+        chips.push(`<span class="reg-chip" style="background:var(--gray-100);color:var(--gray-700)">${tmpl}</span>`);
+    } else {
+        const nivels = tab.querySelectorAll(`input[name^="dem_nivel_${src}_"]`);
+        nivels.forEach(nInp => {
+            if (chips.length >= 4) return;
+            const idx = nInp.name.substring(('dem_nivel_' + src + '_').length);
+            const eInp = tab.querySelector(`input[name="dem_escopo_${src}_${idx}"]`);
+            if (!eInp) return;
+            chips.push(chipDemandaLabel(nInp.value, eInp.value));
+        });
+        const restantes = nivels.length - chips.length;
+        if (restantes > 0) chips.push(`<span class="reg-chip" style="background:var(--gray-100);color:var(--gray-500)">+${restantes}</span>`);
+    }
+    return chips.join('');
+}
+
+function confirmCopyFrom(src, dest) {
+    copiarConfigTreino(src, dest);
+    closeCopyFromSheet();
+    // Garante que a seção de destino esteja aberta pra dar feedback visual
+    const sec = document.getElementById('msec-treino-' + dest);
+    if (sec) sec.classList.add('open');
+}
+
 // Init
 onChangeNTreinos();
 bindMobileMirrors();
@@ -1720,6 +1832,7 @@ for (let t = 0; t < MAX_TREINOS; t++) {
     renderMobileDemandasList(t);
     updateMobileTreinoSection(t);
 }
+updateAllCopyButtonsVisibility();
 </script>
 
 {% endblock %}

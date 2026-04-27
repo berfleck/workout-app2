@@ -913,39 +913,51 @@
             }
             .mob-demandas-empty-strong { display: block; font-style: normal; color: var(--gray-500); font-weight: 600; margin-bottom: 2px; }
 
-            /* ── CTA "Adicionar demandas" ── */
-            .mob-open-drawer-btn {
-                width: 100%;
-                padding: 14px 14px;
-                border: 2px dashed var(--gray-300);
+            /* ── CTAs compactos do treino (Adicionar / Copiar de…) ── */
+            .mob-treino-ctas {
+                display: flex;
+                gap: 6px;
+                margin-top: 8px;
+            }
+            .mob-cta-btn {
+                display: inline-flex; align-items: center; justify-content: center;
+                gap: 5px;
+                padding: 7px 11px;
                 background: white;
-                border-radius: 12px;
-                display: flex; align-items: center; gap: 12px;
+                border: 1px dashed var(--gray-300);
+                border-radius: 8px;
+                font-size: 12px; font-weight: 600;
+                color: var(--gray-700);
                 cursor: pointer;
-                transition: all 0.18s;
-                margin-top: 10px;
-                text-align: left;
+                transition: all 0.15s;
                 font-family: inherit;
+                white-space: nowrap;
             }
-            .mob-open-drawer-btn:hover { border-color: var(--brand-500); background: var(--brand-50); }
-            .mob-open-drawer-icon {
-                width: 36px; height: 36px;
-                border-radius: 9px;
-                background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
-                color: white;
-                display: grid; place-items: center;
-                flex-shrink: 0;
-                box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 8px rgba(232,93,4,0.25);
+            .mob-cta-btn .icon { width: 12px; height: 12px; flex-shrink: 0; }
+            .mob-cta-btn:hover { border-color: var(--brand-500); color: var(--brand-700); background: var(--brand-50); }
+            .mob-cta-add { flex: 1; }
+            .mob-cta-add .icon { color: var(--brand-600); }
+            .mob-cta-copy { flex-shrink: 0; }
+            .mob-cta-copy .icon { color: var(--gray-500); }
+            .mob-cta-copy:hover .icon { color: var(--brand-600); }
+
+            /* Item da sheet "Copiar de…" — usa mais o sheet-item base mas mostra prévia das categorias */
+            .mob-copy-item-preview {
+                display: flex; flex-wrap: wrap;
+                gap: 3px;
+                margin-top: 4px;
             }
-            .mob-open-drawer-icon .icon { width: 16px; height: 16px; }
-            .mob-open-drawer-info { flex: 1; min-width: 0; }
-            .mob-open-drawer-title {
-                font-size: 13px; font-weight: 700;
-                color: var(--gray-900);
-                letter-spacing: -0.012em;
+            .mob-copy-item-preview .reg-chip {
+                font-size: 9.5px;
+                padding: 1px 5px;
             }
-            .mob-open-drawer-sub { font-size: 11px; color: var(--gray-600); margin-top: 1px; }
-            .mob-open-drawer-arrow { color: var(--gray-400); flex-shrink: 0; width: 16px; height: 16px; }
+            .mob-copy-empty {
+                padding: 24px 16px;
+                text-align: center;
+                color: var(--gray-400);
+                font-size: 12.5px;
+                font-style: italic;
+            }
 
             /* ── Drawer overlay + panel ── */
             .mob-demands-overlay {
