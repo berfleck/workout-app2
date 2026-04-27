@@ -17,15 +17,35 @@
     'substituir': 'Gerador · Substituir',
 } %}
 {% set _gerador_eyebrow = _eyebrow_by_acao.get(ctx_acao, 'Gerador') %}
+{# Em modo restrito (substituir/adicionar) o titulo principal vira "Treino N"
+   ou "Novo treino" pra deixar o contexto cristalino (substitui o nome do aluno). #}
+{% if ctx_acao == 'substituir' %}
+    {% set _gerador_titulo_mobile = 'Treino ' ~ ((ctx_treino_idx or 0) + 1) %}
+{% elif ctx_acao == 'adicionar' %}
+    {% set _gerador_titulo_mobile = 'Novo treino' %}
+{% else %}
+    {% set _gerador_titulo_mobile = ctx_aluno.nome if ctx_aluno else 'Selecione um aluno' %}
+{% endif %}
 <div class="gerador-mobile-topbar md:hidden">
     <a href="/{% if ctx_aluno %}?aluno_id={{ ctx_aluno.id }}{% endif %}" class="topbar-back" aria-label="Voltar">
         <svg class="icon"><use href="#i-arrow-left"/></svg>
     </a>
     <div class="topbar-title-area">
-        <div class="topbar-eyebrow">{{ _gerador_eyebrow }}</div>
-        <div class="topbar-title" id="m-topbar-title">{{ ctx_aluno.nome if ctx_aluno else 'Selecione um aluno' }}</div>
+        <div class="topbar-eyebrow">{{ _gerador_eyebrow }}{% if ctx_aluno and ctx_acao in ('substituir', 'adicionar') %} · {{ ctx_aluno.nome }}{% endif %}</div>
+        <div class="topbar-title" id="m-topbar-title">{{ _gerador_titulo_mobile }}</div>
     </div>
 </div>
+
+{# Banner amber compacto mobile (substituir/adicionar) — esclarece o contexto restrito #}
+{% if ctx_acao in ('substituir', 'adicionar') %}
+<div class="gerador-ctx-banner md:hidden">
+    <svg class="icon"><use href="#{{ 'i-replace' if ctx_acao == 'substituir' else 'i-plus' }}"/></svg>
+    <span>
+        {% if ctx_acao == 'substituir' %}Substituindo Treino {{ (ctx_treino_idx or 0) + 1 }} · outros preservados
+        {% else %}Adicionando 1 treino à rotina atual{% endif %}
+    </span>
+</div>
+{% endif %}
 
 {% if ctx_acao %}
 {% set ctx_icone = {'substituir': 'i-replace', 'adicionar': 'i-plus'}.get(ctx_acao, 'i-dumbbell') %}
@@ -344,8 +364,11 @@
         </div>
     {{ msec.close() }}
 
-    {# ── Seções de treino (T1-T5) ── etapa 10 ── #}
-    {% for t in range(MAX_TREINOS) %}
+    {# ── Seções de treino ── #}
+    {# Em modo restrito (substituir/adicionar) renderiza só 1 treino — evita confusão e
+       exclui T2-T5 vazios que seriam descartados pelo backend de qualquer forma. #}
+    {% set _mob_treinos_visiveis = 1 if ctx_acao in ('substituir', 'adicionar') else MAX_TREINOS %}
+    {% for t in range(_mob_treinos_visiveis) %}
     {{ msec.open(
         id='msec-treino-' ~ t,
         icon_text='T' ~ (t + 1),
@@ -1822,13 +1845,18 @@ watchEvitarHistWrap();
 updateMobileSubs();
 // Mobile: auto-carrega histórico do aluno do contexto e força MAX_TREINOS no desktop
 // (treinos sem demandas serão filtrados pelo backend — commit C).
+// Em modo restrito (substituir/adicionar) o n_treinos já vem travado em 1 do backend.
 if (window.matchMedia('(max-width: 768px)').matches) {
     autoCarregarHistAlunoContexto();
     const nSel = document.getElementById('n_treinos');
+    {% if ctx_acao not in ('substituir', 'adicionar') %}
     if (nSel && !nSel.disabled) { nSel.value = MAX_TREINOS; onChangeNTreinos(); }
+    {% endif %}
 }
-// Render inicial das seções de treino mobile (caso histórico já tenha sido carregado)
+// Render inicial das seções de treino mobile (caso histórico já tenha sido carregado).
+// Itera só sobre seções mobile que de fato existem (ctx restrito = só T1).
 for (let t = 0; t < MAX_TREINOS; t++) {
+    if (!document.getElementById('msec-treino-' + t)) continue;
     renderMobileDemandasList(t);
     updateMobileTreinoSection(t);
 }
