@@ -12,9 +12,12 @@
 
 **Branch ativa:** `mobile-redesign-02` (NÃO mergeada em main)
 
-**Etapas concluídas:** 1-10 ✅ · **Próxima:** Etapa 11 (lista de alunos mobile)
+**Etapas concluídas:** 1-10 ✅ (refinada pós-feedback) · **Próxima:** Etapa 11 (lista de alunos mobile)
 
 **Commits feitos (mais recente primeiro):**
+- `074603b` mobile(gerador): n_treinos emergente das demandas configuradas
+- `540dd3f` mobile(drawer): hierarquia compacta com cores por nivel
+- `88b0d65` mobile(gerador): UI quick wins pos-feedback
 - `28b4fc0` mobile(gerador): drawer lateral para escolher demandas dos treinos
 - `8b3cf89` mobile(gerador): adiciona estrutura tela unica com secoes colapsaveis
 - `d17da38` mobile(hub): modo edicao inline com banner + bottom bar focada
@@ -41,6 +44,14 @@
 10. **Bandeja de etiqueta dropada do mobile:** etiqueta do banner de rascunho mobile foi removida — já é editável inline no card aluno.
 11. **Gerador mobile (Etapa 9):** desktop e mobile coexistem na mesma página (`hidden md:grid` no desktop / `md:hidden` no bloco mobile). Inputs mobile são **controllers sem `name`**: JS espelha pros inputs do bloco desktop equivalente (que mantém os `name` que o backend espera). Único campo com `name` próprio no mobile: `etiqueta_rotina` (NEW). Topbar global (`.topbar-mobile` em base.html) é escondido no gerador via `body[data-active-page="gerador"]` — gerador renderiza sua própria topbar custom (back + eyebrow + nome do aluno). `#mobile-bar` antigo restrito ao breakpoint md (≥md e <lg) — não interfere mais com a bb global em <md.
 12. **Drawer de demandas (Etapa 10):** instância única reutilizável (não duplica por treino). `openDemandsDrawer(t)` salva `t` no `dataset.t` e copia checkboxes do tab `t` desktop pros checkboxes do drawer (mesma estrutura, prefixo `mob-`). `applyDemandsDrawer()` reverte o sync, chama `updateDemandas(t)` (desktop) que dispara o hook em `updateTotal` que re-renderiza a lista mobile T1-T5. Modo Template no drawer aplica e fecha imediato. **Não usa `subst-drawer`** (que é semanticamente "substituir 1 exercício") — drawer próprio com classes `mob-*`.
+13. **Refinamentos pós-Etapa 10 (commits 88b0d65 → 074603b):**
+    - Banner "Gerando nova rotina" escondido no mobile (`hidden md:flex`) — duplicava a topbar
+    - `accent-color: var(--brand-500)` nos sliders/checkboxes mobile
+    - Seção **Aluno** removida no mobile (info já vem na topbar; histórico do aluno auto-carrega via `autoCarregarHistAlunoContexto()` no init)
+    - Select **"Nº de treinos"** removido — mobile força `MAX_TREINOS=5` no init e o backend filtra treinos vazios em `/gerar` (`kept_indices`). Frontend mostra T1-T5 como sections; usuário só configura os que quiser
+    - **Tamanho de bloco global** mantido por enquanto; **TODO Etapa 10.5/11.5**: mover pra dentro do drawer de cada treino (per-treino) — exige `tamanho_bloco_{t}` no backend
+    - Drawer ficou compacto: cards de região **sempre abertos** (sem chevron de colapsar), subregião como chip da palette + padrões inline (ganham cor da subregião pai quando selecionados). Reduziu altura de 1 região de ~300px pra ~80px.
+    - Faixa "Total selecionado" do header do drawer removida (redundante com botão "Aplicar (N)")
 
 ### Arquivos novos criados nesta branch
 
