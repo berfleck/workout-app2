@@ -44,12 +44,27 @@
         .treino-acoes { @apply flex gap-1 flex-wrap; }
 
         .bloco-label { @apply text-[10px] font-bold text-gray-400 uppercase tracking-wider; }
-        .bloco-wrap { @apply bg-gray-50 rounded-lg py-2 mb-2; }
-        .bloco-header { @apply flex items-center gap-2 mb-1; }
+        /* Container que agrupa os blocos: arredondamento + clip dos cantos do primeiro/último */
+        .blocos-container { border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
+        /* Opção A (default): blocos colados, separados por borda mais forte que o divisor de exercícios */
+        .bloco-wrap { @apply bg-gray-50 py-1.5; border-bottom: 1px solid #c3c3c3; }
+        .blocos-container .bloco-wrap:last-child { border-bottom: none; }
+        .bloco-header { @apply flex items-center gap-1 mb-0.5 px-3; }
+        .bloco-label-text { @apply text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-auto; }
+        /* Chip legado mantido para painéis auxiliares (referência, comparação, histórico) */
         .bloco-chip { @apply inline-flex items-center justify-center rounded-full bg-brand-500 text-white font-bold text-[10px] leading-none shrink-0; width: 18px; height: 18px; }
-        .exercicio { @apply flex items-center flex-wrap gap-x-3 gap-y-0.5 py-0 pl-3 border-l-[3px] border-brand-500 leading-tight; }
+        .exercicio { @apply flex items-center flex-wrap gap-x-3 gap-y-0.5 py-1 px-3 leading-tight; }
         .exercicio-info { @apply flex-1; }
         .exercicio-nome { @apply text-sm font-semibold; }
+        .ex-label { @apply inline-block bg-brand-50 text-gray-700 font-bold font-mono mr-2 rounded; padding: 1px 6px; font-size: 11px; letter-spacing: 0.02em; }
+        /* Divisor sutil entre exercícios do mesmo bloco — funciona em ambos os layouts (com e sem wrapper) */
+        .bloco-exercicios .exercicio-wrapper + .exercicio-wrapper .exercicio,
+        .bloco-wrap .exercicio + .exercicio { border-top: 1px solid rgba(0,0,0,0.06); }
+
+        /* Opção B (toggle via body.layout-zebra): blocos colados sem borda, alternando bg */
+        body.layout-zebra .bloco-wrap { border-bottom: none; padding-top: 6px; padding-bottom: 6px; }
+        body.layout-zebra .bloco-wrap:nth-of-type(even) { background: #f3f4f6; }
+        body.layout-zebra .bloco-wrap:nth-of-type(odd)  { background: #fafbfc; }
         .exercicio-meta { @apply text-[11px] text-gray-400 mt-0.5; }
         .prescr-badge { @apply inline-flex items-center bg-brand-100 text-brand-500 rounded-md px-2 py-0.5 text-[11px] font-semibold font-mono whitespace-nowrap ml-auto shrink-0; }
         .exercicio-acoes { @apply flex gap-0.5 shrink-0; }
@@ -596,6 +611,10 @@
             /* Esconde Concluir/Cancelar/PNG do header do card editado no mobile (acoes vao pra bb) */
             .treino-card.modo-editar .edit-mode-actions { display: none !important; }
             .treino-card.modo-editar .treino-acoes { display: none !important; }
+            /* Garantia: no mobile, no card de visualizar, só o kebab (md:hidden = visível <768)
+               aparece. As ações desktop (hidden md:inline-flex) ficam ocultas — força display:none
+               com !important caso a precedência de utilitários do Tailwind CDN falhe. */
+            .treino-card .treino-acoes > .hidden { display: none !important; }
 
             /* ── Gerador mobile · topbar custom (≤768px) ── redesign 02 etapa 9 ── */
             /* Quebra padding-top do wrapper pra topbar grudar no topo */
@@ -1848,15 +1867,15 @@
         .resultado-grid.focando-edicao .treino-card.modo-visualizar .treino-header { margin-bottom: 0; }
 
         /* Diff colors */
-        .diff-removido { background: #fef2f2 !important; border-left-color: #f87171 !important; }
-        .diff-adicionado { background: #f0fdf4 !important; border-left-color: #4ade80 !important; }
+        .diff-removido { background: #fef2f2 !important; border-left: 3px solid #f87171; padding-left: 9px !important; }
+        .diff-adicionado { background: #f0fdf4 !important; border-left: 3px solid #4ade80; padding-left: 9px !important; }
 
         /* Modo visualizar compacto */
         .treino-card.modo-visualizar { padding: 14px 18px; }
         .treino-card.modo-visualizar .treino-header { margin-bottom: 8px; }
-        .treino-card.modo-visualizar .bloco-wrap { padding-top: 4px; padding-bottom: 4px; margin-bottom: 6px; }
-        .treino-card.modo-visualizar .bloco-header { margin-bottom: 2px; }
-        .treino-card.modo-visualizar .exercicio { padding: 3px 0 3px 10px; margin-bottom: 2px; border-left-width: 2px; }
+        .treino-card.modo-visualizar .bloco-wrap { padding-top: 4px; padding-bottom: 4px; }
+        .treino-card.modo-visualizar .bloco-header { display: none; }
+        .treino-card.modo-visualizar .exercicio { padding: 4px 10px; margin-bottom: 0; }
         .treino-card.modo-visualizar .exercicio-nome { font-size: 13px; }
         .treino-card.modo-visualizar hr.thin { margin: 4px 0; }
 
@@ -1907,7 +1926,7 @@
         .seg-btn.active { background: white; color: #111827; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
         /* Chips de região (no header do card de treino) */
-        .regiao-chips { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+        .regiao-chips { display: flex; flex-direction: row; gap: 4px; flex-wrap: wrap; align-items: center; width: 100%; min-width: 0; }
         .reg-chip { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 5px; line-height: 1.4; white-space: nowrap; }
         .reg-chip-peito        { background: #ffe4e6; color: #9f1239; }
         .reg-chip-costas       { background: #e0f2fe; color: #075985; }

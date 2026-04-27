@@ -243,15 +243,13 @@
             </div>
             {% endif %}
         </div>
+        <div class="blocos-container">
         {% for bloco in sessao.blocos %}
         <div class="bloco-wrap">
-        <div class="bloco-header">
-            <span class="bloco-chip">{{ bloco.label }}</span>
-        </div>
         {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
-        <div class="exercicio" style="border-left-color:#9ca3af">
+        <div class="exercicio">
             <div class="exercicio-info">
-                <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}</span>
+                <span class="exercicio-nome"><span class="ex-label" style="color:#6b7280">{{ bloco.label }}{{ loop.index }}</span>{{ ex.nome }}</span>
             </div>
             {% if ex.series or ex.reps %}
             <span class="prescr-badge" style="background:#f3f4f6; color:#6b7280">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
@@ -260,6 +258,7 @@
         {% endfor %}
         </div>
         {% endfor %}
+        </div>
     </div>
 </div>
 {% endfor %}

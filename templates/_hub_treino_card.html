@@ -43,15 +43,13 @@
                     hx-confirm="Remover Treino {{ idx + 1 }} da rotina? Esta ação não pode ser desfeita."><svg class="icon"><use href="#i-trash"/></svg></button>
         </div>
     </div>
+    <div class="blocos-container">
     {% for bloco in sessao.blocos %}
     <div class="bloco-wrap">
-    <div class="bloco-header">
-        <span class="bloco-chip">{{ bloco.label }}</span>
-    </div>
     {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
     <div class="exercicio">
         <div class="exercicio-info">
-            <span class="exercicio-nome">{{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
+            <span class="exercicio-nome"><span class="ex-label">{{ bloco.label }}{{ loop.index }}</span>{{ ex.nome }}
                 {% if nomes_anteriores and ex.nome in nomes_anteriores %}
                 <span class="badge-mantido">✓ mantido</span>
                 {% endif %}
@@ -64,4 +62,5 @@
     {% endfor %}
     </div>
     {% endfor %}
+    </div>
 </div>

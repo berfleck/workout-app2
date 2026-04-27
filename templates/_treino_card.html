@@ -83,6 +83,7 @@
         </div>
     </div>
 
+    <div class="blocos-container">
     {% for bloco in sessao.blocos %}
     {% set exs = [] %}
     {% if bloco.ex1 %}{% set _ = exs.append(bloco.ex1) %}{% endif %}
@@ -92,7 +93,8 @@
     <div class="bloco-wrap">
     {% if modo == 'editar' %}
     <div class="bloco-header">
-        <span class="bloco-chip">{{ bloco.label }}</span>        <button class="btn-ghost" title="Regerar bloco" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/regerar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML" hx-confirm="Regerar bloco {{ bloco.label }} com novos exercícios?"><svg class="icon"><use href="#i-refresh-cw"/></svg></button>
+        <span class="bloco-label-text">Bloco {{ bloco.label }}</span>
+        <button class="btn-ghost" title="Regerar bloco" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/regerar" hx-target="#treino-{{ idx }}" hx-swap="innerHTML" hx-confirm="Regerar bloco {{ bloco.label }} com novos exercícios?"><svg class="icon"><use href="#i-refresh-cw"/></svg></button>
         {% if loop.index0 > 0 %}
         <button class="btn-ghost" title="Mover acima" hx-post="/treino/{{ idx }}/bloco/{{ loop.index0 }}/mover/up" hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-arrow-up"/></svg></button>
         {% endif %}
@@ -103,7 +105,8 @@
     </div>
     {% else %}
     <div class="bloco-header">
-        <span class="bloco-chip">{{ bloco.label }}</span>    </div>
+        <span class="bloco-label-text">Bloco {{ bloco.label }}</span>
+    </div>
     {% endif %}
 
     {% set bloco_idx = loop.index0 %}
@@ -116,7 +119,7 @@
             {% if modo == 'editar' %}<span class="drag-handle" title="Arrastar"><svg class="icon"><use href="#i-grip-vertical"/></svg></span>{% endif %}
             <div class="exercicio-info">
                 <span class="exercicio-nome">
-                    {{ bloco.label }}{{ loop.index }} · {{ ex.nome }}
+                    <span class="ex-label">{{ bloco.label }}{{ loop.index }}</span>{{ ex.nome }}
                     {% if modo != 'editar' and nomes_ref is defined and nomes_ref %}
                         {% if ex.nome not in nomes_ref %}
                         <span class="badge-novo">novo</span>
@@ -227,6 +230,7 @@
 
     </div>
     {% endfor %}
+    </div>
 
     {% if bloco_vazio_guiado %}
     {% set aluno = criacao_manual_aluno_obj %}
