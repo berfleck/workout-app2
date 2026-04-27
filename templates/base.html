@@ -664,10 +664,11 @@
                 display: grid; place-items: center;
                 flex-shrink: 0;
             }
-            .section-icon .icon { width: 14px; height: 14px; }
+            .section-icon .icon { width: 16px; height: 16px; stroke-width: 2.2; }
             .section.has-content .section-icon {
-                background: var(--brand-50);
-                color: var(--brand-600);
+                background: var(--brand-100);
+                color: var(--brand-700);
+                border: 1px solid var(--brand-200);
             }
             .section.is-treino .section-icon {
                 background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
@@ -749,6 +750,27 @@
                 font-size: 13px;
                 border-radius: 8px;
             }
+
+            /* ── Nome da rotina (campo solto acima de Configurações) ── */
+            .m-rotina-nome {
+                width: 100%;
+                padding: 11px 14px;
+                background: white;
+                border: 1px solid var(--gray-200);
+                border-radius: 11px;
+                font-size: 14px; font-weight: 600;
+                color: var(--gray-900);
+                font-family: inherit;
+                margin-bottom: 10px;
+                letter-spacing: -0.005em;
+                box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset;
+            }
+            .m-rotina-nome::placeholder { color: var(--gray-400); font-weight: 500; }
+            .m-rotina-nome:focus {
+                outline: none;
+                border-color: var(--brand-500);
+                box-shadow: 0 0 0 3px rgba(232,93,4,0.10);
+            }
             .section-body input[type="range"],
             .section-body input[type="checkbox"] { accent-color: var(--brand-500); }
             .section-body .field-select {
@@ -826,17 +848,23 @@
                 color: white;
             }
             .mob-demanda-item {
-                display: flex; align-items: center; gap: 6px;
-                padding: 6px 0;
+                display: flex; align-items: center; gap: 8px;
+                padding: 7px 0;
                 font-size: 11px;
             }
             .mob-demanda-item:not(:last-child) {
                 border-bottom: 1px dashed var(--gray-200);
             }
-            .mob-demanda-name {
-                flex: 1; min-width: 0;
-                color: var(--gray-700);
-                display: inline-flex; align-items: center; gap: 6px;
+            /* Chip da demanda (label inteira dentro de chip colorido) */
+            .mob-demanda-chip {
+                flex: 1;
+                min-width: 0;
+                font-size: 12px;
+                font-weight: 700;
+                padding: 4px 10px;
+                border-radius: 6px;
+                letter-spacing: -0.005em;
+                line-height: 1.4;
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
             }
             .mob-demanda-counter {

@@ -295,25 +295,25 @@
    bloco desktop acima (que mantém os `name` que o backend espera).
    Etiqueta da rotina é exclusiva do mobile (campo novo, name="etiqueta_rotina").
 ═══════════════════════════════════════════════════════════════════ #}
-{% set _mob_config_open = (ctx_acao in ('', 'nova_rotina')) %}
 <div id="gerador-mobile" class="gerador-mobile md:hidden">
 
-    {# ── Seção Configurações gerais ── #}
+    {# ── Nome da rotina (campo solto, acima do card de Configurações) ── #}
+    <input type="text" class="m-rotina-nome" id="m-etiqueta-rotina"
+           name="etiqueta_rotina"
+           placeholder="Nome da rotina (ex: 3x full body)"
+           autocomplete="off"
+           maxlength="60">
+
+    {# ── Seção Configurações ── inicia FECHADA (uso esporádico) ── #}
     {{ msec.open(
         id='msec-config',
-        icon='i-sliders',
+        icon='i-settings',
         title='Configurações',
         sub='cx 5',
-        open=_mob_config_open,
+        open=False,
         has_content=True
     ) }}
-        <input type="text" class="field-input field-input-compact" id="m-etiqueta-rotina"
-               name="etiqueta_rotina"
-               placeholder="Etiqueta da rotina (ex: Hipertrofia Abr/26)"
-               autocomplete="off"
-               maxlength="60">
-
-        <label class="field-label" for="m-max-cx" style="margin-top: 12px;">Complexidade máxima</label>
+        <label class="field-label" for="m-max-cx">Complexidade máxima</label>
         <div class="field-range">
             <input type="range" id="m-max-cx" min="1" max="5" step="1" value="5"
                    data-mirror="input[name=max_complexidade]"
@@ -1380,10 +1380,8 @@ function renderMobileDemandasList(t) {
             const pad = inp.name.substring(('epp_' + t + '_').length);
             const val = parseInt(inp.value) || 0;
             if (val === 0) return;
-            const label = PADROES_LABELS[pad] || pad;
             rows += `<div class="mob-demanda-item">
                 ${chipForPadrao(pad)}
-                <span class="mob-demanda-name">${label}</span>
                 <div class="mob-demanda-counter">
                     <button type="button" onclick="bumpMobileEpp(${t}, '${pad}', -1)"><svg class="icon"><use href="#i-minus"/></svg></button>
                     <span>${val}</span>
@@ -1408,10 +1406,8 @@ function renderMobileDemandasList(t) {
         const nivel = nInp.value, escopo = eInp.value;
         const qtd = parseInt(qInp.value) || 0;
         if (qtd === 0) return;
-        const label = labelForDemanda(nivel, escopo);
         rows += `<div class="mob-demanda-item">
-            ${chipFor(nivel, escopo)}
-            <span class="mob-demanda-name">${label}</span>
+            ${chipDemandaLabel(nivel, escopo)}
             <div class="mob-demanda-counter">
                 <button type="button" onclick="bumpMobileDem(${t}, '${idx}', -1)"><svg class="icon"><use href="#i-minus"/></svg></button>
                 <span>${qtd}</span>
@@ -1427,32 +1423,45 @@ function renderMobileDemandasList(t) {
     </div>${rows}`;
 }
 
+// Mapping subregião → slug do .reg-chip-* (consistente com base.html)
+const SUBREGIAO_SLUG = {
+    peito: 'peito', costas: 'costas', ombro: 'ombro', bracos: 'bracos',
+    perna_anterior: 'perna-ant', perna_posterior: 'perna-post',
+    adutores: 'adutores', panturrilha: 'panturrilha',
+    core: 'core', cardio: 'cardio'
+};
+
 function labelForDemanda(nivel, escopo) {
     if (nivel === 'padrao') return PADROES_LABELS[escopo] || escopo;
     if (nivel === 'subregiao') return SUBREGIOES_LABELS_JS[escopo] || escopo;
-    if (nivel === 'regiao') return (REGIOES_LABELS_JS[escopo] || escopo) + ' (inteira)';
+    if (nivel === 'regiao') return (REGIOES_LABELS_JS[escopo] || escopo) + ' (toda)';
     return escopo;
 }
 
-function chipFor(nivel, escopo) {
-    if (nivel === 'padrao') return chipForPadrao(escopo);
-    if (nivel === 'subregiao') {
-        const lab = SUBREGIOES_LABELS_JS[escopo] || escopo;
-        return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${lab}</span>`;
+// Retorna o slug do chip pra colorir a demanda inteira com a cor do grupo correspondente.
+function slugForDemanda(nivel, escopo) {
+    if (nivel === 'padrao') {
+        const c = PADRAO_PARA_CHIP_JS[escopo];
+        return c ? c[1] : null;
     }
-    if (nivel === 'regiao') {
-        const cor = {core: 'core', cardio: 'cardio'}[escopo];
-        const lab = REGIOES_LABELS_JS[escopo] || escopo;
-        if (cor) return `<span class="reg-chip reg-chip-${cor}">${lab}</span>`;
-        return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${lab}</span>`;
-    }
-    return '';
+    if (nivel === 'subregiao') return SUBREGIAO_SLUG[escopo] || null;
+    if (nivel === 'regiao') return ({core: 'core', cardio: 'cardio'})[escopo] || null;
+    return null;
+}
+
+// Renderiza UM chip colorido com a label da demanda inteira dentro
+function chipDemandaLabel(nivel, escopo) {
+    const label = labelForDemanda(nivel, escopo);
+    const slug = slugForDemanda(nivel, escopo);
+    if (slug) return `<span class="reg-chip reg-chip-${slug} mob-demanda-chip">${label}</span>`;
+    return `<span class="reg-chip mob-demanda-chip" style="background:var(--gray-100);color:var(--gray-700)">${label}</span>`;
 }
 
 function chipForPadrao(pad) {
     const c = PADRAO_PARA_CHIP_JS[pad];
-    if (c) return `<span class="reg-chip reg-chip-${c[1]}">${c[0]}</span>`;
-    return `<span class="reg-chip" style="background:#f3f4f6;color:#4b5563">${pad}</span>`;
+    const label = PADROES_LABELS[pad] || pad;
+    if (c) return `<span class="reg-chip reg-chip-${c[1]} mob-demanda-chip">${label}</span>`;
+    return `<span class="reg-chip mob-demanda-chip" style="background:var(--gray-100);color:var(--gray-700)">${label}</span>`;
 }
 
 // Wrappers que delegam para os bumpers do desktop
