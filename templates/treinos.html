@@ -1597,11 +1597,7 @@ function toggleMobSubregiao(subregiao, regiao) {
     refreshDrawerVisuals();
     updateDrawerCounters();
 }
-function toggleDrawerRegiao(regiao) {
-    const card = document.getElementById('m-reg-card-' + regiao);
-    if (card) card.classList.toggle('open');
-}
-// Listener no drawer pra refletir cliques nas labels (.mob-padrao-tag com input dentro)
+// Listener no drawer pra refletir cliques nas labels (.mob-pad-tag com input dentro)
 function onMobDemandasChange() {
     refreshDrawerVisuals();
     updateDrawerCounters();
@@ -1609,27 +1605,25 @@ function onMobDemandasChange() {
 
 function refreshDrawerVisuals() {
     const drawer = document.getElementById('mob-demands-drawer');
-    drawer.querySelectorAll('.mob-regiao-card').forEach(card => {
-        const reg = card.dataset.regiao;
+    drawer.querySelectorAll('.mob-rcard').forEach(card => {
         const regCheck = !!card.querySelector('.mob-reg-chk:checked');
         const anyChild = !!card.querySelector('.mob-sub-chk:checked, .mob-pad-chk:checked, .mob-lat-chk:checked');
-        card.classList.toggle('has-selected', regCheck || anyChild);
-        const regToggle = card.querySelector('.mob-regiao-toggle');
-        if (regToggle) regToggle.classList.toggle('selected', regCheck);
-        const summary = card.querySelector('[data-summary]');
-        if (summary) {
+        card.classList.toggle('has-region-selected', regCheck);
+        const hint = card.querySelector('[data-summary]');
+        if (hint) {
             if (regCheck) {
-                summary.textContent = 'região inteira';
-            } else {
+                hint.textContent = 'região inteira selecionada';
+            } else if (anyChild) {
                 const n = card.querySelectorAll('.mob-sub-chk:checked, .mob-pad-chk:checked, .mob-lat-chk:checked').length;
-                summary.textContent = n > 0 ? (n + ' selec.') : '—';
+                hint.textContent = n + ' selec.';
+            } else {
+                hint.textContent = 'tap = região inteira';
             }
         }
-        card.querySelectorAll('.mob-subregiao-block[data-subregiao]').forEach(block => {
-            const sub = block.dataset.subregiao;
-            const subChecked = !!block.querySelector('.mob-sub-chk:checked');
-            const subToggle = block.querySelector('.mob-subregiao-toggle');
-            if (subToggle) subToggle.classList.toggle('active', subChecked);
+        card.querySelectorAll('.mob-srow[data-subregiao]').forEach(row => {
+            const subChecked = !!row.querySelector('.mob-sub-chk:checked');
+            const subTag = row.querySelector('.mob-sub-tag');
+            if (subTag) subTag.classList.toggle('active', subChecked);
         });
     });
 }

@@ -1027,124 +1027,157 @@
             }
             .mode-btn .icon { width: 11px; height: 11px; }
 
-            /* Cards de região no drawer */
-            .mob-regiao-card {
-                background: var(--gray-50);
+            /* ── Drawer hierarquia compacta ── cores por nível ── */
+            .mob-rcard {
+                background: white;
                 border: 1px solid var(--gray-200);
                 border-radius: 10px;
                 margin-bottom: 8px;
                 overflow: hidden;
             }
-            .mob-regiao-card.has-selected {
-                border-color: var(--brand-500);
-                background: white;
-            }
-            .mob-regiao-head {
-                padding: 9px 11px;
+            .mob-rcard-head {
+                width: 100%;
+                padding: 8px 10px;
                 display: flex; align-items: center; gap: 8px;
                 cursor: pointer;
+                background: transparent;
+                border: none;
+                font-family: inherit;
+                text-align: left;
+                transition: filter 0.15s;
             }
-            .mob-regiao-head:hover { background: white; }
-            .mob-regiao-card.open .mob-regiao-head {
-                background: white;
-                border-bottom: 1px solid var(--gray-200);
-            }
-            .mob-regiao-icon {
-                width: 26px; height: 26px;
-                border-radius: 7px;
+            .mob-rcard-head:hover { filter: brightness(0.97); }
+            .mob-rcard-icon {
+                width: 22px; height: 22px;
+                border-radius: 6px;
                 display: grid; place-items: center;
                 flex-shrink: 0;
-            }
-            .mob-regiao-icon.upper  { background: #ffe4e6; color: #9f1239; }
-            .mob-regiao-icon.lower  { background: #d1fae5; color: #065f46; }
-            .mob-regiao-icon.core   { background: #f3e8ff; color: #6b21a8; }
-            .mob-regiao-icon.cardio { background: #fef9c3; color: #854d0e; }
-            .mob-regiao-icon .icon { width: 12px; height: 12px; }
-            .mob-regiao-title {
-                font-size: 13px; font-weight: 700;
-                color: var(--gray-900);
-                letter-spacing: -0.012em;
-                flex: 1;
-            }
-            .mob-regiao-summary {
-                font-family: var(--font-mono);
-                font-size: 10px; font-weight: 600;
-                color: var(--gray-400);
-            }
-            .mob-regiao-card.has-selected .mob-regiao-summary { color: var(--brand-600); }
-            .mob-regiao-chevron {
-                color: var(--gray-400);
-                transition: transform 0.2s;
-                flex-shrink: 0;
-                width: 11px; height: 11px;
-            }
-            .mob-regiao-card.open .mob-regiao-chevron { transform: rotate(90deg); }
-            .mob-regiao-body {
-                padding: 10px 11px;
-                display: none;
-            }
-            .mob-regiao-card.open .mob-regiao-body { display: block; }
-
-            .mob-subregiao-block { margin-bottom: 10px; }
-            .mob-subregiao-block:last-child { margin-bottom: 0; }
-            .mob-subregiao-label {
-                font-family: var(--font-mono);
-                font-size: 9.5px;
-                color: var(--gray-500);
-                text-transform: uppercase; letter-spacing: 0.08em;
-                font-weight: 700;
-                margin-bottom: 6px;
-                display: flex; align-items: center; gap: 6px;
-            }
-            .mob-subregiao-toggle {
-                font-family: var(--font-mono);
-                font-size: 9px;
-                padding: 1.5px 6px;
-                border-radius: 4px;
-                background: var(--gray-100);
-                color: var(--gray-600);
-                font-weight: 700;
-                cursor: pointer;
-                transition: all 0.15s;
-                border: none;
-            }
-            .mob-subregiao-toggle:hover { background: var(--brand-100); color: var(--brand-700); }
-            .mob-subregiao-toggle.active {
-                background: var(--brand-500);
                 color: white;
             }
-            .mob-padroes-tags { display: flex; flex-wrap: wrap; gap: 5px; }
-            .mob-padrao-tag {
-                font-size: 11.5px;
-                padding: 5px 9px;
-                border-radius: 7px;
+            .mob-rcard-icon .icon { width: 11px; height: 11px; }
+            .mob-rcard-title {
+                font-size: 12.5px; font-weight: 800;
+                letter-spacing: -0.012em;
+                color: var(--gray-900);
+                text-transform: uppercase;
+            }
+            .mob-rcard-hint {
+                margin-left: auto;
+                font-family: var(--font-mono);
+                font-size: 9.5px; font-weight: 600;
+                color: var(--gray-400);
+                text-transform: lowercase;
+                letter-spacing: 0;
+            }
+            /* Cores por região (header) */
+            .rcard-upper  { background: linear-gradient(180deg, #ffe4e6 0%, #ffd5d8 100%); border-color: #f9a8a8; }
+            .rcard-lower  { background: linear-gradient(180deg, #d1fae5 0%, #b7f0d2 100%); border-color: #6ee7b7; }
+            .rcard-core   { background: linear-gradient(180deg, #f3e8ff 0%, #e9d5ff 100%); border-color: #c4b5fd; }
+            .rcard-cardio { background: linear-gradient(180deg, #fef9c3 0%, #fef08a 100%); border-color: #fde047; }
+            .rcard-upper  .mob-rcard-icon { background: #9f1239; }
+            .rcard-lower  .mob-rcard-icon { background: #065f46; }
+            .rcard-core   .mob-rcard-icon { background: #6b21a8; }
+            .rcard-cardio .mob-rcard-icon { background: #854d0e; }
+
+            .mob-rcard.has-region-selected .mob-rcard-head {
+                background: linear-gradient(180deg, var(--brand-500), var(--brand-600));
+                color: white;
+            }
+            .mob-rcard.has-region-selected .mob-rcard-title,
+            .mob-rcard.has-region-selected .mob-rcard-hint { color: white; }
+            .mob-rcard.has-region-selected .mob-rcard-hint { font-weight: 800; opacity: 0.9; }
+            .mob-rcard.has-region-selected .mob-rcard-icon {
+                background: rgba(255,255,255,0.25);
+            }
+
+            .mob-rcard-body {
+                padding: 8px 10px 10px;
+                background: white;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            /* Subregião + padrões inline (tudo na mesma linha quando cabe) */
+            .mob-srow {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 4px;
+                padding: 3px 0;
+            }
+            .mob-srow + .mob-srow { border-top: 1px dashed var(--gray-200); padding-top: 6px; }
+
+            /* Tag de subregião — cor MÉDIA da paleta da subregião (chip da palette) */
+            .mob-sub-tag {
+                font-size: 11px; font-weight: 700;
+                padding: 3px 8px;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: all 0.12s;
+                border: 1px solid transparent;
+                font-family: inherit;
+                white-space: nowrap;
+                margin-right: 2px;
+            }
+            .mob-pad-tag {
+                font-size: 11px;
+                padding: 3px 8px;
+                border-radius: 5px;
                 background: white;
                 border: 1px solid var(--gray-200);
-                color: var(--gray-700);
+                color: var(--gray-600);
                 cursor: pointer;
-                transition: all 0.15s;
+                transition: all 0.12s;
                 display: inline-flex; align-items: center;
-                gap: 5px;
+                gap: 4px;
                 font-weight: 500;
                 letter-spacing: -0.005em;
                 font-family: inherit;
+                white-space: nowrap;
             }
-            .mob-padrao-tag .icon { width: 10px; height: 10px; }
-            .mob-padrao-tag input { display: none; }
-            .mob-padrao-tag:hover { border-color: var(--brand-300); color: var(--brand-600); }
-            .mob-padrao-tag.selected,
-            .mob-padrao-tag:has(input:checked) {
-                background: var(--brand-50);
-                border-color: var(--brand-500);
-                color: var(--brand-700);
-                font-weight: 700;
-            }
-            .mob-regiao-toggle.selected {
-                background: var(--brand-500);
-                color: white;
-                border-color: var(--brand-500);
-            }
-            .mob-regiao-toggle.selected .icon { color: white; }
+            .mob-pad-tag input { display: none; }
+            .mob-pad-tag:hover { border-color: var(--gray-400); color: var(--gray-900); }
+
+            /* Cores por subregião — chips inativos (cor leve) */
+            .tag-peito          { background: #ffe4e6; color: #9f1239; }
+            .tag-costas         { background: #e0f2fe; color: #075985; }
+            .tag-ombro          { background: #fef3c7; color: #92400e; }
+            .tag-bracos         { background: #ede9fe; color: #5b21b6; }
+            .tag-perna_anterior { background: #d1fae5; color: #065f46; }
+            .tag-perna_posterior{ background: #ccfbf1; color: #115e59; }
+            .tag-adutores       { background: #ecfccb; color: #3f6212; }
+            .tag-panturrilha    { background: #e0e7ff; color: #3730a3; }
+            .tag-core           { background: #f3e8ff; color: #6b21a8; }
+            .tag-cardio         { background: #fef9c3; color: #854d0e; }
+
+            /* Selecionada: borda da cor sólida + ring */
+            .mob-sub-tag.active.tag-peito          { background: #9f1239; color: white; }
+            .mob-sub-tag.active.tag-costas         { background: #075985; color: white; }
+            .mob-sub-tag.active.tag-ombro          { background: #92400e; color: white; }
+            .mob-sub-tag.active.tag-bracos         { background: #5b21b6; color: white; }
+            .mob-sub-tag.active.tag-perna_anterior { background: #065f46; color: white; }
+            .mob-sub-tag.active.tag-perna_posterior{ background: #115e59; color: white; }
+            .mob-sub-tag.active.tag-adutores       { background: #3f6212; color: white; }
+            .mob-sub-tag.active.tag-panturrilha    { background: #3730a3; color: white; }
+            .mob-sub-tag.active.tag-core           { background: #6b21a8; color: white; }
+            .mob-sub-tag.active.tag-cardio         { background: #854d0e; color: white; }
+
+            /* Padrões ativos: ganham cor da subregião pai (via class tag-pad-X) */
+            .mob-pad-tag:has(input:checked) { font-weight: 700; }
+            .tag-pad-peito:has(input:checked)          { background: #ffe4e6; border-color: #9f1239; color: #9f1239; }
+            .tag-pad-costas:has(input:checked)         { background: #e0f2fe; border-color: #075985; color: #075985; }
+            .tag-pad-ombro:has(input:checked)          { background: #fef3c7; border-color: #92400e; color: #92400e; }
+            .tag-pad-bracos:has(input:checked)         { background: #ede9fe; border-color: #5b21b6; color: #5b21b6; }
+            .tag-pad-perna_anterior:has(input:checked) { background: #d1fae5; border-color: #065f46; color: #065f46; }
+            .tag-pad-perna_posterior:has(input:checked){ background: #ccfbf1; border-color: #115e59; color: #115e59; }
+            .tag-pad-adutores:has(input:checked)       { background: #ecfccb; border-color: #3f6212; color: #3f6212; }
+            .tag-pad-panturrilha:has(input:checked)    { background: #e0e7ff; border-color: #3730a3; color: #3730a3; }
+            .tag-pad-core:has(input:checked)           { background: #f3e8ff; border-color: #6b21a8; color: #6b21a8; }
+            .tag-pad-cardio:has(input:checked)         { background: #fef9c3; border-color: #854d0e; color: #854d0e; }
+
+            /* Quando região inteira está marcada, "fade" os padrões/sub (eles serão ignorados) */
+            .mob-rcard.has-region-selected .mob-rcard-body { opacity: 0.45; pointer-events: none; }
 
             /* Templates list */
             .mob-tmpl-list {
