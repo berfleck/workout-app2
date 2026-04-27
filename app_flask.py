@@ -2092,6 +2092,32 @@ def alunos_page():
     alunos = carregar_alunos()
     if is_htmx:
         return render_template("alunos.html", alunos=alunos)
+    # Enriquecimento (mobile): n_treinos, data_atualizada, dias_atras p/ status dot
+    from datetime import datetime
+    hoje = datetime.now()
+    for a in alunos:
+        a["_n_treinos"] = 0
+        a["_atualizado_label"] = ""
+        a["_dias_atras"] = None
+        rid = a.get("rotina_ativa_id")
+        if not rid:
+            continue
+        reg = carregar_registro(rid)
+        if not reg:
+            continue
+        a["_n_treinos"] = reg.get("n_treinos", 0) or len(reg.get("sessoes", []))
+        data_ref = reg.get("data_atualizada") or reg.get("data_salvo") or reg.get("data") or ""
+        if data_ref:
+            try:
+                dt = datetime.strptime(data_ref.split(" ")[0], "%d/%m/%Y")
+                dias = (hoje - dt).days
+                a["_dias_atras"] = dias
+                if dias == 0: a["_atualizado_label"] = "hoje"
+                elif dias == 1: a["_atualizado_label"] = "1d"
+                elif dias < 30: a["_atualizado_label"] = f"{dias}d"
+                else: a["_atualizado_label"] = f"{dias // 30}m"
+            except (ValueError, IndexError):
+                pass
     return render_template("alunos_page.html", active_page="alunos", alunos=alunos)
 
 @app.route("/alunos/novo", methods=["POST"])

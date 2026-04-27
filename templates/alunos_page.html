@@ -1,6 +1,256 @@
 {% extends "base.html" %}
+
+{% block bb_actions %}
+<button type="button" class="bb-action primary" onclick="openNovoAlunoSheet()">
+    <svg class="icon icon-sm"><use href="#i-plus"/></svg>
+    Aluno
+</button>
+{% endblock %}
+
 {% block content %}
-<div id="alunos-content">
+
+{# ─── Topbar custom mobile (logo + search bar) — substitui o topbar global no /alunos ─── #}
+<div class="alunos-mobile-topbar md:hidden">
+    <a href="/" class="topbar-mobile-logo" aria-label="Início">BF</a>
+    <div class="alunos-search-wrap">
+        <svg class="icon icon-sm alunos-search-icon"><use href="#i-search"/></svg>
+        <input type="search" id="alunos-search" class="alunos-search-input"
+               placeholder="Buscar aluno…" autocomplete="off"
+               oninput="filtrarAlunosMobile()">
+    </div>
+</div>
+
+{# ─── Desktop: render original ─── #}
+<div id="alunos-content" class="hidden md:block">
     {% include "alunos.html" %}
 </div>
+
+{# ─── Mobile: lista nova ─── #}
+{% set _aluno_atual = _topbar_aluno %}
+{% set _ativos = alunos | selectattr('rotina_ativa_id') | list %}
+{% set _outros_ativos = _ativos if not _aluno_atual else _ativos | rejectattr('id', 'equalto', _aluno_atual.id) | list %}
+{% set _sem_rotina = alunos | rejectattr('rotina_ativa_id') | list %}
+{% set _objetivos_unicos = alunos | map(attribute='objetivo') | reject('none') | reject('equalto', '') | unique | list %}
+
+<div id="alunos-mobile" class="alunos-mobile md:hidden">
+    {% if not alunos %}
+    <div class="alunos-empty">
+        <svg class="icon" style="width:36px;height:36px;color:var(--gray-300)"><use href="#i-users"/></svg>
+        <div class="alunos-empty-title">Nenhum aluno cadastrado</div>
+        <div class="alunos-empty-sub">Toque em <strong>+ Aluno</strong> abaixo para começar</div>
+    </div>
+    {% else %}
+
+    {# Filtros chip horizontais #}
+    <div class="alunos-filter-bar" id="alunos-filter-bar">
+        <button type="button" class="alunos-filter-chip active" data-filter="todos" onclick="setAlunoFilter(this)">
+            Todos <span class="alunos-chip-count">{{ alunos|length }}</span>
+        </button>
+        <button type="button" class="alunos-filter-chip" data-filter="ativos" onclick="setAlunoFilter(this)">
+            Ativos <span class="alunos-chip-count">{{ _ativos|length }}</span>
+        </button>
+        {% if _sem_rotina %}
+        <button type="button" class="alunos-filter-chip" data-filter="sem-rotina" onclick="setAlunoFilter(this)">
+            Sem rotina <span class="alunos-chip-count">{{ _sem_rotina|length }}</span>
+        </button>
+        {% endif %}
+        {% for nivel in ['iniciante', 'intermediario', 'avancado'] %}
+            {% set _count = alunos | selectattr('nivel', 'equalto', nivel) | list | length %}
+            {% if _count > 0 %}
+            <button type="button" class="alunos-filter-chip" data-filter="nivel:{{ nivel }}" onclick="setAlunoFilter(this)">
+                {{ {'iniciante': 'Inic.', 'intermediario': 'Interm.', 'avancado': 'Avanç.'}[nivel] }}
+                <span class="alunos-chip-count">{{ _count }}</span>
+            </button>
+            {% endif %}
+        {% endfor %}
+        {% for obj in _objetivos_unicos %}
+            {% set _count = alunos | selectattr('objetivo', 'equalto', obj) | list | length %}
+            {% if _count > 0 %}
+            <button type="button" class="alunos-filter-chip" data-filter="obj:{{ obj }}" onclick="setAlunoFilter(this)">
+                {{ obj | capitalize }} <span class="alunos-chip-count">{{ _count }}</span>
+            </button>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    {# ─── Macro: card de aluno ─── #}
+    {% macro aluno_card(aluno, eh_atual=False) -%}
+        {% set _ini = (aluno.nome[:2] | upper) if aluno.nome else '?' %}
+        {% set _avatar_color = (aluno.id|int) % 5 %}
+        {% set _avatar_classes = ['brown', 'blue', 'green', 'amber', 'gray'] %}
+        {% set _dot = 'gray' %}
+        {% if aluno.get('_dias_atras') is not none %}
+            {% if aluno._dias_atras < 7 %}{% set _dot = 'green' %}
+            {% elif aluno._dias_atras < 30 %}{% set _dot = 'amber' %}
+            {% else %}{% set _dot = 'gray' %}{% endif %}
+        {% endif %}
+        <a href="/?aluno_id={{ aluno.id }}"
+           class="aluno-mob-card{% if eh_atual %} is-atual{% endif %}"
+           data-nome="{{ aluno.nome | lower }}"
+           data-nivel="{{ aluno.get('nivel', '') }}"
+           data-objetivo="{{ aluno.get('objetivo', '') }}"
+           data-tem-rotina="{{ '1' if aluno.get('rotina_ativa_id') else '0' }}">
+            <div class="aluno-mob-avatar avatar-{{ _avatar_classes[_avatar_color] }}">{{ _ini }}</div>
+            <div class="aluno-mob-info">
+                <div class="aluno-mob-name-row">
+                    <span class="aluno-mob-status status-{{ _dot }}"></span>
+                    <span class="aluno-mob-name">{{ aluno.nome }}</span>
+                </div>
+                <div class="aluno-mob-meta">
+                    {%- set _meta = [] -%}
+                    {%- if aluno.get('nivel') -%}{%- set _ = _meta.append({'iniciante': 'iniciante', 'intermediario': 'interm.', 'avancado': 'avanç.'}.get(aluno.nivel, aluno.nivel)) -%}{%- endif -%}
+                    {%- if aluno.get('_n_treinos', 0) > 0 -%}{%- set _ = _meta.append(aluno._n_treinos | string ~ ' treinos') -%}{%- endif -%}
+                    {%- if aluno.get('_atualizado_label') -%}{%- set _ = _meta.append(aluno._atualizado_label) -%}
+                    {%- elif not aluno.get('rotina_ativa_id') -%}{%- set _ = _meta.append('sem rotina') -%}{%- endif -%}
+                    {{ _meta | join(' · ') }}
+                </div>
+                {% if aluno.get('objetivo') %}
+                <div class="aluno-mob-tags">
+                    <span class="aluno-mob-tag {% if eh_atual %}tag-brand{% endif %}">{{ aluno.objetivo | capitalize }}</span>
+                </div>
+                {% endif %}
+            </div>
+            <svg class="icon icon-sm aluno-mob-arrow"><use href="#i-chevron-right"/></svg>
+        </a>
+    {%- endmacro %}
+
+    {# ─── Atual (selecionado em sessão) ─── #}
+    {% if _aluno_atual %}
+    <div class="alunos-section-title" data-group="atual">Atual <span class="count">1</span></div>
+    <div data-group-cards="atual">
+        {{ aluno_card(_aluno_atual, eh_atual=True) }}
+    </div>
+    {% endif %}
+
+    {# ─── Outros ativos ─── #}
+    {% if _outros_ativos %}
+    <div class="alunos-section-title" data-group="outros-ativos">Outros ativos <span class="count">{{ _outros_ativos|length }}</span></div>
+    <div data-group-cards="outros-ativos">
+        {% for a in _outros_ativos %}{{ aluno_card(a) }}{% endfor %}
+    </div>
+    {% endif %}
+
+    {# ─── Sem rotina ─── #}
+    {% if _sem_rotina %}
+    <div class="alunos-section-title" data-group="sem-rotina">Sem rotina <span class="count">{{ _sem_rotina|length }}</span></div>
+    <div data-group-cards="sem-rotina">
+        {% for a in _sem_rotina %}{{ aluno_card(a) }}{% endfor %}
+    </div>
+    {% endif %}
+
+    <div id="alunos-no-results" class="alunos-empty" style="display:none;">
+        <svg class="icon" style="width:32px;height:32px;color:var(--gray-300)"><use href="#i-search"/></svg>
+        <div class="alunos-empty-title">Nenhum aluno encontrado</div>
+    </div>
+    {% endif %}
+</div>
+
+{# ─── Bottom sheet: novo aluno ─── #}
+<div id="novo-aluno-overlay" class="sheet-overlay md:hidden" onclick="closeNovoAlunoSheet(event)" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Novo aluno" onclick="event.stopPropagation()">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Novo cadastro</div>
+                <div class="sheet-title">Aluno</div>
+            </div>
+            <button type="button" class="sheet-close" onclick="closeNovoAlunoSheet()" aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <form class="novo-aluno-form" hx-post="/alunos/novo" hx-target="#alunos-content" hx-swap="innerHTML"
+              hx-on::after-request="if(event.detail.successful){closeNovoAlunoSheet();window.location.reload();}">
+            <label class="field-label">Nome *</label>
+            <input type="text" name="nome" required placeholder="Nome do aluno" class="field-input">
+
+            <label class="field-label">Nível</label>
+            <select name="nivel" class="field-select">
+                <option value="iniciante">Iniciante</option>
+                <option value="intermediario" selected>Intermediário</option>
+                <option value="avancado">Avançado</option>
+            </select>
+
+            <label class="field-label">Objetivo</label>
+            <select name="objetivo" class="field-select">
+                <option>hipertrofia</option><option>forca</option><option>resistencia</option>
+                <option>emagrecimento</option><option>condicionamento</option><option>reabilitacao</option>
+            </select>
+
+            <label class="field-label">Restrições (vírgula)</label>
+            <input type="text" name="restricoes" placeholder="ex: ombro direito, joelho" class="field-input">
+
+            <label class="field-label">Observações</label>
+            <textarea name="obs" rows="2" class="field-input" style="resize:vertical;"></textarea>
+
+            <button type="submit" class="bb-action primary" style="margin-top:14px;width:100%;">
+                <svg class="icon icon-sm"><use href="#i-check"/></svg> Salvar aluno
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+// ── Mobile: filtros chip + busca ──
+function setAlunoFilter(btn) {
+    document.querySelectorAll('.alunos-filter-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    filtrarAlunosMobile();
+}
+
+function filtrarAlunosMobile() {
+    const filterBtn = document.querySelector('.alunos-filter-chip.active');
+    const filtro = filterBtn ? filterBtn.dataset.filter : 'todos';
+    const query = (document.getElementById('alunos-search')?.value || '').trim().toLowerCase();
+    let visiveis = 0;
+
+    document.querySelectorAll('#alunos-mobile .aluno-mob-card').forEach(card => {
+        const nome = card.dataset.nome || '';
+        const nivel = card.dataset.nivel || '';
+        const obj = card.dataset.objetivo || '';
+        const temRotina = card.dataset.temRotina === '1';
+
+        let okFilter = true;
+        if (filtro === 'ativos') okFilter = temRotina;
+        else if (filtro === 'sem-rotina') okFilter = !temRotina;
+        else if (filtro.startsWith('nivel:')) okFilter = nivel === filtro.slice(6);
+        else if (filtro.startsWith('obj:')) okFilter = obj === filtro.slice(4);
+
+        const okQuery = !query || nome.includes(query);
+
+        const visivel = okFilter && okQuery;
+        card.style.display = visivel ? '' : 'none';
+        if (visivel) visiveis++;
+    });
+
+    // Esconde headers de seção que ficaram sem cards visíveis
+    document.querySelectorAll('#alunos-mobile [data-group-cards]').forEach(group => {
+        const visiveis = group.querySelectorAll('.aluno-mob-card:not([style*="display: none"])').length;
+        const titulo = document.querySelector('[data-group="' + group.dataset.groupCards + '"]');
+        if (titulo) titulo.style.display = visiveis > 0 ? '' : 'none';
+        group.style.display = visiveis > 0 ? '' : 'none';
+    });
+
+    const empty = document.getElementById('alunos-no-results');
+    if (empty) empty.style.display = visiveis === 0 ? '' : 'none';
+}
+
+// ── Sheet de novo aluno ──
+function openNovoAlunoSheet() {
+    const overlay = document.getElementById('novo-aluno-overlay');
+    if (!overlay) return;
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sheet-open');
+    setTimeout(() => overlay.querySelector('input[name="nome"]')?.focus(), 200);
+}
+function closeNovoAlunoSheet(e) {
+    if (e && e.target && e.target.id !== 'novo-aluno-overlay') return;
+    const overlay = document.getElementById('novo-aluno-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('sheet-open');
+}
+</script>
+
 {% endblock %}
