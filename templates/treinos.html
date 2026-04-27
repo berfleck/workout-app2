@@ -31,7 +31,8 @@
 {% set ctx_icone = {'substituir': 'i-replace', 'adicionar': 'i-plus'}.get(ctx_acao, 'i-dumbbell') %}
 {% set ctx_titulo = {'substituir': 'Substituindo Treino ' ~ ((ctx_treino_idx or 0) + 1), 'adicionar': 'Adicionando treino à rotina'}.get(ctx_acao, 'Gerando nova rotina') %}
 {% set ctx_subs = {'substituir': 'Os outros treinos da rotina serão preservados', 'adicionar': 'Será adicionado ao final da rotina atual'}.get(ctx_acao, 'A rotina atual será substituída') %}
-<div class="context-banner">
+{# Banner duplica info da topbar mobile — esconder em <md, manter no desktop #}
+<div class="context-banner hidden md:flex">
     <div class="context-info">
         <div class="context-icon"><svg class="icon"><use href="#{{ ctx_icone }}"/></svg></div>
         <div class="context-text">
@@ -294,41 +295,31 @@
    bloco desktop acima (que mantém os `name` que o backend espera).
    Etiqueta da rotina é exclusiva do mobile (campo novo, name="etiqueta_rotina").
 ═══════════════════════════════════════════════════════════════════ #}
-{% set _mob_aluno_open = (ctx_acao == '') and (not ctx_aluno) %}
 {% set _mob_config_open = (ctx_acao in ('', 'nova_rotina')) %}
-{% set _mob_aluno_has = ctx_aluno is not none %}
 <div id="gerador-mobile" class="gerador-mobile md:hidden">
 
-    {# ── Seção Aluno ── #}
+    {# ── Seção Configurações gerais ── #}
     {{ msec.open(
-        id='msec-aluno',
-        icon='i-users',
-        title='Aluno',
-        sub=(ctx_aluno.nome ~ (' · ' ~ ctx_aluno.nivel if ctx_aluno.nivel else '') if ctx_aluno else 'Selecione um aluno'),
-        open=_mob_aluno_open,
-        has_content=_mob_aluno_has
+        id='msec-config',
+        icon='i-sliders',
+        title='Configurações',
+        sub='cx 5',
+        open=_mob_config_open,
+        has_content=True
     ) }}
-        {% if ctx_acao and ctx_aluno %}
-        <div class="aluno-fixo-chip">
-            <svg class="icon"><use href="#i-lock"/></svg>
-            <span class="aluno-fixo-chip-nome">{{ ctx_aluno.nome }}</span>
-            <span class="aluno-fixo-chip-hint">fixo</span>
+        <input type="text" class="field-input field-input-compact" id="m-etiqueta-rotina"
+               name="etiqueta_rotina"
+               placeholder="Etiqueta da rotina (ex: Hipertrofia Abr/26)"
+               autocomplete="off"
+               maxlength="60">
+
+        <label class="field-label" for="m-max-cx" style="margin-top: 12px;">Complexidade máxima</label>
+        <div class="field-range">
+            <input type="range" id="m-max-cx" min="1" max="5" step="1" value="5"
+                   data-mirror="input[name=max_complexidade]"
+                   oninput="document.getElementById('m-max-cx-val').textContent = this.value">
+            <span class="field-range-value" id="m-max-cx-val">5</span>
         </div>
-        {% else %}
-        <label class="field-label" for="m-sel-aluno">Aluno / Turma</label>
-        <select class="field-select" id="m-sel-aluno"
-                onchange="onMobileAlunoChange(this.value)">
-            <option value="">— selecione —</option>
-            {% for a in alunos %}
-            <option value="{{ a.nome }}" {% if ctx_aluno and ctx_aluno.nome == a.nome %}selected{% endif %}>{{ a.nome }}</option>
-            {% endfor %}
-            {% if nomes_hist %}
-            <optgroup label="Do histórico">
-                {% for n in nomes_hist %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
-            </optgroup>
-            {% endif %}
-        </select>
-        {% endif %}
 
         <div id="m-evitar-hist-wrap" class="hidden" style="margin-top: 12px;">
             <label class="field-label" for="m-sel-evitar-ultimos">Evitar exerc. dos últimos</label>
@@ -339,52 +330,6 @@
                 <option value="2">2 períodos</option>
                 <option value="3">3 períodos</option>
             </select>
-        </div>
-    {{ msec.close() }}
-
-    {# ── Seção Configurações gerais ── #}
-    {{ msec.open(
-        id='msec-config',
-        icon='i-sliders',
-        title='Configurações gerais',
-        sub='3 treinos · superset · cx 5',
-        open=_mob_config_open,
-        has_content=True
-    ) }}
-        <label class="field-label" for="m-etiqueta-rotina">Etiqueta da rotina</label>
-        <input type="text" class="field-input" id="m-etiqueta-rotina"
-               name="etiqueta_rotina"
-               placeholder="ex: Hipertrofia Abr/26"
-               autocomplete="off"
-               maxlength="60">
-
-        <label class="field-label" for="m-n-treinos" style="margin-top: 12px;">Nº de treinos</label>
-        <div class="field-row">
-            <select class="field-select" id="m-n-treinos"
-                    data-mirror="#n_treinos"
-                    {% if ctx_acao in ('substituir', 'adicionar') %}disabled{% endif %}>
-                {% for i in range(1, MAX_TREINOS + 1) %}
-                <option value="{{ i }}" {% if ctx_acao in ('substituir', 'adicionar') and i == 1 %}selected{% endif %}>{{ i }}</option>
-                {% endfor %}
-            </select>
-            <select class="field-select" id="m-tamanho-bloco"
-                    data-mirror="select[name=tamanho_bloco]">
-                <option value="1">1 (simples)</option>
-                <option value="2" selected>2 (super séries)</option>
-                <option value="3">3 (tri-sets)</option>
-            </select>
-        </div>
-        <div class="field-row" style="margin-top: 4px;">
-            <span class="field-label" style="margin-bottom: 0; align-self: end; padding-bottom: 4px;">treinos</span>
-            <span class="field-label" style="margin-bottom: 0; align-self: end; padding-bottom: 4px;">por bloco</span>
-        </div>
-
-        <label class="field-label" for="m-max-cx" style="margin-top: 14px;">Complexidade máxima</label>
-        <div class="field-range">
-            <input type="range" id="m-max-cx" min="1" max="5" step="1" value="5"
-                   data-mirror="input[name=max_complexidade]"
-                   oninput="document.getElementById('m-max-cx-val').textContent = this.value">
-            <span class="field-range-value" id="m-max-cx-val">5</span>
         </div>
 
         <div class="field-toggles">
@@ -1303,37 +1248,23 @@ function mirrorFromDesktop() {
     updateMobileSubs();
 }
 
-// Atualiza o subtítulo de cada seção fechada com o resumo dos campos atuais.
+// Atualiza o subtítulo da seção Configurações com o resumo dos campos atuais.
 function updateMobileSubs() {
-    // Aluno
-    const alunoSec = document.getElementById('msec-aluno');
-    if (alunoSec) {
-        const sub = alunoSec.querySelector('[data-section-sub]');
-        const sel = document.getElementById('m-sel-aluno');
-        const evitar = document.getElementById('m-sel-evitar-ultimos');
-        const evitarWrap = document.getElementById('m-evitar-hist-wrap');
-        if (sub) {
-            const nome = sel ? sel.value : '';
-            const partes = [];
-            if (nome) partes.push(nome);
-            if (evitar && evitarWrap && !evitarWrap.classList.contains('hidden') && evitar.value !== '0') {
-                const lbl = evitar.options[evitar.selectedIndex]?.text || '';
-                partes.push('evitar ' + lbl.toLowerCase());
-            }
-            sub.textContent = partes.length ? partes.join(' · ') : 'Selecione um aluno';
-            alunoSec.classList.toggle('has-content', !!nome);
-        }
-    }
-    // Configurações
     const cfgSec = document.getElementById('msec-config');
-    if (cfgSec) {
-        const sub = cfgSec.querySelector('[data-section-sub]');
-        const n = document.getElementById('m-n-treinos')?.value || '3';
-        const tb = document.getElementById('m-tamanho-bloco');
-        const cx = document.getElementById('m-max-cx')?.value || '5';
-        const tbLabel = ({'1': 'simples', '2': 'superset', '3': 'tri-set'})[tb?.value || '2'];
-        if (sub) sub.textContent = `${n} treino${n === '1' ? '' : 's'} · ${tbLabel} · cx ${cx}`;
+    if (!cfgSec) return;
+    const sub = cfgSec.querySelector('[data-section-sub]');
+    if (!sub) return;
+    const cx = document.getElementById('m-max-cx')?.value || '5';
+    const evitar = document.getElementById('m-sel-evitar-ultimos');
+    const evitarWrap = document.getElementById('m-evitar-hist-wrap');
+    const partes = [`cx ${cx}`];
+    if (evitar && evitarWrap && !evitarWrap.classList.contains('hidden') && evitar.value !== '0') {
+        const lbl = evitar.options[evitar.selectedIndex]?.text || '';
+        partes.push('evitar ' + lbl.toLowerCase());
     }
+    const variar = document.getElementById('m-variar-entre');
+    if (variar?.checked) partes.push('s/ similaridade');
+    sub.textContent = partes.join(' · ');
 }
 
 // Bind dos inputs mobile → desktop
@@ -1344,21 +1275,11 @@ function bindMobileMirrors() {
     });
 }
 
-// Aluno mobile: dispara o fluxo do desktop (carrega histórico, etc)
-function onMobileAlunoChange(nome) {
-    // Espelha pro select desktop (dispara onAlunoChange via change handler do _aluno_dropdown)
-    const desktopSel = document.getElementById('sel-aluno');
-    if (desktopSel) {
-        desktopSel.value = nome;
-        desktopSel.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    // Garante que o handler global rode (caso o select desktop seja outro tipo)
+// Auto-carrega histórico do aluno do contexto (mobile não tem mais select de aluno).
+function autoCarregarHistAlunoContexto() {
+    const nome = document.getElementById('m-topbar-title')?.textContent?.trim();
+    if (!nome || nome === 'Selecione um aluno') return;
     if (typeof onAlunoChange === 'function') onAlunoChange(nome);
-    // Atualiza título do topbar mobile imediatamente
-    const tbTitle = document.getElementById('m-topbar-title');
-    if (tbTitle) tbTitle.textContent = nome || 'Selecione um aluno';
-    updateMobileSubs();
-    // O bloco "evitar últimos N períodos" é sincronizado por MutationObserver (init).
 }
 
 // Observa o evitar-hist-wrap do desktop e espelha visibilidade no mobile.
@@ -1720,7 +1641,6 @@ function updateDrawerCounters() {
     drawer.querySelectorAll('.mob-lat-chk:checked').forEach(() => total += 1);
     drawer.querySelectorAll('.mob-sub-chk:checked').forEach(() => total += 2);
     drawer.querySelectorAll('.mob-reg-chk:checked').forEach(() => total += 2);
-    document.getElementById('mob-drawer-total').textContent = total + ' ex';
     document.getElementById('mob-drawer-apply-count').textContent = '(' + total + ')';
 }
 
@@ -1739,6 +1659,13 @@ bindMobileMirrors();
 mirrorFromDesktop();
 watchEvitarHistWrap();
 updateMobileSubs();
+// Mobile: auto-carrega histórico do aluno do contexto e força MAX_TREINOS no desktop
+// (treinos sem demandas serão filtrados pelo backend — commit C).
+if (window.matchMedia('(max-width: 768px)').matches) {
+    autoCarregarHistAlunoContexto();
+    const nSel = document.getElementById('n_treinos');
+    if (nSel && !nSel.disabled) { nSel.value = MAX_TREINOS; onChangeNTreinos(); }
+}
 // Render inicial das seções de treino mobile (caso histórico já tenha sido carregado)
 for (let t = 0; t < MAX_TREINOS; t++) {
     renderMobileDemandasList(t);
