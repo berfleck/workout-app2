@@ -253,6 +253,8 @@ class SuperSerie:
 class Sessao:
     tipo: str
     blocos: list[SuperSerie] = field(default_factory=list)
+    avisos: list[dict] = field(default_factory=list)
+    relaxados: list[str] = field(default_factory=list)  # nomes de exercícios escolhidos via relaxamento de família
 
 
 # ---------------------------------------------------------------------------
@@ -355,16 +357,22 @@ def selecionar_sem_repeticao_similaridade(
     similaridades_usadas: set[str],
     variacao_pais_usados: set[str],
     n: int,
+    relaxar_familia: bool = False,
+    relaxados_out: Optional[list] = None,
 ) -> list[Exercicio]:
     """
     Seleciona até n exercícios evitando repetir grupos de similaridade.
     Se não houver candidatos suficientes respeitando a regra, relaxa:
     permite repetir grupos de similaridade para completar n exercícios,
     mas nunca repete o mesmo exercício.
+
+    Se relaxar_familia=True e ainda assim não completar n, relaxa também
+    o bloqueio por família (variacao_de). Os exercícios escolhidos nessa
+    fase são adicionados a relaxados_out (se passado).
     """
     nomes_usados: set[str] = set()
 
-    def _selecionar(pool, respeitar_sim):
+    def _selecionar(pool, respeitar_sim, respeitar_familia=True):
         selecionados = []
         sims_desta_selecao = set()
         random.shuffle(pool)
@@ -375,7 +383,9 @@ def selecionar_sem_repeticao_similaridade(
                 e.similaridade not in similaridades_usadas
                 and e.similaridade not in sims_desta_selecao
             )
-            var_ok = e.variacao_de is None or e.variacao_de not in variacao_pais_usados
+            var_ok = (not respeitar_familia) or (
+                e.variacao_de is None or e.variacao_de not in variacao_pais_usados
+            )
             if sim_ok and var_ok:
                 selecionados.append(e)
                 sims_desta_selecao.add(e.similaridade)
@@ -384,13 +394,21 @@ def selecionar_sem_repeticao_similaridade(
                 break
         return selecionados
 
-    # Tentativa 1: respeitar similaridade
+    # Tentativa 1: respeitar similaridade + família
     resultado = _selecionar(list(candidatos), respeitar_sim=True)
 
-    # Se não completou n, relaxar regra de similaridade
+    # Tentativa 2: relaxar similaridade (mantém família)
     if len(resultado) < n:
         restantes = [e for e in candidatos if e.nome not in nomes_usados]
         resultado += _selecionar(restantes, respeitar_sim=False)
+
+    # Tentativa 3: relaxar família (apenas se permitido)
+    if len(resultado) < n and relaxar_familia:
+        restantes = [e for e in candidatos if e.nome not in nomes_usados]
+        novos = _selecionar(restantes, respeitar_sim=False, respeitar_familia=False)
+        if relaxados_out is not None:
+            relaxados_out.extend(e.nome for e in novos)
+        resultado += novos
 
     return resultado[:n]
 
@@ -723,6 +741,7 @@ def gerar_sessao(
     exercicios_travados: Optional[list[Exercicio]] = None,
     tamanho_bloco: int = 2,
     evitar_agonistas: bool = False,
+    relaxar_familia: bool = False,
 ) -> Sessao:
     epp      = exercicios_por_padrao or EXERCICIOS_POR_PADRAO
     eq_bloq  = equipamentos_bloqueados or []
@@ -731,6 +750,8 @@ def gerar_sessao(
 
     similaridades_usadas: set[str] = set()
     todos_selecionados: list[Exercicio] = []
+    avisos_da_sessao: list[dict] = []
+    relaxados_local: list[str] = []
 
     # Exercícios travados entram primeiro
     for e in travados:
@@ -748,6 +769,10 @@ def gerar_sessao(
         else:
             sub_specs = [(None, n_spec)]
 
+        n_antes_padrao = len(todos_selecionados)
+        n_antes_relax = len(relaxados_local)
+        n_pedido_padrao = sum(qt for _, qt in sub_specs)
+
         for lateralidade, n in sub_specs:
             candidatos = filtrar_por_padrao(banco, padrao)
             candidatos = filtrar_por_equipamentos(candidatos, eq_bloq)
@@ -757,11 +782,44 @@ def gerar_sessao(
                 candidatos = [e for e in candidatos if e.unilateral == lateralidade]
 
             selecionados = selecionar_sem_repeticao_similaridade(
-                candidatos, similaridades_usadas, var_pais, n
+                candidatos, similaridades_usadas, var_pais, n,
+                relaxar_familia=relaxar_familia,
+                relaxados_out=relaxados_local,
             )
             for e in selecionados:
                 similaridades_usadas.add(e.similaridade)
             todos_selecionados.extend(selecionados)
+
+        # Avisos do tipo familia_repetida (1 por exercício relaxado)
+        novos_relax = relaxados_local[n_antes_relax:]
+        for nome_rel in novos_relax:
+            ex_rel = next((e for e in todos_selecionados if e.nome == nome_rel), None)
+            avisos_da_sessao.append({
+                "tipo": "familia_repetida",
+                "nivel": "padrao",
+                "escopo": padrao,
+                "exercicio": nome_rel,
+                "familia": (ex_rel.variacao_de if ex_rel and ex_rel.variacao_de else nome_rel),
+            })
+
+        n_obtido_padrao = len(todos_selecionados) - n_antes_padrao
+        if n_obtido_padrao < n_pedido_padrao:
+            nomes_em_escopo: set[str] = set()
+            for e in banco:
+                if e.padrao == padrao:
+                    nomes_em_escopo.add(e.nome)
+                    if e.variacao_de:
+                        nomes_em_escopo.add(e.variacao_de)
+            familias_usadas = sorted(n for n in var_pais if n in nomes_em_escopo)
+            avisos_da_sessao.append({
+                "tipo": "incompleta",
+                "nivel": "padrao",
+                "escopo": padrao,
+                "qtd_pedida": n_pedido_padrao,
+                "qtd_obtida": n_obtido_padrao,
+                "faltam": n_pedido_padrao - n_obtido_padrao,
+                "familias_usadas": familias_usadas,
+            })
 
     # Ordenar: compostos primeiro, depois o resto
     todos_selecionados = ordenar_compostos_primeiro(todos_selecionados)
@@ -780,7 +838,10 @@ def gerar_sessao(
         blocos.append(SuperSerie(label=label, ex1=ex1, ex2=ex2, ex3=ex3))
 
     tipo = " + ".join(padroes)
-    return Sessao(tipo=tipo, blocos=blocos)
+    sessao = Sessao(tipo=tipo, blocos=blocos)
+    sessao.avisos = avisos_da_sessao
+    sessao.relaxados = list(relaxados_local)
+    return sessao
 
 
 # ---------------------------------------------------------------------------
@@ -826,6 +887,7 @@ def gerar_sessao_por_demandas(
     tamanho_bloco: int = 2,
     evitar_agonistas: bool = False,
     lateralidade_por_padrao: Optional[dict] = None,
+    relaxar_familia: bool = False,
 ) -> Sessao:
     """
     Gera uma sessão a partir de uma lista de DEMANDAS hierárquicas.
@@ -852,12 +914,14 @@ def gerar_sessao_por_demandas(
       → 6 exercícios = 1º de cada um dos 6 primeiros padrões disponíveis
     """
     eq_bloq  = equipamentos_bloqueados or []
-    var_pais = variacao_pais_usados or set()
+    var_pais_inter = variacao_pais_usados or set()  # inter-treino, READ-ONLY
+    var_pais_intra: set[str] = set()                # within-session, mutado durante seleção
     travados = exercicios_travados or []
 
     similaridades_usadas: set[str] = set()
     nomes_usados: set[str] = set()
     todos_selecionados: list[Exercicio] = []
+    relaxados_local: list[str] = []  # nomes escolhidos via relax família
 
     # Travados entram primeiro
     for e in travados:
@@ -895,20 +959,42 @@ def gerar_sessao_por_demandas(
                     break
 
                 cands = candidatos_por_padrao[p]
+
+                def _bloqueado_familia(e, sets):
+                    """e está bloqueado por família se nome ou variacao_de aparecem em algum dos sets."""
+                    for s in sets:
+                        if e.nome in s:
+                            return True
+                        if e.variacao_de and e.variacao_de in s:
+                            return True
+                    return False
+
+                # Estrito: similaridade + família (inter ∪ intra)
                 disponiveis = [
                     e for e in cands
                     if e.similaridade not in similaridades_usadas
                     and e.nome not in nomes_usados
-                    and (not e.variacao_de or e.variacao_de not in var_pais)
-                    and (not e.nome or e.nome not in var_pais)
+                    and not _bloqueado_familia(e, [var_pais_inter, var_pais_intra])
                 ]
+                tipo_relax = None
+
+                # Relax 1: similaridade (mantém família estrita)
                 if not disponiveis:
                     disponiveis = [
                         e for e in cands
                         if e.nome not in nomes_usados
-                        and (not e.variacao_de or e.variacao_de not in var_pais)
-                        and (not e.nome or e.nome not in var_pais)
+                        and not _bloqueado_familia(e, [var_pais_inter, var_pais_intra])
                     ]
+
+                # Relax 2: família entre treinos (preserva intra)
+                if not disponiveis and relaxar_familia:
+                    disponiveis = [
+                        e for e in cands
+                        if e.nome not in nomes_usados
+                        and not _bloqueado_familia(e, [var_pais_intra])
+                    ]
+                    tipo_relax = "familia"
+
                 if not disponiveis:
                     continue
 
@@ -917,8 +1003,10 @@ def gerar_sessao_por_demandas(
                 similaridades_usadas.add(escolhido.similaridade)
                 nomes_usados.add(escolhido.nome)
                 if escolhido.variacao_de:
-                    var_pais.add(escolhido.variacao_de)
-                var_pais.add(escolhido.nome)
+                    var_pais_intra.add(escolhido.variacao_de)
+                var_pais_intra.add(escolhido.nome)
+                if tipo_relax == "familia":
+                    relaxados_local.append(escolhido.nome)
                 selecionados += 1
                 progresso = True
 
@@ -930,26 +1018,27 @@ def gerar_sessao_por_demandas(
 
     # Resolver cada demanda
     rotulos_demandas: list[str] = []
+    avisos_da_sessao: list[dict] = []
 
     for nivel, escopo, qtd in demandas:
         if qtd <= 0:
             continue
         rotulos_demandas.append(f"{escopo}({qtd})")
 
+        n_antes = len(todos_selecionados)
+        n_antes_relax = len(relaxados_local)
+        padroes = _padroes_de_escopo(nivel, escopo)
+
         # Lateralidade: quando o escopo tem refinamento bilateral/unilateral explícito
         if escopo in lat_map:
-            padroes_esc = _padroes_de_escopo(nivel, escopo)
+            padroes_esc = padroes
             for lat, qt in lat_map[escopo].items():
                 if qt > 0:
                     filtros = {p: lat for p in padroes_esc}
                     _selecionar_ciclando(padroes_esc, qt, filtros_lateralidade=filtros)
-            continue
-
-        padroes = _padroes_de_escopo(nivel, escopo)
-        if not padroes:
-            continue
-
-        if nivel == "regiao":
+        elif not padroes:
+            pass
+        elif nivel == "regiao":
             # ── Regra de proporção: ao menos 60% compostos ────────────────
             compostos = [p for p in padroes if p in PADROES_COMPOSTOS]
             isolados  = [p for p in padroes if p not in PADROES_COMPOSTOS]
@@ -980,6 +1069,38 @@ def gerar_sessao_por_demandas(
             padroes_ord = _ordenar_padroes_por_prioridade(padroes)
             _selecionar_ciclando(padroes_ord, qtd)
 
+        n_obtido = len(todos_selecionados) - n_antes
+
+        # Avisos do tipo "familia_repetida" (1 por exercício relaxado nesta demanda)
+        novos_relax = relaxados_local[n_antes_relax:]
+        for nome_rel in novos_relax:
+            ex_rel = next((e for e in todos_selecionados if e.nome == nome_rel), None)
+            avisos_da_sessao.append({
+                "tipo": "familia_repetida",
+                "nivel": nivel,
+                "escopo": escopo,
+                "exercicio": nome_rel,
+                "familia": (ex_rel.variacao_de if ex_rel and ex_rel.variacao_de else nome_rel),
+            })
+
+        if n_obtido < qtd:
+            nomes_em_escopo: set[str] = set()
+            for e in banco:
+                if e.padrao in padroes:
+                    nomes_em_escopo.add(e.nome)
+                    if e.variacao_de:
+                        nomes_em_escopo.add(e.variacao_de)
+            familias_usadas = sorted(n for n in var_pais_inter if n in nomes_em_escopo)
+            avisos_da_sessao.append({
+                "tipo": "incompleta",
+                "nivel": nivel,
+                "escopo": escopo,
+                "qtd_pedida": qtd,
+                "qtd_obtida": n_obtido,
+                "faltam": qtd - n_obtido,
+                "familias_usadas": familias_usadas,
+            })
+
     # Ordenar: compostos primeiro (dentro do conjunto final)
     todos_selecionados = ordenar_compostos_primeiro(todos_selecionados)
 
@@ -996,7 +1117,10 @@ def gerar_sessao_por_demandas(
         blocos.append(SuperSerie(label=label, ex1=ex1, ex2=ex2, ex3=ex3))
 
     tipo = " + ".join(rotulos_demandas) if rotulos_demandas else "Sessão"
-    return Sessao(tipo=tipo, blocos=blocos)
+    sessao = Sessao(tipo=tipo, blocos=blocos)
+    sessao.avisos = avisos_da_sessao
+    sessao.relaxados = list(relaxados_local)
+    return sessao
 
 
 # ---------------------------------------------------------------------------
@@ -1007,6 +1131,7 @@ def gerar_multiplos_treinos(
     banco: list[Exercicio],
     configs: list[dict],
     variar_entre_treinos: bool = True,
+    relaxar_familia: bool = False,
 ) -> list[Sessao]:
     """
     Gera N sessões de treino evitando repetição de exercícios entre elas.
@@ -1028,9 +1153,9 @@ def gerar_multiplos_treinos(
         Lista de Sessao na mesma ordem de configs.
     """
     # Conjuntos globais compartilhados entre treinos
-    nomes_globais: set[str] = set()       # nomes exatos bloqueados
-    sims_globais: set[str] = set()        # grupos de similaridade bloqueados
-    variacao_pais_globais: set[str] = set()  # nomes usados → bloqueia variações deles
+    nomes_exatos_globais: set[str] = set()   # apenas nomes EXATOS de exercícios usados → filtra banco
+    sims_globais: set[str] = set()           # grupos de similaridade bloqueados
+    variacao_pais_globais: set[str] = set()  # nomes + pais usados → bloqueia famílias (relaxável)
 
     sessoes = []
     for cfg in configs:
@@ -1044,8 +1169,9 @@ def gerar_multiplos_treinos(
         evit_agon     = cfg.get("evitar_agonistas", False)
         lat_padrao    = cfg.get("lateralidade_por_padrao")
 
-        # Bloqueia nomes já usados em treinos anteriores
-        banco_filtrado = [e for e in banco if e.nome not in nomes_globais]
+        # Bloqueia nomes EXATOS já usados em treinos anteriores
+        # (não inclui pais, pra permitir que o relax_familia ressuscite-os)
+        banco_filtrado = [e for e in banco if e.nome not in nomes_exatos_globais]
 
         if demandas:
             sessao = gerar_sessao_por_demandas(
@@ -1058,6 +1184,7 @@ def gerar_multiplos_treinos(
                 variacao_pais_usados=variacao_pais_globais,
                 evitar_agonistas=evit_agon,
                 lateralidade_por_padrao=lat_padrao,
+                relaxar_familia=relaxar_familia,
             )
         else:
             sessao = gerar_sessao(
@@ -1070,18 +1197,43 @@ def gerar_multiplos_treinos(
                 tamanho_bloco=tam_bloco,
                 variacao_pais_usados=variacao_pais_globais,
                 evitar_agonistas=evit_agon,
+                relaxar_familia=relaxar_familia,
             )
+
+        # Recompõe familias_usadas em cada aviso usando o banco COMPLETO
+        # (sem o filtro nomes_globais que removeria justamente as famílias
+        # já usadas — fundamental pra Templates mode, que não popula var_pais
+        # durante a seleção interna).
+        for av in sessao.avisos:
+            if av["nivel"] == "padrao":
+                escopo_padroes = [av["escopo"]]
+            elif av["nivel"] == "subregiao":
+                escopo_padroes = list(SUBREGIAO_PARA_PADROES.get(av["escopo"], []))
+            elif av["nivel"] == "regiao":
+                escopo_padroes = []
+                for sub in REGIAO_PARA_SUBREGIOES.get(av["escopo"], []):
+                    escopo_padroes.extend(SUBREGIAO_PARA_PADROES.get(sub, []))
+            else:
+                escopo_padroes = []
+            nomes_em_escopo: set[str] = set()
+            for e in banco:
+                if e.padrao in escopo_padroes:
+                    nomes_em_escopo.add(e.nome)
+                    if e.variacao_de:
+                        nomes_em_escopo.add(e.variacao_de)
+            av["familias_usadas"] = sorted(n for n in variacao_pais_globais if n in nomes_em_escopo)
 
         # Registra o que foi usado para os próximos treinos
         for bloco in sessao.blocos:
             for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
                 if ex:
-                    nomes_globais.add(ex.nome)
-                    # Bloqueia variações deste exercício nos treinos seguintes
+                    nomes_exatos_globais.add(ex.nome)
+                    # Família: adiciona AMBOS ex.nome e ex.variacao_de em var_pais pra
+                    # cobrir filho-usado → irmãos bloqueados E pai-usado → filhos bloqueados.
+                    # Esse set é o que o relax_familia consegue ignorar.
                     variacao_pais_globais.add(ex.nome)
-                    # Se é uma variação, bloqueia também o exercício pai (bloqueio bidirecional)
                     if ex.variacao_de:
-                        nomes_globais.add(ex.variacao_de)
+                        variacao_pais_globais.add(ex.variacao_de)
                     if variar_entre_treinos:
                         sims_globais.add(ex.similaridade)
 

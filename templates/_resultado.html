@@ -4,6 +4,8 @@
     <div class="flex-1 border-t border-gray-200"></div>
 </div>
 
+{% include "_avisos_modal.html" %}
+
 {% if auto_ref_etiqueta %}
 <div class="auto-ref-badge">
     <svg class="icon align-[-2px]"><use href="#i-pin"/></svg> Comparando com período anterior: <strong>{{ auto_ref_etiqueta }}</strong>

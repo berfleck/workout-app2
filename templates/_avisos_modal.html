@@ -1,0 +1,101 @@
+{% if avisos_por_treino %}
+<div class="mb-3">
+    <button type="button" id="abrir-avisos-modal"
+            class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100">
+        <span>⚠️</span>
+        <span>{{ avisos_por_treino|length }} treino{{ 's' if avisos_por_treino|length > 1 else '' }} com avisos</span>
+        <span class="text-xs text-amber-700 font-normal">— ver detalhes</span>
+    </button>
+</div>
+
+<div id="avisos-modal-backdrop" class="app-modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="app-modal" style="max-width: 580px; max-height: 80vh; overflow-y: auto;" role="document">
+        <div class="app-modal-title">⚠️ Avisos da geração</div>
+        <div class="app-modal-msg" style="white-space: normal;">
+            {% for t in avisos_por_treino %}
+            {% set incompletas = t.avisos | selectattr("tipo", "equalto", "incompleta") | list %}
+            {% set repetidas = t.avisos | selectattr("tipo", "equalto", "familia_repetida") | list %}
+            <div style="margin-top: 14px; padding-top: 12px; {% if not loop.first %}border-top: 1px solid var(--gray-200);{% endif %}">
+                {% if incompletas %}
+                <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">⚠️ Treino {{ t.treino_num }} ficou incompleto</div>
+                {% else %}
+                <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">↻ Treino {{ t.treino_num }} foi preenchido com flexibilizações</div>
+                {% endif %}
+
+                {% for av in incompletas %}
+                <div style="margin-bottom: 12px;">
+                    <p style="margin: 0 0 6px 0;">
+                        Foram pedidos <strong>{{ av.qtd_pedida }}</strong> exercícios de <strong>{{ av.escopo_label }}</strong>,
+                        mas apenas <strong>{{ av.qtd_obtida }}</strong> foram selecionados (faltaram {{ av.faltam }}).
+                    </p>
+                    {% if av.familias_usadas %}
+                    <p style="margin: 0 0 6px 0;">
+                        <em>Por que esgotou:</em> as famílias
+                        <strong>
+                            {%- for f in av.familias_usadas -%}
+                                {{ f }}{% if not loop.last %}, {% endif %}
+                            {%- endfor -%}
+                        </strong>
+                        já foram usadas em treinos anteriores desta rotina e o relaxamento de família está desligado.
+                    </p>
+                    {% else %}
+                    <p style="margin: 0 0 6px 0;">
+                        <em>Por que esgotou:</em> o banco não tem variações suficientes em <strong>{{ av.escopo_label }}</strong> respeitando complexidade e equipamentos.
+                    </p>
+                    {% endif %}
+                    <div style="margin-top: 6px;">Sugestões:</div>
+                    <ul style="margin: 4px 0 0 18px; padding: 0; list-style: disc;">
+                        <li>Marcar a opção <strong>"Relaxar família se necessário"</strong> nas opções gerais</li>
+                        <li>Cadastrar novas variações de <strong>{{ av.escopo_label }}</strong> no banco_exercicios.xlsx</li>
+                        <li>Reduzir a quantidade pedida em <strong>{{ av.escopo_label }}</strong> para esta rotina</li>
+                    </ul>
+                </div>
+                {% endfor %}
+
+                {% if repetidas %}
+                <div style="margin-bottom: 8px;">
+                    <p style="margin: 0 0 6px 0;">
+                        Para completar o treino, o gerador permitiu repetir famílias de exercícios já usadas em treinos anteriores.
+                        Os exercícios marcados com <span style="display:inline-block; padding:1px 6px; background:#fef3c7; border:1px solid #fcd34d; border-radius:4px; font-size:11px; font-weight:700; color:#92400e;">↻</span> no card foram colocados via flexibilização:
+                    </p>
+                    <ul style="margin: 4px 0 0 18px; padding: 0; list-style: disc;">
+                        {% for av in repetidas %}
+                        <li><strong>{{ av.exercicio }}</strong> — repete a família <em>{{ av.familia }}</em> em <strong>{{ av.escopo_label }}</strong></li>
+                        {% endfor %}
+                    </ul>
+                    <p style="margin: 8px 0 0 0; font-size: 12px; color: var(--gray-600);">
+                        Considere cadastrar novas variações no banco ou aceitar a repetição editando o treino.
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="app-modal-actions">
+            <button type="button" id="fechar-avisos-modal" class="app-modal-btn app-modal-btn-primary">Entendi</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    var bd = document.getElementById('avisos-modal-backdrop');
+    var openBtn = document.getElementById('abrir-avisos-modal');
+    var closeBtn = document.getElementById('fechar-avisos-modal');
+    if (!bd || !openBtn || !closeBtn) return;
+    function abrir(){ bd.classList.add('is-open'); bd.setAttribute('aria-hidden','false'); }
+    function fechar(){ bd.classList.remove('is-open'); bd.setAttribute('aria-hidden','true'); }
+    openBtn.addEventListener('click', abrir);
+    closeBtn.addEventListener('click', fechar);
+    bd.addEventListener('click', function(e){ if (e.target === bd) fechar(); });
+    document.addEventListener('keydown', function(e){
+        if (bd.classList.contains('is-open') && e.key === 'Escape'){ e.preventDefault(); fechar(); }
+    });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', abrir);
+    } else {
+        abrir();
+    }
+})();
+</script>
+{% endif %}

@@ -146,6 +146,7 @@
                 <div class="col-span-2 flex flex-wrap gap-4 pt-1">
                     <label class="check-inline"><input type="checkbox" name="variar_entre"> Evitar similaridade</label>
                     <label class="check-inline"><input type="checkbox" name="evitar_agonistas" checked> Evitar agonistas</label>
+                    <label class="check-inline" title="Se uma demanda não puder ser preenchida sem repetir família, permite repetir e marca o exercício."><input type="checkbox" name="relaxar_familia" checked> Relaxar família se necessário</label>
                 </div>
             </div>
         </div>
@@ -360,6 +361,10 @@
             <label class="field-toggle">
                 <input type="checkbox" id="m-evitar-agonistas" checked data-mirror="input[name=evitar_agonistas]">
                 Evitar agonistas no mesmo bloco
+            </label>
+            <label class="field-toggle">
+                <input type="checkbox" id="m-relaxar-familia" checked data-mirror="input[name=relaxar_familia]">
+                Relaxar família se necessário
             </label>
         </div>
     {{ msec.close() }}

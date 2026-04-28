@@ -59,6 +59,9 @@
          data-ex-nome="{{ ex.nome }}">
         <div class="exercicio-info">
             <span class="exercicio-nome"><span class="ex-label">{{ bloco.label }}{{ loop.index }}</span>{{ ex.nome }}
+                {% if sessao.relaxados and ex.nome in sessao.relaxados %}
+                <span class="badge-relaxado" title="Família repetida — colocado via flexibilização porque o banco não tinha mais variações disponíveis">↻</span>
+                {% endif %}
                 {% if estado == 'mantido' %}
                 <span class="ex-pill ex-pill-mantido" title="Mantido"><svg class="icon"><use href="#i-check"/></svg></span>
                 {% elif estado == 'swap' %}

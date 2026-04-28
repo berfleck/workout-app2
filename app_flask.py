@@ -292,7 +292,8 @@ def _sessao_to_dict(s):
             "ex1": _exercicio_to_dict(b.ex1) if b.ex1 else None,
             "ex2": _exercicio_to_dict(b.ex2) if b.ex2 else None,
             "ex3": _exercicio_to_dict(b.ex3) if b.ex3 else None})
-    return {"tipo": s.tipo, "blocos": blocos}
+    return {"tipo": s.tipo, "blocos": blocos,
+            "relaxados": list(getattr(s, "relaxados", []) or [])}
 
 def _dict_to_sessao(d):
     blocos = []
@@ -301,7 +302,9 @@ def _dict_to_sessao(d):
             ex1=_dict_to_exercicio(b["ex1"]) if b.get("ex1") else None,
             ex2=_dict_to_exercicio(b["ex2"]) if b.get("ex2") else None,
             ex3=_dict_to_exercicio(b["ex3"]) if b.get("ex3") else None))
-    return Sessao(tipo=d["tipo"], blocos=blocos)
+    s = Sessao(tipo=d["tipo"], blocos=blocos)
+    s.relaxados = list(d.get("relaxados") or [])
+    return s
 
 def _configs_to_serializable(configs):
     result = []
@@ -681,10 +684,12 @@ def carregar_sessoes_disco():
 def index():
     alunos = carregar_alunos()
     aluno_id = request.args.get("aluno_id", type=int)
+    avisos_por_treino = session.pop("avisos_pendentes", None)
     return render_template("hub.html",
         active_page="hub",
         alunos=alunos,
         selected_aluno_id=aluno_id,
+        avisos_por_treino=avisos_por_treino,
     )
 
 
@@ -1294,6 +1299,7 @@ def gerar():
     tam_bloco = int(request.form.get("tamanho_bloco", 2))
     variar = request.form.get("variar_entre") == "on"
     evitar_agon = request.form.get("evitar_agonistas") == "on"
+    relaxar_familia = request.form.get("relaxar_familia") == "on"
 
     all_configs = []
 
@@ -1444,7 +1450,31 @@ def gerar():
                        and (e.variacao_de is None or e.variacao_de not in nomes_hist)]
         n_bloqueados_hist = banco_antes - len(banco_gerar)
 
-    sessoes_ativas = gerar_multiplos_treinos(banco_gerar, all_configs, variar_entre_treinos=variar)
+    sessoes_ativas = gerar_multiplos_treinos(banco_gerar, all_configs,
+                                             variar_entre_treinos=variar,
+                                             relaxar_familia=relaxar_familia)
+
+    # Calcula avisos cedo (antes de qualquer redirect contextual) para podermos
+    # stashar em session quando a rota redireciona pro HUB (substituir/adicionar/nova_rotina).
+    def _label_escopo_av(nivel, escopo):
+        if nivel == "regiao":
+            return REGIOES_LABELS.get(escopo, escopo)
+        if nivel == "subregiao":
+            return SUBREGIOES_LABELS.get(escopo, escopo)
+        return PADROES_LABELS.get(escopo, escopo)
+
+    avisos_por_treino = []
+    for i, s in enumerate(sessoes_ativas, start=1):
+        if not s.avisos:
+            continue
+        avisos_enriq = [{**av, "escopo_label": _label_escopo_av(av["nivel"], av["escopo"])}
+                        for av in s.avisos]
+        avisos_por_treino.append({"treino_num": i, "tipo": s.tipo, "avisos": avisos_enriq})
+
+    if avisos_por_treino:
+        session["avisos_pendentes"] = avisos_por_treino
+    else:
+        session.pop("avisos_pendentes", None)
 
     # Aplica nome customizado por treino (sobrescreve sessao.tipo se usuário digitou).
     # Usa orig_idx pra ler nome_{N} do form mesmo após filtrar treinos vazios.
@@ -1461,6 +1491,7 @@ def gerar():
         "tamanho_bloco": tam_bloco,
         "variar_entre": variar,
         "evitar_agonistas": evitar_agon,
+        "relaxar_familia": relaxar_familia,
     }
     salvar_sessoes_disco()
 
@@ -1514,12 +1545,17 @@ def gerar():
                     })
                 auto_ref_etiqueta = ultimo_reg.get("etiqueta") or ultimo_reg.get("data_salvo", "")
 
+    # No fluxo padrão de /gerador (sem ctx_acao), exibimos o modal direto em
+    # _resultado.html e limpamos a stash pra não duplicar no próximo HUB.
+    session.pop("avisos_pendentes", None)
+
     return render_template("_resultado.html", sessoes=sessoes_ativas,
                            padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
                            tem_referencia=bool(referencias),
                            referencias=referencias,
                            auto_ref_etiqueta=auto_ref_etiqueta,
-                           nomes_ref=_nomes_ref_set())
+                           nomes_ref=_nomes_ref_set(),
+                           avisos_por_treino=avisos_por_treino)
 
 # ══════════════════════════════════════════════════════════════
 # ROTAS — AÇÕES POR TREINO
