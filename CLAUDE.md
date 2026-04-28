@@ -36,6 +36,9 @@ templates/
   alunos_page.html        — Página completa: wrapper de alunos
   historico.html          — Partial: filtros + lista do histórico
   historico_page.html     — Página completa: wrapper de histórico
+  _avisos_modal.html      — Partial: modal auto-abre após geração com avisos da rotina
+                            (demanda incompleta + flexibilização de família). Incluído
+                            em _resultado.html (fluxo gerador) e hub.html (após redirect)
 
   # Mobile (redesign 02 — branch mobile-redesign-02, etapas 1-8 de 12 concluídas)
   _mobile_bottom_bar.html       — Referência standalone do bottom bar mobile (não usado em runtime)
@@ -50,14 +53,14 @@ Gerados (gitignored): bf_treinamento.db, sessoes_salvas.json
 
 - **`Exercicio`** (dataclass): nome, variacao_de, eq_primario, eq_secundario, regiao, subregiao, padrao, purpose, unilateral, complexidade (1-5), fadiga (1-5), circuito, similaridade, musculo_primario, obs + prescrição: series, reps (str), rir (0-4)
 - **`SuperSerie`**: label (A/B/C...), ex1, ex2?, ex3?
-- **`Sessao`**: tipo (string de padrões), blocos (lista de SuperSerie)
+- **`Sessao`**: tipo (string de padrões), blocos (lista de SuperSerie), `avisos` (list[dict] com `tipo: "incompleta" | "familia_repetida"` + metadata por demanda/exercício), `relaxados` (list[str] de nomes escolhidos via flexibilização de família)
 - **SQLite**: tabela `alunos` (id, nome, nivel, objetivo, restricoes JSON, obs, rotina_ativa_id, rascunho_rotina JSON, rascunho_etiqueta, rascunho_intent) e `historico` (id, data_salvo, data_atualizada, aluno, etiqueta, n_treinos, sessoes JSON, configs JSON)
 
 ## Estado do servidor (variáveis globais em app_flask.py)
 
 - `sessoes_ativas` — lista de Sessao (buffer de trabalho para gerador/edição)
 - `configs_geradas` — config por treino (salva no histórico)
-- `opcoes_globais` — n_treinos, max_complexidade, tamanho_bloco, variar_entre, evitar_agonistas
+- `opcoes_globais` — n_treinos, max_complexidade, tamanho_bloco, variar_entre, evitar_agonistas, relaxar_familia
 - `referencias` — lista de `{"sessao": Sessao, "origem": {...}, "id_ref": str}`. Auto-preenchidas ao gerar com histórico
 - `edicao_hub` — dict com `aluno_id` e `rotina_id` quando editando rotina do HUB
 - `criacao_manual` — dict com `aluno_id` e `novo_idx` quando há treino sendo criado manualmente
@@ -96,6 +99,10 @@ Dois modos: **`gerar_sessao()`** (Templates, padrões + EPP) e **`gerar_sessao_p
 
 Fluxo: selecionar exercícios (similaridade) → ordenar compostos primeiro → montar blocos (geo-diversidade P1-P4, regra fadiga max 4) → ordenar blocos por score → gerar_multiplos_treinos (3 camadas bloqueio: nomes, variacao_de, similaridade).
 
+**Bloqueio inter-treino (gerar_multiplos_treinos)**: dois sets globais separados — `nomes_exatos_globais` (apenas ex.nome, filtra `banco_filtrado`) e `variacao_pais_globais` (ex.nome + ex.variacao_de, controla bloqueio por família). Essa separação permite que pais concretos como "Apoio" sejam ressuscitados pelo relax quando só um filho foi usado. **Internamente** em `_selecionar_ciclando` e `selecionar_sem_repeticao_similaridade`, var_pais é dividido em `var_pais_inter` (read-only, herdado) e `var_pais_intra` (mutado within-session) — só `var_pais_inter` pode ser relaxado.
+
+**Relaxamento de família** (`relaxar_familia: bool`, default ON na UI): quando uma demanda não pode ser preenchida no estrito, tenta 3 níveis em ordem: estrito → relaxa similaridade → relaxa família entre treinos (preserva intra). Exercícios escolhidos no relax 3 vão pra `Sessao.relaxados` (badge `↻` no UI) e geram aviso `tipo: "familia_repetida"`. Se mesmo relaxado faltar exercício (limite intra-família), gera aviso `tipo: "incompleta"`. Avisos são serializados na sessão e propagados via `flask.session['avisos_pendentes']` quando a rota /gerar redireciona pro HUB (substituir/adicionar/nova_rotina), pra que o modal apareça depois do redirect.
+
 ## Layout
 
 **HUB** (`hub.html`) — seletor compacto de aluno no topo. Dois split buttons "+ Treino ▾" e "Nova rotina ▾" (cada um com sub-opções "Com gerador" / "Manual"). Toggle Atual/Anterior/Lado a lado dentro do badge do aluno (ícones i-eye, i-clock, i-columns). Grid de treino cards com ações (substituir, remover, regerar bloco). Banner de rascunho aparece automaticamente em qualquer alteração.
@@ -122,6 +129,8 @@ Fluxo: selecionar exercícios (similaridade) → ordenar compostos primeiro → 
 - **Mobile bb (rascunho)**: `_mobile_bb_actions_hub.html` mostra "Atualizar" sempre que `_topbar_tem_rotina and _topbar_intent != 'nova-rotina'` — espelha o banner desktop. NÃO depende de `_topbar_alteracoes > 0` (que ignora moves; usar essa condição esconderia "Atualizar" após swaps).
 - **Toggle Anterior**: quando há rascunho, "Anterior" passa a mostrar a rotina ativa publicada (não a anterior à ativa).
 - **Autosave de prescrição**: `hx-trigger="focusout delay:300ms"` na form. Salva ao sair do form, não enquanto digita. Rota `/limpar` zera prescrição.
+- **Badge `↻` (família repetida)**: classe `.badge-relaxado` em `base.html`. Renderizado em `_treino_card.html` e `_hub_treino_card.html` quando `ex.nome in sessao.relaxados`. Persiste através de serialização (`_sessao_to_dict`/`_dict_to_sessao` incluem o campo `relaxados`).
+- **Modal de avisos** (`_avisos_modal.html`): auto-abre via IIFE inline. Distingue por tipo — `incompleta` mostra "ficou incompleto" + sugestões; `familia_repetida` mostra lista de exercícios relaxados. Botão "ver detalhes" reabre. Em fluxos de redirect (HUB), `session['avisos_pendentes']` é populada em `/gerar` e popped no `/` (index) — modal aparece no HUB após o setTimeout do snippet de redirect.
 
 ## Pendências (curto prazo)
 
