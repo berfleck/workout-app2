@@ -359,12 +359,55 @@ def _formatar_prescricao(ex_dict):
     return " · ".join(partes)
 
 
+def _estados_rascunho_por_posicao(rascunho_sessoes, publicada_sessoes):
+    """Para cada posição (treino_idx, bloco_label, ei) na rotina rascunho, classifica:
+    - 'mantido' — mesma exercise no mesmo lugar da publicada
+    - 'swap'    — mesmo nome em outra posição da publicada (mudou de lugar)
+    - 'substituido' — posição existia na publicada com OUTRO exercício
+    - 'novo'    — posição nova (não existia na publicada)
+    Retorna dict {(treino_idx, bloco_label, ei): estado}.
+    """
+    if not rascunho_sessoes or not publicada_sessoes:
+        return {}
+    # Index por nome (1ª ocorrência) e por posição
+    nomes_pub = set()
+    pub_por_pos = {}
+    for ti, sessao in enumerate(publicada_sessoes):
+        for bloco in sessao.get("blocos", []):
+            label = bloco.get("label", "")
+            for ei, key in enumerate(("ex1", "ex2", "ex3")):
+                ex = bloco.get(key)
+                if not ex or not ex.get("nome"): continue
+                nomes_pub.add(ex["nome"])
+                pub_por_pos[(ti, label, ei)] = ex["nome"]
+    estados = {}
+    for ti, sessao in enumerate(rascunho_sessoes):
+        for bloco in sessao.get("blocos", []):
+            label = bloco.get("label", "")
+            for ei, key in enumerate(("ex1", "ex2", "ex3")):
+                ex = bloco.get(key)
+                if not ex or not ex.get("nome"): continue
+                pos = (ti, label, ei)
+                nome = ex["nome"]
+                pub_aqui = pub_por_pos.get(pos)
+                if pub_aqui == nome:
+                    estados[pos] = "mantido"
+                elif nome in nomes_pub:
+                    estados[pos] = "swap"
+                elif pub_aqui is not None:
+                    estados[pos] = "substituido"
+                else:
+                    estados[pos] = "novo"
+    return estados
+
+
 def _coletar_exercicios_por_nome(sessoes_dicts):
-    """Retorna {nome_ex: {'ex': dict, 'treino_idx': int, 'bloco_label': str}} (1ª ocorrência)."""
+    """Retorna {nome_ex: {'ex': dict, 'treino_idx': int, 'bloco_label': str, 'ei': int, 'pos_label': 'A1'}} (1ª ocorrência)."""
     out = {}
     for ti, sessao in enumerate(sessoes_dicts or []):
         for bloco in sessao.get("blocos", []):
-            for key in ("ex1", "ex2", "ex3"):
+            label = bloco.get("label", "")
+            for ei, key in enumerate(("ex1", "ex2", "ex3")):
                 ex = bloco.get(key)
                 if not ex or not ex.get("nome"):
                     continue
@@ -372,7 +415,9 @@ def _coletar_exercicios_por_nome(sessoes_dicts):
                     out[ex["nome"]] = {
                         "ex": ex,
                         "treino_idx": ti,
-                        "bloco_label": bloco.get("label", ""),
+                        "bloco_label": label,
+                        "ei": ei,
+                        "pos_label": f"{label}{ei + 1}",
                     }
     return out
 
@@ -458,9 +503,54 @@ def diff_rascunho_vs_publicada(aluno_id):
                 "depois": depois or "—",
             })
 
-    # Ordenar: edited primeiro (mais "ativo"), depois added, depois removed; dentro de cada por treino_idx
-    ordem = {"treino_removed": 0, "edited": 1, "added": 2, "removed": 3}
-    mudancas.sort(key=lambda m: (ordem.get(m["tipo"], 9), m["treino_idx"], m["ex"]))
+    # Movimentações: nomes em ambos cuja posição (mesmo treino) mudou.
+    # Pares simétricos (A pra posição de B, B pra posição de A) são reportados como "swap".
+    movs = {}
+    for nome in nomes_rasc & nomes_pub:
+        if pub[nome]["treino_idx"] != rasc[nome]["treino_idx"]:
+            continue  # mover entre treinos é raro e fora do escopo do swap intra-treino
+        if (pub[nome]["bloco_label"], pub[nome]["ei"]) != (rasc[nome]["bloco_label"], rasc[nome]["ei"]):
+            movs[nome] = {
+                "treino_idx": pub[nome]["treino_idx"],
+                "from": pub[nome]["pos_label"],
+                "to": rasc[nome]["pos_label"],
+            }
+    pareados = set()
+    nomes_movidos = sorted(movs.keys())
+    for i, na in enumerate(nomes_movidos):
+        if na in pareados: continue
+        for nb in nomes_movidos[i+1:]:
+            if nb in pareados: continue
+            if movs[na]["treino_idx"] != movs[nb]["treino_idx"]: continue
+            if movs[na]["to"] == movs[nb]["from"] and movs[na]["from"] == movs[nb]["to"]:
+                mudancas.append({
+                    "tipo": "moved",
+                    "ex": f"{movs[na]['from']} ↔ {movs[nb]['from']}",
+                    "treino_idx": movs[na]["treino_idx"],
+                    "bloco_label": "",
+                    "nome_a": na,
+                    "nome_b": nb,
+                    "pos_a": movs[na]["from"],
+                    "pos_b": movs[nb]["from"],
+                })
+                pareados.add(na); pareados.add(nb)
+                break
+    for nome in nomes_movidos:
+        if nome in pareados: continue
+        m = movs[nome]
+        mudancas.append({
+            "tipo": "moved",
+            "ex": f"{nome}: {m['from']} → {m['to']}",
+            "treino_idx": m["treino_idx"],
+            "bloco_label": "",
+            "nome_a": nome,
+            "pos_a": m["from"],
+            "pos_b": m["to"],
+        })
+
+    # Ordenar: edited primeiro (mais "ativo"), depois moved, added, removed; dentro de cada por treino_idx
+    ordem = {"treino_removed": 0, "edited": 1, "moved": 2, "added": 3, "removed": 4}
+    mudancas.sort(key=lambda m: (ordem.get(m["tipo"], 9), m["treino_idx"], m.get("ex", "")))
     return mudancas
 
 
@@ -738,6 +828,9 @@ def hub_rotina():
             if info["status"] == "removido":
                 diff_summary["removidos"] += 1
 
+    estados_rascunho = {}
+    if eh_rascunho and rotina_reg:
+        estados_rascunho = _estados_rascunho_por_posicao(rascunho_sessoes, rotina_reg["sessoes"])
     return render_template("_rotina_hub.html",
                            rotina=rotina,
                            anterior=anterior,
@@ -750,6 +843,7 @@ def hub_rotina():
                            rascunho_intent=carregar_intent_rascunho(aluno_id) if eh_rascunho else "",
                            total_alteracoes=total_alteracoes,
                            tem_rotina_publicada=tem_rotina_publicada,
+                           estados_rascunho=estados_rascunho,
                            diff_atual=diff_atual,
                            diff_anterior=diff_anterior,
                            diff_summary=diff_summary,
@@ -834,9 +928,15 @@ def hub_visualizar_inline(aluno_id, t):
                     for key in ("ex1", "ex2", "ex3"):
                         ex = b.get(key)
                         if ex: nomes_anteriores.add(ex["nome"])
+    estados_rascunho = {}
+    rascunho = carregar_rascunho(aluno_id)
+    rotina_reg = carregar_rotina_ativa(aluno_id)
+    if rascunho and rotina_reg:
+        estados_rascunho = _estados_rascunho_por_posicao(rascunho, rotina_reg["sessoes"])
     return render_template("_hub_treino_card.html", sessao=sessao, idx=t,
                            aluno_id=aluno_id,
                            nomes_anteriores=nomes_anteriores,
+                           estados_rascunho=estados_rascunho,
                            padroes_labels=PADROES_LABELS)
 
 
@@ -1684,6 +1784,61 @@ def exercicio_mover(t, bi, ei, dest_label):
             break
     salvar_sessoes_disco()
     return _responder_card_com_banner(t)
+
+def _swap_ex_in_sessao(sessao, bi_a, ei_a, bi_b, ei_b):
+    """Troca atomicamente dois exercícios pela posição (bloco_idx, ei). Mesmo treino."""
+    attrs = ("ex1", "ex2", "ex3")
+    bloco_a = sessao.blocos[bi_a]
+    bloco_b = sessao.blocos[bi_b]
+    attr_a, attr_b = attrs[ei_a], attrs[ei_b]
+    ex_a = getattr(bloco_a, attr_a)
+    ex_b = getattr(bloco_b, attr_b)
+    setattr(bloco_a, attr_a, ex_b)
+    setattr(bloco_b, attr_b, ex_a)
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/swap/<int:bi_a>/<int:ei_a>/<int:bi_b>/<int:ei_b>", methods=["POST"])
+def hub_swap_visualizar(aluno_id, t, bi_a, ei_a, bi_b, ei_b):
+    """Swap atômico entre 2 exercícios do mesmo treino, em modo visualização do HUB.
+    Persiste como rascunho SEM ativar modo edição (edicao_hub fica intacto).
+    Retorna card visualizar + banner OOB."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts:
+        return '<div class="erro">Nenhuma rotina ativa.</div>', 404
+    if t < 0 or t >= len(sessoes_dicts):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    sessao_dict = sessoes_dicts[t]
+    blocos = sessao_dict["blocos"]
+    if bi_a < 0 or bi_a >= len(blocos) or bi_b < 0 or bi_b >= len(blocos):
+        return '<div class="erro">Bloco inválido.</div>', 400
+    if ei_a not in (0, 1, 2) or ei_b not in (0, 1, 2):
+        return '<div class="erro">Posição inválida.</div>', 400
+    if (bi_a, ei_a) == (bi_b, ei_b):
+        return '<div class="erro">Selecione um exercício diferente.</div>', 400
+    attrs = ("ex1", "ex2", "ex3")
+    attr_a, attr_b = attrs[ei_a], attrs[ei_b]
+    blocos[bi_a][attr_a], blocos[bi_b][attr_b] = blocos[bi_b][attr_b], blocos[bi_a][attr_a]
+    salvar_rascunho(aluno_id, sessoes_dicts)
+
+    sessao = _dict_to_sessao(sessao_dict)
+    aluno = next((a for a in carregar_alunos() if a["id"] == aluno_id), None)
+    nomes_anteriores = set()
+    if aluno:
+        rot_ant = carregar_rotina_anterior(aluno["nome"], aluno.get("rotina_ativa_id"))
+        if rot_ant:
+            for s_dict in rot_ant["sessoes"]:
+                for b in s_dict["blocos"]:
+                    for key in ("ex1", "ex2", "ex3"):
+                        ex = b.get(key)
+                        if ex: nomes_anteriores.add(ex["nome"])
+    rotina_reg = carregar_rotina_ativa(aluno_id)
+    estados_rascunho = _estados_rascunho_por_posicao(sessoes_dicts, rotina_reg["sessoes"]) if rotina_reg else {}
+    card = render_template("_hub_treino_card.html", sessao=sessao, idx=t,
+                           aluno_id=aluno_id, nomes_anteriores=nomes_anteriores,
+                           estados_rascunho=estados_rascunho,
+                           padroes_labels=PADROES_LABELS)
+    return card + render_draft_banner_oob(aluno_id)
+
 
 @app.route("/treino/<int:t>/exercicio/<int:bi>/<int:ei>/destacar", methods=["POST"])
 def exercicio_destacar(t, bi, ei):

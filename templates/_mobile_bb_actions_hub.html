@@ -16,7 +16,10 @@
         <svg class="icon"><use href="#i-check"/></svg> Aceitar
     </button>
 {% elif _topbar_eh_rascunho %}
-    {% set caso_a = _topbar_tem_rotina and _topbar_alteracoes > 0 and _topbar_intent != 'nova-rotina' %}
+    {# "Atualizar" aparece sempre que há rotina publicada e a intent não é nova-rotina,
+       independente de _topbar_alteracoes (que ignora trocas posicionais como o swap).
+       Espelha a lógica do banner desktop em _draft_banner.html. #}
+    {% set caso_a = _topbar_tem_rotina and _topbar_intent != 'nova-rotina' %}
     <button type="button" class="bb-icon-action bb-danger-ghost" data-bb-descartar
             data-aluno-id="{{ _topbar_aluno.id }}"
             aria-label="Descartar rascunho">

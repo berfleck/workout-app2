@@ -27,6 +27,16 @@
             <strong>Treino {{ m.treino_idx + 1 }}{% if m.bloco_label %} · {{ m.bloco_label }}{% endif %}</strong>
             {{ m.ex }}: prescrição alterada de <strong>{{ m.antes }}</strong> para <strong>{{ m.depois }}</strong>
         </div>
+        {% elif m.tipo == 'moved' %}
+        <div class="change-icon mov"><svg class="icon icon-xs"><use href="#i-shuffle"/></svg></div>
+        <div class="change-text">
+            <strong>Treino {{ m.treino_idx + 1 }}</strong>
+            {% if m.nome_b %}
+            trocou <strong>{{ m.pos_a }}</strong> ({{ m.nome_a }}) com <strong>{{ m.pos_b }}</strong> ({{ m.nome_b }})
+            {% else %}
+            <strong>{{ m.nome_a }}</strong> moveu de <strong>{{ m.pos_a }}</strong> para <strong>{{ m.pos_b }}</strong>
+            {% endif %}
+        </div>
         {% endif %}
     </div>
     {% endfor %}

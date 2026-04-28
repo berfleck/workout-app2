@@ -45,13 +45,30 @@
     </div>
     <div class="blocos-container">
     {% for bloco in sessao.blocos %}
+    {% set bi = loop.index0 %}
     <div class="bloco-wrap">
     {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
-    <div class="exercicio">
+    {% set ei = loop.index0 %}
+    {% set estado = estados_rascunho.get((idx, bloco.label, ei)) if estados_rascunho is defined and estados_rascunho else None %}
+    <div class="exercicio" data-swap-ex
+         data-aluno-id="{{ aluno_id }}"
+         data-treino-idx="{{ idx }}"
+         data-bloco-idx="{{ bi }}"
+         data-ei="{{ ei }}"
+         data-ex-label="{{ bloco.label }}{{ loop.index }}"
+         data-ex-nome="{{ ex.nome }}">
         <div class="exercicio-info">
             <span class="exercicio-nome"><span class="ex-label">{{ bloco.label }}{{ loop.index }}</span>{{ ex.nome }}
-                {% if nomes_anteriores and ex.nome in nomes_anteriores %}
-                <span class="badge-mantido">✓ mantido</span>
+                {% if estado == 'mantido' %}
+                <span class="ex-pill ex-pill-mantido" title="Mantido"><svg class="icon"><use href="#i-check"/></svg></span>
+                {% elif estado == 'swap' %}
+                <span class="ex-pill ex-pill-swap" title="Trocou de posição"><svg class="icon"><use href="#i-arrow-left-right"/></svg></span>
+                {% elif estado == 'substituido' %}
+                <span class="ex-pill ex-pill-substituido" title="Substituído"><svg class="icon"><use href="#i-shuffle"/></svg></span>
+                {% elif estado == 'novo' %}
+                <span class="ex-pill ex-pill-novo" title="Novo"><svg class="icon"><use href="#i-sparkles"/></svg></span>
+                {% elif not estados_rascunho and nomes_anteriores and ex.nome in nomes_anteriores %}
+                <span class="ex-pill ex-pill-mantido" title="Mantido do período anterior"><svg class="icon"><use href="#i-check"/></svg></span>
                 {% endif %}
             </span>
         </div>

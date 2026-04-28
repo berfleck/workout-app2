@@ -1,0 +1,41 @@
+Vamos iniciar o redesign mobile do app. Os arquivos de referência estão em
+docs/redesign/mobile/:
+
+- guia_redesign_mobile.md  ← plano de execução (LEIA INTEIRO ANTES DE QUALQUER COISA)
+- mockup_mobile_hub.html
+- mockup_mobile_gerador.html
+- mockup_mobile_aux.html
+
+Antes de codar qualquer coisa, faça o seguinte na ordem:
+
+1. Leia o guia_redesign_mobile.md inteiro.
+2. Abra os 3 mockups HTML e analise os frames de telefone — eles são a
+   verdade visual final. Em qualquer divergência entre o guia e os
+   mockups, o mockup vence.
+3. Me dê um resumo curto (5-8 linhas) do que entendeu sobre:
+   - A direção geral do redesign mobile
+   - O que muda na bottom bar
+   - A decisão sobre o drawer no Gerador (A2, não A1)
+   - As 12 etapas do plano
+
+Depois disso, vamos começar pela Etapa 1 (Limpeza da topbar mobile).
+Antes de escrever qualquer código da Etapa 1:
+
+- Liste em bullets curtos o que você vai mexer (arquivos, blocos,
+  classes CSS).
+- Faça TODAS as perguntas da seção "Perguntas para fazer ao usuário
+  antes de começar" da Etapa 1.
+- ESPERE minhas respostas antes de implementar.
+
+Regras gerais válidas para todas as etapas:
+
+- Nunca pule etapas, nunca agrupe duas etapas num commit, nunca avance
+  pra próxima etapa sem eu pedir.
+- Sempre faça as perguntas listadas em cada etapa antes de codar.
+- Após cada etapa, faça commit no formato definido no guia
+  (`mobile(<escopo>): <descrição>`) e me confirme antes de prosseguir.
+- Marque a etapa como ✅ no próprio guia_redesign_mobile.md ao concluir.
+- Trabalhe sempre numa branch dedicada — me sugira o nome agora antes de
+  começar (ex: `mobile-redesign-02`).
+
+Pode começar lendo o guia e me dando o resumo da etapa 1.
