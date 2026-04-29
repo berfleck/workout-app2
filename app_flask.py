@@ -1938,6 +1938,102 @@ def hub_swap_visualizar(aluno_id, t, bi_a, ei_a, bi_b, ei_b):
     return card + render_draft_banner_oob(aluno_id)
 
 
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/substituir-aleatorio/<int:bi>/<slot>", methods=["POST"])
+def hub_substituir_aleatorio(aluno_id, t, bi, slot):
+    """Substitui um exercício por outro aleatório do mesmo padrão (ou da subregião,
+    via param 'escopo'), salvando como rascunho — SEM ativar modo edição.
+    Cycle por (aluno_id, t, bi, slot, escopo): trocar de escopo reinicia o cycle."""
+    global historico_substituicoes
+    if slot not in ("ex1", "ex2", "ex3"):
+        return '<div class="erro">Slot inválido.</div>', 400
+    escopo = (request.form.get("escopo") or "padrao").strip().lower()
+    if escopo not in ("padrao", "subregiao"):
+        escopo = "padrao"
+
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts:
+        return '<div class="erro">Nenhuma rotina ativa.</div>', 404
+    if t < 0 or t >= len(sessoes_dicts):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    blocos = sessoes_dicts[t]["blocos"]
+    if bi < 0 or bi >= len(blocos):
+        return '<div class="erro">Bloco inválido.</div>', 400
+    ex_atual_dict = blocos[bi].get(slot)
+    if not ex_atual_dict:
+        return '<div class="erro">Exercício não encontrado.</div>', 404
+    nome_ex = ex_atual_dict["nome"]
+
+    # Banco filtrado: exclui nomes em uso nos OUTROS treinos da rotina
+    nomes_outros_treinos = set()
+    for i, s in enumerate(sessoes_dicts):
+        if i == t: continue
+        for b in s["blocos"]:
+            for k in ("ex1", "ex2", "ex3"):
+                ex = b.get(k)
+                if ex: nomes_outros_treinos.add(ex["nome"])
+    banco_subst = [e for e in banco if e.nome not in nomes_outros_treinos]
+    if not banco_subst:
+        banco_subst = list(banco)
+
+    # Cycle: chave inclui escopo (toggle reinicia o cycle)
+    pos_key = (aluno_id, t, bi, slot, escopo)
+    if pos_key not in historico_substituicoes:
+        historico_substituicoes[pos_key] = {"inicial": nome_ex, "vistos": {nome_ex}}
+    dados = historico_substituicoes[pos_key]
+    inicial = dados["inicial"]
+    ja_sugeridos = dados["vistos"]
+    if escopo == "subregiao":
+        sub_alvo = PADRAO_PARA_SUBREGIAO.get(ex_atual_dict.get("padrao"))
+        candidatos_escopo = {e.nome for e in banco_subst if PADRAO_PARA_SUBREGIAO.get(e.padrao) == sub_alvo} if sub_alvo else set()
+    else:
+        candidatos_escopo = {e.nome for e in banco_subst if e.padrao == ex_atual_dict.get("padrao")}
+    restantes = candidatos_escopo - ja_sugeridos - {nome_ex}
+    if restantes:
+        banco_subst = [e for e in banco_subst if e.nome not in ja_sugeridos]
+    else:
+        # Reset do ciclo: preserva inicial (nunca volta) e atual (evita repetição em sequência)
+        dados["vistos"] = {inicial, nome_ex}
+        banco_filtrado = [e for e in banco_subst if e.nome not in dados["vistos"]]
+        if banco_filtrado:
+            banco_subst = banco_filtrado
+
+    # Aplicar substituição via gerador (usa Sessao)
+    sessao_obj = _dict_to_sessao(sessoes_dicts[t])
+    nova_sessao = substituir_exercicio(sessao_obj, nome_ex, banco_subst, escopo=escopo)
+
+    # Verificar se realmente mudou (caso não haja candidatos)
+    novo_dict = _sessao_to_dict(nova_sessao)
+    novo_ex = novo_dict["blocos"][bi].get(slot)
+    if not novo_ex or novo_ex["nome"] == nome_ex:
+        # Nada substituído — devolve card atual sem mexer no rascunho
+        sessao_render = _dict_to_sessao(sessoes_dicts[t])
+    else:
+        sessoes_dicts[t] = novo_dict
+        salvar_rascunho(aluno_id, sessoes_dicts)
+        historico_substituicoes[pos_key]["vistos"].add(novo_ex["nome"])
+        sessao_render = nova_sessao
+
+    aluno = next((a for a in carregar_alunos() if a["id"] == aluno_id), None)
+    nomes_anteriores = set()
+    if aluno:
+        rot_ant = carregar_rotina_anterior(aluno["nome"], aluno.get("rotina_ativa_id"))
+        if rot_ant:
+            for s_dict in rot_ant["sessoes"]:
+                for b in s_dict["blocos"]:
+                    for key in ("ex1", "ex2", "ex3"):
+                        ex = b.get(key)
+                        if ex: nomes_anteriores.add(ex["nome"])
+    rotina_reg = carregar_rotina_ativa(aluno_id)
+    intent_atual = carregar_intent_rascunho(aluno_id)
+    publicada_para_diff = [] if intent_atual == "nova-rotina" else (rotina_reg["sessoes"] if rotina_reg else [])
+    estados_rascunho = _estados_rascunho_por_posicao(sessoes_dicts, publicada_para_diff)
+    card = render_template("_hub_treino_card.html", sessao=sessao_render, idx=t,
+                           aluno_id=aluno_id, nomes_anteriores=nomes_anteriores,
+                           estados_rascunho=estados_rascunho,
+                           padroes_labels=PADROES_LABELS)
+    return card + render_draft_banner_oob(aluno_id)
+
+
 @app.route("/treino/<int:t>/exercicio/<int:bi>/<int:ei>/destacar", methods=["POST"])
 def exercicio_destacar(t, bi, ei):
     """Remove exercise from its block and create a new block with it at the end."""

@@ -629,19 +629,11 @@ def substituir_exercicio(
     banco: list[Exercicio],
     equipamentos_bloqueados: Optional[list[str]] = None,
     max_complexidade: int = 5,
+    escopo: str = "padrao",
 ) -> Sessao:
     """
-    Substitui um exercício específico na sessão por outro do mesmo padrão.
-
-    Args:
-        sessao: sessão atual
-        nome_atual: nome do exercício a substituir
-        banco: banco completo de exercícios
-        equipamentos_bloqueados: equipamentos indisponíveis
-        max_complexidade: complexidade máxima permitida
-
-    Returns:
-        Sessao atualizada com o exercício substituído
+    Substitui um exercício específico na sessão por outro do mesmo padrão
+    (escopo='padrao', default) ou da mesma subregião (escopo='subregiao').
     """
     eq_bloq = equipamentos_bloqueados or []
 
@@ -681,8 +673,12 @@ def substituir_exercicio(
             nomes_em_uso.add(bloco.ex3.nome)
     nomes_em_uso.discard(nome_atual)
 
-    # Buscar substituto: mesmo padrão, sem repetir nomes da sessão
-    candidatos = filtrar_por_padrao(banco, exercicio_alvo.padrao)
+    # Buscar substituto: mesmo padrão (ou subregião) e sem repetir nomes da sessão
+    if escopo == "subregiao":
+        sub_alvo = PADRAO_PARA_SUBREGIAO.get(exercicio_alvo.padrao)
+        candidatos = [e for e in banco if PADRAO_PARA_SUBREGIAO.get(e.padrao) == sub_alvo] if sub_alvo else []
+    else:
+        candidatos = filtrar_por_padrao(banco, exercicio_alvo.padrao)
     candidatos = filtrar_por_equipamentos(candidatos, eq_bloq)
     candidatos = filtrar_por_complexidade(candidatos, max_complexidade)
     candidatos = [e for e in candidatos if e.nome not in nomes_em_uso and e.nome != nome_atual]

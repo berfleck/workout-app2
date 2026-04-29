@@ -128,6 +128,87 @@
         @media (max-width: 768px) {
             .swap-indicator { top: auto; bottom: calc(var(--bb-height, 64px) + 12px + env(safe-area-inset-bottom, 0px)); }
         }
+
+        /* ── Mini-popup de ações por exercício (long-press) ── */
+        body.action-popup-open { user-select: none; -webkit-user-select: none; }
+        .ex-action-popup {
+            position: fixed;
+            z-index: 110;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 32px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            padding: 10px;
+            min-width: 240px;
+            max-width: calc(100vw - 24px);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            animation: exActionPopupIn 140ms ease-out;
+        }
+        @keyframes exActionPopupIn {
+            from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .ex-action-popup::before {
+            content: ""; position: absolute; left: var(--arrow-x, 24px);
+            width: 12px; height: 12px; background: white;
+            border-left: 1px solid rgba(15, 23, 42, 0.06);
+            border-top:  1px solid rgba(15, 23, 42, 0.06);
+            transform: rotate(45deg);
+        }
+        .ex-action-popup.arrow-bottom::before { bottom: -6px; transform: rotate(225deg); }
+        .ex-action-popup.arrow-top::before    { top: -6px; }
+        .ex-action-popup__target {
+            font-size: 11px; color: #6b7280; padding: 0 4px 2px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px;
+        }
+        .ex-action-popup__btn {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 12px; min-height: 44px;
+            background: #f9fafb; border: 1px solid #e5e7eb;
+            border-radius: 8px; cursor: pointer;
+            font-size: 14px; font-weight: 600; color: #1f2937;
+            transition: background 100ms;
+        }
+        .ex-action-popup__btn:hover { background: #f3f4f6; }
+        .ex-action-popup__btn:active { background: #e5e7eb; }
+        .ex-action-popup__btn .icon { width: 16px; height: 16px; flex-shrink: 0; }
+        .ex-action-popup__btn--primary { background: var(--brand-500); color: white; border-color: var(--brand-500); }
+        .ex-action-popup__btn--primary:hover { background: #d35103; }
+        .ex-action-popup__btn--primary:active { background: #b8470a; }
+        .ex-action-popup__chip-row {
+            display: flex; align-items: center; gap: 6px;
+            padding: 2px 4px; font-size: 11px; color: #6b7280;
+        }
+        .ex-action-popup__chip {
+            display: inline-flex; gap: 0; background: #f3f4f6;
+            border-radius: 999px; padding: 2px;
+        }
+        .ex-action-popup__chip button {
+            background: transparent; border: 0; cursor: pointer;
+            padding: 4px 10px; border-radius: 999px;
+            font-size: 11px; font-weight: 600; color: #6b7280;
+        }
+        .ex-action-popup__chip button.active { background: white; color: #1f2937; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .ex-action-popup__close {
+            position: absolute; top: 6px; right: 6px;
+            background: transparent; border: 0; cursor: pointer;
+            width: 24px; height: 24px; display: grid; place-items: center;
+            color: #9ca3af; border-radius: 4px;
+        }
+        .ex-action-popup__close:hover { background: #f3f4f6; color: #4b5563; }
+        .ex-action-popup__close .icon { width: 14px; height: 14px; }
+        .ex-action-popup__msg {
+            font-size: 11px; color: #b45309; background: #fef3c7;
+            border-radius: 6px; padding: 6px 8px; line-height: 1.3;
+        }
+        .exercicio.action-popup-target {
+            background: var(--brand-50) !important;
+            box-shadow: inset 0 0 0 2px var(--brand-500);
+            border-radius: 6px;
+        }
+
         .exercicio-meta { @apply text-[11px] text-gray-400 mt-0.5; }
         .prescr-badge { @apply inline-flex items-center bg-brand-100 text-brand-500 rounded-md px-2 py-0.5 text-[11px] font-semibold font-mono whitespace-nowrap ml-auto shrink-0; }
         .exercicio-acoes { @apply flex gap-0.5 shrink-0; }
@@ -2963,6 +3044,8 @@ document.addEventListener('click', async function(e) {
 
     document.addEventListener('touchstart', function(e) {
         if (e.touches.length !== 1) { clearTimer(); return; }
+        // Tap dentro do popup não dispara nada (e não entra como long-press)
+        if (e.target.closest('.ex-action-popup')) { clearTimer(); return; }
         const ex = e.target.closest('[data-swap-ex]');
         if (!ex) return;
         // Não dispara em cliques em controles internos (botões, links, inputs)
@@ -2970,12 +3053,13 @@ document.addEventListener('click', async function(e) {
         pressStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         pressTargetEl = ex;
         pressTimer = setTimeout(function() {
-            // Long-press completou. Se já há source e este NÃO é o source, faz swap;
-            // senão, entra em modo swap com este como source.
+            // Long-press completou:
+            // - Se já em modo swap com outro target → faz swap (atalho).
+            // - Senão → abre popup de ações (Trocar / Substituir).
             if (swapSource && pressTargetEl) {
                 performSwap(pressTargetEl);
             } else if (pressTargetEl) {
-                enterSwapMode(pressTargetEl);
+                openExerciseActionPopup(pressTargetEl);
             }
             clearTimer();
         }, LONG_PRESS_MS);
@@ -3016,6 +3100,207 @@ document.addEventListener('click', async function(e) {
     document.body.addEventListener('htmx:beforeSwap', function(evt) {
         if (swapSource && swapSource.el && !document.body.contains(swapSource.el)) {
             cancelSwapMode();
+        }
+    });
+
+    // ── Mini-popup de ações por exercício (Trocar / Substituir aleatório) ────
+    let popupState = null; // {alunoId, t, bi, ei, slot, escopo, anchorEl, popupEl}
+
+    function _slotFromEi(ei) { return ei === 0 ? 'ex1' : (ei === 1 ? 'ex2' : 'ex3'); }
+
+    function closeExerciseActionPopup() {
+        if (!popupState) return;
+        if (popupState.anchorEl) popupState.anchorEl.classList.remove('action-popup-target');
+        if (popupState.popupEl && popupState.popupEl.parentNode) popupState.popupEl.parentNode.removeChild(popupState.popupEl);
+        document.body.classList.remove('action-popup-open');
+        popupState = null;
+    }
+    window.closeExerciseActionPopup = closeExerciseActionPopup;
+
+    function _positionPopup(popupEl, anchorEl) {
+        const rect = anchorEl.getBoundingClientRect();
+        const popupRect = popupEl.getBoundingClientRect();
+        const margin = 8;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        // Preferir abaixo (em mobile o long-press é tipicamente na parte alta da tela)
+        let top = rect.bottom + margin;
+        let placement = 'top'; // seta apontando pra cima (popup está abaixo do alvo)
+        if (top + popupRect.height + margin > vh) {
+            // não cabe abaixo, tenta acima
+            const above = rect.top - popupRect.height - margin;
+            if (above >= margin) { top = above; placement = 'bottom'; }
+            else top = Math.max(margin, vh - popupRect.height - margin);
+        }
+        let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
+        if (left < margin) left = margin;
+        if (left + popupRect.width + margin > vw) left = vw - popupRect.width - margin;
+        // posição relativa da seta (em relação ao popup)
+        const arrowX = Math.max(16, Math.min(popupRect.width - 28, rect.left + rect.width / 2 - left - 6));
+        popupEl.style.top = top + 'px';
+        popupEl.style.left = left + 'px';
+        popupEl.style.setProperty('--arrow-x', arrowX + 'px');
+        popupEl.classList.remove('arrow-top', 'arrow-bottom');
+        popupEl.classList.add('arrow-' + placement);
+    }
+
+    function _renderPopupContent(popupEl, state, opts) {
+        opts = opts || {};
+        const escopo = state.escopo;
+        const exNome = state.nome || '';
+        let msgHtml = '';
+        if (opts.message) msgHtml = '<div class="ex-action-popup__msg">' + opts.message + '</div>';
+        popupEl.innerHTML =
+            '<button type="button" class="ex-action-popup__close" data-popup-close aria-label="Fechar">' +
+                '<svg class="icon"><use href="#i-x"/></svg>' +
+            '</button>' +
+            '<div class="ex-action-popup__target" title="' + exNome.replace(/"/g, '&quot;') + '">' + exNome + '</div>' +
+            msgHtml +
+            '<button type="button" class="ex-action-popup__btn" data-popup-action="swap">' +
+                '<svg class="icon"><use href="#i-arrow-left-right"/></svg>' +
+                '<span>Trocar de posição</span>' +
+            '</button>' +
+            '<button type="button" class="ex-action-popup__btn ex-action-popup__btn--primary" data-popup-action="substituir">' +
+                '<svg class="icon"><use href="#i-shuffle"/></svg>' +
+                '<span>Substituir aleatório</span>' +
+            '</button>' +
+            '<div class="ex-action-popup__chip-row">' +
+                '<span>Escopo:</span>' +
+                '<div class="ex-action-popup__chip" role="group">' +
+                    '<button type="button" data-popup-escopo="padrao" class="' + (escopo === 'padrao' ? 'active' : '') + '">padrão</button>' +
+                    '<button type="button" data-popup-escopo="subregiao" class="' + (escopo === 'subregiao' ? 'active' : '') + '">subregião</button>' +
+                '</div>' +
+            '</div>';
+    }
+
+    function openExerciseActionPopup(exEl) {
+        // Se já em modo swap, ignora (o long-press com swapSource ativo é tratado direto pelo performSwap)
+        if (swapSource) return;
+        closeExerciseActionPopup();
+        const d = exEl.dataset;
+        const ei = parseInt(d.ei, 10);
+        popupState = {
+            alunoId: d.alunoId,
+            t: parseInt(d.treinoIdx, 10),
+            bi: parseInt(d.blocoIdx, 10),
+            ei: ei,
+            slot: _slotFromEi(ei),
+            nome: d.exNome || '',
+            escopo: 'padrao',
+            anchorEl: exEl,
+            popupEl: null,
+        };
+        const popupEl = document.createElement('div');
+        popupEl.className = 'ex-action-popup';
+        popupEl.setAttribute('role', 'dialog');
+        popupEl.setAttribute('aria-label', 'Ações do exercício');
+        document.body.appendChild(popupEl);
+        popupState.popupEl = popupEl;
+        _renderPopupContent(popupEl, popupState);
+        _positionPopup(popupEl, exEl);
+        exEl.classList.add('action-popup-target');
+        document.body.classList.add('action-popup-open');
+        if (navigator.vibrate) try { navigator.vibrate(30); } catch(e) {}
+    }
+
+    function _reanchorPopup() {
+        if (!popupState) return;
+        const sel = '[data-swap-ex][data-treino-idx="' + popupState.t + '"][data-bloco-idx="' + popupState.bi + '"][data-ei="' + popupState.ei + '"]';
+        const newEl = document.querySelector(sel);
+        if (!newEl) { closeExerciseActionPopup(); return; }
+        if (popupState.anchorEl) popupState.anchorEl.classList.remove('action-popup-target');
+        popupState.anchorEl = newEl;
+        popupState.nome = newEl.dataset.exNome || '';
+        newEl.classList.add('action-popup-target');
+        _renderPopupContent(popupState.popupEl, popupState);
+        _positionPopup(popupState.popupEl, newEl);
+    }
+
+    function _doPopupSubstituir() {
+        if (!popupState) return;
+        const s = popupState;
+        const url = '/hub/rotina/' + s.alunoId + '/treino/' + s.t + '/substituir-aleatorio/' + s.bi + '/' + s.slot;
+        const targetSel = '#treino-' + s.t;
+        const fd = new FormData();
+        fd.append('escopo', s.escopo);
+        fetch(url, { method: 'POST', headers: { 'HX-Request': 'true' }, body: fd })
+            .then(r => r.text())
+            .then(html => {
+                const cardEl = document.querySelector(targetSel);
+                if (!cardEl) return;
+                const tmp = document.createElement('div');
+                tmp.innerHTML = html;
+                tmp.querySelectorAll('[hx-swap-oob]').forEach(oob => {
+                    const id = oob.id;
+                    if (!id) return;
+                    oob.removeAttribute('hx-swap-oob');
+                    const existing = document.getElementById(id);
+                    if (existing) existing.replaceWith(oob);
+                    else document.body.appendChild(oob);
+                });
+                cardEl.innerHTML = tmp.innerHTML;
+                if (window.htmx) htmx.process(cardEl);
+                if (document.body.dataset.activePage === 'hub' && window.htmx) {
+                    const bbActions = document.querySelector('.bb-actions');
+                    if (bbActions) htmx.ajax('GET', '/_mobile_bb_actions', { target: '.bb-actions', swap: 'innerHTML' });
+                }
+                _reanchorPopup();
+            })
+            .catch(err => console.error('Substituir aleatório falhou:', err));
+    }
+
+    // Delegação de cliques dentro do popup
+    document.addEventListener('click', function(e) {
+        if (!popupState) return;
+        const popup = popupState.popupEl;
+        const inside = popup && popup.contains(e.target);
+        if (!inside) {
+            // Tap fora: ignora se for o próprio anchor ou outro exercício (deixa o fluxo normal de swap/popup tratar)
+            if (e.target.closest('[data-swap-ex]')) {
+                closeExerciseActionPopup();
+                return;
+            }
+            closeExerciseActionPopup();
+            return;
+        }
+        const closeBtn = e.target.closest('[data-popup-close]');
+        if (closeBtn) { e.preventDefault(); closeExerciseActionPopup(); return; }
+        const escBtn = e.target.closest('[data-popup-escopo]');
+        if (escBtn) {
+            e.preventDefault();
+            const novo = escBtn.dataset.popupEscopo;
+            if (novo && novo !== popupState.escopo) {
+                popupState.escopo = novo;
+                _renderPopupContent(popupState.popupEl, popupState);
+                _positionPopup(popupState.popupEl, popupState.anchorEl);
+            }
+            return;
+        }
+        const actBtn = e.target.closest('[data-popup-action]');
+        if (actBtn) {
+            e.preventDefault();
+            const action = actBtn.dataset.popupAction;
+            if (action === 'swap') {
+                const anchor = popupState.anchorEl;
+                closeExerciseActionPopup();
+                if (anchor) enterSwapMode(anchor);
+            } else if (action === 'substituir') {
+                _doPopupSubstituir();
+            }
+        }
+    }, true);
+
+    // ESC fecha popup também
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && popupState) closeExerciseActionPopup();
+    });
+
+    // Fecha em scroll
+    window.addEventListener('scroll', function() { if (popupState) closeExerciseActionPopup(); }, { passive: true });
+
+    // Fecha quando o card alvo desaparece (htmx swap externo)
+    document.body.addEventListener('htmx:beforeSwap', function() {
+        if (popupState && popupState.anchorEl && !document.body.contains(popupState.anchorEl)) {
+            closeExerciseActionPopup();
         }
     });
 })();
