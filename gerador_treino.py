@@ -358,68 +358,62 @@ def ordenar_compostos_primeiro(exercicios: list[Exercicio]) -> list[Exercicio]:
 
 
 # ---------------------------------------------------------------------------
-# Regra de similaridade
+# Seleção evitando família (variacao_de)
 # ---------------------------------------------------------------------------
 
-def selecionar_sem_repeticao_similaridade(
+def selecionar_evitando_familia(
     candidatos: list[Exercicio],
-    similaridades_usadas: set[str],
     variacao_pais_usados: set[str],
     n: int,
     relaxar_familia: bool = False,
     relaxados_out: Optional[list] = None,
 ) -> list[Exercicio]:
     """
-    Seleciona até n exercícios evitando repetir grupos de similaridade.
-    Se não houver candidatos suficientes respeitando a regra, relaxa:
-    permite repetir grupos de similaridade para completar n exercícios,
-    mas nunca repete o mesmo exercício.
-
-    Se relaxar_familia=True e ainda assim não completar n, relaxa também
-    o bloqueio por família (variacao_de). Os exercícios escolhidos nessa
-    fase são adicionados a relaxados_out (se passado).
+    Seleciona até n exercícios evitando repetir famílias (variacao_de) e nomes.
+    Se relaxar_familia=True e o estrito não preencher, relaxa família entre treinos.
+    Exercícios escolhidos no relax são adicionados a relaxados_out (se passado).
     """
     nomes_usados: set[str] = set()
+    var_pais_local: set[str] = set(variacao_pais_usados)
 
-    def _selecionar(pool, respeitar_sim, respeitar_familia=True):
-        selecionados = []
-        sims_desta_selecao = set()
+    def _passa_familia(e):
+        if e.nome in var_pais_local:
+            return False
+        if e.variacao_de and e.variacao_de in var_pais_local:
+            return False
+        return True
+
+    selecionados: list[Exercicio] = []
+
+    # Tentativa 1: estrito (família + nome)
+    pool = list(candidatos)
+    random.shuffle(pool)
+    for e in pool:
+        if len(selecionados) >= n:
+            break
+        if e.nome in nomes_usados:
+            continue
+        if not _passa_familia(e):
+            continue
+        selecionados.append(e)
+        nomes_usados.add(e.nome)
+        var_pais_local.add(e.nome)
+        if e.variacao_de:
+            var_pais_local.add(e.variacao_de)
+
+    # Tentativa 2: relax família (apenas se autorizado)
+    if relaxar_familia and len(selecionados) < n:
+        pool = [e for e in candidatos if e.nome not in nomes_usados]
         random.shuffle(pool)
         for e in pool:
-            if e.nome in nomes_usados:
-                continue
-            sim_ok = (not respeitar_sim) or (
-                e.similaridade not in similaridades_usadas
-                and e.similaridade not in sims_desta_selecao
-            )
-            var_ok = (not respeitar_familia) or (
-                e.variacao_de is None or e.variacao_de not in variacao_pais_usados
-            )
-            if sim_ok and var_ok:
-                selecionados.append(e)
-                sims_desta_selecao.add(e.similaridade)
-                nomes_usados.add(e.nome)
             if len(selecionados) >= n:
                 break
-        return selecionados
+            selecionados.append(e)
+            nomes_usados.add(e.nome)
+            if relaxados_out is not None:
+                relaxados_out.append(e.nome)
 
-    # Tentativa 1: respeitar similaridade + família
-    resultado = _selecionar(list(candidatos), respeitar_sim=True)
-
-    # Tentativa 2: relaxar similaridade (mantém família)
-    if len(resultado) < n:
-        restantes = [e for e in candidatos if e.nome not in nomes_usados]
-        resultado += _selecionar(restantes, respeitar_sim=False)
-
-    # Tentativa 3: relaxar família (apenas se permitido)
-    if len(resultado) < n and relaxar_familia:
-        restantes = [e for e in candidatos if e.nome not in nomes_usados]
-        novos = _selecionar(restantes, respeitar_sim=False, respeitar_familia=False)
-        if relaxados_out is not None:
-            relaxados_out.extend(e.nome for e in novos)
-        resultado += novos
-
-    return resultado[:n]
+    return selecionados[:n]
 
 
 # ---------------------------------------------------------------------------
@@ -637,8 +631,7 @@ def substituir_exercicio(
     max_complexidade: int = 5,
 ) -> Sessao:
     """
-    Substitui um exercício específico na sessão por outro do mesmo padrão
-    e grupo de similaridade diferente dos já usados.
+    Substitui um exercício específico na sessão por outro do mesmo padrão.
 
     Args:
         sessao: sessão atual
@@ -678,16 +671,6 @@ def substituir_exercicio(
         print(f"  [!] Exercício '{nome_atual}' não encontrado na sessão.")
         return sessao
 
-    # Similaridades já em uso (excluindo o exercício alvo)
-    sims_em_uso = set()
-    for i, bloco in enumerate(sessao.blocos):
-        if bloco.ex1.nome != nome_atual:
-            sims_em_uso.add(bloco.ex1.similaridade)
-        if bloco.ex2 and bloco.ex2.nome != nome_atual:
-            sims_em_uso.add(bloco.ex2.similaridade)
-        if bloco.ex3 and bloco.ex3.nome != nome_atual:
-            sims_em_uso.add(bloco.ex3.similaridade)
-
     # Nomes já em uso na sessão
     nomes_em_uso = set()
     for bloco in sessao.blocos:
@@ -698,22 +681,11 @@ def substituir_exercicio(
             nomes_em_uso.add(bloco.ex3.nome)
     nomes_em_uso.discard(nome_atual)
 
-    # Buscar substituto: mesmo padrão, similaridade não usada
+    # Buscar substituto: mesmo padrão, sem repetir nomes da sessão
     candidatos = filtrar_por_padrao(banco, exercicio_alvo.padrao)
     candidatos = filtrar_por_equipamentos(candidatos, eq_bloq)
     candidatos = filtrar_por_complexidade(candidatos, max_complexidade)
-    candidatos = [
-        e for e in candidatos
-        if e.nome not in nomes_em_uso
-        and e.similaridade not in sims_em_uso
-    ]
-
-    if not candidatos:
-        # Relaxa regra de similaridade se não encontrar nada
-        candidatos = filtrar_por_padrao(banco, exercicio_alvo.padrao)
-        candidatos = filtrar_por_equipamentos(candidatos, eq_bloq)
-        candidatos = filtrar_por_complexidade(candidatos, max_complexidade)
-        candidatos = [e for e in candidatos if e.nome not in nomes_em_uso]
+    candidatos = [e for e in candidatos if e.nome not in nomes_em_uso]
 
     if not candidatos:
         print(f"  [!] Nenhum substituto encontrado para '{nome_atual}'.")
@@ -757,7 +729,6 @@ def gerar_sessao(
     var_pais = variacao_pais_usados or set()
     travados = exercicios_travados or []
 
-    similaridades_usadas: set[str] = set()
     todos_selecionados: list[Exercicio] = []
     avisos_da_sessao: list[dict] = []
     relaxados_local: list[str] = []
@@ -765,7 +736,6 @@ def gerar_sessao(
     # Exercícios travados entram primeiro
     for e in travados:
         todos_selecionados.append(e)
-        similaridades_usadas.add(e.similaridade)
 
     # Selecionar por padrão
     nomes_travados = {e.nome for e in travados}
@@ -790,13 +760,11 @@ def gerar_sessao(
             if lateralidade:
                 candidatos = [e for e in candidatos if e.unilateral == lateralidade]
 
-            selecionados = selecionar_sem_repeticao_similaridade(
-                candidatos, similaridades_usadas, var_pais, n,
+            selecionados = selecionar_evitando_familia(
+                candidatos, var_pais, n,
                 relaxar_familia=relaxar_familia,
                 relaxados_out=relaxados_local,
             )
-            for e in selecionados:
-                similaridades_usadas.add(e.similaridade)
             todos_selecionados.extend(selecionados)
 
         # Avisos do tipo familia_repetida (1 por exercício relaxado)
@@ -944,7 +912,6 @@ def gerar_sessao_por_demandas(
     var_pais_intra: set[str] = set()                # within-session, mutado durante seleção
     travados = exercicios_travados or []
 
-    similaridades_usadas: set[str] = set()
     nomes_usados: set[str] = set()
     todos_selecionados: list[Exercicio] = []
     relaxados_local: list[str] = []  # nomes escolhidos via relax família
@@ -952,7 +919,6 @@ def gerar_sessao_por_demandas(
     # Travados entram primeiro
     for e in travados:
         todos_selecionados.append(e)
-        similaridades_usadas.add(e.similaridade)
         nomes_usados.add(e.nome)
 
     lat_map = lateralidade_por_padrao or {}
@@ -966,9 +932,9 @@ def gerar_sessao_por_demandas(
     ) -> int:
         """Cicla pelos padrões pegando 1 por vez. Retorna quantos selecionou.
 
-        Aplica os 3 níveis de relax CRUZANDO TODOS os padrões em cada nível,
-        antes de descer pro próximo: estrito em todos → relax 1 em todos →
-        relax 2 em todos. Isso evita que um padrão "esgotado" (sem candidatos
+        Aplica os 2 níveis de relax CRUZANDO TODOS os padrões em cada nível,
+        antes de descer pro próximo: estrito em todos → relax família entre
+        treinos em todos. Isso evita que um padrão "esgotado" (sem candidatos
         estritos) seja preenchido via relax enquanto outro padrão do mesmo
         escopo ainda teria opção estrita disponível.
 
@@ -1003,22 +969,15 @@ def gerar_sessao_por_demandas(
             return False
 
         def _filtrar(cands: list[Exercicio], nivel_relax: int) -> list[Exercicio]:
-            # nivel_relax: 0=estrito, 1=relax similaridade, 2=relax família inter
+            # nivel_relax: 0=estrito, 1=relax família inter (preserva intra)
             if nivel_relax == 0:
-                base = [
-                    e for e in cands
-                    if e.similaridade not in similaridades_usadas
-                    and e.nome not in nomes_usados
-                    and not _bloqueado_familia(e, [var_pais_inter, var_pais_intra])
-                ]
-            elif nivel_relax == 1:
                 base = [
                     e for e in cands
                     if e.nome not in nomes_usados
                     and not _bloqueado_familia(e, [var_pais_inter, var_pais_intra])
                 ]
             else:
-                # nivel 2: relax família inter (preserva intra)
+                # nivel 1: relax família inter (preserva intra)
                 base = [
                     e for e in cands
                     if e.nome not in nomes_usados
@@ -1034,8 +993,8 @@ def gerar_sessao_por_demandas(
 
         selecionados = 0
 
-        # Niveis de relax a tentar, em ordem. Relax 2 só se relaxar_familia=True.
-        niveis = [0, 1] + ([2] if relaxar_familia else [])
+        # Niveis de relax a tentar, em ordem. Relax 1 só se relaxar_familia=True.
+        niveis = [0] + ([1] if relaxar_familia else [])
 
         for nivel_relax in niveis:
             if selecionados >= qtd:
@@ -1051,12 +1010,11 @@ def gerar_sessao_por_demandas(
                         continue
                     escolhido = random.choice(disponiveis)
                     todos_selecionados.append(escolhido)
-                    similaridades_usadas.add(escolhido.similaridade)
                     nomes_usados.add(escolhido.nome)
                     if escolhido.variacao_de:
                         var_pais_intra.add(escolhido.variacao_de)
                     var_pais_intra.add(escolhido.nome)
-                    if nivel_relax == 2:
+                    if nivel_relax == 1:
                         relaxados_local.append(escolhido.nome)
                     selecionados += 1
                     progresso = True
@@ -1181,13 +1139,12 @@ def gerar_sessao_por_demandas(
 
 
 # ---------------------------------------------------------------------------
-# Geração de múltiplos treinos com compartilhamento de estado de similaridade
+# Geração de múltiplos treinos com compartilhamento de estado entre sessões
 # ---------------------------------------------------------------------------
 
 def gerar_multiplos_treinos(
     banco: list[Exercicio],
     configs: list[dict],
-    variar_entre_treinos: bool = True,
     relaxar_familia: bool = False,
 ) -> list[Sessao]:
     """
@@ -1202,16 +1159,14 @@ def gerar_multiplos_treinos(
             - tamanho_bloco: int
             - exercicios_travados: list[Exercicio] (opcional)
             - equipamentos_bloqueados: list[str] (opcional)
-        variar_entre_treinos: se True, similaridades usadas num treino
-            não se repetem nos seguintes (mais variação).
-            Se False, só os nomes exatos são bloqueados entre treinos.
+        relaxar_familia: se True, permite repetir famílias entre treinos
+            quando o estrito não consegue preencher uma demanda.
 
     Returns:
         Lista de Sessao na mesma ordem de configs.
     """
     # Conjuntos globais compartilhados entre treinos
     nomes_exatos_globais: set[str] = set()   # apenas nomes EXATOS de exercícios usados → filtra banco
-    sims_globais: set[str] = set()           # grupos de similaridade bloqueados
     variacao_pais_globais: set[str] = set()  # nomes + pais usados → bloqueia famílias (relaxável)
 
     sessoes = []
@@ -1291,8 +1246,6 @@ def gerar_multiplos_treinos(
                     variacao_pais_globais.add(ex.nome)
                     if ex.variacao_de:
                         variacao_pais_globais.add(ex.variacao_de)
-                    if variar_entre_treinos:
-                        sims_globais.add(ex.similaridade)
 
         sessoes.append(sessao)
 
@@ -1328,11 +1281,9 @@ def buscar_substitutos(
     regiao: Optional[str] = None,
     purpose: Optional[str] = None,
     unilateral: Optional[str] = None,
-    similaridade: Optional[str] = None,
     max_complexidade: int = 5,
     max_fadiga: int = 5,
     equipamentos_bloqueados: Optional[list[str]] = None,
-    ignorar_similaridade_usada: bool = False,
 ) -> list[Exercicio]:
     """
     Retorna lista de candidatos filtrados para substituir um exercício na sessão.
@@ -1341,12 +1292,10 @@ def buscar_substitutos(
     eq_bloq = equipamentos_bloqueados or []
 
     nomes_em_uso = set()
-    sims_em_uso = set()
     for bloco in sessao.blocos:
         for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
             if ex and ex.nome != nome_atual:
                 nomes_em_uso.add(ex.nome)
-                sims_em_uso.add(ex.similaridade)
 
     candidatos = list(banco)
     if padrao:
@@ -1357,16 +1306,12 @@ def buscar_substitutos(
         candidatos = [e for e in candidatos if e.purpose == purpose]
     if unilateral:
         candidatos = [e for e in candidatos if e.unilateral == unilateral]
-    if similaridade:
-        candidatos = [e for e in candidatos if e.similaridade == similaridade]
     if eq_bloq:
         candidatos = [e for e in candidatos if e.eq_primario not in eq_bloq]
 
     candidatos = [e for e in candidatos if e.complexidade <= max_complexidade]
     candidatos = [e for e in candidatos if e.fadiga <= max_fadiga]
     candidatos = [e for e in candidatos if e.nome not in nomes_em_uso]
-    if not ignorar_similaridade_usada:
-        candidatos = [e for e in candidatos if e.similaridade not in sims_em_uso]
 
     candidatos.sort(key=lambda e: (e.purpose != "compound", e.fadiga * -1, e.nome))
     return candidatos

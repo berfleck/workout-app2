@@ -51,7 +51,6 @@ def rodar(seed, modo="hierarquia", relaxar=False):
             "max_complexidade": 5, "tamanho_bloco": 2,
         }
     sessoes = gerar_multiplos_treinos(banco, [cfg, cfg],
-                                      variar_entre_treinos=True,
                                       relaxar_familia=relaxar)
 
     nomes_t1 = _coletar_nomes(sessoes[0])

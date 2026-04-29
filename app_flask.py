@@ -9,7 +9,7 @@ from datetime import datetime
 from gerador_treino import (
     carregar_banco, gerar_sessao, gerar_sessao_por_demandas, gerar_multiplos_treinos,
     substituir_exercicio, buscar_substitutos, substituir_exercicio_por,
-    expandir_para_padroes, selecionar_sem_repeticao_similaridade,
+    expandir_para_padroes, selecionar_evitando_familia,
     TEMPLATES, TEMPLATE_EPP, EXERCICIOS_POR_PADRAO,
     PADRAO_PARA_SUBREGIAO, SUBREGIAO_PARA_REGIAO,
     REGIAO_PARA_SUBREGIOES, SUBREGIAO_PARA_PADROES,
@@ -1265,15 +1265,13 @@ def hub_regerar_bloco(aluno_id, t, bi):
 
     # Gerar novos exercícios para cada padrão do bloco
     novos_exs = []
-    sims_usados = set()
     for padrao in padroes_bloco:
         candidatos = [e for e in banco_filtrado if e.padrao == padrao and e.complexidade <= 5]
         if not candidatos:
             candidatos = [e for e in banco if e.padrao == padrao]
-        ex = selecionar_sem_repeticao_similaridade(candidatos, set(), sims_usados, 1)
+        ex = selecionar_evitando_familia(candidatos, set(), 1)
         if ex:
             novos_exs.append(ex[0])
-            sims_usados.add(ex[0].similaridade)
         elif candidatos:
             novos_exs.append(candidatos[0])
 
@@ -1312,7 +1310,6 @@ def gerar():
     n_treinos = int(request.form.get("n_treinos", 1))
     max_cx = int(request.form.get("max_complexidade", 5))
     tam_bloco = int(request.form.get("tamanho_bloco", 2))
-    variar = request.form.get("variar_entre") == "on"
     evitar_agon = request.form.get("evitar_agonistas") == "on"
     relaxar_familia = request.form.get("relaxar_familia") == "on"
 
@@ -1466,7 +1463,6 @@ def gerar():
         n_bloqueados_hist = banco_antes - len(banco_gerar)
 
     sessoes_ativas = gerar_multiplos_treinos(banco_gerar, all_configs,
-                                             variar_entre_treinos=variar,
                                              relaxar_familia=relaxar_familia)
 
     # Calcula avisos cedo (antes de qualquer redirect contextual) para podermos
@@ -1504,7 +1500,6 @@ def gerar():
         "n_treinos": n_treinos,
         "max_complexidade": max_cx,
         "tamanho_bloco": tam_bloco,
-        "variar_entre": variar,
         "evitar_agonistas": evitar_agon,
         "relaxar_familia": relaxar_familia,
     }
@@ -1759,14 +1754,12 @@ def bloco_regerar(t, bi):
                       and (e.variacao_de is None or e.variacao_de not in nomes_bloqueados)]
 
     novos = []
-    sims = set()
     for padrao in padroes_bloco:
         cands = [e for e in banco_filtrado if e.padrao == padrao]
         if not cands: cands = [e for e in banco if e.padrao == padrao]
-        escolhidos = selecionar_sem_repeticao_similaridade(cands, set(), sims, 1)
+        escolhidos = selecionar_evitando_familia(cands, set(), 1)
         if escolhidos:
             novos.append(escolhidos[0])
-            sims.add(escolhidos[0].similaridade)
         elif cands:
             novos.append(cands[0])
 

@@ -60,7 +60,7 @@ Gerados (gitignored): bf_treinamento.db, sessoes_salvas.json
 
 - `sessoes_ativas` — lista de Sessao (buffer de trabalho para gerador/edição)
 - `configs_geradas` — config por treino (salva no histórico)
-- `opcoes_globais` — n_treinos, max_complexidade, tamanho_bloco, variar_entre, evitar_agonistas, relaxar_familia
+- `opcoes_globais` — n_treinos, max_complexidade, tamanho_bloco, evitar_agonistas, relaxar_familia
 - `referencias` — lista de `{"sessao": Sessao, "origem": {...}, "id_ref": str}`. Auto-preenchidas ao gerar com histórico
 - `edicao_hub` — dict com `aluno_id` e `rotina_id` quando editando rotina do HUB
 - `criacao_manual` — dict com `aluno_id` e `novo_idx` quando há treino sendo criado manualmente
@@ -97,13 +97,13 @@ Sidebar fixa à esquerda (60px, ícones) no desktop. Mobile: navegação horizon
 
 Dois modos: **`gerar_sessao()`** (Templates, padrões + EPP) e **`gerar_sessao_por_demandas()`** (Hierarquia, demandas `[(nivel, escopo, qtd)]`, 60% compostos para região).
 
-Fluxo: selecionar exercícios (similaridade) → ordenar compostos primeiro → montar blocos (geo-diversidade P1-P4, regra fadiga max 4) → ordenar blocos por score → gerar_multiplos_treinos (3 camadas bloqueio: nomes, variacao_de, similaridade).
+Fluxo: selecionar exercícios (família + nome) → ordenar compostos primeiro → montar blocos (geo-diversidade P1-P4, regra fadiga max 4) → ordenar blocos por score → gerar_multiplos_treinos (2 camadas bloqueio: nomes, variacao_de).
 
 **Classificação composto vs isolado é por EXERCÍCIO via `purpose`** (não por padrão). `PURPOSE_COMPOSTO = {"compound", "explosive"}` e helper `_eh_composto(e)`. Padrões mistos como `hinge` (12 compound + 8 isolation), `squat` (16 compound + 1 isolation), `puxadas` (5 + 2) e `adduction` (1 + 2) contribuem em **ambas as fases** do region 60%. Em região(N): Fase 1 cycla padrões com `filtro_purpose="composto"` (min `ceil(N×0.6)`), Fase 2 com `filtro_purpose="isolado"`. Em subregião/padrão: `_ordenar_padroes_por_prioridade(padroes, banco=banco)` põe padrões com candidato composto disponível primeiro (dinâmico, não estático), e `_selecionar_ciclando` recebe `preferir_composto=True`. Constante `PADROES_COMPOSTOS` mantida no arquivo só pra retrocompat de import — não é mais usada na lógica.
 
-**Bloqueio inter-treino (gerar_multiplos_treinos)**: dois sets globais separados — `nomes_exatos_globais` (apenas ex.nome, filtra `banco_filtrado`) e `variacao_pais_globais` (ex.nome + ex.variacao_de, controla bloqueio por família). Essa separação permite que pais concretos como "Apoio" sejam ressuscitados pelo relax quando só um filho foi usado. **Internamente** em `_selecionar_ciclando` e `selecionar_sem_repeticao_similaridade`, var_pais é dividido em `var_pais_inter` (read-only, herdado) e `var_pais_intra` (mutado within-session) — só `var_pais_inter` pode ser relaxado.
+**Bloqueio inter-treino (gerar_multiplos_treinos)**: dois sets globais separados — `nomes_exatos_globais` (apenas ex.nome, filtra `banco_filtrado`) e `variacao_pais_globais` (ex.nome + ex.variacao_de, controla bloqueio por família). Essa separação permite que pais concretos como "Apoio" sejam ressuscitados pelo relax quando só um filho foi usado. **Internamente** em `_selecionar_ciclando` e `selecionar_evitando_familia`, var_pais é dividido em `var_pais_inter` (read-only, herdado) e `var_pais_intra` (mutado within-session) — só `var_pais_inter` pode ser relaxado.
 
-**Relaxamento de família** (`relaxar_familia: bool`, default ON na UI): quando uma demanda não pode ser preenchida no estrito, tenta 3 níveis em ordem: estrito → relaxa similaridade → relaxa família entre treinos (preserva intra). Exercícios escolhidos no relax 3 vão pra `Sessao.relaxados` (badge `↻` no UI) e geram aviso `tipo: "familia_repetida"`. Se mesmo relaxado faltar exercício (limite intra-família), gera aviso `tipo: "incompleta"`. Avisos são serializados na sessão e propagados via `flask.session['avisos_pendentes']` quando a rota /gerar redireciona pro HUB (substituir/adicionar/nova_rotina), pra que o modal apareça depois do redirect.
+**Relaxamento de família** (`relaxar_familia: bool`, default ON na UI): quando uma demanda não pode ser preenchida no estrito, tenta 2 níveis em ordem: estrito (família + nome) → relaxa família entre treinos (preserva intra). Exercícios escolhidos no relax vão pra `Sessao.relaxados` (badge `↻` no UI) e geram aviso `tipo: "familia_repetida"`. Se mesmo relaxado faltar exercício (limite intra-família), gera aviso `tipo: "incompleta"`. Avisos são serializados na sessão e propagados via `flask.session['avisos_pendentes']` quando a rota /gerar redireciona pro HUB (substituir/adicionar/nova_rotina), pra que o modal apareça depois do redirect.
 
 ## Layout
 
