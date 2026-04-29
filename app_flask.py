@@ -98,6 +98,10 @@ referencias: list[dict] = []
 edicao_hub: dict | None = None  # {"aluno_id": int, "rotina_id": str}
 # Estado de criação manual pendente (permite cancelar e restaurar rascunho anterior)
 criacao_manual: dict | None = None  # {"aluno_id": int, "backup": [...sessoes_dicts...], "novo_idx": int}
+# Histórico de sugestões do botão substituir (cycle sem repetir até esgotar):
+# (treino_idx, bloco_idx, posicao) -> {"inicial": str, "vistos": set[str]}
+# "inicial" é o nome do exercício no momento do primeiro clique e nunca volta a ser sugerido.
+historico_substituicoes: dict[tuple[int, int, str], dict] = {}
 
 def _ref_sessoes():
     return [r["sessao"] for r in referencias]
@@ -717,6 +721,7 @@ def gerador_page():
 
     if acao in ("nova_rotina", "adicionar", "substituir"):
         sessoes_ativas = []
+        historico_substituicoes.clear()
         salvar_sessoes_disco()
 
     return render_template("treinos.html",
@@ -894,11 +899,12 @@ def hub_rotina_render(aluno_id, periodo="atual"):
 
 def _carregar_hub_edicao(aluno_id):
     """Carrega sessoes do aluno em sessoes_ativas e marca edicao_hub."""
-    global sessoes_ativas, edicao_hub
+    global sessoes_ativas, edicao_hub, historico_substituicoes
     sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
     if not sessoes_dicts:
         return False
     sessoes_ativas = [_dict_to_sessao(s) for s in sessoes_dicts]
+    historico_substituicoes = {}
     rotina_reg = carregar_rotina_ativa(aluno_id)
     edicao_hub = {"aluno_id": aluno_id, "rotina_id": rotina_reg["id"] if rotina_reg else None}
     return True
@@ -1307,6 +1313,7 @@ def hub_regerar_bloco(aluno_id, t, bi):
 @app.route("/gerar", methods=["POST"])
 def gerar():
     global sessoes_ativas, configs_geradas, opcoes_globais
+    historico_substituicoes.clear()
     n_treinos = int(request.form.get("n_treinos", 1))
     max_cx = int(request.form.get("max_complexidade", 5))
     tam_bloco = int(request.form.get("tamanho_bloco", 2))
@@ -1651,30 +1658,72 @@ def treino_regerar(t):
                            modo="visualizar", padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
                            nomes_ref=_nomes_ref_set())
 
-@app.route("/treino/<int:t>/substituir/<nome_ex>", methods=["POST"])
+@app.route("/treino/<int:t>/substituir/<path:nome_ex>", methods=["POST"])
 def treino_substituir(t, nome_ex):
-    global sessoes_ativas
+    global sessoes_ativas, historico_substituicoes
     if t >= len(sessoes_ativas): return "", 404
-    banco_subst = banco
+
+    # Localizar posição (treino, bloco, slot) — chave estável do histórico de sugestões
+    pos_key = None
+    for bi, b in enumerate(sessoes_ativas[t].blocos):
+        if b.ex1 and b.ex1.nome == nome_ex: pos_key = (t, bi, "ex1"); break
+        if b.ex2 and b.ex2.nome == nome_ex: pos_key = (t, bi, "ex2"); break
+        if b.ex3 and b.ex3.nome == nome_ex: pos_key = (t, bi, "ex3"); break
+
+    nomes_outros_treinos = {ex.nome for i, s in enumerate(sessoes_ativas) if i != t
+                            for b in s.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
+    banco_sem_irmaos = [e for e in banco if e.nome not in nomes_outros_treinos]
+    banco_subst = banco_sem_irmaos if banco_sem_irmaos else banco
     ref_sessoes = _ref_sessoes()
     if ref_sessoes:
         nomes_ref = {ex.nome for s in ref_sessoes for b in s.blocos
                      for ex in [b.ex1, b.ex2, b.ex3] if ex}
-        banco_sem_ref = [e for e in banco if e.nome not in nomes_ref]
-        banco_subst = banco_sem_ref if banco_sem_ref else banco
+        banco_sem_ref = [e for e in banco_subst if e.nome not in nomes_ref]
+        banco_subst = banco_sem_ref if banco_sem_ref else banco_subst
+
+    # Filtrar nomes já sugeridos para esta posição; se esgotou o ciclo, reseta (preservando inicial)
+    if pos_key:
+        if pos_key not in historico_substituicoes:
+            historico_substituicoes[pos_key] = {"inicial": nome_ex, "vistos": {nome_ex}}
+        dados = historico_substituicoes[pos_key]
+        inicial = dados["inicial"]
+        ja_sugeridos = dados["vistos"]
+        ex_atual = getattr(sessoes_ativas[t].blocos[pos_key[1]], pos_key[2])
+        padrao_alvo = ex_atual.padrao if ex_atual else None
+        candidatos_padrao = {e.nome for e in banco_subst if e.padrao == padrao_alvo} if padrao_alvo else set()
+        restantes = candidatos_padrao - ja_sugeridos - {nome_ex}
+        if restantes:
+            banco_subst = [e for e in banco_subst if e.nome not in ja_sugeridos]
+        else:
+            # Reset do ciclo: preserva o inicial (nunca volta) e o atual (evita repetir em sequência)
+            dados["vistos"] = {inicial, nome_ex}
+            banco_filtrado = [e for e in banco_subst if e.nome not in dados["vistos"]]
+            if banco_filtrado:
+                banco_subst = banco_filtrado
+
     sessoes_ativas[t] = substituir_exercicio(sessoes_ativas[t], nome_ex, banco_subst)
+
+    # Registrar nome efetivamente escolhido
+    if pos_key and pos_key in historico_substituicoes:
+        novo_ex = getattr(sessoes_ativas[t].blocos[pos_key[1]], pos_key[2], None)
+        if novo_ex and novo_ex.nome != nome_ex:
+            historico_substituicoes[pos_key]["vistos"].add(novo_ex.nome)
+
     salvar_sessoes_disco()
     return _responder_card_com_banner(t)
 
-@app.route("/treino/<int:t>/substituir-por/<nome_atual>/<nome_novo>", methods=["POST"])
-def treino_substituir_por(t, nome_atual, nome_novo):
+@app.route("/treino/<int:t>/substituir-por", methods=["POST"])
+def treino_substituir_por(t):
     global sessoes_ativas
     if t >= len(sessoes_ativas): return "", 404
+    nome_atual = request.form.get("nome_atual", "")
+    nome_novo = request.form.get("nome_novo", "")
+    if not nome_atual or not nome_novo: return "", 400
     sessoes_ativas[t] = substituir_exercicio_por(sessoes_ativas[t], nome_atual, nome_novo, banco)
     salvar_sessoes_disco()
     return _responder_card_com_banner(t)
 
-@app.route("/treino/<int:t>/buscar-substitutos/<nome_ex>")
+@app.route("/treino/<int:t>/buscar-substitutos/<path:nome_ex>")
 def buscar_subs(t, nome_ex):
     """Returns substitution panel HTML."""
     if t >= len(sessoes_ativas): return "", 404
@@ -1687,6 +1736,8 @@ def buscar_subs(t, nome_ex):
 
     nomes_em_uso = {e.nome for bloco in sessoes_ativas[t].blocos
                     for e in [bloco.ex1, bloco.ex2, bloco.ex3] if e and e.nome != nome_ex}
+    nomes_em_uso |= {ex.nome for i, s in enumerate(sessoes_ativas) if i != t
+                     for b in s.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
 
     cands = filtrar_banco(texto=texto, padrao=padrao or None, purpose=purpose or None,
                           unilateral=unilateral or None, equipamento=equipamento or None,
@@ -1922,7 +1973,7 @@ def bloco_adicionar_exercicio(t, bi, nome_ex):
     salvar_sessoes_disco()
     return _responder_card_com_banner(t)
 
-@app.route("/treino/<int:t>/novo-bloco/<nome_ex>", methods=["POST"])
+@app.route("/treino/<int:t>/novo-bloco/<path:nome_ex>", methods=["POST"])
 def novo_bloco(t, nome_ex):
     global sessoes_ativas
     if t >= len(sessoes_ativas): return "", 404

@@ -685,7 +685,7 @@ def substituir_exercicio(
     candidatos = filtrar_por_padrao(banco, exercicio_alvo.padrao)
     candidatos = filtrar_por_equipamentos(candidatos, eq_bloq)
     candidatos = filtrar_por_complexidade(candidatos, max_complexidade)
-    candidatos = [e for e in candidatos if e.nome not in nomes_em_uso]
+    candidatos = [e for e in candidatos if e.nome not in nomes_em_uso and e.nome != nome_atual]
 
     if not candidatos:
         print(f"  [!] Nenhum substituto encontrado para '{nome_atual}'.")

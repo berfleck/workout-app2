@@ -165,9 +165,9 @@
                 {% endif %}
             </form>
             <div class="exercicio-acoes">
-                <button class="btn-ghost" title="Substituir aleatório"
+                <button class="btn-ghost" data-keep-scroll title="Substituir aleatório"
                         hx-post="/treino/{{ idx }}/substituir/{{ ex.nome|urlencode }}"
-                        hx-target="#treino-{{ idx }}" hx-swap="innerHTML"><svg class="icon"><use href="#i-shuffle"/></svg></button>
+                        hx-target="#treino-{{ idx }}" hx-swap="innerHTML focus-scroll:false"><svg class="icon"><use href="#i-shuffle"/></svg></button>
                 {% set chip_ex = padrao_para_chip.get(ex.padrao) if ex.padrao else None %}
                 {% set meta_resumo = [] %}
                 {% if ex.purpose %}{% set _ = meta_resumo.append(purpose_pt.get(ex.purpose, ex.purpose)) %}{% endif %}

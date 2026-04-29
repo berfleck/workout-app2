@@ -61,6 +61,11 @@
         .bloco-exercicios .exercicio-wrapper + .exercicio-wrapper .exercicio,
         .bloco-wrap .exercicio + .exercicio { border-top: 1px solid rgba(0,0,0,0.06); }
 
+        /* Desabilita scroll-anchor: navegadores tentam manter a posição visual quando
+           conteúdo muda de altura, e em mobile isso pode acabar empurrando a viewport
+           para o final do card recém-substituído. */
+        html, body { overflow-anchor: none; }
+
         /* Opção B (toggle via body.layout-zebra): blocos colados sem borda, alternando bg */
         body.layout-zebra .bloco-wrap { border-bottom: none; padding-top: 6px; padding-bottom: 6px; }
         body.layout-zebra .bloco-wrap:nth-of-type(even) { background: #f3f4f6; }
@@ -1947,6 +1952,24 @@
         .treino-card.modo-visualizar .exercicio-nome { font-size: 13px; }
         .treino-card.modo-visualizar hr.thin { margin: 4px 0; }
 
+        /* Mobile: card e fundo cinza extendem ate a borda da tela pra ganhar
+           espaco horizontal pros nomes/prescricoes. Cancela o px-4 (16px) do
+           wrapper main e o padding lateral interno do card. */
+        @media (max-width: 768px) {
+            .treino-card.modo-visualizar {
+                margin-left: -16px;
+                margin-right: -16px;
+                padding-left: 0;
+                padding-right: 0;
+                border-left: none;
+                border-right: none;
+                border-radius: 0;
+            }
+            .treino-card.modo-visualizar .treino-header { padding-left: 20px; padding-right: 14px; }
+            .treino-card.modo-visualizar .blocos-container { border-radius: 0; }
+            .treino-card.modo-visualizar .exercicio { padding-left: 18px; }
+        }
+
         /* Scroll containers */
         [id^="add-results-"], [id^="nb-results-"] { max-height: 240px; overflow-y: auto; }
 
@@ -3333,9 +3356,8 @@ function confirmarSubstDrawer() {
     const novoNome = sel.dataset.nome;
     const t = drawer.dataset.treino;
     const exAtual = drawer.dataset.exAtual;
-    htmx.ajax('POST',
-        '/treino/' + t + '/substituir-por/' + encodeURIComponent(exAtual) + '/' + encodeURIComponent(novoNome),
-        {target: '#treino-' + t, swap: 'innerHTML'});
+    htmx.ajax('POST', '/treino/' + t + '/substituir-por',
+        {target: '#treino-' + t, swap: 'innerHTML', values: {nome_atual: exAtual, nome_novo: novoNome}});
     closeSubstDrawer();
 }
 
@@ -3360,6 +3382,48 @@ document.body.addEventListener('htmx:afterRequest', function(evt) {
         showAutosaveToast();
     }
 });
+
+// Preserva posição de scroll em ações marcadas com [data-keep-scroll]
+// (substituir aleatório etc) — evita que mobile role para o final da tela
+// após o swap. Captura no clique (antes do request) e restaura em vários
+// eventos para cobrir o reflow assíncrono.
+(function() {
+    let __keepScrollY = null;
+    let __keepScrollDocY = null;
+    let __keepScrollUntil = 0;
+
+    document.addEventListener('click', function(e) {
+        const trigger = e.target.closest('[data-keep-scroll]');
+        if (!trigger) return;
+        __keepScrollY = window.scrollY || window.pageYOffset || 0;
+        __keepScrollDocY = document.documentElement.scrollTop || document.body.scrollTop || 0;
+        __keepScrollUntil = Date.now() + 1500;
+    }, true);
+
+    function restoreScroll() {
+        if (__keepScrollY === null || Date.now() > __keepScrollUntil) {
+            __keepScrollY = null; __keepScrollDocY = null;
+            return;
+        }
+        const y = __keepScrollY;
+        const dy = __keepScrollDocY;
+        window.scrollTo(0, y);
+        if (document.documentElement) document.documentElement.scrollTop = dy;
+        if (document.body) document.body.scrollTop = dy;
+    }
+
+    document.body.addEventListener('htmx:beforeSwap', restoreScroll);
+    document.body.addEventListener('htmx:afterSwap', function() {
+        restoreScroll();
+        requestAnimationFrame(function() {
+            restoreScroll();
+            requestAnimationFrame(function() {
+                restoreScroll();
+                __keepScrollY = null; __keepScrollDocY = null;
+            });
+        });
+    });
+})();
 
 // Split button: caret abre/fecha menu; click fora ou Esc fecha
 document.addEventListener('click', function(e) {

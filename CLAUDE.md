@@ -64,6 +64,7 @@ Gerados (gitignored): bf_treinamento.db, sessoes_salvas.json
 - `referencias` — lista de `{"sessao": Sessao, "origem": {...}, "id_ref": str}`. Auto-preenchidas ao gerar com histórico
 - `edicao_hub` — dict com `aluno_id` e `rotina_id` quando editando rotina do HUB
 - `criacao_manual` — dict com `aluno_id` e `novo_idx` quando há treino sendo criado manualmente
+- `historico_substituicoes` — `{(treino_idx, bloco_idx, slot): {"inicial": str, "vistos": set}}`. Cycle do botão substituir aleatório: não repete sugestões até esgotar; ao resetar preserva o nome inicial (nunca volta) e o atual. Limpo em `/gerar`, `_carregar_hub_edicao`, e quando contexto do gerador zera sessoes (acao=nova_rotina/adicionar/substituir).
 - Persistência via `sessoes_salvas.json` (auto-save + auto-restore)
 
 ## Navegação (rotas principais)
