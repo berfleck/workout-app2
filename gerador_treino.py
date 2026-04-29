@@ -72,10 +72,14 @@ for pad, sub in PADRAO_PARA_SUBREGIAO.items():
     SUBREGIAO_PARA_PADROES.setdefault(sub, []).append(pad)
 
 
-# Padrões considerados "compostos" para fins de PRIORIDADE de seleção
-# (não confundir com o campo `purpose` do banco, que é por exercício individual).
-# Quando o usuário pede N exercícios de um escopo, o app preenche primeiro
-# garantindo 1 de cada padrão composto, depois cicla pelos isolados.
+# Classificação composto vs isolado é por EXERCÍCIO via coluna `purpose` do banco.
+# compound + explosive → composto. isolation + stability → isolado.
+# A constante PADROES_COMPOSTOS abaixo é mantida apenas pra retrocompatibilidade
+# de import (não é usada na lógica de seleção). Padrões mistos como `hinge`,
+# `squat` e `puxadas` têm tanto compostos quanto isolados no banco — a
+# classificação por padrão era incorreta.
+PURPOSE_COMPOSTO = {"compound", "explosive"}
+
 PADROES_COMPOSTOS = {
     "squat", "hinge",
     "empurrar_compostos", "remadas", "puxadas", "ombro_composto",
@@ -85,6 +89,11 @@ PADROES_COMPOSTOS = {
 # Ex: 0.6 = ao menos 60% dos exercícios serão compostos.
 # Só se aplica quando o escopo tem tanto compostos quanto isolados.
 PROPORCAO_COMPOSTOS = 0.6
+
+
+def _eh_composto(e: "Exercicio") -> bool:
+    """Classificação de composto vs isolado no nível do exercício."""
+    return e.purpose in PURPOSE_COMPOSTO
 
 # Agrupamento funcional push/pull para evitar pares agonistas em super séries.
 # Exercícios do mesmo grupo compartilham musculatura primária ou sinergista relevante:
@@ -865,16 +874,33 @@ def _padroes_de_escopo(
     return []
 
 
-def _ordenar_padroes_por_prioridade(padroes: list[str]) -> list[str]:
+def _ordenar_padroes_por_prioridade(
+    padroes: list[str],
+    banco: Optional[list["Exercicio"]] = None,
+) -> list[str]:
     """
-    Compostos primeiro, depois isolados. Dentro de cada grupo, ordem aleatória
-    para evitar viés determinístico (ex: bíceps sempre antes de tríceps).
+    Padrões com candidatos compostos disponíveis no banco vêm primeiro
+    (a classificação é dinâmica via purpose, não via lista estática).
+    Dentro de cada grupo, ordem aleatória pra evitar viés determinístico.
+
+    Se `banco` for None, faz shuffle simples (sem priorizar — modo legado).
     """
-    compostos = [p for p in padroes if p in PADROES_COMPOSTOS]
-    isolados  = [p for p in padroes if p not in PADROES_COMPOSTOS]
-    random.shuffle(compostos)
-    random.shuffle(isolados)
-    return compostos + isolados
+    if banco is None:
+        out = list(padroes)
+        random.shuffle(out)
+        return out
+
+    com_compostos: list[str] = []
+    sem_compostos: list[str] = []
+    for p in padroes:
+        cands = [e for e in banco if e.padrao == p]
+        if any(_eh_composto(e) for e in cands):
+            com_compostos.append(p)
+        else:
+            sem_compostos.append(p)
+    random.shuffle(com_compostos)
+    random.shuffle(sem_compostos)
+    return com_compostos + sem_compostos
 
 
 def gerar_sessao_por_demandas(
@@ -935,8 +961,22 @@ def gerar_sessao_por_demandas(
     def _selecionar_ciclando(
         padroes_ciclo: list[str], qtd: int,
         filtros_lateralidade: Optional[dict[str, str]] = None,
+        filtro_purpose: Optional[str] = None,   # None | "composto" | "isolado"
+        preferir_composto: bool = False,
     ) -> int:
-        """Cicla pelos padrões pegando 1 por vez. Retorna quantos selecionou."""
+        """Cicla pelos padrões pegando 1 por vez. Retorna quantos selecionou.
+
+        Aplica os 3 níveis de relax CRUZANDO TODOS os padrões em cada nível,
+        antes de descer pro próximo: estrito em todos → relax 1 em todos →
+        relax 2 em todos. Isso evita que um padrão "esgotado" (sem candidatos
+        estritos) seja preenchido via relax enquanto outro padrão do mesmo
+        escopo ainda teria opção estrita disponível.
+
+        filtro_purpose: se "composto" só aceita candidatos com _eh_composto=True;
+        se "isolado" só aceita _eh_composto=False; se None aceita todos.
+        preferir_composto: quando filtro_purpose=None, prefere candidatos
+        compostos se houver no nível atual; senão usa qualquer.
+        """
         # Pré-calcular candidatos por padrão
         candidatos_por_padrao: dict[str, list[Exercicio]] = {}
         for p in padroes_ciclo:
@@ -947,73 +987,82 @@ def gerar_sessao_por_demandas(
             if filtros_lateralidade and p in filtros_lateralidade:
                 lat = filtros_lateralidade[p]
                 cands = [e for e in cands if e.unilateral == lat]
+            if filtro_purpose == "composto":
+                cands = [e for e in cands if _eh_composto(e)]
+            elif filtro_purpose == "isolado":
+                cands = [e for e in cands if not _eh_composto(e)]
             candidatos_por_padrao[p] = cands
 
-        selecionados = 0
-        loop_sem_progresso = 0
+        def _bloqueado_familia(e, sets):
+            """e está bloqueado por família se nome ou variacao_de aparecem em algum dos sets."""
+            for s in sets:
+                if e.nome in s:
+                    return True
+                if e.variacao_de and e.variacao_de in s:
+                    return True
+            return False
 
-        while selecionados < qtd:
-            progresso = False
-            for p in padroes_ciclo:
-                if selecionados >= qtd:
-                    break
-
-                cands = candidatos_por_padrao[p]
-
-                def _bloqueado_familia(e, sets):
-                    """e está bloqueado por família se nome ou variacao_de aparecem em algum dos sets."""
-                    for s in sets:
-                        if e.nome in s:
-                            return True
-                        if e.variacao_de and e.variacao_de in s:
-                            return True
-                    return False
-
-                # Estrito: similaridade + família (inter ∪ intra)
-                disponiveis = [
+        def _filtrar(cands: list[Exercicio], nivel_relax: int) -> list[Exercicio]:
+            # nivel_relax: 0=estrito, 1=relax similaridade, 2=relax família inter
+            if nivel_relax == 0:
+                base = [
                     e for e in cands
                     if e.similaridade not in similaridades_usadas
                     and e.nome not in nomes_usados
                     and not _bloqueado_familia(e, [var_pais_inter, var_pais_intra])
                 ]
-                tipo_relax = None
+            elif nivel_relax == 1:
+                base = [
+                    e for e in cands
+                    if e.nome not in nomes_usados
+                    and not _bloqueado_familia(e, [var_pais_inter, var_pais_intra])
+                ]
+            else:
+                # nivel 2: relax família inter (preserva intra)
+                base = [
+                    e for e in cands
+                    if e.nome not in nomes_usados
+                    and not _bloqueado_familia(e, [var_pais_intra])
+                ]
+            # Preferência por composto dentro do nível: se houver, sorteia só dele;
+            # caso contrário cai no pool inteiro.
+            if preferir_composto and filtro_purpose is None:
+                comp = [e for e in base if _eh_composto(e)]
+                if comp:
+                    return comp
+            return base
 
-                # Relax 1: similaridade (mantém família estrita)
-                if not disponiveis:
-                    disponiveis = [
-                        e for e in cands
-                        if e.nome not in nomes_usados
-                        and not _bloqueado_familia(e, [var_pais_inter, var_pais_intra])
-                    ]
+        selecionados = 0
 
-                # Relax 2: família entre treinos (preserva intra)
-                if not disponiveis and relaxar_familia:
-                    disponiveis = [
-                        e for e in cands
-                        if e.nome not in nomes_usados
-                        and not _bloqueado_familia(e, [var_pais_intra])
-                    ]
-                    tipo_relax = "familia"
+        # Niveis de relax a tentar, em ordem. Relax 2 só se relaxar_familia=True.
+        niveis = [0, 1] + ([2] if relaxar_familia else [])
 
-                if not disponiveis:
-                    continue
+        for nivel_relax in niveis:
+            if selecionados >= qtd:
+                break
+            # Cicla pelos padrões neste nível até esgotar progresso
+            while selecionados < qtd:
+                progresso = False
+                for p in padroes_ciclo:
+                    if selecionados >= qtd:
+                        break
+                    disponiveis = _filtrar(candidatos_por_padrao[p], nivel_relax)
+                    if not disponiveis:
+                        continue
+                    escolhido = random.choice(disponiveis)
+                    todos_selecionados.append(escolhido)
+                    similaridades_usadas.add(escolhido.similaridade)
+                    nomes_usados.add(escolhido.nome)
+                    if escolhido.variacao_de:
+                        var_pais_intra.add(escolhido.variacao_de)
+                    var_pais_intra.add(escolhido.nome)
+                    if nivel_relax == 2:
+                        relaxados_local.append(escolhido.nome)
+                    selecionados += 1
+                    progresso = True
+                if not progresso:
+                    break  # esgotou este nível, desce pro próximo
 
-                escolhido = random.choice(disponiveis)
-                todos_selecionados.append(escolhido)
-                similaridades_usadas.add(escolhido.similaridade)
-                nomes_usados.add(escolhido.nome)
-                if escolhido.variacao_de:
-                    var_pais_intra.add(escolhido.variacao_de)
-                var_pais_intra.add(escolhido.nome)
-                if tipo_relax == "familia":
-                    relaxados_local.append(escolhido.nome)
-                selecionados += 1
-                progresso = True
-
-            if not progresso:
-                loop_sem_progresso += 1
-                if loop_sem_progresso >= 2:
-                    break
         return selecionados
 
     # Resolver cada demanda
@@ -1040,34 +1089,42 @@ def gerar_sessao_por_demandas(
             pass
         elif nivel == "regiao":
             # ── Regra de proporção: ao menos 60% compostos ────────────────
-            compostos = [p for p in padroes if p in PADROES_COMPOSTOS]
-            isolados  = [p for p in padroes if p not in PADROES_COMPOSTOS]
-            random.shuffle(compostos)
-            random.shuffle(isolados)
+            # Classificação por exercício (purpose), não por padrão.
+            # Cada padrão pode contribuir nas duas fases (ex: hinge tem 12
+            # compostos e 8 isolados no banco — entra em ambas).
+            cands_no_escopo = [e for e in banco if e.padrao in padroes]
+            tem_compostos = any(_eh_composto(e) for e in cands_no_escopo)
+            tem_isolados  = any(not _eh_composto(e) for e in cands_no_escopo)
 
-            if compostos and isolados:
-                import math
+            padroes_shuf = list(padroes)
+            random.shuffle(padroes_shuf)
+
+            if tem_compostos and tem_isolados:
                 min_compostos = math.ceil(qtd * PROPORCAO_COMPOSTOS)
                 # Não pedir mais compostos do que o total
                 min_compostos = min(min_compostos, qtd)
                 max_isolados  = qtd - min_compostos
 
-                # Fase 1: preencher compostos ciclando
-                n_comp = _selecionar_ciclando(compostos, min_compostos)
-                # Fase 2: preencher isolados ciclando
-                n_iso = _selecionar_ciclando(isolados, max_isolados)
-                # Fase 3: se sobrou espaço (isolados esgotaram), preenche com mais compostos
+                # Fase 1: preencher compostos ciclando os padrões
+                n_comp = _selecionar_ciclando(padroes_shuf, min_compostos, filtro_purpose="composto")
+                # Fase 2: preencher isolados ciclando os padrões
+                n_iso = _selecionar_ciclando(padroes_shuf, max_isolados, filtro_purpose="isolado")
+                # Fase 3: se sobrou espaço, tenta mais compostos; depois isolados
                 faltam = qtd - n_comp - n_iso
                 if faltam > 0:
-                    _selecionar_ciclando(compostos, faltam)
+                    n_extra_c = _selecionar_ciclando(padroes_shuf, faltam, filtro_purpose="composto")
+                    faltam -= n_extra_c
+                if faltam > 0:
+                    _selecionar_ciclando(padroes_shuf, faltam, filtro_purpose="isolado")
             else:
-                # Só compostos ou só isolados — cicla normalmente
-                padroes_ord = _ordenar_padroes_por_prioridade(padroes)
-                _selecionar_ciclando(padroes_ord, qtd)
+                # Só um tipo disponível — cicla com preferência por composto
+                _selecionar_ciclando(padroes_shuf, qtd, preferir_composto=True)
         else:
-            # ── Subregião / Padrão: sem proporção forçada, Opção C pura ──
-            padroes_ord = _ordenar_padroes_por_prioridade(padroes)
-            _selecionar_ciclando(padroes_ord, qtd)
+            # ── Subregião / Padrão: cicla padrões com prioridade dinâmica ──
+            # Padrões que TÊM candidato composto no banco vêm primeiro;
+            # dentro de cada padrão, candidatos compostos são preferidos.
+            padroes_ord = _ordenar_padroes_por_prioridade(padroes, banco=banco)
+            _selecionar_ciclando(padroes_ord, qtd, preferir_composto=True)
 
         n_obtido = len(todos_selecionados) - n_antes
 

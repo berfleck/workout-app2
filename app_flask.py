@@ -12,7 +12,7 @@ from gerador_treino import (
     expandir_para_padroes, selecionar_sem_repeticao_similaridade,
     TEMPLATES, TEMPLATE_EPP, EXERCICIOS_POR_PADRAO,
     PADRAO_PARA_SUBREGIAO, SUBREGIAO_PARA_REGIAO,
-    REGIAO_PARA_SUBREGIOES, SUBREGIAO_PARA_PADROES, PADROES_COMPOSTOS,
+    REGIAO_PARA_SUBREGIOES, SUBREGIAO_PARA_PADROES,
     Exercicio, Sessao, SuperSerie,
 )
 from gerar_imagem import gerar_png
