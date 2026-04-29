@@ -369,9 +369,13 @@ def _estados_rascunho_por_posicao(rascunho_sessoes, publicada_sessoes):
     - 'substituido' — posição existia na publicada com OUTRO exercício
     - 'novo'    — posição nova (não existia na publicada)
     Retorna dict {(treino_idx, bloco_label, ei): estado}.
+
+    Quando publicada_sessoes é vazio (rotina nova sem comparação), todas as
+    posições viram 'novo'.
     """
-    if not rascunho_sessoes or not publicada_sessoes:
+    if not rascunho_sessoes:
         return {}
+    publicada_sessoes = publicada_sessoes or []
     # Index por nome (1ª ocorrência) e por posição
     nomes_pub = set()
     pub_por_pos = {}
@@ -834,8 +838,10 @@ def hub_rotina():
                 diff_summary["removidos"] += 1
 
     estados_rascunho = {}
-    if eh_rascunho and rotina_reg:
-        estados_rascunho = _estados_rascunho_por_posicao(rascunho_sessoes, rotina_reg["sessoes"])
+    if eh_rascunho:
+        intent_atual = carregar_intent_rascunho(aluno_id)
+        publicada_para_diff = [] if intent_atual == "nova-rotina" else (rotina_reg["sessoes"] if rotina_reg else [])
+        estados_rascunho = _estados_rascunho_por_posicao(rascunho_sessoes, publicada_para_diff)
     return render_template("_rotina_hub.html",
                            rotina=rotina,
                            anterior=anterior,
@@ -936,8 +942,10 @@ def hub_visualizar_inline(aluno_id, t):
     estados_rascunho = {}
     rascunho = carregar_rascunho(aluno_id)
     rotina_reg = carregar_rotina_ativa(aluno_id)
-    if rascunho and rotina_reg:
-        estados_rascunho = _estados_rascunho_por_posicao(rascunho, rotina_reg["sessoes"])
+    if rascunho:
+        intent_atual = carregar_intent_rascunho(aluno_id)
+        publicada_para_diff = [] if intent_atual == "nova-rotina" else (rotina_reg["sessoes"] if rotina_reg else [])
+        estados_rascunho = _estados_rascunho_por_posicao(rascunho, publicada_para_diff)
     return render_template("_hub_treino_card.html", sessao=sessao, idx=t,
                            aluno_id=aluno_id,
                            nomes_anteriores=nomes_anteriores,
@@ -1011,6 +1019,11 @@ def hub_salvar_rotina(aluno_id):
     rotina_atual = carregar_rotina_ativa(aluno_id)
     agora = datetime.now().strftime("%d/%m/%Y %H:%M")
 
+    # Salva configs se houver (vem do último /gerar, persiste via configs_geradas global)
+    configs_serial = None
+    if configs_geradas:
+        configs_serial = {"globals": dict(opcoes_globais), "treinos": _configs_to_serializable(configs_geradas)}
+
     if modo == "atualizar" and rotina_atual:
         atualizar_historico_registro(
             reg_id=rotina_atual["id"],
@@ -1018,6 +1031,7 @@ def hub_salvar_rotina(aluno_id):
             etiqueta=etiqueta or rotina_atual.get("etiqueta", ""),
             n_treinos=len(sessoes),
             sessoes=sessoes,
+            configs=configs_serial or rotina_atual.get("configs"),
         )
     else:
         reg_id = datetime.now().strftime("%Y%m%d_%H%M%S_") + secrets.token_hex(2)
@@ -1028,6 +1042,7 @@ def hub_salvar_rotina(aluno_id):
             etiqueta=etiqueta,
             n_treinos=len(sessoes),
             sessoes=sessoes,
+            configs=configs_serial,
         )
         definir_rotina_ativa(aluno_id, reg_id)
 
@@ -1507,6 +1522,7 @@ def gerar():
             if ctx_acao == "nova_rotina":
                 sessoes_rascunho = [_sessao_to_dict(s) for s in sessoes_ativas]
                 salvar_rascunho(ctx_aluno_id, sessoes_rascunho)
+                salvar_intent_rascunho(ctx_aluno_id, "nova-rotina")
                 return f'<div class="sucesso">Rotina gerada para {aluno_obj["nome"]}!</div><script>setTimeout(()=>window.location.href="/?aluno_id={ctx_aluno_id}",1500)</script>'
 
             sessoes_rotina = _obter_sessoes_trabalho(ctx_aluno_id) or []
@@ -1868,7 +1884,9 @@ def hub_swap_visualizar(aluno_id, t, bi_a, ei_a, bi_b, ei_b):
                         ex = b.get(key)
                         if ex: nomes_anteriores.add(ex["nome"])
     rotina_reg = carregar_rotina_ativa(aluno_id)
-    estados_rascunho = _estados_rascunho_por_posicao(sessoes_dicts, rotina_reg["sessoes"]) if rotina_reg else {}
+    intent_atual = carregar_intent_rascunho(aluno_id)
+    publicada_para_diff = [] if intent_atual == "nova-rotina" else (rotina_reg["sessoes"] if rotina_reg else [])
+    estados_rascunho = _estados_rascunho_por_posicao(sessoes_dicts, publicada_para_diff)
     card = render_template("_hub_treino_card.html", sessao=sessao, idx=t,
                            aluno_id=aluno_id, nomes_anteriores=nomes_anteriores,
                            estados_rascunho=estados_rascunho,
@@ -2085,7 +2103,8 @@ def aluno_historico():
     nome = request.args.get("nome", "").strip()
     if not nome:
         return ""
-    registros = buscar_historico_por_aluno(nome)
+    # Limita às 2 rotinas mais recentes pra não poluir a UI.
+    registros = buscar_historico_por_aluno(nome)[:2]
     return render_template("_historico_aluno.html", registros=registros,
                            padroes_labels=PADROES_LABELS)
 

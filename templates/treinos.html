@@ -100,7 +100,7 @@
             {% endwith %}
             {% endif %}
 
-            <div id="evitar-hist-wrap" class="mt-3 items-center gap-2 text-xs hidden">
+            <div id="evitar-hist-wrap" class="mt-3 flex items-center gap-2 text-xs">
                 <span class="text-gray-500">Evitar exerc. dos últimos</span>
                 <select name="evitar_ultimos" id="sel-evitar-ultimos"
                         class="px-1.5 py-0.5 border border-gray-200 rounded text-xs">
@@ -405,6 +405,9 @@
         </div>
     {{ msec.close() }}
     {% endfor %}
+
+    {# Histórico do aluno — abaixo dos treinos no mobile #}
+    <div id="m-hist-aluno-panel" class="m-hist-panel"></div>
 
 </div>
 </form>
@@ -1064,26 +1067,24 @@ function copiarConfigTreino(src, dest) {
 
 function onAlunoChange(nome) {
     const panel = document.getElementById('hist-aluno-panel');
+    const mPanel = document.getElementById('m-hist-aluno-panel');
     const evitarWrap = document.getElementById('evitar-hist-wrap');
     if (!nome) {
-        panel.innerHTML = '';
+        if (panel) panel.innerHTML = '';
+        if (mPanel) mPanel.innerHTML = '';
         evitarWrap.style.display = 'none';
         evitarWrap.classList.add('hidden');
         return;
     }
+    // Aluno selecionado — wrap visível mesmo se histórico ainda vazio.
+    evitarWrap.style.display = '';
+    evitarWrap.classList.remove('hidden');
+    evitarWrap.classList.add('flex');
     fetch('/aluno-historico?nome=' + encodeURIComponent(nome))
         .then(r => r.text())
         .then(html => {
-            panel.innerHTML = html;
-            if (html.trim()) {
-                evitarWrap.style.display = '';
-                evitarWrap.classList.remove('hidden');
-                evitarWrap.classList.add('flex');
-            } else {
-                evitarWrap.style.display = 'none';
-                evitarWrap.classList.add('hidden');
-                evitarWrap.classList.remove('flex');
-            }
+            if (panel) panel.innerHTML = html;
+            if (mPanel) mPanel.innerHTML = html;
         })
         .catch(e => console.error('Erro ao carregar historico:', e));
 }
@@ -1325,10 +1326,18 @@ function bindMobileMirrors() {
     });
 }
 
-// Auto-carrega histórico do aluno do contexto (mobile não tem mais select de aluno).
+// Auto-carrega histórico do aluno do contexto.
+// Lê o nome do aluno em ordem: hidden input `name=aluno` (ctx fixo) → select desktop
+// → topbar mobile. Se nenhum tem nome válido, não dispara.
 function autoCarregarHistAlunoContexto() {
-    const nome = document.getElementById('m-topbar-title')?.textContent?.trim();
-    if (!nome || nome === 'Selecione um aluno') return;
+    const candidatos = [
+        document.querySelector('input[type=hidden][name="aluno"]')?.value,
+        document.getElementById('sel-aluno')?.value,
+        document.getElementById('m-topbar-title')?.textContent,
+    ];
+    const nome = candidatos.map(s => (s || '').trim())
+                           .find(s => s && s !== 'Selecione um aluno');
+    if (!nome) return;
     if (typeof onAlunoChange === 'function') onAlunoChange(nome);
 }
 
@@ -1848,11 +1857,11 @@ bindMobileMirrors();
 mirrorFromDesktop();
 watchEvitarHistWrap();
 updateMobileSubs();
-// Mobile: auto-carrega histórico do aluno do contexto e força MAX_TREINOS no desktop
-// (treinos sem demandas serão filtrados pelo backend — commit C).
+// Auto-carrega histórico do aluno do contexto (feature fixa em desktop e mobile).
+autoCarregarHistAlunoContexto();
+// Mobile: força MAX_TREINOS (treinos sem demandas serão filtrados pelo backend).
 // Em modo restrito (substituir/adicionar) o n_treinos já vem travado em 1 do backend.
 if (window.matchMedia('(max-width: 768px)').matches) {
-    autoCarregarHistAlunoContexto();
     const nSel = document.getElementById('n_treinos');
     {% if ctx_acao not in ('substituir', 'adicionar') %}
     if (nSel && !nSel.disabled) { nSel.value = MAX_TREINOS; onChangeNTreinos(); }
