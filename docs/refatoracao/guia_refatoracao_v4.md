@@ -7,7 +7,12 @@
 > - Frente 4 — cleanup de squat (padrões refinados) — ✅ concluída
 > - Frente 5 — setup pytest + harness de simulação — ✅ concluída
 >
-> Etapa 1 inteira concluída. Próxima: Etapa 2 (Nível 2 — pré-alocação global).
+> **Progresso da Etapa 2** (branch `refator-gerador`):
+> - Sub-PR 1 — `pre_alocar_rotina` + `_calcular_escassez` isolados — ✅ concluído
+> - Sub-PR 2 — integração + regeneração de snapshots + métricas — ✅ concluído
+> - Sub-PR 3 — caching de pools — não foi necessário (perf 2.24s pra 3000 simulações)
+>
+> Log detalhado em `docs/refatoracao/logs/etapa_2.md`. Próxima: Etapa 3 (âncoras protegidas com peso/obrigatoriedade).
 
 > Documento mestre para conduzir a refatoração do gerador de treinos.
 > Sintetiza o roteiro de `memoria_projeto.md`, o design de
@@ -1051,9 +1056,20 @@ uma configuração e retorna métricas agregadas.
 **Métricas-chave por etapa:**
 
 - **Etapa 2** (Nível 2):
-  - Razão posterior/anterior em `lower(N)` (esperado: ≈ 1.0)
-  - Frequência de adutores e panturrilha em `lower(4+)` (esperado: > 30%)
-  - Treinos com avisos `incompleta` em rotinas de 3+ treinos (esperado: redução)
+  - Razão posterior/anterior em `lower(N)` (esperado: ≈ 1.0). **Concluído**:
+    `lower(4)×3` 0.94 → 1.0; `lower(6)×1` 1.38 → 1.0 deterministicamente.
+  - Frequência de adutores e panturrilha em `lower(N)`: critério **ajustado**
+    em D2.1 final do user. Comportamento esperado:
+    - `lower(2-4)`: NÃO aparecem (acessórias não competem em `qtd ≤ 2 × n_essenciais`).
+    - `lower(5+)`: aparecem com frequência crescente.
+    - Nunca dominam sobre essenciais (peito + costas + ombro / perna_ant + perna_post).
+    **Concluído**: `lower(4)×3` 18.3% → 0%; `lower(6)×1` 5.3% → 100%.
+  - Treinos com avisos `incompleta` em rotinas de 3+ treinos: redução **ou
+    sinalização explícita**. Pré-Etapa 2 a Fase 1 antiga relaxava silenciosamente
+    quando família esgotava — não havia aviso. Pós-Etapa 2 a Fase 0 emite
+    avisos `incompleta` rotina-level (slot que nem o relax preencheu) e a
+    Fase 0 marca `relaxados` explícitos com badge ↻. Cobertura em quantidade
+    não diminuiu, mas a sinalização ficou mais rica.
 
 - **Etapa 3** (âncoras região e subregião):
   - Rotinas `upper(3)+` sem composto de peito (esperado: < 5%)

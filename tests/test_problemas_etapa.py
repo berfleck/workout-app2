@@ -34,13 +34,17 @@ def _all_exercicios(sessoes):
         yield from _exercicios(s)
 
 
-# ----- 1: viés posterior > anterior em lower(N) — Etapa 2 -----------------
+# ----- 1: viés posterior > anterior em lower(N) — Etapa 2 (RESOLVIDO) ------
 
 
-@pytest.mark.xfail(strict=True, reason="Etapa 2: pré-alocação global resolve viés")
 def test_lower_4_distribui_anterior_e_posterior_balanceado(banco):
     """Em 100 rotinas lower(4), a razão posterior/anterior deve ficar
-    próxima de 1.0. Hoje fica ~2.5."""
+    próxima de 1.0.
+
+    RESOLVIDO na Etapa 2 (pré-alocação global com cobertura essencial):
+    `lower(4)` decompõe em 2 perna_anterior + 2 perna_posterior (ambas
+    essenciais, acessórias não competem pois 4 NÃO > 2×2). Razão tende a
+    1.0 deterministicamente."""
     from tests.harness import simular_rotina
 
     cfg = {"demandas": [("regiao", "lower", 4)]}

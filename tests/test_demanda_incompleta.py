@@ -76,38 +76,59 @@ def _rodar(banco, seed: int, modo: str, relaxar: bool):
 @pytest.mark.parametrize("seed", SEEDS)
 @pytest.mark.parametrize("modo", ["hierarquia", "templates"])
 def test_t2_incompleto_sem_relax_gera_aviso_e_nao_relaxados(banco, modo, seed):
-    """Em modo estrito, T2 deve ficar incompleto (só 1 peito disponível
-    após bloquear famílias de T1) e isso deve aparecer como aviso
-    `incompleta`. `sessao.relaxados` deve ficar vazio."""
+    """Em modo estrito, a rotina deve ficar incompleta em algum treino (só
+    3 famílias de peito viáveis pra 4 vagas pedidas) e isso deve aparecer
+    como aviso `incompleta` (treino-level OU rotina-level) em algum dos
+    treinos. `sessao.relaxados` deve ficar vazio em todos os treinos.
+
+    Pré-Etapa 2 o aviso aparecia sempre em T2 (geração sequencial).
+    Pós-Etapa 2 a Fase 0 redistribui escassez: o exercício composto raro
+    (`Apoio`) pode ser alocado em T1 ou T2 dependendo da seed; o aviso
+    cai no treino que ficou sem essa família. A intenção clínica do
+    teste é preservada: a regra de família detecta o problema e gera o
+    aviso, em algum lugar da rotina.
+    """
     sessoes = _rodar(banco, seed, modo, relaxar=False)
+    todos_avisos = [a for s in sessoes for a in s.avisos]
     if modo == "hierarquia":
-        avisos_peito_t2 = [
-            a for a in sessoes[1].avisos
+        avisos_peito = [
+            a for a in todos_avisos
             if a.get("tipo") == "incompleta"
-            and a["nivel"] == "subregiao" and a["escopo"] == "peito"
+            and (
+                (a.get("nivel") == "subregiao" and a.get("escopo") == "peito")
+                or a.get("escopo_demanda") == "peito"
+                or a.get("escopo_alocacao") == "peito"
+            )
         ]
     else:
         peito_pads = {"empurrar_compostos", "empurrar_isolados"}
-        avisos_peito_t2 = [
-            a for a in sessoes[1].avisos
+        avisos_peito = [
+            a for a in todos_avisos
             if a.get("tipo") == "incompleta"
-            and a["nivel"] == "padrao" and a["escopo"] in peito_pads
+            and (
+                (a.get("nivel") == "padrao" and a.get("escopo") in peito_pads)
+                or a.get("escopo_demanda") in peito_pads
+                or a.get("escopo_alocacao") in peito_pads
+            )
         ]
-    assert avisos_peito_t2, (
-        f"T2 ({modo}, seed={seed}): esperado aviso 'incompleta' de peito; "
-        f"avisos={sessoes[1].avisos}"
+    assert avisos_peito, (
+        f"({modo}, seed={seed}): esperado aviso 'incompleta' de peito em "
+        f"algum treino; avisos={[a for s in sessoes for a in s.avisos]}"
     )
-    if modo == "hierarquia":
-        av = avisos_peito_t2[0]
-        assert av["qtd_obtida"] == 1
-        assert av["faltam"] == 1
-    else:
-        total_obtido = sum(a["qtd_obtida"] for a in avisos_peito_t2)
-        total_pedido = sum(a["qtd_pedida"] for a in avisos_peito_t2)
-        assert total_obtido < total_pedido
-    assert sessoes[1].relaxados == [], (
-        f"sem relaxar, sessao.relaxados deveria ser []; got {sessoes[1].relaxados}"
-    )
+    # Faltou pelo menos 1 vaga (Fase 0 ou Fase 1). Aviso treino-level traz
+    # `qtd_obtida`/`qtd_pedida`; aviso rotina-level traz `faltam`.
+    faltam_total = 0
+    for a in avisos_peito:
+        if "faltam" in a:
+            faltam_total += a["faltam"]
+        elif "qtd_pedida" in a and "qtd_obtida" in a:
+            faltam_total += a["qtd_pedida"] - a["qtd_obtida"]
+    assert faltam_total >= 1, f"avisos_peito: {avisos_peito}"
+    # Nenhuma sessão deve ter relaxados (modo estrito)
+    for i, s in enumerate(sessoes):
+        assert s.relaxados == [], (
+            f"sem relaxar, T{i}.relaxados deveria ser []; got {s.relaxados}"
+        )
 
 
 @pytest.mark.parametrize("seed", SEEDS)

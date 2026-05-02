@@ -1127,12 +1127,71 @@ def _calcular_escassez(
     return len(cands)
 
 
-def _decompor_demanda_regiao(regiao: str, qtd: int) -> list[tuple[str, str, int]]:
+def _decompor_demanda_subregiao(
+    subregiao: str,
+    qtd: int,
+    padroes_obrigatorios: Optional[list[str]] = None,
+) -> list[tuple[str, str, int]]:
+    """Decompõe demanda subregião em sub-demandas por padrão.
+
+    Estratégia análoga à decomposição região: garante 1 de cada padrão da
+    subregião + ciclar entre eles. Preserva paridade clínica que o cycling
+    do `_selecionar_ciclando` legacy entregava (ex: costas(4) → 2 remadas +
+    2 puxadas, em vez de 3:1 puxando pra proporção do banco).
+
+    Subregiões com 1 padrão só (panturrilha, adutores no banco atual) viram
+    qtd vagas do padrão único.
+
+    `padroes_obrigatorios`: padrões da subregião que devem ter ≥ 1 vaga
+    (suporte a travados — D3.1). Se houver mais obrigatórios que `qtd`,
+    sorteia entre os obrigatórios.
+    """
+    padroes = list(SUBREGIAO_PARA_PADROES.get(subregiao, []))
+    if not padroes or qtd <= 0:
+        return []
+
+    obrig = [p for p in (padroes_obrigatorios or []) if p in padroes]
+
+    if qtd <= len(obrig):
+        escolhidos = random.sample(obrig, qtd)
+        return [("padrao", p, 1) for p in escolhidos]
+
+    # 1 vaga pra cada obrigatório, depois 1 de cada padrão remanescente
+    alocacao = {p: 1 for p in obrig}
+    vagas_restantes = qtd - len(obrig)
+
+    nao_obrig = [p for p in padroes if p not in alocacao]
+    if vagas_restantes > 0 and nao_obrig:
+        n_cobrir = min(vagas_restantes, len(nao_obrig))
+        # Cobertura 1 de cada padrão restante (pra preservar paridade)
+        nao_obrig_shuf = random.sample(nao_obrig, len(nao_obrig))
+        for p in nao_obrig_shuf[:n_cobrir]:
+            alocacao[p] = 1
+        vagas_restantes -= n_cobrir
+
+    # Ciclar todas as vagas extras entre todos os padrões da subregião
+    if vagas_restantes > 0:
+        pool_shuf = random.sample(padroes, len(padroes))
+        for i in range(vagas_restantes):
+            p = pool_shuf[i % len(pool_shuf)]
+            alocacao[p] = alocacao.get(p, 0) + 1
+    return [("padrao", p, qt) for p, qt in alocacao.items() if qt > 0]
+
+
+def _decompor_demanda_regiao(
+    regiao: str,
+    qtd: int,
+    subregioes_obrigatorias: Optional[list[str]] = None,
+) -> list[tuple[str, str, int]]:
     """Aplica regra essencial/acessório (D2.1) pra demanda região.
 
     Retorna lista de sub-demandas `("subregiao", sub, qty)`. A ordem das
     sub-demandas e a distribuição em ciclo dependem de `random.*` — chamador
     deve setar seed se quiser determinismo.
+
+    `subregioes_obrigatorias`: subregiões que devem ter ≥ 1 vaga (suporte a
+    travados — D3.1). Pode forçar inclusão de subregião acessória que
+    normalmente não competiria.
     """
     if regiao not in SUBREGIOES_POR_REGIAO:
         # Fallback: distribui uniformemente entre subregiões da região
@@ -1144,21 +1203,37 @@ def _decompor_demanda_regiao(regiao: str, qtd: int) -> list[tuple[str, str, int]
     estrutura = SUBREGIOES_POR_REGIAO[regiao]
     essenciais = list(estrutura.get("essenciais", []))
     acessorias = list(estrutura.get("acessorias", []))
+    todas_subs = essenciais + acessorias
 
     if qtd <= 0:
         return []
 
-    if qtd < len(essenciais):
-        # Sorteia uniformemente qtd essenciais (com seed)
-        escolhidos = random.sample(essenciais, qtd)
+    obrig = [s for s in (subregioes_obrigatorias or []) if s in todas_subs]
+
+    if qtd <= len(obrig):
+        # Mais obrigatórias que vagas: sortear qtd entre obrigatórias
+        escolhidos = random.sample(obrig, qtd)
         return [("subregiao", sub, 1) for sub in escolhidos]
 
-    # 1 de cada essencial
-    alocacao = {sub: 1 for sub in essenciais}
-    vagas_restantes = qtd - len(essenciais)
+    # 1 vaga pra cada obrigatória primeiro
+    alocacao = {sub: 1 for sub in obrig}
+    vagas_restantes = qtd - len(obrig)
+
+    # Cobre essenciais não-cobertas (até esgotar vagas)
+    essenciais_faltantes = [s for s in essenciais if s not in alocacao]
+    for sub in essenciais_faltantes:
+        if vagas_restantes <= 0:
+            break
+        alocacao[sub] = 1
+        vagas_restantes -= 1
+
+    if vagas_restantes <= 0:
+        return [("subregiao", sub, qt) for sub, qt in alocacao.items() if qt > 0]
 
     # Pool de ciclo: essenciais sempre; acessórias só se qtd > 2 × num_essenciais
-    if qtd > 2 * len(essenciais) and acessorias:
+    # OU se há acessória obrigatória (já alocada acima — pool inclui acessórias).
+    inclui_acessorias = (qtd > 2 * len(essenciais)) or any(s in acessorias for s in obrig)
+    if inclui_acessorias and acessorias:
         pool_ciclo = essenciais + acessorias
     else:
         pool_ciclo = essenciais
@@ -1181,10 +1256,11 @@ def _slot_compativel_com_travado(slot: _Slot, ex: Exercicio) -> bool:
 def pre_alocar_rotina(
     banco: list[Exercicio],
     configs: list[dict],
-    relaxar_familia: bool = False,  # aceito mas IGNORADO pela Fase 0 (D3.2)
+    relaxar_familia: bool = False,
 ) -> tuple[
     dict[int, dict[int, list[Exercicio]]],
     list[dict],
+    dict[int, list[str]],
 ]:
     """Aloca exercícios entre os N treinos antes de qualquer um ser montado.
 
@@ -1198,22 +1274,30 @@ def pre_alocar_rotina(
                  da Fase 1 em gerar_sessao_por_demandas.
 
     Returns:
-        (alocacao, avisos_rotina) onde:
+        (alocacao, avisos_rotina, relaxados_por_treino) onde:
           alocacao = {treino_idx: {d_idx: [Exercicio, ...]}}
           avisos_rotina = lista de avisos `incompleta` rotina-level (escopo="rotina")
+          relaxados_por_treino = {treino_idx: [nome_ex, ...]} — exs alocados via
+            relax de família entre treinos (segundo passe, só se relaxar_familia=True).
 
     Algoritmo:
       1. Normaliza configs (templates → demandas).
       2. Pra cada demanda região, decompõe em sub-demandas usando regra
-         essencial/acessório (SUBREGIOES_POR_REGIAO).
-      3. Travados de cada treino consomem 1 vaga da primeira demanda compatível.
-         Se nenhuma demanda bate, vira "extra" — alocado mas sem d_idx.
+         essencial/acessório (SUBREGIOES_POR_REGIAO). Subregião → padrão
+         (cycling pra preservar paridade do _selecionar_ciclando legacy).
+      3. Travados de cada treino consomem 1 vaga da primeira demanda compatível
+         (decomposição é travado-aware via padroes_obrigatorios). Se nenhuma
+         demanda bate, vira "extra" — alocado mas sem d_idx.
       4. Cada (sub-)demanda restante vira N slots granulares. Slots de
          demandas região marcam requer_composto=True até a quota composta
          (ceil(qtd × 0.6)) ser cumprida.
-      5. Loop de alocação: ordena slots por (escassez, peso_nivel, jitter_seeded);
-         pega o primeiro; sorteia exercício do pool. Atualiza estado global.
-      6. Slot sem candidatos vira aviso `incompleta` rotina-level.
+      5. Passe 1 (estrito): ordena slots por (escassez, peso_nivel,
+         jitter_seeded); pega o primeiro; sorteia exercício do pool estrito.
+         Slots sem candidato estrito viram pendentes pro passe 2.
+      6. Passe 2 (relax — só se relaxar_familia=True): pra cada slot pendente,
+         tenta de novo permitindo família repetida entre treinos (mas nome
+         único globalmente). Sucessos vão pra relaxados_por_treino[t_idx].
+      7. Slots ainda vazios após passe 2 → aviso `incompleta` rotina-level.
     """
     configs_norm = [_normalizar_config(c) for c in configs]
 
@@ -1224,6 +1308,7 @@ def pre_alocar_rotina(
     nomes_globais: set[str] = set()
     familias_globais: set[str] = set()
     avisos_rotina: list[dict] = []
+    relaxados_por_treino: dict[int, list[str]] = {}
 
     # ─── Etapa A: decompor demandas e construir slots ────────────────────
     # Estrutura intermediária: pra cada (t_idx, d_idx_original), guardamos:
@@ -1234,6 +1319,24 @@ def pre_alocar_rotina(
     quota_total: dict[tuple[int, int], tuple[str, str, int]] = {}
     sub_demandas_por_origem: dict[tuple[int, int], list[tuple[str, str, int]]] = {}
 
+    # Pré-mapeamento travados → primeira demanda compatível (D3.1).
+    # Esse mapeamento informa a decomposição (subregioes_obrigatorias e
+    # padroes_obrigatorios) pra garantir que cada travado tenha um slot
+    # do padrão dele depois da decomposição.
+    travados_por_demanda: dict[tuple[int, int], list[Exercicio]] = {}
+    for t_idx, cfg in enumerate(configs_norm):
+        travados = list(cfg.get("exercicios_travados") or [])
+        for ex in travados:
+            for d_idx, dem in enumerate(cfg.get("demandas") or []):
+                if not (isinstance(dem, (list, tuple)) and len(dem) >= 3):
+                    continue
+                nv, esc, qt = dem[0], dem[1], int(dem[2])
+                if qt <= 0:
+                    continue
+                if ex.padrao in set(_padroes_de_escopo(nv, esc)):
+                    travados_por_demanda.setdefault((t_idx, d_idx), []).append(ex)
+                    break
+
     for t_idx, cfg in enumerate(configs_norm):
         for d_idx, dem in enumerate(cfg.get("demandas") or []):
             if not (isinstance(dem, (list, tuple)) and len(dem) >= 3):
@@ -1243,12 +1346,37 @@ def pre_alocar_rotina(
                 continue
             quota_total[(t_idx, d_idx)] = (nivel, escopo, qtd)
 
+            travados_d = travados_por_demanda.get((t_idx, d_idx), [])
+            padroes_obrig = [ex.padrao for ex in travados_d]
+            subs_obrig = list({
+                PADRAO_PARA_SUBREGIAO[p] for p in padroes_obrig
+                if p in PADRAO_PARA_SUBREGIAO
+            })
+
             if nivel == "regiao":
                 # Quota composta global por demanda (D2.2: 60% por demanda região)
                 quota_composta[(t_idx, d_idx)] = math.ceil(qtd * PROPORCAO_COMPOSTOS)
-                # Decomposição essencial/acessório
-                sub_dems = _decompor_demanda_regiao(escopo, qtd)
-                sub_demandas_por_origem[(t_idx, d_idx)] = sub_dems
+                # Decomposição em 2 níveis: região → subregião → padrão, com
+                # awareness de travados em ambos os níveis.
+                sub_dems_subregiao = _decompor_demanda_regiao(
+                    escopo, qtd, subregioes_obrigatorias=subs_obrig,
+                )
+                sub_dems_padrao: list[tuple[str, str, int]] = []
+                for (_n, sub_esc, sub_qt) in sub_dems_subregiao:
+                    pads_obrig_sub = [
+                        p for p in padroes_obrig
+                        if PADRAO_PARA_SUBREGIAO.get(p) == sub_esc
+                    ]
+                    sub_dems_padrao.extend(
+                        _decompor_demanda_subregiao(
+                            sub_esc, sub_qt, padroes_obrigatorios=pads_obrig_sub,
+                        )
+                    )
+                sub_demandas_por_origem[(t_idx, d_idx)] = sub_dems_padrao
+            elif nivel == "subregiao":
+                sub_demandas_por_origem[(t_idx, d_idx)] = _decompor_demanda_subregiao(
+                    escopo, qtd, padroes_obrigatorios=padroes_obrig,
+                )
             else:
                 sub_demandas_por_origem[(t_idx, d_idx)] = [(nivel, escopo, qtd)]
 
@@ -1320,13 +1448,14 @@ def pre_alocar_rotina(
     # alocados. Slot só fica "obriga composto" enquanto há quota.
     # Implementação: a flag é dinâmica — recalculada antes de cada iteração.
 
-    # ─── Etapa D: loop de alocação ───────────────────────────────────────
+    # ─── Etapa D: passe 1 (estrito) ──────────────────────────────────────
+    slots_para_relax: list[_Slot] = []
     while slots_pendentes:
-        # Atualizar requer_composto dinamicamente
+        # Atualizar requer_composto dinamicamente. Slot herda quota composta
+        # da demanda região mãe (presente em quota_composta sse origem é região).
         for slot in slots_pendentes:
             slot.requer_composto = (
-                slot.nivel == "subregiao"  # decomposto de regiao
-                and (slot.treino_idx, slot.d_idx_original) in quota_composta
+                (slot.treino_idx, slot.d_idx_original) in quota_composta
                 and quota_composta[(slot.treino_idx, slot.d_idx_original)] > 0
             )
 
@@ -1350,9 +1479,9 @@ def pre_alocar_rotina(
             nomes_globais, familias_globais,
             filtro_purpose="composto" if slot.requer_composto else None,
         )
-        # Se requer_composto mas não há composto disponível, relaxa a flag
-        # e tenta sem filtro (slot é "ainda da quota composta", mas como não
-        # há, aceita isolado e a quota fica em deficit — gera aviso depois).
+        # Se requer_composto mas não há composto disponível, tenta sem filtro
+        # (slot ainda conta na quota composta mas aceita isolado — quota fica
+        # em deficit que será detectado em etapas futuras via âncoras).
         if slot.requer_composto and not cands:
             cands = _candidatos_estritos(
                 banco, slot.nivel, slot.escopo_alocacao, cfg_t,
@@ -1372,7 +1501,54 @@ def pre_alocar_rotina(
             if chave in quota_composta and _eh_composto(escolhido):
                 quota_composta[chave] = max(0, quota_composta[chave] - 1)
         else:
-            # Slot sem candidatos no estrito → aviso `incompleta` rotina-level
+            # Slot sem candidatos no estrito → vira candidato a relax
+            slots_para_relax.append(slot)
+
+    # ─── Etapa E: passe 2 (relax família entre treinos) ──────────────────
+    # Só rodado se relaxar_familia=True. Permite candidato cuja família já
+    # foi usada em outros treinos da mesma rotina (mas nome único global).
+    if relaxar_familia and slots_para_relax:
+        # Re-ordenar slots remanescentes por escassez (relaxada — só nomes bloqueiam)
+        def _escassez_relax(s: _Slot) -> int:
+            cfg_t = configs_norm[s.treino_idx]
+            # No relax, familias_bloqueadas = vazio, mas nomes_globais ainda bloqueia.
+            return _calcular_escassez(s, banco, cfg_t, nomes_globais, set())
+
+        while slots_para_relax:
+            slots_para_relax.sort(
+                key=lambda s: (_escassez_relax(s), _peso_nivel(s.nivel), random.random())
+            )
+            slot = slots_para_relax.pop(0)
+            cfg_t = configs_norm[slot.treino_idx]
+            cands = _candidatos_estritos(
+                banco, slot.nivel, slot.escopo_alocacao, cfg_t,
+                nomes_globais, set(),  # família relaxada
+                filtro_purpose=None,
+            )
+            if cands:
+                escolhido = random.choice(cands)
+                alocacao[slot.treino_idx][slot.d_idx_original].append(escolhido)
+                nomes_globais.add(escolhido.nome)
+                # Família AINDA é tracked pra slots subsequentes do mesmo passe relax
+                familias_globais.add(escolhido.nome)
+                if escolhido.variacao_de:
+                    familias_globais.add(escolhido.variacao_de)
+                relaxados_por_treino.setdefault(slot.treino_idx, []).append(escolhido.nome)
+            else:
+                # Mesmo no relax não há candidato → aviso rotina-level
+                avisos_rotina.append({
+                    "tipo": "incompleta",
+                    "escopo": "rotina",
+                    "treino_idx": slot.treino_idx,
+                    "nivel": quota_total[(slot.treino_idx, slot.d_idx_original)][0],
+                    "escopo_demanda": slot.escopo_demanda_original,
+                    "nivel_alocacao": slot.nivel,
+                    "escopo_alocacao": slot.escopo_alocacao,
+                    "faltam": 1,
+                })
+    else:
+        # relax desligado: slots_para_relax viram avisos diretamente
+        for slot in slots_para_relax:
             avisos_rotina.append({
                 "tipo": "incompleta",
                 "escopo": "rotina",
@@ -1381,10 +1557,10 @@ def pre_alocar_rotina(
                 "escopo_demanda": slot.escopo_demanda_original,
                 "nivel_alocacao": slot.nivel,
                 "escopo_alocacao": slot.escopo_alocacao,
-                "faltam": 1,  # 1 slot por aviso (granular)
+                "faltam": 1,
             })
 
-    return alocacao, avisos_rotina
+    return alocacao, avisos_rotina, relaxados_por_treino
 
 
 def gerar_sessao_por_demandas(
@@ -1398,6 +1574,7 @@ def gerar_sessao_por_demandas(
     evitar_agonistas: bool = False,
     lateralidade_por_padrao: Optional[dict] = None,
     relaxar_familia: bool = False,
+    exercicios_pre_alocados: Optional[dict[int, list[Exercicio]]] = None,
 ) -> Sessao:
     """
     Gera uma sessão a partir de uma lista de DEMANDAS hierárquicas.
@@ -1432,10 +1609,17 @@ def gerar_sessao_por_demandas(
     todos_selecionados: list[Exercicio] = []
     relaxados_local: list[str] = []  # nomes escolhidos via relax família
 
-    # Travados entram primeiro
-    for e in travados:
-        todos_selecionados.append(e)
-        nomes_usados.add(e.nome)
+    # Modo pré-alocado (Fase 0 da Etapa 2 já fixou os exercícios concretos):
+    # pula a seleção interna e usa os exercícios fornecidos. Travados já estão
+    # contemplados na alocação (chave -1 pra travados sem demanda compatível).
+    pre_alocados_modo = exercicios_pre_alocados is not None
+
+    if not pre_alocados_modo:
+        # Fluxo legado (gerar_sessao_por_demandas chamado standalone, ex: /regerar):
+        # travados entram primeiro como extras.
+        for e in travados:
+            todos_selecionados.append(e)
+            nomes_usados.add(e.nome)
 
     lat_map = lateralidade_por_padrao or {}
 
@@ -1543,94 +1727,140 @@ def gerar_sessao_por_demandas(
     rotulos_demandas: list[str] = []
     avisos_da_sessao: list[dict] = []
 
-    for nivel, escopo, qtd in demandas:
-        if qtd <= 0:
-            continue
-        rotulos_demandas.append(f"{escopo}({qtd})")
+    if pre_alocados_modo:
+        # ── Modo pré-alocado: usa os exercícios fixados pela Fase 0 ─────
+        # Travados sem demanda compatível ficam na chave especial -1.
+        for ex in (exercicios_pre_alocados.get(-1, []) or []):
+            if ex.nome not in nomes_usados:
+                todos_selecionados.append(ex)
+                nomes_usados.add(ex.nome)
 
-        n_antes = len(todos_selecionados)
-        n_antes_relax = len(relaxados_local)
-        padroes = _padroes_de_escopo(nivel, escopo)
+        for d_idx, demanda in enumerate(demandas):
+            if not (isinstance(demanda, (list, tuple)) and len(demanda) >= 3):
+                continue
+            nivel, escopo, qtd = demanda[0], demanda[1], int(demanda[2])
+            if qtd <= 0:
+                continue
+            rotulos_demandas.append(f"{escopo}({qtd})")
+            exs_pre = exercicios_pre_alocados.get(d_idx, []) or []
+            for ex in exs_pre:
+                if ex.nome not in nomes_usados:
+                    todos_selecionados.append(ex)
+                    nomes_usados.add(ex.nome)
+            # Aviso `incompleta` treino-level só quando a Fase 0 não preencheu
+            # tudo desta demanda (D3.2): Fase 1 não relaxa, mas a contagem do
+            # pré-alocado pode ter ficado abaixo do pedido (e a Fase 0 já
+            # gerou o aviso rotina-level correspondente).
+            n_obtido = len(exs_pre)
+            if n_obtido < qtd:
+                padroes = _padroes_de_escopo(nivel, escopo)
+                nomes_em_escopo: set[str] = set()
+                for e in banco:
+                    if e.padrao in padroes:
+                        nomes_em_escopo.add(e.nome)
+                        if e.variacao_de:
+                            nomes_em_escopo.add(e.variacao_de)
+                familias_usadas = sorted(n for n in var_pais_inter if n in nomes_em_escopo)
+                avisos_da_sessao.append({
+                    "tipo": "incompleta",
+                    "escopo_aviso": "treino",  # D3.2
+                    "nivel": nivel,
+                    "escopo": escopo,
+                    "qtd_pedida": qtd,
+                    "qtd_obtida": n_obtido,
+                    "faltam": qtd - n_obtido,
+                    "familias_usadas": familias_usadas,
+                })
+    else:
+        # ── Modo standalone: comportamento atual (chamada via /regerar) ──
+        for nivel, escopo, qtd in demandas:
+            if qtd <= 0:
+                continue
+            rotulos_demandas.append(f"{escopo}({qtd})")
 
-        # Lateralidade: quando o escopo tem refinamento bilateral/unilateral explícito
-        if escopo in lat_map:
-            padroes_esc = padroes
-            for lat, qt in lat_map[escopo].items():
-                if qt > 0:
-                    filtros = {p: lat for p in padroes_esc}
-                    _selecionar_ciclando(padroes_esc, qt, filtros_lateralidade=filtros)
-        elif not padroes:
-            pass
-        elif nivel == "regiao":
-            # ── Regra de proporção: ao menos 60% compostos ────────────────
-            # Classificação por exercício (purpose), não por padrão.
-            # Cada padrão pode contribuir nas duas fases (ex: hinge tem 12
-            # compostos e 8 isolados no banco — entra em ambas).
-            cands_no_escopo = [e for e in banco if e.padrao in padroes]
-            tem_compostos = any(_eh_composto(e) for e in cands_no_escopo)
-            tem_isolados  = any(not _eh_composto(e) for e in cands_no_escopo)
+            n_antes = len(todos_selecionados)
+            n_antes_relax = len(relaxados_local)
+            padroes = _padroes_de_escopo(nivel, escopo)
 
-            padroes_shuf = list(padroes)
-            random.shuffle(padroes_shuf)
+            # Lateralidade: quando o escopo tem refinamento bilateral/unilateral explícito
+            if escopo in lat_map:
+                padroes_esc = padroes
+                for lat, qt in lat_map[escopo].items():
+                    if qt > 0:
+                        filtros = {p: lat for p in padroes_esc}
+                        _selecionar_ciclando(padroes_esc, qt, filtros_lateralidade=filtros)
+            elif not padroes:
+                pass
+            elif nivel == "regiao":
+                # ── Regra de proporção: ao menos 60% compostos ────────────────
+                # Classificação por exercício (purpose), não por padrão.
+                # Cada padrão pode contribuir nas duas fases (ex: hinge tem 12
+                # compostos e 8 isolados no banco — entra em ambas).
+                cands_no_escopo = [e for e in banco if e.padrao in padroes]
+                tem_compostos = any(_eh_composto(e) for e in cands_no_escopo)
+                tem_isolados  = any(not _eh_composto(e) for e in cands_no_escopo)
 
-            if tem_compostos and tem_isolados:
-                min_compostos = math.ceil(qtd * PROPORCAO_COMPOSTOS)
-                # Não pedir mais compostos do que o total
-                min_compostos = min(min_compostos, qtd)
-                max_isolados  = qtd - min_compostos
+                padroes_shuf = list(padroes)
+                random.shuffle(padroes_shuf)
 
-                # Fase 1: preencher compostos ciclando os padrões
-                n_comp = _selecionar_ciclando(padroes_shuf, min_compostos, filtro_purpose="composto")
-                # Fase 2: preencher isolados ciclando os padrões
-                n_iso = _selecionar_ciclando(padroes_shuf, max_isolados, filtro_purpose="isolado")
-                # Fase 3: se sobrou espaço, tenta mais compostos; depois isolados
-                faltam = qtd - n_comp - n_iso
-                if faltam > 0:
-                    n_extra_c = _selecionar_ciclando(padroes_shuf, faltam, filtro_purpose="composto")
-                    faltam -= n_extra_c
-                if faltam > 0:
-                    _selecionar_ciclando(padroes_shuf, faltam, filtro_purpose="isolado")
+                if tem_compostos and tem_isolados:
+                    min_compostos = math.ceil(qtd * PROPORCAO_COMPOSTOS)
+                    # Não pedir mais compostos do que o total
+                    min_compostos = min(min_compostos, qtd)
+                    max_isolados  = qtd - min_compostos
+
+                    # Fase 1: preencher compostos ciclando os padrões
+                    n_comp = _selecionar_ciclando(padroes_shuf, min_compostos, filtro_purpose="composto")
+                    # Fase 2: preencher isolados ciclando os padrões
+                    n_iso = _selecionar_ciclando(padroes_shuf, max_isolados, filtro_purpose="isolado")
+                    # Fase 3: se sobrou espaço, tenta mais compostos; depois isolados
+                    faltam = qtd - n_comp - n_iso
+                    if faltam > 0:
+                        n_extra_c = _selecionar_ciclando(padroes_shuf, faltam, filtro_purpose="composto")
+                        faltam -= n_extra_c
+                    if faltam > 0:
+                        _selecionar_ciclando(padroes_shuf, faltam, filtro_purpose="isolado")
+                else:
+                    # Só um tipo disponível — cicla com preferência por composto
+                    _selecionar_ciclando(padroes_shuf, qtd, preferir_composto=True)
             else:
-                # Só um tipo disponível — cicla com preferência por composto
-                _selecionar_ciclando(padroes_shuf, qtd, preferir_composto=True)
-        else:
-            # ── Subregião / Padrão: cicla padrões com prioridade dinâmica ──
-            # Padrões que TÊM candidato composto no banco vêm primeiro;
-            # dentro de cada padrão, candidatos compostos são preferidos.
-            padroes_ord = _ordenar_padroes_por_prioridade(padroes, banco=banco)
-            _selecionar_ciclando(padroes_ord, qtd, preferir_composto=True)
+                # ── Subregião / Padrão: cicla padrões com prioridade dinâmica ──
+                # Padrões que TÊM candidato composto no banco vêm primeiro;
+                # dentro de cada padrão, candidatos compostos são preferidos.
+                padroes_ord = _ordenar_padroes_por_prioridade(padroes, banco=banco)
+                _selecionar_ciclando(padroes_ord, qtd, preferir_composto=True)
 
-        n_obtido = len(todos_selecionados) - n_antes
+            n_obtido = len(todos_selecionados) - n_antes
 
-        # Avisos do tipo "familia_repetida" (1 por exercício relaxado nesta demanda)
-        novos_relax = relaxados_local[n_antes_relax:]
-        for nome_rel in novos_relax:
-            ex_rel = next((e for e in todos_selecionados if e.nome == nome_rel), None)
-            avisos_da_sessao.append({
-                "tipo": "familia_repetida",
-                "nivel": nivel,
-                "escopo": escopo,
-                "exercicio": nome_rel,
-                "familia": (ex_rel.variacao_de if ex_rel and ex_rel.variacao_de else nome_rel),
-            })
+            # Avisos do tipo "familia_repetida" (1 por exercício relaxado nesta demanda)
+            novos_relax = relaxados_local[n_antes_relax:]
+            for nome_rel in novos_relax:
+                ex_rel = next((e for e in todos_selecionados if e.nome == nome_rel), None)
+                avisos_da_sessao.append({
+                    "tipo": "familia_repetida",
+                    "nivel": nivel,
+                    "escopo": escopo,
+                    "exercicio": nome_rel,
+                    "familia": (ex_rel.variacao_de if ex_rel and ex_rel.variacao_de else nome_rel),
+                })
 
-        if n_obtido < qtd:
-            nomes_em_escopo: set[str] = set()
-            for e in banco:
-                if e.padrao in padroes:
-                    nomes_em_escopo.add(e.nome)
-                    if e.variacao_de:
-                        nomes_em_escopo.add(e.variacao_de)
-            familias_usadas = sorted(n for n in var_pais_inter if n in nomes_em_escopo)
-            avisos_da_sessao.append({
-                "tipo": "incompleta",
-                "nivel": nivel,
-                "escopo": escopo,
-                "qtd_pedida": qtd,
-                "qtd_obtida": n_obtido,
-                "faltam": qtd - n_obtido,
-                "familias_usadas": familias_usadas,
-            })
+            if n_obtido < qtd:
+                nomes_em_escopo: set[str] = set()
+                for e in banco:
+                    if e.padrao in padroes:
+                        nomes_em_escopo.add(e.nome)
+                        if e.variacao_de:
+                            nomes_em_escopo.add(e.variacao_de)
+                familias_usadas = sorted(n for n in var_pais_inter if n in nomes_em_escopo)
+                avisos_da_sessao.append({
+                    "tipo": "incompleta",
+                    "nivel": nivel,
+                    "escopo": escopo,
+                    "qtd_pedida": qtd,
+                    "qtd_obtida": n_obtido,
+                    "faltam": qtd - n_obtido,
+                    "familias_usadas": familias_usadas,
+                })
 
     # Ordenar: compostos primeiro (dentro do conjunto final)
     todos_selecionados = ordenar_compostos_primeiro(todos_selecionados)
@@ -1664,32 +1894,61 @@ def gerar_multiplos_treinos(
     relaxar_familia: bool = False,
 ) -> list[Sessao]:
     """
-    Gera N sessões de treino evitando repetição de exercícios entre elas.
+    Gera N sessões de treino com pré-alocação global (Etapa 2 da refatoração v4).
+
+    Pipeline em 3 fases:
+      Fase 0 — pre_alocar_rotina aloca exercícios entre os N treinos antes de
+        qualquer um ser montado, ordenando vagas por escassez. Travados
+        consomem vaga (D3.1). Avisos `incompleta` rotina-level são gerados
+        aqui (D3.2).
+      Fase 1 — gerar_sessao_por_demandas recebe `exercicios_pre_alocados` e
+        usa direto, sem refazer seleção. Avisos `familia_repetida` da Fase 1
+        existem só pra fluxo standalone (quando chamada via /regerar).
+      Fase 2 — montar_blocos (intocada).
+
+    Templates legacy (cfg sem `demandas`) são convertidos via
+    `_normalizar_config` na borda externa (D4 opção C). `gerar_sessao` legado
+    permanece intocado e continua chamável standalone (ex: `/regerar` no
+    app_flask), mas não é chamado a partir daqui.
 
     Args:
-        banco: banco completo de exercícios
-        configs: lista de dicts, um por treino, com chaves:
-            - padroes: list[str]
-            - exercicios_por_padrao: dict
-            - max_complexidade: int
-            - tamanho_bloco: int
-            - exercicios_travados: list[Exercicio] (opcional)
-            - equipamentos_bloqueados: list[str] (opcional)
-        relaxar_familia: se True, permite repetir famílias entre treinos
-            quando o estrito não consegue preencher uma demanda.
+        banco: banco completo de exercícios.
+        configs: lista de dicts, um por treino. Aceita formato de demandas
+            (`{"demandas": [...]}`) OU formato template legado
+            (`{"padroes": [...], "exercicios_por_padrao": {...}}`). Ambos
+            convertidos internamente em demandas.
+        relaxar_familia: se True, permite Fase 1 relaxar família entre treinos.
+            Fase 0 (pré-alocação) sempre opera no modo estrito, independente
+            desta flag (D3.2).
 
     Returns:
-        Lista de Sessao na mesma ordem de configs.
+        Lista de Sessao na mesma ordem de configs. Avisos `incompleta`
+        rotina-level são anexados em sessoes[0].avisos com escopo="rotina".
     """
-    # Conjuntos globais compartilhados entre treinos
-    nomes_exatos_globais: set[str] = set()   # apenas nomes EXATOS de exercícios usados → filtra banco
-    variacao_pais_globais: set[str] = set()  # nomes + pais usados → bloqueia famílias (relaxável)
+    # Normaliza configs (templates → demandas, D4 opção C)
+    configs_norm = [_normalizar_config(c) for c in configs]
 
-    sessoes = []
-    for cfg in configs:
-        demandas      = cfg.get("demandas")  # lista de (nivel, escopo, qtd)
-        padroes       = cfg.get("padroes", [])
-        epp           = cfg.get("exercicios_por_padrao", {p: 1 for p in padroes})
+    # Fase 0: pré-alocação global (com 2º passe de relax se relaxar_familia)
+    alocacao, avisos_rotina, relaxados_por_treino = pre_alocar_rotina(
+        banco, configs_norm, relaxar_familia=relaxar_familia,
+    )
+
+    # Reconstrói variacao_pais_globais a partir da alocação (R5).
+    # Esse set é repassado pra Fase 1 só pra preencher `familias_usadas` em
+    # avisos `incompleta` treino-level (rastreabilidade de quais famílias
+    # bloquearam a alocação).
+    variacao_pais_globais: set[str] = set()
+    for _t_idx, by_demanda in alocacao.items():
+        for _d_idx, exs in by_demanda.items():
+            for ex in exs:
+                variacao_pais_globais.add(ex.nome)
+                if ex.variacao_de:
+                    variacao_pais_globais.add(ex.variacao_de)
+
+    # Fase 1: gera sessão por treino usando os exercícios pré-alocados
+    sessoes: list[Sessao] = []
+    for treino_idx, cfg in enumerate(configs_norm):
+        demandas      = cfg.get("demandas") or []
         max_cx        = cfg.get("max_complexidade", 5)
         tam_bloco     = cfg.get("tamanho_bloco", 2)
         travados      = cfg.get("exercicios_travados", [])
@@ -1697,49 +1956,58 @@ def gerar_multiplos_treinos(
         evit_agon     = cfg.get("evitar_agonistas", False)
         lat_padrao    = cfg.get("lateralidade_por_padrao")
 
-        # Bloqueia nomes EXATOS já usados em treinos anteriores
-        # (não inclui pais, pra permitir que o relax_familia ressuscite-os)
-        banco_filtrado = [e for e in banco if e.nome not in nomes_exatos_globais]
+        exs_pre = alocacao.get(treino_idx, {})
 
-        if demandas:
-            sessao = gerar_sessao_por_demandas(
-                banco_filtrado,
-                demandas=demandas,
-                equipamentos_bloqueados=eq_bloq,
-                max_complexidade=max_cx,
-                exercicios_travados=travados,
-                tamanho_bloco=tam_bloco,
-                variacao_pais_usados=variacao_pais_globais,
-                evitar_agonistas=evit_agon,
-                lateralidade_por_padrao=lat_padrao,
-                relaxar_familia=relaxar_familia,
-            )
-        else:
-            sessao = gerar_sessao(
-                banco_filtrado,
-                padroes,
-                exercicios_por_padrao=epp,
-                equipamentos_bloqueados=eq_bloq,
-                max_complexidade=max_cx,
-                exercicios_travados=travados,
-                tamanho_bloco=tam_bloco,
-                variacao_pais_usados=variacao_pais_globais,
-                evitar_agonistas=evit_agon,
-                relaxar_familia=relaxar_familia,
-            )
+        sessao = gerar_sessao_por_demandas(
+            banco,
+            demandas=demandas,
+            equipamentos_bloqueados=eq_bloq,
+            max_complexidade=max_cx,
+            exercicios_travados=travados,
+            tamanho_bloco=tam_bloco,
+            variacao_pais_usados=variacao_pais_globais,
+            evitar_agonistas=evit_agon,
+            lateralidade_por_padrao=lat_padrao,
+            relaxar_familia=relaxar_familia,
+            exercicios_pre_alocados=exs_pre,
+        )
 
-        # Recompõe familias_usadas em cada aviso usando o banco COMPLETO
-        # (sem o filtro nomes_globais que removeria justamente as famílias
-        # já usadas — fundamental pra Templates mode, que não popula var_pais
-        # durante a seleção interna).
+        # Propaga relaxados da Fase 0 pra Sessao.relaxados (badge ↻ na UI)
+        # e gera aviso `familia_repetida` por exercício relaxado.
+        relaxados_t = relaxados_por_treino.get(treino_idx, [])
+        if relaxados_t:
+            sessao.relaxados = list(relaxados_t)
+            for nome_rel in relaxados_t:
+                # Localiza o exercício pra resgatar variacao_de
+                ex_rel = next(
+                    (ex for bloco in sessao.blocos
+                     for ex in (bloco.ex1, bloco.ex2, bloco.ex3)
+                     if ex and ex.nome == nome_rel),
+                    None,
+                )
+                sessao.avisos.append({
+                    "tipo": "familia_repetida",
+                    "exercicio": nome_rel,
+                    "familia": (
+                        ex_rel.variacao_de if ex_rel and ex_rel.variacao_de
+                        else nome_rel
+                    ),
+                })
+
+        # Recompõe familias_usadas em avisos de incompleta treino-level
+        # (mantém compat com UI legada que olha esse campo).
         for av in sessao.avisos:
-            if av["nivel"] == "padrao":
-                escopo_padroes = [av["escopo"]]
-            elif av["nivel"] == "subregiao":
-                escopo_padroes = list(SUBREGIAO_PARA_PADROES.get(av["escopo"], []))
-            elif av["nivel"] == "regiao":
+            if av.get("tipo") != "incompleta":
+                continue
+            nivel_av = av.get("nivel")
+            escopo_av = av.get("escopo")
+            if nivel_av == "padrao":
+                escopo_padroes = [escopo_av]
+            elif nivel_av == "subregiao":
+                escopo_padroes = list(SUBREGIAO_PARA_PADROES.get(escopo_av, []))
+            elif nivel_av == "regiao":
                 escopo_padroes = []
-                for sub in REGIAO_PARA_SUBREGIOES.get(av["escopo"], []):
+                for sub in REGIAO_PARA_SUBREGIOES.get(escopo_av, []):
                     escopo_padroes.extend(SUBREGIAO_PARA_PADROES.get(sub, []))
             else:
                 escopo_padroes = []
@@ -1749,21 +2017,17 @@ def gerar_multiplos_treinos(
                     nomes_em_escopo.add(e.nome)
                     if e.variacao_de:
                         nomes_em_escopo.add(e.variacao_de)
-            av["familias_usadas"] = sorted(n for n in variacao_pais_globais if n in nomes_em_escopo)
-
-        # Registra o que foi usado para os próximos treinos
-        for bloco in sessao.blocos:
-            for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
-                if ex:
-                    nomes_exatos_globais.add(ex.nome)
-                    # Família: adiciona AMBOS ex.nome e ex.variacao_de em var_pais pra
-                    # cobrir filho-usado → irmãos bloqueados E pai-usado → filhos bloqueados.
-                    # Esse set é o que o relax_familia consegue ignorar.
-                    variacao_pais_globais.add(ex.nome)
-                    if ex.variacao_de:
-                        variacao_pais_globais.add(ex.variacao_de)
+            av["familias_usadas"] = sorted(
+                n for n in variacao_pais_globais if n in nomes_em_escopo
+            )
 
         sessoes.append(sessao)
+
+    # Anexa avisos rotina-level no primeiro treino (R3 — sem mexer na UI).
+    # Cada aviso já carrega `escopo: "rotina"`. UI mistura visualmente; ajuste
+    # de UX vira ponto aberto.
+    if avisos_rotina and sessoes:
+        sessoes[0].avisos.extend(avisos_rotina)
 
     return sessoes
 

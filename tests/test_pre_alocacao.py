@@ -135,7 +135,7 @@ def _alocados_treino(alocacao, t_idx):
 def test_pre_alocar_lower_2_um_de_cada_essencial(banco):
     random.seed(10)
     cfg = {"demandas": [("regiao", "lower", 2)]}
-    alocacao, _avisos = pre_alocar_rotina(banco, [cfg])
+    alocacao, _avisos, _relax = pre_alocar_rotina(banco, [cfg])
     exs = _all_alocados(alocacao)
     assert len(exs) == 2
     subs = {ex.subregiao for ex in exs}
@@ -146,7 +146,7 @@ def test_pre_alocar_lower_4_dois_e_dois_essenciais(banco):
     """Acessórias não competem em lower(4): 2 perna_ant + 2 perna_post."""
     random.seed(11)
     cfg = {"demandas": [("regiao", "lower", 4)]}
-    alocacao, _ = pre_alocar_rotina(banco, [cfg])
+    alocacao, _, _relax = pre_alocar_rotina(banco, [cfg])
     exs = _all_alocados(alocacao)
     assert len(exs) == 4
     cnt_sub = Counter(ex.subregiao for ex in exs)
@@ -157,7 +157,7 @@ def test_pre_alocar_lower_6_um_de_cada_subregiao(banco):
     """lower(6): 2+2 essenciais + 1+1 acessórias = 6."""
     random.seed(12)
     cfg = {"demandas": [("regiao", "lower", 6)]}
-    alocacao, _ = pre_alocar_rotina(banco, [cfg])
+    alocacao, _, _relax = pre_alocar_rotina(banco, [cfg])
     exs = _all_alocados(alocacao)
     assert len(exs) == 6
     cnt_sub = Counter(ex.subregiao for ex in exs)
@@ -171,14 +171,14 @@ def test_pre_alocar_subregiao_e_padrao_sem_decomposicao(banco):
     """Demandas de subregião e padrão viram slots diretos sem decomposição."""
     random.seed(13)
     cfg_sub = {"demandas": [("subregiao", "peito", 3)]}
-    alocacao, _ = pre_alocar_rotina(banco, [cfg_sub])
+    alocacao, _, _relax = pre_alocar_rotina(banco, [cfg_sub])
     exs = _all_alocados(alocacao)
     assert len(exs) == 3
     assert all(ex.subregiao == "peito" for ex in exs)
 
     random.seed(14)
     cfg_pad = {"demandas": [("padrao", "hinge", 2)]}
-    alocacao, _ = pre_alocar_rotina(banco, [cfg_pad])
+    alocacao, _, _relax = pre_alocar_rotina(banco, [cfg_pad])
     exs = _all_alocados(alocacao)
     assert len(exs) == 2
     assert all(ex.padrao == "hinge" for ex in exs)
@@ -188,7 +188,7 @@ def test_pre_alocar_quota_composto_em_regiao(banco):
     """lower(5): pelo menos ceil(5×0.6)=3 compostos."""
     random.seed(15)
     cfg = {"demandas": [("regiao", "lower", 5)]}
-    alocacao, _ = pre_alocar_rotina(banco, [cfg])
+    alocacao, _, _relax = pre_alocar_rotina(banco, [cfg])
     exs = _all_alocados(alocacao)
     n_compostos = sum(1 for ex in exs if _eh_composto(ex))
     assert n_compostos >= 3, f"esperado >= 3 compostos, obtido {n_compostos}"
@@ -202,7 +202,7 @@ def test_pre_alocar_travado_consome_vaga(banco):
         "demandas": [("regiao", "lower", 3)],
         "exercicios_travados": [travado],
     }
-    alocacao, _ = pre_alocar_rotina(banco, [cfg])
+    alocacao, _, _relax = pre_alocar_rotina(banco, [cfg])
     exs = _all_alocados(alocacao)
     assert len(exs) == 3
     assert travado.nome in {ex.nome for ex in exs}
@@ -212,7 +212,7 @@ def test_pre_alocar_multi_treino_sem_repetir_nomes(banco):
     """3 treinos lower(3): nenhum exercício se repete entre treinos."""
     random.seed(17)
     cfg = {"demandas": [("regiao", "lower", 3)]}
-    alocacao, _ = pre_alocar_rotina(banco, [cfg, cfg, cfg])
+    alocacao, _, _relax = pre_alocar_rotina(banco, [cfg, cfg, cfg])
     todos_nomes = [ex.nome for ex in _all_alocados(alocacao)]
     duplicados = [n for n, c in Counter(todos_nomes).items() if c > 1]
     assert not duplicados, f"duplicados entre treinos: {duplicados}"
@@ -227,7 +227,7 @@ def test_pre_alocar_aviso_incompleta_rotina_level(banco):
         if e.subregiao != "peito" or e.nome == "Crossover Sentado"
     ]
     cfg = {"demandas": [("subregiao", "peito", 3)]}
-    alocacao, avisos = pre_alocar_rotina(banco_curto, [cfg, cfg])
+    alocacao, avisos, _relax = pre_alocar_rotina(banco_curto, [cfg, cfg])
     # 1 ex será alocado (no T1, ordem aleatória), e 5 slots ficam sem candidato
     # → 5 avisos rotina-level. Mas com seed pode haver ≤ 5 (se 0 alocados, 6 avisos).
     avisos_rot = [a for a in avisos if a.get("tipo") == "incompleta" and a.get("escopo") == "rotina"]
@@ -243,9 +243,9 @@ def test_pre_alocar_determinismo_com_seed(banco):
     """Mesmo seed → mesma alocação."""
     cfg = {"demandas": [("regiao", "lower", 4)]}
     random.seed(99)
-    aloc_a, _ = pre_alocar_rotina(banco, [cfg, cfg])
+    aloc_a, _, _ = pre_alocar_rotina(banco, [cfg, cfg])
     random.seed(99)
-    aloc_b, _ = pre_alocar_rotina(banco, [cfg, cfg])
+    aloc_b, _, _ = pre_alocar_rotina(banco, [cfg, cfg])
 
     def _serialize(aloc):
         return {t: {d: tuple(e.nome for e in exs) for d, exs in by_d.items()}
@@ -258,9 +258,9 @@ def test_pre_alocar_seeds_diferentes_produzem_alocacoes_diferentes(banco):
     """Tie-break sorteado: seeds diferentes geram alocações diferentes."""
     cfg = {"demandas": [("regiao", "lower", 4)]}
     random.seed(100)
-    aloc_a, _ = pre_alocar_rotina(banco, [cfg, cfg])
+    aloc_a, _, _ = pre_alocar_rotina(banco, [cfg, cfg])
     random.seed(200)
-    aloc_b, _ = pre_alocar_rotina(banco, [cfg, cfg])
+    aloc_b, _, _ = pre_alocar_rotina(banco, [cfg, cfg])
 
     def _serialize(aloc):
         return {t: {d: tuple(e.nome for e in exs) for d, exs in by_d.items()}
@@ -273,7 +273,7 @@ def test_pre_alocar_cobertura_essencial_intra_treino_multi(banco):
     """lower(2) × 3 treinos: cada treino tem 1 perna_ant + 1 perna_post."""
     random.seed(101)
     cfg = {"demandas": [("regiao", "lower", 2)]}
-    alocacao, _ = pre_alocar_rotina(banco, [cfg, cfg, cfg])
+    alocacao, _, _relax = pre_alocar_rotina(banco, [cfg, cfg, cfg])
     for t_idx in range(3):
         exs = _alocados_treino(alocacao, t_idx)
         subs = {ex.subregiao for ex in exs}
