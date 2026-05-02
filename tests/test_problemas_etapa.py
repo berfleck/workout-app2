@@ -226,14 +226,16 @@ def test_core_3_nao_gera_3_pranchas_iguais(banco):
     )
 
 
-# ----- 9: tríceps Francesa + Polia em triceps(2) — Frente 2 / Etapa 7 ----
+# ----- 9: tríceps Francesa + Polia em triceps(2) — Frente 2 (RESOLVIDO) --
 
 
-@pytest.mark.xfail(strict=True, reason="Frente 2 ou Etapa 7: variacao_de tríceps")
 def test_triceps_2_aceita_francesa_e_polia(banco):
     """Em 100 rotinas triceps(2) × 1 modo estrito (sem relax), deve
-    sempre conseguir 2 tríceps distintos. Hoje todos têm
-    variacao_de="Tríceps", então estrito falha."""
+    sempre conseguir 2 tríceps distintos.
+
+    RESOLVIDO na Frente 2 da Etapa 1: `variacao_de` foi refinado dos
+    8 tríceps em 5 famílias estritas (Pushdown, Coice, Francês, Testa,
+    Mergulho), tornando matematicamente possível pegar 2 sem relax."""
     falhas = 0
     for seed in range(9000, 9100):
         random.seed(seed)

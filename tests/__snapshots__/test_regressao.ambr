@@ -685,17 +685,6 @@
           'nivel': 'padrao',
           'tipo': 'familia_repetida',
         }),
-        dict({
-          'escopo': 'triceps',
-          'exercicio': 'Tríceps Unilateral Polia',
-          'familia': 'Tríceps',
-          'familias_usadas': list([
-            'Tríceps',
-            'Tríceps Coice Com Halter',
-          ]),
-          'nivel': 'padrao',
-          'tipo': 'familia_repetida',
-        }),
       ]),
       'blocos': list([
         dict({
@@ -746,7 +735,6 @@
         'Apoio Ajoelhado',
         'Desenv. Halteres Sentado',
         'Desenv. Halteres Uni.',
-        'Tríceps Unilateral Polia',
       ]),
       'tipo': 'empurrar_compostos + empurrar_isolados + ombro_composto + hinge + knee_flexion + abduction + core_isometrico + triceps',
     }),
@@ -756,22 +744,13 @@
   list([
     dict({
       'avisos': list([
-        dict({
-          'escopo': 'triceps',
-          'faltam': 1,
-          'familias_usadas': list([
-          ]),
-          'nivel': 'padrao',
-          'qtd_obtida': 1,
-          'qtd_pedida': 2,
-          'tipo': 'incompleta',
-        }),
       ]),
       'blocos': list([
         dict({
           'label': 'A',
           'nomes': list([
             'Tríceps Mergulho Banco',
+            'Tríceps Unilateral Polia',
           ]),
         }),
       ]),
