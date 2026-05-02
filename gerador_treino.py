@@ -42,8 +42,8 @@ PADRAO_PARA_SUBREGIAO = {
     "biceps":             "bracos",
     "triceps":            "bracos",
     # Outros
-    "core_isometrico": "core",
-    "core_dinamico":   "core",
+    "core_isometrico": "core_isometrico",
+    "core_dinamico":   "core_dinamico",
     "cardio":          "cardio",
 }
 
@@ -57,7 +57,8 @@ SUBREGIAO_PARA_REGIAO = {
     "costas": "upper",
     "ombro":  "upper",
     "bracos": "upper",
-    "core":   "core",
+    "core_isometrico": "core",
+    "core_dinamico":   "core",
     "cardio": "cardio",
 }
 
@@ -840,6 +841,14 @@ def _padroes_de_escopo(
     if nivel == "padrao":
         return [escopo]
     if nivel == "subregiao":
+        # Retrocompat: a subregião antiga "core" foi quebrada em
+        # core_dinamico + core_isometrico (Frente 3 da refatoração).
+        # Configs salvos em SQLite ou testes antigos podem ainda pedir
+        # ("subregiao", "core", N) — expandimos para os padrões das duas
+        # subregiões novas pra preservar comportamento.
+        if escopo == "core":
+            return list(SUBREGIAO_PARA_PADROES.get("core_dinamico", [])) + \
+                   list(SUBREGIAO_PARA_PADROES.get("core_isometrico", []))
         return list(SUBREGIAO_PARA_PADROES.get(escopo, []))
     if nivel == "regiao":
         pads: list[str] = []

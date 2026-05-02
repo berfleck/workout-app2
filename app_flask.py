@@ -217,13 +217,15 @@ REGIOES_LABELS = {"upper": "Membros superiores", "lower": "Membros inferiores", 
 SUBREGIOES_LABELS = {
     "peito": "Peito", "costas": "Costas", "ombro": "Ombro", "bracos": "Braços",
     "perna_anterior": "Perna anterior", "perna_posterior": "Perna posterior",
-    "adutores": "Adutores", "panturrilha": "Panturrilha", "core": "Core", "cardio": "Cardio",
+    "adutores": "Adutores", "panturrilha": "Panturrilha",
+    "core_dinamico": "Core dinâmico", "core_isometrico": "Core isométrico",
+    "cardio": "Cardio",
 }
 ORDEM_REGIOES = ["upper", "lower", "core", "cardio"]
 ORDEM_SUBREGIOES = {
     "upper": ["peito", "costas", "ombro", "bracos"],
     "lower": ["perna_anterior", "perna_posterior", "adutores", "panturrilha"],
-    "core": ["core"], "cardio": ["cardio"],
+    "core": ["core_isometrico", "core_dinamico"], "cardio": ["cardio"],
 }
 ORDEM_PADROES = {
     "peito": ["empurrar_compostos", "empurrar_isolados"],
@@ -232,7 +234,8 @@ ORDEM_PADROES = {
     "bracos": ["biceps", "triceps"],
     "perna_anterior": ["squat"], "perna_posterior": ["hinge", "knee_flexion", "abduction"],
     "adutores": ["adduction"], "panturrilha": ["flexao_plantar"],
-    "core": ["core_isometrico", "core_dinamico"], "cardio": ["cardio"],
+    "core_isometrico": ["core_isometrico"], "core_dinamico": ["core_dinamico"],
+    "cardio": ["cardio"],
 }
 
 todos_equipamentos = sorted({e.eq_primario for e in banco if e.eq_primario and e.eq_primario != "Sem equipamento"})
