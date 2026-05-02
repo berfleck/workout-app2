@@ -274,16 +274,20 @@ def filtrar_banco(texto="", padrao=None, purpose=None, unilateral=None,
 def _exercicio_to_dict(ex):
     return {"nome": ex.nome, "variacao_de": ex.variacao_de,
             "eq_primario": ex.eq_primario, "eq_secundario": ex.eq_secundario,
-            "regiao": ex.regiao, "padrao": ex.padrao, "purpose": ex.purpose,
+            "regiao": ex.regiao, "subregiao": ex.subregiao, "padrao": ex.padrao,
+            "purpose": ex.purpose,
             "unilateral": ex.unilateral, "complexidade": ex.complexidade,
             "fadiga": ex.fadiga, "circuito": ex.circuito,
             "similaridade": ex.similaridade, "musculo_primario": ex.musculo_primario,
             "obs": ex.obs, "series": ex.series, "reps": ex.reps, "rir": ex.rir}
 
 def _dict_to_exercicio(d):
+    padrao = d.get("padrao", "")
+    subregiao = d.get("subregiao") or PADRAO_PARA_SUBREGIAO.get(padrao, "")
     return Exercicio(nome=d["nome"], variacao_de=d.get("variacao_de"),
         eq_primario=d.get("eq_primario",""), eq_secundario=d.get("eq_secundario"),
-        regiao=d.get("regiao",""), padrao=d.get("padrao",""), purpose=d.get("purpose",""),
+        regiao=d.get("regiao",""), subregiao=subregiao, padrao=padrao,
+        purpose=d.get("purpose",""),
         unilateral=d.get("unilateral",""), complexidade=d.get("complexidade",1),
         fadiga=d.get("fadiga",1), circuito=d.get("circuito","não"),
         similaridade=d.get("similaridade",""), musculo_primario=d.get("musculo_primario",""),
@@ -1983,8 +1987,8 @@ def hub_substituir_aleatorio(aluno_id, t, bi, slot):
     inicial = dados["inicial"]
     ja_sugeridos = dados["vistos"]
     if escopo == "subregiao":
-        sub_alvo = PADRAO_PARA_SUBREGIAO.get(ex_atual_dict.get("padrao"))
-        candidatos_escopo = {e.nome for e in banco_subst if PADRAO_PARA_SUBREGIAO.get(e.padrao) == sub_alvo} if sub_alvo else set()
+        sub_alvo = ex_atual_dict.get("subregiao") or PADRAO_PARA_SUBREGIAO.get(ex_atual_dict.get("padrao", ""))
+        candidatos_escopo = {e.nome for e in banco_subst if e.subregiao == sub_alvo} if sub_alvo else set()
     else:
         candidatos_escopo = {e.nome for e in banco_subst if e.padrao == ex_atual_dict.get("padrao")}
     restantes = candidatos_escopo - ja_sugeridos - {nome_ex}

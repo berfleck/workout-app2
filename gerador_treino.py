@@ -235,6 +235,7 @@ class Exercicio:
     eq_primario: str
     eq_secundario: Optional[str]
     regiao: str
+    subregiao: str
     padrao: str
     purpose: str
     unilateral: str
@@ -298,13 +299,23 @@ def carregar_banco(path: str) -> list[Exercicio]:
         if not nome:
             continue
         eq_pri = _str(row.get("eq_primario")) or _EQ_FIXES.get(nome, "")
+        padrao = _str(row.get("padrao"))
+        subregiao_canonica = PADRAO_PARA_SUBREGIAO.get(padrao, "")
+        subregiao_xlsx = _str(row.get("subregiao"))
+        if subregiao_xlsx and subregiao_canonica and subregiao_xlsx != subregiao_canonica:
+            print(
+                f"[carregar_banco] WARN: '{nome}' tem subregiao='{subregiao_xlsx}' "
+                f"no XLSX, mas padrao='{padrao}' deriva '{subregiao_canonica}' "
+                f"do mapa canônico. Usando o mapa."
+            )
         exercicios.append(Exercicio(
             nome=nome,
             variacao_de=_str(row.get("variacao_de")) or None,
             eq_primario=eq_pri,
             eq_secundario=_str(row.get("eq_secundario")) or None,
             regiao=_str(row.get("regiao")),
-            padrao=_str(row.get("padrao")),
+            subregiao=subregiao_canonica,
+            padrao=padrao,
             purpose=_str(row.get("purpose")),
             unilateral=_str(row.get("unilateral")),
             complexidade=int(row.get("complexidade") if row.get("complexidade") and not (isinstance(row.get("complexidade"), float) and math.isnan(row.get("complexidade"))) else 1),
@@ -675,8 +686,8 @@ def substituir_exercicio(
 
     # Buscar substituto: mesmo padrão (ou subregião) e sem repetir nomes da sessão
     if escopo == "subregiao":
-        sub_alvo = PADRAO_PARA_SUBREGIAO.get(exercicio_alvo.padrao)
-        candidatos = [e for e in banco if PADRAO_PARA_SUBREGIAO.get(e.padrao) == sub_alvo] if sub_alvo else []
+        sub_alvo = exercicio_alvo.subregiao or None
+        candidatos = [e for e in banco if e.subregiao == sub_alvo] if sub_alvo else []
     else:
         candidatos = filtrar_por_padrao(banco, exercicio_alvo.padrao)
     candidatos = filtrar_por_equipamentos(candidatos, eq_bloq)
