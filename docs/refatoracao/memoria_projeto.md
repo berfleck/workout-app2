@@ -1,3 +1,56 @@
+> ## ⚠️ Nota de superação parcial
+>
+> Este documento é o **checkpoint de uma sessão anterior** de design
+> e análise. Algumas seções foram **superadas** pelo
+> `guia_refatoracao_v4.md`, que é a fonte de verdade operacional
+> atual. Outras seções **continuam relevantes e únicas** e devem ser
+> consultadas para contexto.
+>
+> ### O que foi superado (NÃO usar como referência)
+>
+> - **Roteiro de 10 etapas** (seção "Roteiro"): substituído pelas 8
+>   etapas do guia v4, com escopo e ordem redefinidos. Em particular:
+>   cargas (HIB2) foi movida para depois de Nível 2 + âncoras; squat
+>   e core ganharam frentes próprias na Etapa 1; uma Etapa 8 nova
+>   (explicabilidade) foi adicionada.
+> - **Lista de 6 problemas conhecidos** (seção "Problemas conhecidos
+>   não resolvidos"): expandida no guia v4 para 8 problemas, com
+>   problemas 7 (distribuição reproduz banco) e 8 (core sem
+>   subregiões) adicionados.
+> - **Empacotamento "Nível 2 + âncoras protegidas"**: o guia v4
+>   separou em Etapas 2 e 3 independentes, e expandiu a regra de
+>   âncoras para operar em subregião também (não só em região).
+> - **"Próximo passo claro quando retomar"** (seção final): a
+>   sequência sugerida lá é da fase pré-v4 e não corresponde mais
+>   ao plano atual. Usar a Seção 4 do guia v4.
+>
+> ### O que continua válido (CONSULTAR para contexto)
+>
+> - **Calibração HIB2** (seção "Onde paramos: filtro de cargas"):
+>   thresholds 6/5/6 escolhidos, justificativa clínica, análise dos
+>   20 casos. Continua sendo a calibração de partida da Etapa 4 do
+>   guia v4.
+> - **Conceitos**: "dança das cadeiras", "blocos solo legítimos vs
+>   forçados", "interpretação dos números de bloqueios nos
+>   relatórios", "Fase 1 vs Fase 2 do gerador". Continuam corretos
+>   e úteis para o vocabulário comum do projeto.
+> - **Estado atual do app** (seção "Já implementado e funcionando"):
+>   ainda reflete o ponto de partida da refatoração.
+> - **Banco atual** (seção "Banco atual"): descrição das 125
+>   entradas e colunas continua atualizada.
+> - **Documentos do projeto a manter sincronizados**: a lista de
+>   referências cruzadas continua útil, embora alguns documentos
+>   listados estejam agora em `docs/refatoracao/arquivo/`.
+>
+> ### Resumo: como usar este documento
+>
+> Para **decidir o que fazer**, use o `guia_refatoracao_v4.md`.
+> Para **entender o contexto histórico** ou consultar a calibração
+> HIB2, use este documento. Para **lista de problemas atual**, use
+> a tabela do guia v4 (Seção 3).
+
+---
+
 # Memória do projeto — Workout App v2
 
 > Documento de checkpoint criado para encerrar conversa longa e retomar

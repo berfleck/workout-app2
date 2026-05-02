@@ -2,6 +2,24 @@
 
 App para personal trainer gerar, editar e exportar sessões de treino. Roda localmente. Dados em SQLite + XLSX.
 
+## Refatoração em andamento
+
+Estamos em refatoração planejada do gerador de treinos.
+Documento mestre: `docs/refatoracao/guia_refatoracao_v4.md`.
+
+Antes de qualquer mudança em `gerador_treino.py`, no banco de
+exercícios, ou em rotas que toquem o motor de geração, ler o guia
+e identificar em qual etapa o trabalho atual se encaixa. Não
+acumular mudanças de etapas diferentes no mesmo PR.
+
+Documentos de apoio (em `docs/refatoracao/`):
+- `memoria_projeto.md` — contexto histórico (HIB2, casos clínicos,
+  conceitos). Tem nota de superação parcial no topo: consultar com
+  atenção a essa nota.
+- `arquivo/` — documentos superados, NÃO usar como referência.
+
+Fonte de verdade operacional: `guia_refatoracao_v4.md`.
+
 ## Stack
 
 Flask + Jinja2 + HTMX 2.0.4 + Tailwind CDN (`cdn.tailwindcss.com` com `@apply` em `<style type="text/tailwindcss">`) + SortableJS 1.15.3. Fonte: DM Sans. Cores: laranja `#e85d04`, fundo `#f9fafb`.
