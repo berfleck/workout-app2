@@ -74,6 +74,31 @@ for pad, sub in PADRAO_PARA_SUBREGIAO.items():
     SUBREGIAO_PARA_PADROES.setdefault(sub, []).append(pad)
 
 
+# Estrutura essencial/acessório usada na pré-alocação global (Etapa 2).
+# Em demanda região(N): garante 1 de cada essencial; vagas restantes ciclam
+# por essenciais; acessórias só competem se N > 2 × num_essenciais.
+# Quando N < num_essenciais, sorteia uniformemente N essenciais (com seed).
+SUBREGIOES_POR_REGIAO: dict[str, dict[str, list[str]]] = {
+    "lower": {
+        "essenciais": ["perna_anterior", "perna_posterior"],
+        "acessorias": ["panturrilha", "adutores"],
+    },
+    "upper": {
+        # posterior_ombro a decidir junto com Etapa 3 (âncoras com peso)
+        "essenciais": ["peito", "costas", "ombro"],
+        "acessorias": [],
+    },
+    "core": {
+        "essenciais": ["core_dinamico", "core_isometrico"],
+        "acessorias": [],
+    },
+    "cardio": {
+        "essenciais": ["cardio"],
+        "acessorias": [],
+    },
+}
+
+
 # Classificação composto vs isolado é por EXERCÍCIO via coluna `purpose` do banco.
 # compound + explosive → composto. isolation + stability → isolado.
 # A constante PADROES_COMPOSTOS abaixo é mantida apenas pra retrocompatibilidade
@@ -941,6 +966,425 @@ def _ordenar_padroes_por_prioridade(
     random.shuffle(com_compostos)
     random.shuffle(sem_compostos)
     return com_compostos + sem_compostos
+
+
+# ---------------------------------------------------------------------------
+# Pré-alocação global (Etapa 2 da refatoração v4)
+#
+# Antes de qualquer treino ser montado, alocamos os exercícios entre os N
+# treinos de uma rotina, ordenando vagas por escassez (slots com poucos
+# candidatos viáveis vão primeiro). Resolve viés posterior > anterior em
+# lower(N), bloqueios em cadeia, e treinos finais incompletos.
+#
+# Princípio quota → sorteio (Seção 2 do guia v4): a Fase 0 (quota) decide
+# QUANTOS exercícios de cada subregião/padrão entram; o sorteio dentro do
+# pool de cada slot decide QUAL exercício específico. Etapa 3 vai estender
+# a quota com pesos clínicos, sem mexer no sorteio.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _Slot:
+    """Vaga unitária na pré-alocação global. Granular: 1 vaga = 1 exercício."""
+    treino_idx: int
+    d_idx_original: int        # índice da demanda no config[treino_idx]
+    nivel: str                  # "regiao" | "subregiao" | "padrao"
+    escopo_alocacao: str       # subregião ou padrão fixado pra este slot
+    escopo_demanda_original: str  # escopo da demanda mãe (regiao quando vem de regiao)
+    requer_composto: bool      # True = a quota composta da demanda mãe ainda não foi cumprida
+
+
+def _peso_nivel(nivel: str) -> int:
+    """Tie-breaker: granular (padrão) ganha em empate de escassez."""
+    return {"padrao": 0, "subregiao": 1, "regiao": 2}.get(nivel, 9)
+
+
+def _normalizar_config(cfg: dict) -> dict:
+    """Converte um cfg em formato canônico com `demandas` (D4 opção C).
+
+    - Se `cfg` tem `demandas`: pass-through (já é o formato canônico).
+    - Se `cfg` tem `padroes` + `exercicios_por_padrao`: converte cada
+      `(padrao, qtd)` em `("padrao", padrao, qtd)`. Trata _PADROES_LEGADOS
+      ("squat" → squat_bilateral + squat_unilateral) preservando comportamento
+      atual via `lateralidade_por_padrao`.
+    """
+    if cfg.get("demandas"):
+        return dict(cfg)
+
+    padroes = cfg.get("padroes", []) or []
+    epp = cfg.get("exercicios_por_padrao", {}) or {}
+    lat_atual = dict(cfg.get("lateralidade_por_padrao") or {})
+    demandas: list[tuple[str, str, int]] = []
+
+    for p in padroes:
+        n_spec = epp.get(p, 1)
+
+        if p in _PADROES_LEGADOS:
+            filhos = _PADROES_LEGADOS[p]
+            if isinstance(n_spec, dict):
+                # split direto: bilateral→squat_bilateral, unilateral→squat_unilateral
+                lat_para_filho = {"bilateral": "squat_bilateral", "unilateral": "squat_unilateral"}
+                for lat, qt in n_spec.items():
+                    if qt <= 0:
+                        continue
+                    filho = lat_para_filho.get(lat)
+                    if filho:
+                        demandas.append(("padrao", filho, qt))
+            else:
+                # cycling: ceil/floor entre os 2 filhos com viés aleatório
+                total = int(n_spec)
+                if total > 0:
+                    ordem = list(filhos)
+                    random.shuffle(ordem)
+                    cotas = [(total + 1) // 2, total // 2]
+                    for filho, qt in zip(ordem, cotas):
+                        if qt > 0:
+                            demandas.append(("padrao", filho, qt))
+        else:
+            if isinstance(n_spec, dict):
+                # EPP-dict de lateralidade preserva comportamento via lateralidade_por_padrao
+                # Total de vagas = soma dos qts; lateralidade aplicada na Fase 1.
+                total = sum(qt for qt in n_spec.values() if qt > 0)
+                if total > 0:
+                    demandas.append(("padrao", p, total))
+                    lat_atual[p] = {lat: qt for lat, qt in n_spec.items() if qt > 0}
+            else:
+                if int(n_spec) > 0:
+                    demandas.append(("padrao", p, int(n_spec)))
+
+    out = dict(cfg)
+    out["demandas"] = demandas
+    if lat_atual:
+        out["lateralidade_por_padrao"] = lat_atual
+    return out
+
+
+def _candidatos_estritos(
+    banco: list[Exercicio],
+    nivel: str,
+    escopo: str,
+    cfg_treino: dict,
+    nomes_bloqueados: set[str],
+    familias_bloqueadas: set[str],
+    filtro_purpose: Optional[str] = None,  # None | "composto" | "isolado"
+) -> list[Exercicio]:
+    """Retorna candidatos viáveis pra um slot no MODO ESTRITO.
+
+    Aplica filtros user (eq, complexidade), filtros de hierarquia (padrões do
+    escopo), e bloqueia nomes + famílias já alocados. Não considera relax.
+    """
+    eq_bloq = cfg_treino.get("equipamentos_bloqueados") or []
+    max_cx = cfg_treino.get("max_complexidade", 5)
+    lat_map = cfg_treino.get("lateralidade_por_padrao") or {}
+    padroes_do_escopo = _padroes_de_escopo(nivel, escopo)
+
+    cands: list[Exercicio] = []
+    for e in banco:
+        if e.padrao not in padroes_do_escopo:
+            continue
+        if e.eq_primario in eq_bloq:
+            continue
+        if e.complexidade > max_cx:
+            continue
+        if e.nome in nomes_bloqueados:
+            continue
+        if e.nome in familias_bloqueadas:
+            continue
+        if e.variacao_de and e.variacao_de in familias_bloqueadas:
+            continue
+        # Lateralidade: se a demanda original (escopo) tem filtro explícito
+        # via lateralidade_por_padrao (template legado), aplicar.
+        if escopo in lat_map and isinstance(lat_map[escopo], dict):
+            # lat_map[escopo] = {"bilateral": X, "unilateral": Y}
+            lats_permitidas = {lat for lat, qt in lat_map[escopo].items() if qt > 0}
+            if e.unilateral not in lats_permitidas:
+                continue
+        if filtro_purpose == "composto" and not _eh_composto(e):
+            continue
+        if filtro_purpose == "isolado" and _eh_composto(e):
+            continue
+        cands.append(e)
+    return cands
+
+
+def _calcular_escassez(
+    slot: _Slot,
+    banco: list[Exercicio],
+    cfg_treino: dict,
+    nomes_bloqueados: set[str],
+    familias_bloqueadas: set[str],
+) -> int:
+    """Número de candidatos viáveis (modo estrito) pra esse slot.
+
+    Quanto menor, mais escasso, mais prioritário na ordenação. Slot com
+    `requer_composto=True` filtra só compostos (mais restritivo).
+    """
+    filtro = "composto" if slot.requer_composto else None
+    cands = _candidatos_estritos(
+        banco, slot.nivel, slot.escopo_alocacao, cfg_treino,
+        nomes_bloqueados, familias_bloqueadas, filtro_purpose=filtro,
+    )
+    return len(cands)
+
+
+def _decompor_demanda_regiao(regiao: str, qtd: int) -> list[tuple[str, str, int]]:
+    """Aplica regra essencial/acessório (D2.1) pra demanda região.
+
+    Retorna lista de sub-demandas `("subregiao", sub, qty)`. A ordem das
+    sub-demandas e a distribuição em ciclo dependem de `random.*` — chamador
+    deve setar seed se quiser determinismo.
+    """
+    if regiao not in SUBREGIOES_POR_REGIAO:
+        # Fallback: distribui uniformemente entre subregiões da região
+        subs = REGIAO_PARA_SUBREGIOES.get(regiao, [])
+        if not subs:
+            return []
+        return [("subregiao", sub, qtd // len(subs)) for sub in subs if qtd // len(subs) > 0]
+
+    estrutura = SUBREGIOES_POR_REGIAO[regiao]
+    essenciais = list(estrutura.get("essenciais", []))
+    acessorias = list(estrutura.get("acessorias", []))
+
+    if qtd <= 0:
+        return []
+
+    if qtd < len(essenciais):
+        # Sorteia uniformemente qtd essenciais (com seed)
+        escolhidos = random.sample(essenciais, qtd)
+        return [("subregiao", sub, 1) for sub in escolhidos]
+
+    # 1 de cada essencial
+    alocacao = {sub: 1 for sub in essenciais}
+    vagas_restantes = qtd - len(essenciais)
+
+    # Pool de ciclo: essenciais sempre; acessórias só se qtd > 2 × num_essenciais
+    if qtd > 2 * len(essenciais) and acessorias:
+        pool_ciclo = essenciais + acessorias
+    else:
+        pool_ciclo = essenciais
+
+    if vagas_restantes > 0 and pool_ciclo:
+        pool_shuffled = random.sample(pool_ciclo, len(pool_ciclo))
+        for i in range(vagas_restantes):
+            sub = pool_shuffled[i % len(pool_shuffled)]
+            alocacao[sub] = alocacao.get(sub, 0) + 1
+
+    return [("subregiao", sub, qt) for sub, qt in alocacao.items() if qt > 0]
+
+
+def _slot_compativel_com_travado(slot: _Slot, ex: Exercicio) -> bool:
+    """Travado é compatível com slot se o padrão do travado pertence ao escopo do slot."""
+    padroes_do_slot = set(_padroes_de_escopo(slot.nivel, slot.escopo_alocacao))
+    return ex.padrao in padroes_do_slot
+
+
+def pre_alocar_rotina(
+    banco: list[Exercicio],
+    configs: list[dict],
+    relaxar_familia: bool = False,  # aceito mas IGNORADO pela Fase 0 (D3.2)
+) -> tuple[
+    dict[int, dict[int, list[Exercicio]]],
+    list[dict],
+]:
+    """Aloca exercícios entre os N treinos antes de qualquer um ser montado.
+
+    Args:
+        banco: banco completo de exercícios.
+        configs: lista de cfg dict, idealmente já normalizadas via
+                 _normalizar_config (configs sem `demandas` são normalizadas
+                 internamente).
+        relaxar_familia: aceito por simetria de assinatura, mas a Fase 0
+                 sempre opera no modo estrito (D3.2). Relax é responsabilidade
+                 da Fase 1 em gerar_sessao_por_demandas.
+
+    Returns:
+        (alocacao, avisos_rotina) onde:
+          alocacao = {treino_idx: {d_idx: [Exercicio, ...]}}
+          avisos_rotina = lista de avisos `incompleta` rotina-level (escopo="rotina")
+
+    Algoritmo:
+      1. Normaliza configs (templates → demandas).
+      2. Pra cada demanda região, decompõe em sub-demandas usando regra
+         essencial/acessório (SUBREGIOES_POR_REGIAO).
+      3. Travados de cada treino consomem 1 vaga da primeira demanda compatível.
+         Se nenhuma demanda bate, vira "extra" — alocado mas sem d_idx.
+      4. Cada (sub-)demanda restante vira N slots granulares. Slots de
+         demandas região marcam requer_composto=True até a quota composta
+         (ceil(qtd × 0.6)) ser cumprida.
+      5. Loop de alocação: ordena slots por (escassez, peso_nivel, jitter_seeded);
+         pega o primeiro; sorteia exercício do pool. Atualiza estado global.
+      6. Slot sem candidatos vira aviso `incompleta` rotina-level.
+    """
+    configs_norm = [_normalizar_config(c) for c in configs]
+
+    alocacao: dict[int, dict[int, list[Exercicio]]] = {
+        t_idx: {d_idx: [] for d_idx in range(len(cfg.get("demandas", []) or []))}
+        for t_idx, cfg in enumerate(configs_norm)
+    }
+    nomes_globais: set[str] = set()
+    familias_globais: set[str] = set()
+    avisos_rotina: list[dict] = []
+
+    # ─── Etapa A: decompor demandas e construir slots ────────────────────
+    # Estrutura intermediária: pra cada (t_idx, d_idx_original), guardamos:
+    #   - demanda original (nivel, escopo, qtd)
+    #   - sub-demandas (apenas pra região; pra subregião/padrão é a própria)
+    #   - quota composta restante (apenas pra região)
+    quota_composta: dict[tuple[int, int], int] = {}
+    quota_total: dict[tuple[int, int], tuple[str, str, int]] = {}
+    sub_demandas_por_origem: dict[tuple[int, int], list[tuple[str, str, int]]] = {}
+
+    for t_idx, cfg in enumerate(configs_norm):
+        for d_idx, dem in enumerate(cfg.get("demandas") or []):
+            if not (isinstance(dem, (list, tuple)) and len(dem) >= 3):
+                continue
+            nivel, escopo, qtd = dem[0], dem[1], int(dem[2])
+            if qtd <= 0:
+                continue
+            quota_total[(t_idx, d_idx)] = (nivel, escopo, qtd)
+
+            if nivel == "regiao":
+                # Quota composta global por demanda (D2.2: 60% por demanda região)
+                quota_composta[(t_idx, d_idx)] = math.ceil(qtd * PROPORCAO_COMPOSTOS)
+                # Decomposição essencial/acessório
+                sub_dems = _decompor_demanda_regiao(escopo, qtd)
+                sub_demandas_por_origem[(t_idx, d_idx)] = sub_dems
+            else:
+                sub_demandas_por_origem[(t_idx, d_idx)] = [(nivel, escopo, qtd)]
+
+    # ─── Etapa B: processar travados (D3.1) ──────────────────────────────
+    # Travado consome 1 vaga da primeira demanda compatível (mesmo padrão >
+    # mesma subregião > mesma região), na ordem das demandas do treino.
+    travados_por_treino: dict[int, list[Exercicio]] = {}
+    for t_idx, cfg in enumerate(configs_norm):
+        travados = list(cfg.get("exercicios_travados") or [])
+        travados_por_treino[t_idx] = travados
+
+        for ex in travados:
+            # Tenta achar demanda compatível, em ordem; se houver sub-demandas
+            # de uma região, escolhe a que cobre o padrão do travado.
+            consumiu = False
+            for d_idx in alocacao[t_idx].keys():
+                sub_dems = sub_demandas_por_origem.get((t_idx, d_idx), [])
+                # Se alguma sub-demanda dessa origem cobre o padrão do travado, consome
+                for sub_idx, (sub_nivel, sub_escopo, sub_qtd) in enumerate(sub_dems):
+                    padroes_cobertura = _padroes_de_escopo(sub_nivel, sub_escopo)
+                    if ex.padrao in padroes_cobertura and sub_qtd > 0:
+                        # Decrementa a sub-demanda
+                        novos_sub = list(sub_dems)
+                        novos_sub[sub_idx] = (sub_nivel, sub_escopo, sub_qtd - 1)
+                        sub_demandas_por_origem[(t_idx, d_idx)] = novos_sub
+                        # Adiciona à alocação
+                        alocacao[t_idx][d_idx].append(ex)
+                        nomes_globais.add(ex.nome)
+                        familias_globais.add(ex.nome)
+                        if ex.variacao_de:
+                            familias_globais.add(ex.variacao_de)
+                        # Se região, decrementa quota composta se travado é composto
+                        if (t_idx, d_idx) in quota_composta and _eh_composto(ex):
+                            quota_composta[(t_idx, d_idx)] = max(0, quota_composta[(t_idx, d_idx)] - 1)
+                        consumiu = True
+                        break
+                if consumiu:
+                    break
+
+            if not consumiu:
+                # Nenhuma demanda compatível: travado vira "extra" (sem d_idx)
+                # Adicionamos sob a chave especial -1 pra propagar à Fase 1.
+                alocacao[t_idx].setdefault(-1, []).append(ex)
+                nomes_globais.add(ex.nome)
+                familias_globais.add(ex.nome)
+                if ex.variacao_de:
+                    familias_globais.add(ex.variacao_de)
+
+    # ─── Etapa C: construir lista de slots pendentes ─────────────────────
+    slots_pendentes: list[_Slot] = []
+    for (t_idx, d_idx), sub_dems in sub_demandas_por_origem.items():
+        nivel_orig, escopo_orig, _ = quota_total[(t_idx, d_idx)]
+        for (sub_nivel, sub_escopo, sub_qtd) in sub_dems:
+            for _ in range(sub_qtd):
+                slot = _Slot(
+                    treino_idx=t_idx,
+                    d_idx_original=d_idx,
+                    nivel=sub_nivel,
+                    escopo_alocacao=sub_escopo,
+                    escopo_demanda_original=escopo_orig,
+                    requer_composto=False,  # marcado em loop separado abaixo
+                )
+                slots_pendentes.append(slot)
+
+    # Marca requer_composto pros primeiros N slots de cada demanda região
+    # (N = quota composta restante após travados). Como a ordem dos slots
+    # ainda não foi ordenada por escassez, o requer_composto vai pra TODOS
+    # os slots da demanda; a flag é decrementada conforme compostos são
+    # alocados. Slot só fica "obriga composto" enquanto há quota.
+    # Implementação: a flag é dinâmica — recalculada antes de cada iteração.
+
+    # ─── Etapa D: loop de alocação ───────────────────────────────────────
+    while slots_pendentes:
+        # Atualizar requer_composto dinamicamente
+        for slot in slots_pendentes:
+            slot.requer_composto = (
+                slot.nivel == "subregiao"  # decomposto de regiao
+                and (slot.treino_idx, slot.d_idx_original) in quota_composta
+                and quota_composta[(slot.treino_idx, slot.d_idx_original)] > 0
+            )
+
+        # Calcular escassez de cada slot pendente
+        def _escassez_slot(s: _Slot) -> int:
+            cfg_t = configs_norm[s.treino_idx]
+            return _calcular_escassez(s, banco, cfg_t, nomes_globais, familias_globais)
+
+        # Ordenação: (escassez_estrita, peso_nivel, jitter_seeded)
+        # jitter usa random.random() — seed do chamador é respeitada.
+        slots_pendentes.sort(
+            key=lambda s: (_escassez_slot(s), _peso_nivel(s.nivel), random.random())
+        )
+
+        slot = slots_pendentes.pop(0)
+        cfg_t = configs_norm[slot.treino_idx]
+
+        # Tentar alocar com filtro composto se requer_composto
+        cands = _candidatos_estritos(
+            banco, slot.nivel, slot.escopo_alocacao, cfg_t,
+            nomes_globais, familias_globais,
+            filtro_purpose="composto" if slot.requer_composto else None,
+        )
+        # Se requer_composto mas não há composto disponível, relaxa a flag
+        # e tenta sem filtro (slot é "ainda da quota composta", mas como não
+        # há, aceita isolado e a quota fica em deficit — gera aviso depois).
+        if slot.requer_composto and not cands:
+            cands = _candidatos_estritos(
+                banco, slot.nivel, slot.escopo_alocacao, cfg_t,
+                nomes_globais, familias_globais,
+                filtro_purpose=None,
+            )
+
+        if cands:
+            escolhido = random.choice(cands)
+            alocacao[slot.treino_idx][slot.d_idx_original].append(escolhido)
+            nomes_globais.add(escolhido.nome)
+            familias_globais.add(escolhido.nome)
+            if escolhido.variacao_de:
+                familias_globais.add(escolhido.variacao_de)
+            # Decrementa quota composta se aplicável
+            chave = (slot.treino_idx, slot.d_idx_original)
+            if chave in quota_composta and _eh_composto(escolhido):
+                quota_composta[chave] = max(0, quota_composta[chave] - 1)
+        else:
+            # Slot sem candidatos no estrito → aviso `incompleta` rotina-level
+            avisos_rotina.append({
+                "tipo": "incompleta",
+                "escopo": "rotina",
+                "treino_idx": slot.treino_idx,
+                "nivel": quota_total[(slot.treino_idx, slot.d_idx_original)][0],
+                "escopo_demanda": slot.escopo_demanda_original,
+                "nivel_alocacao": slot.nivel,
+                "escopo_alocacao": slot.escopo_alocacao,
+                "faltam": 1,  # 1 slot por aviso (granular)
+            })
+
+    return alocacao, avisos_rotina
 
 
 def gerar_sessao_por_demandas(
