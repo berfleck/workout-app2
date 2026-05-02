@@ -87,11 +87,11 @@ def test_perna_anterior_3x3_respeita_quota_3_2(banco):
         cfg = {"demandas": [("subregiao", "perna_anterior", 3)]}
         sessoes = gerar_multiplos_treinos(banco, [cfg, cfg, cfg], relaxar_familia=True)
         for ex in _all_exercicios(sessoes):
-            if ex.padrao == "squat":  # antes da Frente 4
-                if ex.unilateral == "bilateral":
-                    bi_total += 1
-                elif ex.unilateral == "unilateral":
-                    uni_total += 1
+            # Frente 4: padrão refinado em squat_bilateral / squat_unilateral
+            if ex.padrao == "squat_bilateral":
+                bi_total += 1
+            elif ex.padrao == "squat_unilateral":
+                uni_total += 1
     razao = bi_total / max(uni_total, 1)
     # Esperado pós-Etapa 3: ~ 3/2 = 1.5
     assert 1.2 <= razao <= 1.8, (
@@ -150,13 +150,18 @@ def test_costas_4_distribui_remadas_e_puxadas_paritarias(banco):
     )
 
 
-# ----- 6: cobertura bi+uni dentro de cada treino — Etapa 3 ----------------
+# ----- 6: cobertura bi+uni dentro de cada treino — Frente 4 (RESOLVIDO) ---
 
 
-@pytest.mark.xfail(strict=True, reason="Etapa 3: hierarquia treino > rotina")
 def test_perna_anterior_3x3_cobre_bi_e_uni_em_cada_treino(banco):
     """Em 100 rotinas perna_anterior(3) × 3, ≥ 80% dos treinos individuais
-    devem ter pelo menos 1 squat bilateral E 1 squat unilateral."""
+    devem ter pelo menos 1 squat bilateral E 1 squat unilateral.
+
+    RESOLVIDO na Frente 4 da Etapa 1: squat virou 2 padrões reais
+    (squat_bilateral + squat_unilateral), e o cycling do `_selecionar_ciclando`
+    em demandas de subregião naturalmente cobre os 2 padrões antes de repetir.
+    A Etapa 3 (hierarquia treino > rotina) vai *formalizar* isso via quotas;
+    este teste fica como guarda contra regressão durante a refatoração."""
     treinos_completos = 0
     treinos_total = 0
     for seed in range(6000, 6100):
@@ -166,12 +171,10 @@ def test_perna_anterior_3x3_cobre_bi_e_uni_em_cada_treino(banco):
         for s in sessoes:
             treinos_total += 1
             tem_bi = any(
-                ex.padrao == "squat" and ex.unilateral == "bilateral"
-                for ex in _exercicios(s)
+                ex.padrao == "squat_bilateral" for ex in _exercicios(s)
             )
             tem_uni = any(
-                ex.padrao == "squat" and ex.unilateral == "unilateral"
-                for ex in _exercicios(s)
+                ex.padrao == "squat_unilateral" for ex in _exercicios(s)
             )
             if tem_bi and tem_uni:
                 treinos_completos += 1

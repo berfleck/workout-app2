@@ -90,7 +90,7 @@ def test_blocos_respeitam_tamanho_configurado(banco):
 
 def test_exercicios_travados_aparecem_no_resultado(banco):
     random.seed(31)
-    travados = [next(e for e in banco if e.padrao == "squat")]
+    travados = [next(e for e in banco if e.padrao in ("squat_bilateral", "squat_unilateral"))]
     nomes_travados = {e.nome for e in travados}
     cfg = {
         "demandas": [("regiao", "lower", 4)],

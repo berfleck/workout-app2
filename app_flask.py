@@ -131,6 +131,8 @@ PADRAO_PARA_CHIP = {
     "biceps":             ("bíceps", "bracos"),
     "triceps":            ("tríceps", "bracos"),
     "squat":              ("quadríceps", "perna-ant"),
+    "squat_bilateral":    ("quadríceps", "perna-ant"),
+    "squat_unilateral":   ("quadríceps", "perna-ant"),
     "hinge":              ("posterior", "perna-post"),
     "knee_flexion":       ("posterior", "perna-post"),
     "abduction":          ("abdutores", "perna-post"),
@@ -201,7 +203,10 @@ def sessao_chips(sessao):
     return chips
 
 PADROES_LABELS = {
-    "squat": "Agachamento", "hinge": "Extensão de quadril",
+    "squat": "Agachamento",
+    "squat_bilateral": "Agachamento bilateral",
+    "squat_unilateral": "Agachamento unilateral",
+    "hinge": "Extensão de quadril",
     "knee_flexion": "Flexão de joelho", "abduction": "Abdução",
     "adduction": "Adução", "flexao_plantar": "Flexão plantar",
     "empurrar_compostos": "Empurrar compostos", "empurrar_isolados": "Empurrar isolados",
@@ -286,6 +291,12 @@ def _exercicio_to_dict(ex):
 
 def _dict_to_exercicio(d):
     padrao = d.get("padrao", "")
+    # Frente 4: retrocompat de leitura — sessões antigas serializadas com
+    # padrao="squat" são derivadas para squat_bilateral / squat_unilateral
+    # via coluna unilateral. Cobre sessoes_salvas.json e historico.sessoes.
+    if padrao == "squat":
+        lat = (d.get("unilateral") or "").strip()
+        padrao = "squat_unilateral" if lat == "unilateral" else "squat_bilateral"
     subregiao = d.get("subregiao") or PADRAO_PARA_SUBREGIAO.get(padrao, "")
     return Exercicio(nome=d["nome"], variacao_de=d.get("variacao_de"),
         eq_primario=d.get("eq_primario",""), eq_secundario=d.get("eq_secundario"),
@@ -1344,15 +1355,23 @@ def gerar():
             for p in padroes:
                 val = request.form.get(f"epp_{t}_{p}")
                 if val is not None: epp[p] = int(val)
-            # Lateralidade squat
+            # Frente 4: traduz squat_bi/squat_uni direto em padrões refinados.
+            # Substitui o agregado "squat" por squat_bilateral e squat_unilateral.
             squat_bi = int(request.form.get(f"squat_bi_{t}", 0))
             squat_uni = int(request.form.get(f"squat_uni_{t}", 0))
             if squat_bi > 0 or squat_uni > 0:
-                lat = {}
-                if squat_bi > 0: lat["bilateral"] = squat_bi
-                if squat_uni > 0: lat["unilateral"] = squat_uni
-                epp["squat"] = lat
-                cfg["lateralidade_por_padrao"] = {"squat": lat}
+                epp.pop("squat", None)
+                if squat_bi > 0: epp["squat_bilateral"] = squat_bi
+                if squat_uni > 0: epp["squat_unilateral"] = squat_uni
+                # Inserir os filhos no lugar de "squat" na lista de padroes
+                padroes_novos = []
+                for p in padroes:
+                    if p == "squat":
+                        if squat_bi > 0: padroes_novos.append("squat_bilateral")
+                        if squat_uni > 0: padroes_novos.append("squat_unilateral")
+                    else:
+                        padroes_novos.append(p)
+                padroes = padroes_novos
 
             cfg["padroes"] = [p for p in padroes if (epp.get(p, 0) if isinstance(epp.get(p, 0), int) else sum(epp.get(p, {}).values())) > 0]
             cfg["exercicios_por_padrao"] = epp
@@ -1371,20 +1390,33 @@ def gerar():
                     demandas.append((nivel, escopo, qtd))
                 i += 1
 
-            # Lateralidade squat
-            lat_padrao = {}
+            # Frente 4: traduz squat_bi/squat_uni direto em demandas refinadas.
+            # Substitui qualquer demanda agregada (padrao=squat ou subregiao=perna_anterior)
+            # por demandas (padrao, squat_bilateral, X) + (padrao, squat_unilateral, Y).
             squat_bi = int(request.form.get(f"squat_bi_{t}", 0))
             squat_uni = int(request.form.get(f"squat_uni_{t}", 0))
             if squat_bi > 0 or squat_uni > 0:
-                lat = {}
-                if squat_bi > 0: lat["bilateral"] = squat_bi
-                if squat_uni > 0: lat["unilateral"] = squat_uni
-                # Find which demand scope contains squat
+                demandas_novas = []
+                substituida = False
                 for n, e, q in demandas:
-                    if (n == "padrao" and e == "squat") or (n == "subregiao" and e == "perna_anterior"):
-                        lat_padrao[e] = lat
-                        break
-                cfg["lateralidade_por_padrao"] = lat_padrao
+                    eh_agregada_squat = (n == "padrao" and e == "squat") or \
+                                        (n == "subregiao" and e == "perna_anterior")
+                    if eh_agregada_squat and not substituida:
+                        if squat_bi > 0:
+                            demandas_novas.append(("padrao", "squat_bilateral", squat_bi))
+                        if squat_uni > 0:
+                            demandas_novas.append(("padrao", "squat_unilateral", squat_uni))
+                        substituida = True
+                    else:
+                        demandas_novas.append((n, e, q))
+                # Caso usuário tenha marcado bi/uni sem demanda agregada presente,
+                # ainda assim adiciona as demandas refinadas.
+                if not substituida:
+                    if squat_bi > 0:
+                        demandas_novas.append(("padrao", "squat_bilateral", squat_bi))
+                    if squat_uni > 0:
+                        demandas_novas.append(("padrao", "squat_unilateral", squat_uni))
+                demandas = demandas_novas
 
             cfg["demandas"] = demandas if demandas else None
             cfg["padroes"] = []

@@ -25,7 +25,8 @@ XLSX_PATH = "banco_exercicios.xlsx"
 # Mapeamento PADRÃO → SUBREGIÃO (todo padrão pertence a uma e só uma subregião)
 PADRAO_PARA_SUBREGIAO = {
     # Membros inferiores
-    "squat":          "perna_anterior",
+    "squat_bilateral":  "perna_anterior",
+    "squat_unilateral": "perna_anterior",
     "hinge":          "perna_posterior",
     "knee_flexion":   "perna_posterior",
     "abduction":      "perna_posterior",
@@ -77,13 +78,21 @@ for pad, sub in PADRAO_PARA_SUBREGIAO.items():
 # compound + explosive → composto. isolation + stability → isolado.
 # A constante PADROES_COMPOSTOS abaixo é mantida apenas pra retrocompatibilidade
 # de import (não é usada na lógica de seleção). Padrões mistos como `hinge`,
-# `squat` e `puxadas` têm tanto compostos quanto isolados no banco — a
+# `squat_*` e `puxadas` têm tanto compostos quanto isolados no banco — a
 # classificação por padrão era incorreta.
 PURPOSE_COMPOSTO = {"compound", "explosive"}
 
 PADROES_COMPOSTOS = {
-    "squat", "hinge",
+    "squat_bilateral", "squat_unilateral", "hinge",
     "empurrar_compostos", "remadas", "puxadas", "ombro_composto",
+}
+
+# Tabela de tradução de padrões legados (configs salvas em SQLite ou
+# templates antigos podem referenciar `squat`). Frente 4 da Etapa 1
+# refinou squat em squat_bilateral + squat_unilateral. Aplicada em
+# `expandir_para_padroes`, `_padroes_de_escopo` e `gerar_sessao` legacy.
+_PADROES_LEGADOS = {
+    "squat": ("squat_bilateral", "squat_unilateral"),
 }
 
 # Proporção mínima de compostos em demandas de nível "regiao".
@@ -114,7 +123,8 @@ GRUPO_MUSCULAR_PADRAO: dict[str, str] = {
     "posterior_ombro": "pull",
     "biceps":          "pull",
     # Lower — anterior
-    "squat":        "quad",
+    "squat_bilateral":  "quad",
+    "squat_unilateral": "quad",
     "knee_flexion": "hamstring",
     # Lower — posterior
     "hinge":     "hamstring",
@@ -160,7 +170,11 @@ def expandir_para_padroes(
         for pad in SUBREGIAO_PARA_PADROES.get(sub, []):
             add(pad)
     for pad in (padroes or []):
-        add(pad)
+        if pad in _PADROES_LEGADOS:
+            for filho in _PADROES_LEGADOS[pad]:
+                add(filho)
+        else:
+            add(pad)
 
     return resultado
 
@@ -747,15 +761,46 @@ def gerar_sessao(
 
     # Selecionar por padrão
     nomes_travados = {e.nome for e in travados}
+
+    # Retrocompat Frente 4: padrões legados ("squat") são expandidos.
+    # - EPP int N → cycling entre os 2 filhos (B3.iii do plano).
+    # - EPP dict {"bilateral": X, "unilateral": Y} → split direto pros 2 filhos
+    #   (cobre configs salvas que usavam lateralidade_por_padrao via legacy mode).
+    padroes_iter: list[tuple[str, list[tuple[Optional[str], int]]]] = []
     for padrao in padroes:
         n_spec = epp.get(padrao, 1)
-
-        # n_spec pode ser int (padrão) ou dict {"bilateral": n, "unilateral": n}
-        if isinstance(n_spec, dict):
-            sub_specs = [(lat, qt) for lat, qt in n_spec.items() if qt > 0]
+        if padrao in _PADROES_LEGADOS:
+            filhos = _PADROES_LEGADOS[padrao]
+            if isinstance(n_spec, dict):
+                # split direto: bilateral→squat_bilateral, unilateral→squat_unilateral
+                lat_para_filho = {"bilateral": "squat_bilateral", "unilateral": "squat_unilateral"}
+                for lat, qt in n_spec.items():
+                    if qt <= 0: continue
+                    filho = lat_para_filho.get(lat)
+                    if filho:
+                        padroes_iter.append((filho, [(None, qt)]))
+            else:
+                # cycling: distribuir N entre os 2 filhos com viés aleatório.
+                # ceil(N/2) pro primeiro filho do shuffle, floor(N/2) pro segundo.
+                # N=1 → (1, 0): 50/50 entre bi/uni dependendo do shuffle.
+                # N=2 → (1, 1); N=3 → (2, 1); N=4 → (2, 2).
+                total = int(n_spec)
+                ordem = list(filhos); random.shuffle(ordem)
+                cotas = [(total + 1) // 2, total // 2]
+                for filho, qt in zip(ordem, cotas):
+                    if qt > 0:
+                        padroes_iter.append((filho, [(None, qt)]))
         else:
-            sub_specs = [(None, n_spec)]
+            if isinstance(n_spec, dict):
+                sub_specs = [(lat, qt) for lat, qt in n_spec.items() if qt > 0]
+            else:
+                sub_specs = [(None, n_spec)]
+            padroes_iter.append((padrao, sub_specs))
 
+    # Mapa de padrões internos → escopo reportado em avisos (UI legada espera "squat")
+    _AVISO_ESCOPO_FALLBACK = {filho: legado for legado, filhos in _PADROES_LEGADOS.items() for filho in filhos}
+
+    for padrao, sub_specs in padroes_iter:
         n_antes_padrao = len(todos_selecionados)
         n_antes_relax = len(relaxados_local)
         n_pedido_padrao = sum(qt for _, qt in sub_specs)
@@ -775,6 +820,11 @@ def gerar_sessao(
             )
             todos_selecionados.extend(selecionados)
 
+        # Escopo reportado em avisos: usa o nome legado (ex: "squat") quando
+        # padrão interno é filho refinado (squat_bilateral / squat_unilateral).
+        # Mantém compatibilidade com UI/snapshots que esperam o nome agregado.
+        escopo_aviso = _AVISO_ESCOPO_FALLBACK.get(padrao, padrao)
+
         # Avisos do tipo familia_repetida (1 por exercício relaxado)
         novos_relax = relaxados_local[n_antes_relax:]
         for nome_rel in novos_relax:
@@ -782,7 +832,7 @@ def gerar_sessao(
             avisos_da_sessao.append({
                 "tipo": "familia_repetida",
                 "nivel": "padrao",
-                "escopo": padrao,
+                "escopo": escopo_aviso,
                 "exercicio": nome_rel,
                 "familia": (ex_rel.variacao_de if ex_rel and ex_rel.variacao_de else nome_rel),
             })
@@ -799,7 +849,7 @@ def gerar_sessao(
             avisos_da_sessao.append({
                 "tipo": "incompleta",
                 "nivel": "padrao",
-                "escopo": padrao,
+                "escopo": escopo_aviso,
                 "qtd_pedida": n_pedido_padrao,
                 "qtd_obtida": n_obtido_padrao,
                 "faltam": n_pedido_padrao - n_obtido_padrao,
@@ -839,6 +889,12 @@ def _padroes_de_escopo(
 ) -> list[str]:
     """Retorna a lista de padrões pertencentes a um escopo (regiao/subregiao/padrao)."""
     if nivel == "padrao":
+        # Retrocompat: o padrão antigo "squat" foi refinado em
+        # squat_bilateral + squat_unilateral (Frente 4 da refatoração).
+        # Configs salvos em SQLite ou testes antigos podem ainda pedir
+        # ("padrao", "squat", N) — expandimos para os 2 filhos.
+        if escopo in _PADROES_LEGADOS:
+            return list(_PADROES_LEGADOS[escopo])
         return [escopo]
     if nivel == "subregiao":
         # Retrocompat: a subregião antiga "core" foi quebrada em

@@ -1,5 +1,14 @@
 # Guia de refatoração — Workout App v2
 
+> **Progresso da Etapa 1** (branch `refator-gerador`):
+> - Frente 1 — `subregiao` na dataclass — ✅ concluída
+> - Frente 2 — cleanup do banco de tríceps — ✅ concluída
+> - Frente 3 — cleanup de core (subregiões) — ✅ concluída
+> - Frente 4 — cleanup de squat (padrões refinados) — ✅ concluída
+> - Frente 5 — setup pytest + harness de simulação — ✅ concluída
+>
+> Etapa 1 inteira concluída. Próxima: Etapa 2 (Nível 2 — pré-alocação global).
+
 > Documento mestre para conduzir a refatoração do gerador de treinos.
 > Sintetiza o roteiro de `memoria_projeto.md`, o design de
 > `refatoracao_visao_global.md`, e as recomendações das análises de
