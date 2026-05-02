@@ -34,7 +34,12 @@
       "Read(//tmp/**)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(PYTHONUTF8=1 python *)",
+      "Skill(update-config)",
+      "PowerShell(powershell -NoProfile -Command \"[System.Media.SystemSounds]::Asterisk.Play\\(\\); Start-Sleep -Milliseconds 300\"; echo \"exit: $LASTEXITCODE\")",
+      "PowerShell($s = Get-Content C:\\\\Users\\\\berfl\\\\.claude\\\\settings.json -Raw | ConvertFrom-Json; $s.hooks.Stop.hooks.command)",
+      "Bash(git rm *)"
     ]
   }
 }
