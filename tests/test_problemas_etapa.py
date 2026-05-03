@@ -78,7 +78,6 @@ def test_upper_3x2treinos_tem_composto_de_cada_ancora(banco):
 # ----- 3: quota proporcional 3:2 em perna_anterior(3)x3 — Etapa 3 ---------
 
 
-@pytest.mark.xfail(strict=True, reason="Etapa 3: quotas proporcionais aos pesos das âncoras")
 def test_perna_anterior_3x3_respeita_quota_3_2(banco):
     """Em 100 rotinas perna_anterior(3) × 3, distribuição
     bilateral:unilateral deve aproximar 3:2 (proporção dos pesos),

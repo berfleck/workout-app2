@@ -1657,7 +1657,6 @@ def pre_alocar_rotina(
     avisos_rotina: list[dict] = []
     relaxados_por_treino: dict[int, list[str]] = {}
 
-    # ─── Etapa A: decompor demandas e construir slots ────────────────────
     # Estrutura intermediária: pra cada (t_idx, d_idx_original), guardamos:
     #   - demanda original (nivel, escopo, qtd)
     #   - sub-demandas (apenas pra região; pra subregião/padrão é a própria)
@@ -1683,6 +1682,108 @@ def pre_alocar_rotina(
                     travados_por_demanda.setdefault((t_idx, d_idx), []).append(ex)
                     break
 
+    # ─── Etapa A.0: agregar demandas idênticas across treinos (Etapa 3) ──
+    # Hierarquia treino > rotina: demandas iguais (mesmo nivel/escopo/qtd) em
+    # treinos diferentes têm quota calculada UMA VEZ no nível rotina e
+    # redistribuída via round-robin que minimiza concentração de déficit.
+    # Demandas com travado entram no caminho per-treino (não agregam).
+    demandas_agregadas: dict[tuple[str, str, int], list[tuple[int, int]]] = {}
+    for t_idx, cfg in enumerate(configs_norm):
+        for d_idx, dem in enumerate(cfg.get("demandas") or []):
+            if not (isinstance(dem, (list, tuple)) and len(dem) >= 3):
+                continue
+            nv, esc, qt = dem[0], dem[1], int(dem[2])
+            if qt <= 0:
+                continue
+            # Demandas com travado têm constraint extra → caminho per-treino
+            if travados_por_demanda.get((t_idx, d_idx)):
+                continue
+            chave = (nv, esc, qt)
+            demandas_agregadas.setdefault(chave, []).append((t_idx, d_idx))
+
+    # Pra cada grupo com >1 treino e nivel != "padrao" (padrão é imune às
+    # âncoras), calcular quotas globais e redistribuir
+    quotas_pre_alocadas: dict[tuple[int, int], dict[str, int]] = {}
+    for (nv, esc, qt), instancias in demandas_agregadas.items():
+        if nv == "padrao":
+            continue  # demanda padrão imune a âncoras
+        if len(instancias) <= 1:
+            continue  # 1 treino só → caminho per-treino normal
+
+        n_tr = len(instancias)
+        vagas_total = qt * n_tr
+
+        if nv == "regiao":
+            if esc not in ANCORAS_POR_REGIAO:
+                continue  # fallback Etapa 2 (cardio) — sem agregação
+            ancoras_raw = ANCORAS_POR_REGIAO[esc]
+            n_obrig = sum(1 for a in ancoras_raw if a["obrigatoria"])
+            # Filtro pré-quotas no nível região (acessórias só se qtd > 2*n_obrig)
+            if n_obrig > 0 and qt <= 2 * n_obrig:
+                ancoras_para_q = [a for a in ancoras_raw if a["obrigatoria"]]
+            else:
+                ancoras_para_q = ancoras_raw
+            anc_dict = [
+                {"chave": a["subregiao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
+                for a in ancoras_para_q
+            ]
+            # Quotas no nível rotina: subregiões totais
+            quotas_reg, avs_reg = calcular_quotas(anc_dict, vagas_total)
+            for av in avs_reg:
+                av["nivel"] = "regiao"
+                av["escopo"] = esc
+                av["escopo_demanda"] = esc
+                av["treino_idx"] = instancias[0][0]
+                avisos_rotina.append(av)
+
+            # Distribuir subregiões entre treinos
+            pesos_reg = {a["subregiao"]: a["peso"] for a in ancoras_para_q}
+            por_treino_sub = _distribuir_quotas_entre_treinos(
+                quotas_reg, n_tr, [qt] * n_tr, pesos_reg,
+            )
+
+            # Pra cada treino, descer um nível: aplicar quotas de padrão
+            # sobre cada subregião alocada
+            for i, (t_idx, d_idx) in enumerate(instancias):
+                quotas_padrao_treino: dict[str, int] = {}
+                for sub_esc, sub_qt in por_treino_sub[i].items():
+                    if sub_qt <= 0:
+                        continue
+                    sub_dems_p, avs_sub = _decompor_demanda_subregiao(
+                        sub_esc, sub_qt
+                    )
+                    for av in avs_sub:
+                        av["treino_idx"] = t_idx
+                        av["escopo_demanda"] = esc
+                        avisos_rotina.append(av)
+                    for (_n, p, q) in sub_dems_p:
+                        quotas_padrao_treino[p] = quotas_padrao_treino.get(p, 0) + q
+                quotas_pre_alocadas[(t_idx, d_idx)] = quotas_padrao_treino
+
+        elif nv == "subregiao":
+            if esc not in ANCORAS_POR_SUBREGIAO:
+                continue  # fallback Etapa 2
+            ancoras_raw = ANCORAS_POR_SUBREGIAO[esc]
+            anc_dict = [
+                {"chave": a["padrao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
+                for a in ancoras_raw
+            ]
+            quotas_sub, avs_sub = calcular_quotas(anc_dict, vagas_total)
+            for av in avs_sub:
+                av["nivel"] = "subregiao"
+                av["escopo"] = esc
+                av["escopo_demanda"] = esc
+                av["treino_idx"] = instancias[0][0]
+                avisos_rotina.append(av)
+
+            pesos_sub = {a["padrao"]: a["peso"] for a in ancoras_raw}
+            por_treino_pad = _distribuir_quotas_entre_treinos(
+                quotas_sub, n_tr, [qt] * n_tr, pesos_sub,
+            )
+            for i, (t_idx, d_idx) in enumerate(instancias):
+                quotas_pre_alocadas[(t_idx, d_idx)] = por_treino_pad[i]
+
+    # ─── Etapa A: decompor demandas e construir slots ────────────────────
     for t_idx, cfg in enumerate(configs_norm):
         for d_idx, dem in enumerate(cfg.get("demandas") or []):
             if not (isinstance(dem, (list, tuple)) and len(dem) >= 3):
@@ -1699,10 +1800,16 @@ def pre_alocar_rotina(
                 if p in PADRAO_PARA_SUBREGIAO
             })
 
+            # Caminho hierarquia treino > rotina: usa quotas pré-calculadas
+            # no nível rotina (Etapa A.0) se essa demanda foi agregada.
+            quotas_aggr = quotas_pre_alocadas.get((t_idx, d_idx))
+            if quotas_aggr is not None:
+                sub_demandas_por_origem[(t_idx, d_idx)] = [
+                    ("padrao", p, q) for p, q in quotas_aggr.items() if q > 0
+                ]
+                continue
+
             if nivel == "regiao":
-                # Decomposição em 2 níveis: região → subregião → padrão, com
-                # awareness de travados em ambos os níveis. Etapa 3: usa
-                # ANCORAS_POR_REGIAO + ANCORAS_POR_SUBREGIAO via Hamilton.
                 sub_dems_subregiao, avs_reg = _decompor_demanda_regiao(
                     escopo, qtd, subregioes_obrigatorias=subs_obrig,
                 )
