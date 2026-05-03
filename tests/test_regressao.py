@@ -204,3 +204,24 @@ def test_max_complexidade_baixa_seed29(banco, snapshot):
     cfg = {"demandas": [("regiao", "upper", 4)], "max_complexidade": 2}
     sessoes = gerar_multiplos_treinos(banco, [cfg], relaxar_familia=True)
     assert _rotina_clinica(sessoes) == snapshot
+
+
+# ----- 13: Etapa 4 — full body com filtro HIB2 ON ---------------------------
+
+def test_full_body_4treinos_seed1_HIB2(banco, snapshot):
+    """Etapa 4 — congela comportamento com filtro de cargas HIB2 (6/5/6) ATIVO.
+
+    Mesma config do snapshot full_body_4treinos_seed1 mas com cargas_config
+    apertando lombar e core. Esperado: pares com lombar 5+ ou core 6 ficam
+    bloqueados, alguns blocos podem virar solo (exercício pesado sem par
+    pareável). Cobertura clínica avaliada caso-a-caso na regeneração."""
+    random.seed(1)
+    from gerador_treino import TEMPLATES, TEMPLATE_EPP
+
+    cfg = {
+        "padroes": TEMPLATES["Full Body"],
+        "exercicios_por_padrao": dict(TEMPLATE_EPP["Full Body"]),
+        "cargas_config": {"grip": 6, "lombar": 5, "core": 6},
+    }
+    sessoes = gerar_multiplos_treinos(banco, [cfg] * 4, relaxar_familia=True)
+    assert _rotina_clinica(sessoes) == snapshot

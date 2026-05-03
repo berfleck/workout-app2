@@ -892,6 +892,8 @@ def _buscar_candidato(
     tamanho: int,
     evitar_unilateral: bool = False,
     evitar_agonistas: bool = False,
+    cargas_config: dict | None = None,
+    exercicios_travados: list | set | None = None,
 ) -> int | None:
     """
     Retorna o índice do melhor candidato para entrar no bloco, ou None.
@@ -930,7 +932,11 @@ def _buscar_candidato(
     def aceita(j: int) -> bool:
         if usados[j]:
             return False
-        if not pode_adicionar_ao_bloco(bloco_atual, exercicios[j], tamanho):
+        if not pode_adicionar_ao_bloco(
+            bloco_atual, exercicios[j], tamanho,
+            cargas_config=cargas_config,
+            exercicios_travados=exercicios_travados,
+        ):
             return False
         if ja_tem_uni and exercicios[j].unilateral == "unilateral":
             return False
@@ -978,6 +984,8 @@ def montar_blocos(
     exercicios: list[Exercicio],
     tamanho: int = 2,
     evitar_agonistas: bool = False,
+    cargas_config: dict | None = None,
+    exercicios_travados: list | set | None = None,
 ) -> list[tuple]:
     """
     Monta blocos de tamanho configurável (1, 2 ou 3).
@@ -1015,6 +1023,8 @@ def montar_blocos(
                     regioes_no_bloco, padroes_no_bloco, tamanho,
                     evitar_unilateral=True,
                     evitar_agonistas=evitar_agonistas,
+                    cargas_config=cargas_config,
+                    exercicios_travados=exercicios_travados,
                 )
 
             # Fallback (ou blocos de 3): sem restrição de unilateral
@@ -1024,6 +1034,8 @@ def montar_blocos(
                     regioes_no_bloco, padroes_no_bloco, tamanho,
                     evitar_unilateral=False,
                     evitar_agonistas=evitar_agonistas,
+                    cargas_config=cargas_config,
+                    exercicios_travados=exercicios_travados,
                 )
 
             if melhor is None:
@@ -1140,6 +1152,7 @@ def gerar_sessao(
     tamanho_bloco: int = 2,
     evitar_agonistas: bool = False,
     relaxar_familia: bool = False,
+    cargas_config: dict | None = None,
 ) -> Sessao:
     epp      = exercicios_por_padrao or EXERCICIOS_POR_PADRAO
     eq_bloq  = equipamentos_bloqueados or []
@@ -1255,7 +1268,13 @@ def gerar_sessao(
     todos_selecionados = ordenar_compostos_primeiro(todos_selecionados)
 
     # Montar e ordenar blocos
-    grupos = ordenar_blocos(montar_blocos(todos_selecionados, tamanho=tamanho_bloco, evitar_agonistas=evitar_agonistas))
+    grupos = ordenar_blocos(montar_blocos(
+        todos_selecionados,
+        tamanho=tamanho_bloco,
+        evitar_agonistas=evitar_agonistas,
+        cargas_config=cargas_config,
+        exercicios_travados=travados,
+    ))
 
     # Criar SuperSeries
     labels = "ABCDEFGHIJKLMNOP"
@@ -2116,6 +2135,7 @@ def gerar_sessao_por_demandas(
     lateralidade_por_padrao: Optional[dict] = None,
     relaxar_familia: bool = False,
     exercicios_pre_alocados: Optional[dict[int, list[Exercicio]]] = None,
+    cargas_config: dict | None = None,
 ) -> Sessao:
     """
     Gera uma sessão a partir de uma lista de DEMANDAS hierárquicas.
@@ -2459,7 +2479,13 @@ def gerar_sessao_por_demandas(
     todos_selecionados = ordenar_compostos_primeiro(todos_selecionados)
 
     # Montar e ordenar blocos
-    grupos = ordenar_blocos(montar_blocos(todos_selecionados, tamanho=tamanho_bloco, evitar_agonistas=evitar_agonistas))
+    grupos = ordenar_blocos(montar_blocos(
+        todos_selecionados,
+        tamanho=tamanho_bloco,
+        evitar_agonistas=evitar_agonistas,
+        cargas_config=cargas_config,
+        exercicios_travados=travados,
+    ))
 
     labels = "ABCDEFGHIJKLMNOP"
     blocos = []
@@ -2548,6 +2574,7 @@ def gerar_multiplos_treinos(
         eq_bloq       = cfg.get("equipamentos_bloqueados", [])
         evit_agon     = cfg.get("evitar_agonistas", False)
         lat_padrao    = cfg.get("lateralidade_por_padrao")
+        cargas_cfg    = cfg.get("cargas_config")
 
         exs_pre = alocacao.get(treino_idx, {})
 
@@ -2563,6 +2590,7 @@ def gerar_multiplos_treinos(
             lateralidade_por_padrao=lat_padrao,
             relaxar_familia=relaxar_familia,
             exercicios_pre_alocados=exs_pre,
+            cargas_config=cargas_cfg,
         )
 
         # Propaga relaxados da Fase 0 pra Sessao.relaxados (badge ↻ na UI)

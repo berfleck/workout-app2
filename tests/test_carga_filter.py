@@ -222,3 +222,132 @@ def test_pode_adicionar_carga_e_fadiga_independentes():
     assert pode_adicionar_ao_bloco([a], b, 2, cargas_config=HIB2) is False
     # Sem carga, fadiga ainda bloqueia (max_alta_fadiga=1 em bloco 2)
     assert pode_adicionar_ao_bloco([a], b, 2, cargas_config=None) is False
+
+
+# ---------------------------------------------------------------------------
+# Sub-PR 1.2 — plumbing pelas 6 funções: invariante end-to-end
+# ---------------------------------------------------------------------------
+
+def test_gerar_multiplos_treinos_respeita_cargas_config(banco):
+    """Invariante: com cargas_config no cfg, nenhum par dentro de bloco viola filtro.
+
+    Roda 20 seeds (mesmas do harness recalibrar_cargas_hib2) pra cobrir variação.
+    """
+    import random
+    from gerador_treino import _bloqueio_cargas, gerar_multiplos_treinos
+    cfg = {
+        "demandas": [("regiao", "lower", 4), ("regiao", "upper", 3), ("regiao", "core", 1)],
+        "tamanho_bloco": 2,
+        "max_complexidade": 5,
+        "equipamentos_bloqueados": [],
+        "evitar_agonistas": True,
+        "cargas_config": HIB2,
+    }
+    SEEDS = [1, 7, 13, 23, 42, 99, 100, 117, 200, 314,
+             555, 777, 1000, 1234, 1492, 1789, 1984, 2024, 4096, 9999]
+    for seed in SEEDS:
+        random.seed(seed)
+        sessoes = gerar_multiplos_treinos(banco, [cfg, cfg], relaxar_familia=True)
+        for s in sessoes:
+            for bloco in s.blocos:
+                exs = [e for e in (bloco.ex1, bloco.ex2, bloco.ex3) if e]
+                for i in range(len(exs)):
+                    for j in range(i + 1, len(exs)):
+                        assert not _bloqueio_cargas(exs[i], exs[j], HIB2), (
+                            f"seed={seed}: par viola filtro HIB2: "
+                            f"{exs[i].nome} (g={exs[i].carga_grip} "
+                            f"l={exs[i].carga_lombar} c={exs[i].demanda_core}) + "
+                            f"{exs[j].nome} (g={exs[j].carga_grip} "
+                            f"l={exs[j].carga_lombar} c={exs[j].demanda_core})"
+                        )
+
+
+def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
+    """Evidência forte: par documentado pelo harness (seed=1) some quando filtro liga.
+
+    Sem filtro, seed=1 com cfg lower(4)+upper(3)+core(1)×2 produz par
+    'Hiperextensão 45°' + 'Remada Baixa Aberta' (lombar 3+2=5 viola HIB2).
+    Com filtro HIB2 ligado, esse par precisa desaparecer.
+    """
+    import random
+    from gerador_treino import gerar_multiplos_treinos
+    cfg = {
+        "demandas": [("regiao", "lower", 4), ("regiao", "upper", 3), ("regiao", "core", 1)],
+        "tamanho_bloco": 2,
+        "max_complexidade": 5,
+        "equipamentos_bloqueados": [],
+        "evitar_agonistas": True,
+    }
+    PAR = {"Hiperextensão 45°", "Remada Baixa Aberta"}
+
+    def par_aparece(sessoes):
+        for s in sessoes:
+            for bloco in s.blocos:
+                nomes = {e.nome for e in (bloco.ex1, bloco.ex2, bloco.ex3) if e}
+                if PAR.issubset(nomes):
+                    return True
+        return False
+
+    random.seed(1)
+    s_off = gerar_multiplos_treinos(banco, [cfg, cfg], relaxar_familia=True)
+    assert par_aparece(s_off), (
+        "Pré-condição falhou: harness disse que seed=1 produz o par sem filtro. "
+        "Se isso mudou, atualize o teste com par bloqueado novo do harness."
+    )
+
+    random.seed(1)
+    cfg_on = {**cfg, "cargas_config": HIB2}
+    s_on = gerar_multiplos_treinos(banco, [cfg_on, cfg_on], relaxar_familia=True)
+    assert not par_aparece(s_on), (
+        "Filtro falhou: par 'Hiperextensão 45°' + 'Remada Baixa Aberta' "
+        "apareceu mesmo com cargas_config HIB2 ativo."
+    )
+
+
+def test_gerar_multiplos_treinos_sem_cargas_config_inalterado(banco):
+    """Sem cargas_config, comportamento idêntico ao pré-Etapa 4 (sanity check)."""
+    import random
+    from gerador_treino import gerar_multiplos_treinos
+    cfg = {
+        "demandas": [("regiao", "lower", 3)],
+        "tamanho_bloco": 2,
+        "max_complexidade": 5,
+        "equipamentos_bloqueados": [],
+        "evitar_agonistas": False,
+    }
+    random.seed(42)
+    s_ref = gerar_multiplos_treinos(banco, [cfg], relaxar_familia=True)
+    random.seed(42)
+    cfg_with_none = {**cfg, "cargas_config": None}
+    s_test = gerar_multiplos_treinos(banco, [cfg_with_none], relaxar_familia=True)
+    # Nomes nos blocos devem ser idênticos (cargas_config=None == omitido)
+    nomes_ref = [
+        [e.nome for e in (b.ex1, b.ex2, b.ex3) if e]
+        for b in s_ref[0].blocos
+    ]
+    nomes_test = [
+        [e.nome for e in (b.ex1, b.ex2, b.ex3) if e]
+        for b in s_test[0].blocos
+    ]
+    assert nomes_ref == nomes_test
+
+
+def test_gerar_sessao_por_demandas_respeita_cargas_config(banco):
+    """Standalone gerar_sessao_por_demandas (caminho /regerar) também respeita filtro."""
+    from gerador_treino import _bloqueio_cargas, gerar_sessao_por_demandas
+    sessao = gerar_sessao_por_demandas(
+        banco,
+        demandas=[("regiao", "lower", 4)],
+        max_complexidade=5,
+        tamanho_bloco=2,
+        evitar_agonistas=True,
+        cargas_config=HIB2,
+    )
+    for bloco in sessao.blocos:
+        exs = [e for e in (bloco.ex1, bloco.ex2, bloco.ex3) if e]
+        for i in range(len(exs)):
+            for j in range(i + 1, len(exs)):
+                assert not _bloqueio_cargas(exs[i], exs[j], HIB2), (
+                    f"par viola filtro HIB2 em standalone: "
+                    f"{exs[i].nome} + {exs[j].nome}"
+                )
