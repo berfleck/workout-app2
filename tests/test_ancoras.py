@@ -385,3 +385,79 @@ def test_quotas_de_subregiao_sem_ancoras_devolve_vazio():
     from gerador_treino import _quotas_de_subregiao
     quotas, _ = _quotas_de_subregiao("core_dinamico", 3)
     assert quotas == {}
+
+
+# ─── Distribuição treino > rotina ──────────────────────────────────────
+
+
+def test_distribuir_perna_anterior_2x3_espalha_uni():
+    """perna_anterior(2)x3 com quota global bi:4 uni:2 → espalhar uni."""
+    from gerador_treino import _distribuir_quotas_entre_treinos
+    quotas_global = {"squat_bilateral": 4, "squat_unilateral": 2}
+    pesos = {"squat_bilateral": 3, "squat_unilateral": 2}
+    random.seed(1)
+    por_treino = _distribuir_quotas_entre_treinos(
+        quotas_global, n_treinos=3, vagas_por_treino=[2, 2, 2], pesos=pesos
+    )
+    # Cada treino tem 2 vagas; total bi=4 + uni=2 = 6 ✓
+    for t in por_treino:
+        assert sum(t.values()) == 2
+    total_bi = sum(t.get("squat_bilateral", 0) for t in por_treino)
+    total_uni = sum(t.get("squat_unilateral", 0) for t in por_treino)
+    assert total_bi == 4
+    assert total_uni == 2
+    # Nenhum treino deve concentrar 2 uni; espalhamento é a regra
+    treinos_com_uni = [i for i, t in enumerate(por_treino) if t.get("squat_unilateral", 0) > 0]
+    assert len(treinos_com_uni) == 2, f"esperado 2 treinos com uni, obtido {por_treino}"
+
+
+def test_distribuir_perna_anterior_3x3_cobertura_intra_treino():
+    """perna_anterior(3)x3 com bi:5 uni:4 → cada treino tem ≥1 bi E ≥1 uni."""
+    from gerador_treino import _distribuir_quotas_entre_treinos
+    quotas_global = {"squat_bilateral": 5, "squat_unilateral": 4}
+    pesos = {"squat_bilateral": 3, "squat_unilateral": 2}
+    random.seed(2)
+    por_treino = _distribuir_quotas_entre_treinos(
+        quotas_global, n_treinos=3, vagas_por_treino=[3, 3, 3], pesos=pesos
+    )
+    for t in por_treino:
+        assert t.get("squat_bilateral", 0) >= 1
+        assert t.get("squat_unilateral", 0) >= 1
+
+
+def test_distribuir_costas_4x1_um_treino_so():
+    """costas(4)x1 com remadas:2 puxadas:2 → 1 treino com 2+2."""
+    from gerador_treino import _distribuir_quotas_entre_treinos
+    quotas_global = {"remadas": 2, "puxadas": 2}
+    pesos = {"remadas": 2, "puxadas": 2}
+    por_treino = _distribuir_quotas_entre_treinos(
+        quotas_global, n_treinos=1, vagas_por_treino=[4], pesos=pesos
+    )
+    assert por_treino == [{"remadas": 2, "puxadas": 2}]
+
+
+def test_distribuir_perna_posterior_6_um_treino():
+    """perna_posterior(6)x1 com hinge:3 knee:2 abd:1 → 1 treino com 3+2+1."""
+    from gerador_treino import _distribuir_quotas_entre_treinos
+    quotas_global = {"hinge": 3, "knee_flexion": 2, "abduction": 1}
+    pesos = {"hinge": 3, "knee_flexion": 2, "abduction": 1}
+    por_treino = _distribuir_quotas_entre_treinos(
+        quotas_global, n_treinos=1, vagas_por_treino=[6], pesos=pesos
+    )
+    assert por_treino == [{"hinge": 3, "knee_flexion": 2, "abduction": 1}]
+
+
+def test_distribuir_zero_treinos():
+    """Caso degenerado: n_treinos=0 → lista vazia."""
+    from gerador_treino import _distribuir_quotas_entre_treinos
+    out = _distribuir_quotas_entre_treinos({}, n_treinos=0, vagas_por_treino=[], pesos={})
+    assert out == []
+
+
+def test_distribuir_quota_vazia():
+    """Quotas vazias → cada treino recebe dict vazio."""
+    from gerador_treino import _distribuir_quotas_entre_treinos
+    out = _distribuir_quotas_entre_treinos(
+        {}, n_treinos=3, vagas_por_treino=[2, 2, 2], pesos={},
+    )
+    assert out == [{}, {}, {}]

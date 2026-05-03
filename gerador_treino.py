@@ -318,6 +318,75 @@ def _quotas_de_subregiao(subregiao: str, vagas: int) -> tuple[dict[str, int], li
     return quotas, avisos
 
 
+def _distribuir_quotas_entre_treinos(
+    quotas_global: dict[str, int],
+    n_treinos: int,
+    vagas_por_treino: list[int],
+    pesos: dict[str, int],
+) -> list[dict[str, int]]:
+    """Distribui quotas globais entre N treinos via round-robin sobre fila
+    intercalada por peso, minimizando concentração de déficit (R6 da Etapa 3).
+
+    Args:
+        quotas_global: {chave: qtd_total_na_rotina}.
+        n_treinos: número de treinos.
+        vagas_por_treino: vagas alocadas pra esta demanda em cada treino.
+        pesos: {chave: peso} (usado pra ordenar a fila — peso maior primeiro).
+
+    Returns:
+        Lista de N dicts {chave: qtd_no_treino}, soma == quotas_global.
+
+    Algoritmo:
+      1. Ordenar chaves por peso desc (tie-break alfabético).
+      2. Construir fila intercalada via round-robin pelas qtds.
+      3. Distribuir slots pelos N treinos via round-robin, respeitando
+         vagas_por_treino (pula treino lotado).
+    """
+    if n_treinos <= 0:
+        return []
+    if sum(quotas_global.values()) == 0:
+        return [{} for _ in range(n_treinos)]
+
+    # Ordenar chaves por peso desc (tie-break alfabético estável)
+    chaves_ord = sorted(
+        quotas_global.keys(),
+        key=lambda k: (-pesos.get(k, 0), k),
+    )
+
+    # Construir fila intercalada via round-robin pelas qtds
+    fila: list[str] = []
+    qtds = {k: quotas_global[k] for k in chaves_ord}
+    while sum(qtds.values()) > 0:
+        for k in chaves_ord:
+            if qtds[k] > 0:
+                fila.append(k)
+                qtds[k] -= 1
+
+    # Distribuir slots pelos treinos via round-robin, respeitando capacidade
+    por_treino: list[dict[str, int]] = [{} for _ in range(n_treinos)]
+    capacidade = list(vagas_por_treino)
+    treino_atual = 0
+    for chave in fila:
+        # Avança até treino com capacidade disponível
+        tentativas = 0
+        while capacidade[treino_atual] <= 0:
+            treino_atual = (treino_atual + 1) % n_treinos
+            tentativas += 1
+            if tentativas > n_treinos:
+                # Sem capacidade em ninguém — consistência interna falha
+                # (não deveria acontecer se sum(vagas_por_treino) == sum(quotas))
+                break
+        else:
+            por_treino[treino_atual][chave] = por_treino[treino_atual].get(chave, 0) + 1
+            capacidade[treino_atual] -= 1
+            treino_atual = (treino_atual + 1) % n_treinos
+            continue
+        # Loop saiu por break — parar distribuição
+        break
+
+    return por_treino
+
+
 # Classificação composto vs isolado é por EXERCÍCIO via coluna `purpose` do banco.
 # compound + explosive → composto. isolation + stability → isolado.
 # A constante PADROES_COMPOSTOS abaixo é mantida apenas pra retrocompatibilidade
