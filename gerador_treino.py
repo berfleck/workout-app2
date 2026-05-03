@@ -187,6 +187,95 @@ def _validar_ancoras() -> None:
 _validar_ancoras()
 
 
+def calcular_quotas(
+    ancoras: list[dict],
+    vagas: int,
+) -> tuple[dict[str, int], list[dict]]:
+    """Distribui `vagas` entre âncoras pelos pesos via Hamilton's Largest
+    Remainder Method. Mínimos contam na proporção (não são adicionais).
+
+    Args:
+        ancoras: lista de dicts {chave, peso, obrigatoria}. `chave` pode ser
+            nome de subregião (ANCORAS_POR_REGIAO) ou padrão (ANCORAS_POR_SUBREGIAO).
+        vagas: total de vagas a distribuir.
+
+    Returns:
+        (quotas, avisos) onde:
+          quotas = {chave: qtd_vagas} (chaves com qtd > 0)
+          avisos = lista de dicts {tipo: "ancora_nao_cumprida", chave: str,
+            motivo: "vagas_insuficientes"} para obrigatórias que ficaram fora.
+
+    Algoritmo:
+      1. Se vagas == 0 ou ancoras vazia: retornar ({}, []).
+      2. Se vagas < num_obrigatorias: sortear `vagas` entre obrigatórias com
+         random.sample (respeita seed do chamador). Obrigatórias não sorteadas
+         viram aviso `ancora_nao_cumprida`. Não-obrigatórias ignoradas.
+      3. Caso normal: Hamilton's Largest Remainder.
+         a. Para cada âncora: ideal = vagas × peso / soma_pesos
+         b. floor = int(ideal); resto = ideal - floor
+         c. Distribuir vagas remanescentes (vagas - sum(floors)) pra âncoras
+            com maior resto. Tie-break em resto: obrigatória > peso maior >
+            ordem de definição (estável).
+    """
+    if vagas <= 0 or not ancoras:
+        return {}, []
+
+    obrigatorias = [a for a in ancoras if a.get("obrigatoria")]
+    n_obrig = len(obrigatorias)
+
+    # ── Caso especial: vagas < obrigatórias → sorteio ────────────────────
+    if vagas < n_obrig:
+        sorteadas = random.sample(obrigatorias, vagas)
+        quotas = {a["chave"]: 1 for a in sorteadas}
+        nomes_sorteadas = {a["chave"] for a in sorteadas}
+        avisos = [
+            {
+                "tipo": "ancora_nao_cumprida",
+                "chave": a["chave"],
+                "motivo": "vagas_insuficientes",
+            }
+            for a in obrigatorias
+            if a["chave"] not in nomes_sorteadas
+        ]
+        return quotas, avisos
+
+    # ── Hamilton's Largest Remainder ────────────────────────────────────
+    total_peso = sum(a["peso"] for a in ancoras)
+    if total_peso <= 0:
+        return {}, []
+
+    # Calcula ideal e floor pra cada âncora
+    pares = []  # [(idx_estavel, ancora, ideal, floor)]
+    for idx, a in enumerate(ancoras):
+        ideal = vagas * a["peso"] / total_peso
+        pares.append((idx, a, ideal, int(ideal)))
+
+    # Quota inicial = floor
+    quotas = {a["chave"]: f for _, a, _, f in pares}
+    distribuidas = sum(f for _, _, _, f in pares)
+    restantes = vagas - distribuidas
+
+    # Distribuir vagas restantes pelos maiores restos com tie-break:
+    # obrigatória > peso maior > ordem de definição (estável)
+    if restantes > 0:
+        def tiebreak_key(p):
+            idx, a, ideal, floor = p
+            resto = ideal - floor
+            return (
+                -resto,                          # maior resto primeiro
+                0 if a.get("obrigatoria") else 1,  # obrig primeiro
+                -a["peso"],                      # peso maior primeiro
+                idx,                             # ordem definição (estável)
+            )
+        pares_ord = sorted(pares, key=tiebreak_key)
+        for _, a, _, _ in pares_ord[:restantes]:
+            quotas[a["chave"]] += 1
+
+    # Filtra zeros pra retornar dict limpo
+    quotas = {k: v for k, v in quotas.items() if v > 0}
+    return quotas, []
+
+
 # Classificação composto vs isolado é por EXERCÍCIO via coluna `purpose` do banco.
 # compound + explosive → composto. isolation + stability → isolado.
 # A constante PADROES_COMPOSTOS abaixo é mantida apenas pra retrocompatibilidade
