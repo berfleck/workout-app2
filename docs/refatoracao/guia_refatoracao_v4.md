@@ -19,7 +19,14 @@
 > - Sub-PR 2 — integração `_decompor_demanda_*` + hierarquia treino>rotina + standalone + 8 snapshots regenerados — ✅ concluído
 > - Sub-PR 3 — avisos `ancora_nao_cumprida` + `ancora_sem_candidatos` + métricas + log — ✅ concluído
 >
-> Log detalhado em `docs/refatoracao/logs/etapa_3.md`. Próxima: Etapa 4 (filtro de cargas / HIB2).
+> Log detalhado em `docs/refatoracao/logs/etapa_3.md`.
+>
+> **Progresso da Etapa 4** (branch `refator-gerador`):
+> - Sub-PR 0 — dataclass + `_int_or_zero` + `_bloqueio_cargas` helper puro + harness recalibração HIB2 + 20 casos clínicos pós-Etapa 3 (aprovação clínica do usuário recebida: HIB2 6/5/6 mantido) — ✅ concluído
+> - Sub-PR 1 — filtro integrado em `pode_adicionar_ao_bloco` + `cargas_config` plumbado pelas 6 funções do motor + aviso `relaxado_carga` via second-pass + Flask `/gerar` e `/regerar` leem form — ✅ concluído
+> - Sub-PR 2 — 3 selects em `<details>` mobile-first + modal renderiza 5 tipos de aviso (R3 Etapa 3 fechado: `ancora_*` saem do silêncio) + persistência via JSON natural + log + atualização guia v4 — ✅ concluído
+>
+> Log detalhado em `docs/refatoracao/logs/etapa_4.md`. Próxima: Etapa 5 (score consolidado em `_buscar_candidato`).
 
 > Documento mestre para conduzir a refatoração do gerador de treinos.
 > Sintetiza o roteiro de `memoria_projeto.md`, o design de
