@@ -455,6 +455,90 @@ GRUPO_MUSCULAR_PADRAO: dict[str, str] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Etapa 5: Score de pareamento intra-bloco
+# ---------------------------------------------------------------------------
+# Substitui a cascata determinística de 16 combinações geo×sub em
+# `_buscar_candidato` por scoring linear + amostragem softmax top-K.
+# A hierarquia dos pesos preserva a ordem da cascata anterior:
+# regiao_diff (1000) >> padrao_diff (100) >> nao_agonista (50) >> composto (25),
+# evitando compensações cruzadas (não dá pra somar 10x não-agonista pra
+# superar 1x região diferente). Anti-uni é sensível a contraste muscular:
+# penalidade alta entre unilaterais do mesmo grupo (resolveria caso V-Up
+# Uni + Hollow Hold), baixa entre grupos diferentes (V-Up Uni + Tríceps
+# Uni continua atraente).
+PESOS_SCORE_PAREAMENTO: dict[str, int] = {
+    "regiao_diff":         1000,  # candidato em região diferente do âncora
+    "padrao_diff":          100,  # candidato em padrão diferente
+    "nao_agonista":          50,  # grupo músculo-funcional diferente
+    "composto":              25,  # candidato com purpose composto
+    "anti_uni_mesmo_grupo": -75,  # 2 unilaterais do mesmo grupo musculo-funcional
+    "anti_uni_diff_grupo":  -10,  # 2 unilaterais de grupos diferentes
+}
+
+# Amostragem entre top-K candidatos. K=3 dá variabilidade real sem
+# arriscar pegar candidato de tier inferior (ex: P3 quando P1 tem
+# 4 candidatos válidos). T=200 (1/5 do peso de regiao_diff) faz a
+# softmax distribuir ~uniforme dentro do mesmo tier mas dominar top-1
+# quando há gap entre tiers.
+SOFTMAX_TOP_K: int = 3
+SOFTMAX_TEMPERATURA: float = 200.0
+
+
+def _score_pareamento(
+    candidato: "Exercicio",
+    bloco_atual: list["Exercicio"],
+    evitar_agonistas: bool,
+) -> int:
+    """Score linear de quão bom é parear `candidato` com o bloco já montado.
+
+    Maior = melhor. Componentes aditivos definidos em
+    `PESOS_SCORE_PAREAMENTO`. Não aplica filtros hard (cargas, fadiga) —
+    assume que `pode_adicionar_ao_bloco` já validou viabilidade.
+
+    Componentes:
+    - `regiao_diff`: candidato cuja região não está no bloco
+    - `padrao_diff`: candidato cujo padrão não está no bloco
+    - `nao_agonista`: grupo musculo-funcional diferente de todos no bloco
+      (só pesa se `evitar_agonistas=True`)
+    - `composto`: candidato com purpose composto/explosivo
+    - `anti_uni_mesmo_grupo` / `anti_uni_diff_grupo`: penalidade quando
+      candidato é unilateral E há outro unilateral no bloco; o peso
+      depende de mesmo/diferente grupo musculo-funcional
+    """
+    pesos = PESOS_SCORE_PAREAMENTO
+    score = 0
+
+    regioes_no_bloco = {e.regiao for e in bloco_atual}
+    padroes_no_bloco = {e.padrao for e in bloco_atual}
+    if candidato.regiao not in regioes_no_bloco:
+        score += pesos["regiao_diff"]
+    if candidato.padrao not in padroes_no_bloco:
+        score += pesos["padrao_diff"]
+
+    if evitar_agonistas:
+        grupos_no_bloco = {GRUPO_MUSCULAR_PADRAO.get(e.padrao) for e in bloco_atual}
+        if GRUPO_MUSCULAR_PADRAO.get(candidato.padrao) not in grupos_no_bloco:
+            score += pesos["nao_agonista"]
+
+    if _eh_composto(candidato):
+        score += pesos["composto"]
+
+    # Anti-unilateral refinado — sensível a contraste muscular.
+    # Aplica uma penalidade por cada unilateral já presente no bloco.
+    # Em blocos de 3 com 2 unilaterais já presentes, somam duas penalidades
+    # (efeito acumulativo desejado: desincentiva trio com 3 unilaterais).
+    if candidato.unilateral == "unilateral":
+        grupo_cand = GRUPO_MUSCULAR_PADRAO.get(candidato.padrao)
+        for ex in bloco_atual:
+            if ex.unilateral != "unilateral":
+                continue
+            mesmo_grupo = grupo_cand == GRUPO_MUSCULAR_PADRAO.get(ex.padrao)
+            score += pesos["anti_uni_mesmo_grupo"] if mesmo_grupo else pesos["anti_uni_diff_grupo"]
+
+    return score
+
+
 def expandir_para_padroes(
     regioes: list[str] | None = None,
     subregioes: list[str] | None = None,

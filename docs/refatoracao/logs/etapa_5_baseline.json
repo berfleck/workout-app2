@@ -1,0 +1,87 @@
+{
+  "core_3_uni_pair": {
+    "descricao": "core_isometrico(1) + 2 unilaterais travados (V-Up Uni + Tríceps Uni)",
+    "n_iter": 100,
+    "total_blocos": 200,
+    "blocos_unicos": 16,
+    "entropia_bits": 3.5334,
+    "entropia_max_bits": 4.0,
+    "entropia_normalizada": 0.8834,
+    "top_5_pareamentos": [
+      {
+        "bloco": [
+          "Tríceps Unilateral Polia"
+        ],
+        "frequencia": 55
+      },
+      {
+        "bloco": [
+          "Tríceps Unilateral Polia",
+          "V-Up Unilateral"
+        ],
+        "frequencia": 30
+      },
+      {
+        "bloco": [
+          "V-Up Unilateral"
+        ],
+        "frequencia": 15
+      },
+      {
+        "bloco": [
+          "Prancha Feijao",
+          "V-Up Unilateral"
+        ],
+        "frequencia": 11
+      },
+      {
+        "bloco": [
+          "Prancha Alternada",
+          "V-Up Unilateral"
+        ],
+        "frequencia": 10
+      }
+    ]
+  },
+  "lower_4_upper_3": {
+    "descricao": "lower(4) + upper(3) — config multi-região representativa",
+    "n_iter": 100,
+    "total_blocos": 401,
+    "blocos_unicos": 243,
+    "entropia_bits": 7.5652,
+    "entropia_max_bits": 7.9248,
+    "entropia_normalizada": 0.9546,
+    "top_5_pareamentos": [
+      {
+        "bloco": [
+          "Cadeira Flexora"
+        ],
+        "frequencia": 15
+      },
+      {
+        "bloco": [
+          "Flexão Joelhos Slide"
+        ],
+        "frequencia": 9
+      },
+      {
+        "bloco": [
+          "Nordic Curl"
+        ],
+        "frequencia": 8
+      },
+      {
+        "bloco": [
+          "Desenv. Halteres Uni."
+        ],
+        "frequencia": 7
+      },
+      {
+        "bloco": [
+          "Box Jump"
+        ],
+        "frequencia": 7
+      }
+    ]
+  }
+}
