@@ -12,7 +12,14 @@
 > - Sub-PR 2 — integração + regeneração de snapshots + métricas — ✅ concluído
 > - Sub-PR 3 — caching de pools — não foi necessário (perf 2.24s pra 3000 simulações)
 >
-> Log detalhado em `docs/refatoracao/logs/etapa_2.md`. Próxima: Etapa 3 (âncoras protegidas com peso/obrigatoriedade).
+> Log detalhado em `docs/refatoracao/logs/etapa_2.md`.
+>
+> **Progresso da Etapa 3** (branch `refator-gerador`):
+> - Sub-PR 1 — constantes ANCORAS_POR_* + `calcular_quotas` + helpers + `_distribuir_quotas_entre_treinos` — ✅ concluído
+> - Sub-PR 2 — integração `_decompor_demanda_*` + hierarquia treino>rotina + standalone + 8 snapshots regenerados — ✅ concluído
+> - Sub-PR 3 — avisos `ancora_nao_cumprida` + `ancora_sem_candidatos` + métricas + log — ✅ concluído
+>
+> Log detalhado em `docs/refatoracao/logs/etapa_3.md`. Próxima: Etapa 4 (filtro de cargas / HIB2).
 
 > Documento mestre para conduzir a refatoração do gerador de treinos.
 > Sintetiza o roteiro de `memoria_projeto.md`, o design de
