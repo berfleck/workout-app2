@@ -2225,41 +2225,93 @@ def gerar_sessao_por_demandas(
             elif not padroes:
                 pass
             elif nivel == "regiao":
-                # ── Regra de proporção: ao menos 60% compostos ────────────────
-                # Classificação por exercício (purpose), não por padrão.
-                # Cada padrão pode contribuir nas duas fases (ex: hinge tem 12
-                # compostos e 8 isolados no banco — entra em ambas).
-                cands_no_escopo = [e for e in banco if e.padrao in padroes]
-                tem_compostos = any(_eh_composto(e) for e in cands_no_escopo)
-                tem_isolados  = any(not _eh_composto(e) for e in cands_no_escopo)
-
-                padroes_shuf = list(padroes)
-                random.shuffle(padroes_shuf)
-
-                if tem_compostos and tem_isolados:
-                    min_compostos = math.ceil(qtd * PROPORCAO_COMPOSTOS)
-                    # Não pedir mais compostos do que o total
-                    min_compostos = min(min_compostos, qtd)
-                    max_isolados  = qtd - min_compostos
-
-                    # Fase 1: preencher compostos ciclando os padrões
-                    n_comp = _selecionar_ciclando(padroes_shuf, min_compostos, filtro_purpose="composto")
-                    # Fase 2: preencher isolados ciclando os padrões
-                    n_iso = _selecionar_ciclando(padroes_shuf, max_isolados, filtro_purpose="isolado")
-                    # Fase 3: se sobrou espaço, tenta mais compostos; depois isolados
-                    faltam = qtd - n_comp - n_iso
-                    if faltam > 0:
-                        n_extra_c = _selecionar_ciclando(padroes_shuf, faltam, filtro_purpose="composto")
-                        faltam -= n_extra_c
-                    if faltam > 0:
-                        _selecionar_ciclando(padroes_shuf, faltam, filtro_purpose="isolado")
+                # Etapa 3: aplicar âncoras região + subregião quando definidas.
+                # Fallback (regiões sem âncoras: cardio): cycling com regra
+                # 60% compostos via PROPORCAO_COMPOSTOS (legado preservado).
+                if escopo in ANCORAS_POR_REGIAO:
+                    ancoras_raw = ANCORAS_POR_REGIAO[escopo]
+                    n_obrig = sum(1 for a in ancoras_raw if a["obrigatoria"])
+                    # Filtro pré-quotas: acessórias só competem se qtd > 2 × n_obrig
+                    if n_obrig > 0 and qtd <= 2 * n_obrig:
+                        ancoras_para_q = [a for a in ancoras_raw if a["obrigatoria"]]
+                    else:
+                        ancoras_para_q = ancoras_raw
+                    anc_reg_dict = [
+                        {"chave": a["subregiao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
+                        for a in ancoras_para_q
+                    ]
+                    quotas_reg, avisos_reg = calcular_quotas(anc_reg_dict, qtd)
+                    for av in avisos_reg:
+                        av["nivel"] = "regiao"
+                        av["escopo"] = escopo
+                        avisos_da_sessao.append(av)
+                    # Pra cada subregião alocada, descer um nível
+                    for sub_esc, sub_qt in quotas_reg.items():
+                        if sub_qt <= 0:
+                            continue
+                        if sub_esc in ANCORAS_POR_SUBREGIAO:
+                            ancoras_sub = ANCORAS_POR_SUBREGIAO[sub_esc]
+                            anc_sub_dict = [
+                                {"chave": a["padrao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
+                                for a in ancoras_sub
+                            ]
+                            quotas_sub, avisos_sub = calcular_quotas(anc_sub_dict, sub_qt)
+                            for av in avisos_sub:
+                                av["nivel"] = "subregiao"
+                                av["escopo"] = sub_esc
+                                avisos_da_sessao.append(av)
+                            for p, q in quotas_sub.items():
+                                if q > 0:
+                                    _selecionar_ciclando([p], q)
+                        else:
+                            # Fallback: cycling pelos padrões da subregião
+                            pads_sub = SUBREGIAO_PARA_PADROES.get(sub_esc, [])
+                            pads_ord = _ordenar_padroes_por_prioridade(pads_sub, banco=banco)
+                            _selecionar_ciclando(pads_ord, sub_qt, preferir_composto=True)
                 else:
-                    # Só um tipo disponível — cicla com preferência por composto
-                    _selecionar_ciclando(padroes_shuf, qtd, preferir_composto=True)
+                    # Fallback Etapa 2: cycling com PROPORCAO_COMPOSTOS
+                    cands_no_escopo = [e for e in banco if e.padrao in padroes]
+                    tem_compostos = any(_eh_composto(e) for e in cands_no_escopo)
+                    tem_isolados  = any(not _eh_composto(e) for e in cands_no_escopo)
+                    padroes_shuf = list(padroes)
+                    random.shuffle(padroes_shuf)
+                    if tem_compostos and tem_isolados:
+                        min_compostos = math.ceil(qtd * PROPORCAO_COMPOSTOS)
+                        min_compostos = min(min_compostos, qtd)
+                        max_isolados = qtd - min_compostos
+                        n_comp = _selecionar_ciclando(padroes_shuf, min_compostos, filtro_purpose="composto")
+                        n_iso = _selecionar_ciclando(padroes_shuf, max_isolados, filtro_purpose="isolado")
+                        faltam = qtd - n_comp - n_iso
+                        if faltam > 0:
+                            n_extra_c = _selecionar_ciclando(padroes_shuf, faltam, filtro_purpose="composto")
+                            faltam -= n_extra_c
+                        if faltam > 0:
+                            _selecionar_ciclando(padroes_shuf, faltam, filtro_purpose="isolado")
+                    else:
+                        _selecionar_ciclando(padroes_shuf, qtd, preferir_composto=True)
+            elif nivel == "subregiao":
+                # Etapa 3: aplicar âncoras subregião quando definidas.
+                # Fallback (sem âncoras: core_dinamico, core_isometrico,
+                # bracos, adutores): cycling com prioridade dinâmica.
+                if escopo in ANCORAS_POR_SUBREGIAO:
+                    ancoras_sub = ANCORAS_POR_SUBREGIAO[escopo]
+                    anc_sub_dict = [
+                        {"chave": a["padrao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
+                        for a in ancoras_sub
+                    ]
+                    quotas_sub, avisos_sub = calcular_quotas(anc_sub_dict, qtd)
+                    for av in avisos_sub:
+                        av["nivel"] = "subregiao"
+                        av["escopo"] = escopo
+                        avisos_da_sessao.append(av)
+                    for p, q in quotas_sub.items():
+                        if q > 0:
+                            _selecionar_ciclando([p], q)
+                else:
+                    padroes_ord = _ordenar_padroes_por_prioridade(padroes, banco=banco)
+                    _selecionar_ciclando(padroes_ord, qtd, preferir_composto=True)
             else:
-                # ── Subregião / Padrão: cicla padrões com prioridade dinâmica ──
-                # Padrões que TÊM candidato composto no banco vêm primeiro;
-                # dentro de cada padrão, candidatos compostos são preferidos.
+                # Demanda padrão: imune a âncoras (usuário foi específico)
                 padroes_ord = _ordenar_padroes_por_prioridade(padroes, banco=banco)
                 _selecionar_ciclando(padroes_ord, qtd, preferir_composto=True)
 
