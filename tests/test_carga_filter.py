@@ -80,3 +80,70 @@ def test_carregar_banco_cargas_em_faixa_0_3(banco):
         assert 0 <= e.carga_grip <= 3
         assert 0 <= e.carga_lombar <= 3
         assert 0 <= e.demanda_core <= 3
+
+
+# ---------------------------------------------------------------------------
+# Sub-PR 0.2 — helper puro _bloqueio_cargas
+# ---------------------------------------------------------------------------
+
+HIB2 = {"grip": 6, "lombar": 5, "core": 6}
+
+
+def test_bloqueio_cargas_par_lombar_atinge_threshold():
+    """Hiperextensão (lombar=3) + Remada Curvada (lombar=2) bloqueia em HIB2 (lombar=5)."""
+    from gerador_treino import _bloqueio_cargas
+    a = _make_ex("Hiperextensão", lombar=3)
+    b = _make_ex("Remada Curvada", lombar=2)
+    assert _bloqueio_cargas(a, b, HIB2) is True
+
+
+def test_bloqueio_cargas_um_zero_libera():
+    """Regra "ambos >= 1" — se um lado é 0, par passa mesmo se outro é alto."""
+    from gerador_treino import _bloqueio_cargas
+    a = _make_ex("A", lombar=0)
+    b = _make_ex("B", lombar=5)  # b sozinho atinge threshold
+    assert _bloqueio_cargas(a, b, HIB2) is False
+
+
+def test_bloqueio_cargas_soma_abaixo_threshold():
+    """Soma 5 com threshold 6 → não bloqueia."""
+    from gerador_treino import _bloqueio_cargas
+    a = _make_ex("A", grip=2)
+    b = _make_ex("B", grip=3)
+    assert _bloqueio_cargas(a, b, HIB2) is False
+
+
+def test_bloqueio_cargas_qualquer_dimensao_dispara():
+    """Bloqueia se *qualquer* dimensão viola (não precisa todas)."""
+    from gerador_treino import _bloqueio_cargas
+    a = _make_ex("A", grip=3, lombar=2, core=1)
+    b = _make_ex("B", grip=3, lombar=2, core=1)
+    # grip 3+3=6 ≥ 6 (threshold grip) → True
+    assert _bloqueio_cargas(a, b, HIB2) is True
+
+
+def test_bloqueio_cargas_thresholds_diferentes():
+    """Mesmo par com threshold mais frouxo libera."""
+    from gerador_treino import _bloqueio_cargas
+    a = _make_ex("A", lombar=3)
+    b = _make_ex("B", lombar=2)
+    # threshold lombar=6 (mais frouxo) → soma 5 não bloqueia
+    assert _bloqueio_cargas(a, b, {"grip": 6, "lombar": 6, "core": 6}) is False
+
+
+def test_bloqueio_cargas_threshold_zero_pula_dimensao():
+    """Threshold 0 ou None pula a dimensão (não bloqueia por ela)."""
+    from gerador_treino import _bloqueio_cargas
+    a = _make_ex("A", lombar=3)
+    b = _make_ex("B", lombar=3)
+    # só threshold de grip definido — lombar/core ignorados
+    assert _bloqueio_cargas(a, b, {"grip": 6}) is False
+    assert _bloqueio_cargas(a, b, {"grip": 6, "lombar": 0, "core": 0}) is False
+
+
+def test_bloqueio_cargas_simetrico():
+    """`_bloqueio_cargas(a, b, t)` === `_bloqueio_cargas(b, a, t)`."""
+    from gerador_treino import _bloqueio_cargas
+    a = _make_ex("A", lombar=3)
+    b = _make_ex("B", lombar=2)
+    assert _bloqueio_cargas(a, b, HIB2) == _bloqueio_cargas(b, a, HIB2)

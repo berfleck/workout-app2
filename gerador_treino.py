@@ -815,6 +815,35 @@ def ordenar_blocos(blocos: list[tuple]) -> list[tuple]:
 # Pareamento em super séries
 # ---------------------------------------------------------------------------
 
+# Filtro de cargas (Etapa 4 / HIB2). Mapeamento dimensão → atributo no Exercicio.
+_DIMS_CARGA: tuple[tuple[str, str], ...] = (
+    ("grip", "carga_grip"),
+    ("lombar", "carga_lombar"),
+    ("core", "demanda_core"),
+)
+
+
+def _bloqueio_cargas(ex_a: "Exercicio", ex_b: "Exercicio", thresholds: dict) -> bool:
+    """Retorna True se o par viola o filtro de cargas em qualquer dimensão.
+
+    Bloqueia se (a) ambos os exercícios têm valor >= 1 na dimensão E
+    (b) a soma dos valores >= threshold[dim]. Threshold ausente, 0 ou None
+    pula a dimensão. Simétrica.
+
+    Travados (`exercicios_travados`) são exceção e devem ser filtrados pelo
+    caller — esta função é o predicado puro.
+    """
+    for dim, attr in _DIMS_CARGA:
+        thr = thresholds.get(dim)
+        if not thr:
+            continue
+        va = getattr(ex_a, attr, 0)
+        vb = getattr(ex_b, attr, 0)
+        if va >= 1 and vb >= 1 and (va + vb) >= thr:
+            return True
+    return False
+
+
 def pode_adicionar_ao_bloco(bloco_atual: list, candidato: Exercicio, tamanho_bloco: int) -> bool:
     """Verifica se o candidato pode entrar no bloco respeitando a regra de fadiga."""
     max_alta_fadiga = 1 if tamanho_bloco <= 2 else 2
