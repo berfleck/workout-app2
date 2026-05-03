@@ -1338,11 +1338,22 @@ def gerar():
     evitar_agon = request.form.get("evitar_agonistas") == "on"
     relaxar_familia = request.form.get("relaxar_familia") == "on"
 
+    # Filtro de cargas (Etapa 4 / HIB2). Apenas aplica se os 3 thresholds vierem
+    # preenchidos no form. Defaults da UI: grip=6, lombar=5, core=6 (HIB2).
+    grip_max = int(request.form.get("carga_grip_max") or 0)
+    lombar_max = int(request.form.get("carga_lombar_max") or 0)
+    core_max = int(request.form.get("demanda_core_max") or 0)
+    cargas_config = (
+        {"grip": grip_max, "lombar": lombar_max, "core": core_max}
+        if (grip_max and lombar_max and core_max) else None
+    )
+
     all_configs = []
 
     for t in range(n_treinos):
         cfg = {"max_complexidade": max_cx, "tamanho_bloco": tam_bloco,
-               "equipamentos_bloqueados": [], "evitar_agonistas": evitar_agon}
+               "equipamentos_bloqueados": [], "evitar_agonistas": evitar_agon,
+               "cargas_config": cargas_config}
 
         modo = request.form.get(f"modo_{t}", "hierarquia")
         cfg["modo"] = modo
@@ -1548,6 +1559,7 @@ def gerar():
         "tamanho_bloco": tam_bloco,
         "evitar_agonistas": evitar_agon,
         "relaxar_familia": relaxar_familia,
+        "cargas_config": cargas_config,
     }
     salvar_sessoes_disco()
 
@@ -1677,7 +1689,8 @@ def treino_regerar(t):
             tamanho_bloco=cfg_r.get("tamanho_bloco", 2),
             exercicios_travados=cfg_r.get("exercicios_travados", []),
             evitar_agonistas=cfg_r.get("evitar_agonistas", False),
-            lateralidade_por_padrao=cfg_r.get("lateralidade_por_padrao"))
+            lateralidade_por_padrao=cfg_r.get("lateralidade_por_padrao"),
+            cargas_config=cfg_r.get("cargas_config"))
     else:
         nova = gerar_sessao(banco_regen, cfg_r["padroes"],
             exercicios_por_padrao=cfg_r["exercicios_por_padrao"],
@@ -1685,7 +1698,8 @@ def treino_regerar(t):
             max_complexidade=cfg_r.get("max_complexidade", 5),
             tamanho_bloco=cfg_r.get("tamanho_bloco", 2),
             exercicios_travados=cfg_r.get("exercicios_travados", []),
-            evitar_agonistas=cfg_r.get("evitar_agonistas", False))
+            evitar_agonistas=cfg_r.get("evitar_agonistas", False),
+            cargas_config=cfg_r.get("cargas_config"))
 
     # Preserva o nome custom do treino se existir
     nome_custom = cfg_r.get("nome_custom", "")
