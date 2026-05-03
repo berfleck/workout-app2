@@ -1531,12 +1531,31 @@ def gerar():
             return SUBREGIOES_LABELS.get(escopo, escopo)
         return PADROES_LABELS.get(escopo, escopo)
 
+    def _bloco_label_por_exercicio(nome, blocos):
+        """Encontra o label A/B/C... do bloco que contém o exercício."""
+        if not nome:
+            return None
+        for b in blocos:
+            if any(ex and ex.nome == nome for ex in (b.ex1, b.ex2, b.ex3)):
+                return b.label
+        return None
+
     avisos_por_treino = []
     for i, s in enumerate(sessoes_ativas, start=1):
         if not s.avisos:
             continue
-        avisos_enriq = [{**av, "escopo_label": _label_escopo_av(av["nivel"], av["escopo"])}
-                        for av in s.avisos]
+        avisos_enriq = []
+        for av in s.avisos:
+            av_copy = dict(av)
+            # Avisos com nivel/escopo (incompleta, ancora_*) ganham label legível.
+            if av.get("nivel"):
+                av_copy["escopo_label"] = _label_escopo_av(av["nivel"], av["escopo"])
+            # relaxado_carga: derivar bloco_label A/B/C... a partir do exercício âncora.
+            if av.get("tipo") == "relaxado_carga":
+                bl = _bloco_label_por_exercicio(av.get("exercicio"), s.blocos)
+                if bl:
+                    av_copy["bloco_label"] = bl
+            avisos_enriq.append(av_copy)
         avisos_por_treino.append({"treino_num": i, "tipo": s.tipo, "avisos": avisos_enriq})
 
     if avisos_por_treino:

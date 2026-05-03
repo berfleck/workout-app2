@@ -15,9 +15,14 @@
             {% for t in avisos_por_treino %}
             {% set incompletas = t.avisos | selectattr("tipo", "equalto", "incompleta") | list %}
             {% set repetidas = t.avisos | selectattr("tipo", "equalto", "familia_repetida") | list %}
+            {% set cargas = t.avisos | selectattr("tipo", "equalto", "relaxado_carga") | list %}
+            {% set ancoras_nc = t.avisos | selectattr("tipo", "equalto", "ancora_nao_cumprida") | list %}
+            {% set ancoras_sc = t.avisos | selectattr("tipo", "equalto", "ancora_sem_candidatos") | list %}
             <div style="margin-top: 14px; padding-top: 12px; {% if not loop.first %}border-top: 1px solid var(--gray-200);{% endif %}">
                 {% if incompletas %}
                 <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">⚠️ Treino {{ t.treino_num }} ficou incompleto</div>
+                {% elif cargas or ancoras_nc or ancoras_sc %}
+                <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">↻ Treino {{ t.treino_num }} foi gerado com restrições</div>
                 {% else %}
                 <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">↻ Treino {{ t.treino_num }} foi preenchido com flexibilizações</div>
                 {% endif %}
@@ -66,6 +71,60 @@
                     <p style="margin: 8px 0 0 0; font-size: 12px; color: var(--gray-600);">
                         Considere cadastrar novas variações no banco ou aceitar a repetição editando o treino.
                     </p>
+                </div>
+                {% endif %}
+
+                {% if cargas %}
+                <div style="margin-bottom: 8px;">
+                    <p style="margin: 0 0 6px 0;">
+                        <span style="display:inline-block; padding:1px 6px; background:#fee2e2; border:1px solid #fca5a5; border-radius:4px; font-size:11px; font-weight:700; color:#991b1b;">🔒</span>
+                        Bloco{{ 's' if cargas|length > 1 else '' }} ficaram solo por filtro de carga (HIB2):
+                    </p>
+                    <ul style="margin: 4px 0 0 18px; padding: 0; list-style: disc;">
+                        {% for av in cargas %}
+                        <li>
+                            Bloco <strong>{{ av.bloco_label or '?' }}</strong>:
+                            <strong>{{ av.exercicio }}</strong> não pareou com <em>{{ av.par_bloqueado }}</em>
+                            — {{ av.dimensao }} somou <strong>{{ av.soma }}</strong> (limite {{ av.threshold }}).
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <p style="margin: 8px 0 0 0; font-size: 12px; color: var(--gray-600);">
+                        Para reduzir solos forçados, afrouxe o limite em <em>Configurações gerais → Limites de carga</em>.
+                    </p>
+                </div>
+                {% endif %}
+
+                {% if ancoras_nc %}
+                <div style="margin-bottom: 8px;">
+                    <p style="margin: 0 0 6px 0;">
+                        <span style="display:inline-block; padding:1px 6px; background:#dbeafe; border:1px solid #93c5fd; border-radius:4px; font-size:11px; font-weight:700; color:#1e40af;">🎯</span>
+                        Âncora{{ 's' if ancoras_nc|length > 1 else '' }} obrigatória{{ 's' if ancoras_nc|length > 1 else '' }} não cumprida{{ 's' if ancoras_nc|length > 1 else '' }}:
+                    </p>
+                    <ul style="margin: 4px 0 0 18px; padding: 0; list-style: disc;">
+                        {% for av in ancoras_nc %}
+                        <li>
+                            <strong>{{ av.escopo_label or av.escopo }}</strong>: padrão âncora <em>{{ av.chave }}</em> ficou sem vaga
+                            ({% if av.motivo == 'vagas_insuficientes' %}vagas pedidas insuficientes para todas as obrigatórias{% else %}{{ av.motivo }}{% endif %}).
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if ancoras_sc %}
+                <div style="margin-bottom: 8px;">
+                    <p style="margin: 0 0 6px 0;">
+                        <span style="display:inline-block; padding:1px 6px; background:#dbeafe; border:1px solid #93c5fd; border-radius:4px; font-size:11px; font-weight:700; color:#1e40af;">🎯</span>
+                        Âncora{{ 's' if ancoras_sc|length > 1 else '' }} sem candidato{{ 's' if ancoras_sc|length > 1 else '' }} no banco filtrado:
+                    </p>
+                    <ul style="margin: 4px 0 0 18px; padding: 0; list-style: disc;">
+                        {% for av in ancoras_sc %}
+                        <li>
+                            <strong>{{ av.escopo_label or av.escopo }}</strong>: padrão <em>{{ av.chave or av.padrao }}</em> não tinha exercício compatível com os filtros desta rotina.
+                        </li>
+                        {% endfor %}
+                    </ul>
                 </div>
                 {% endif %}
             </div>
