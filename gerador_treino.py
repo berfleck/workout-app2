@@ -408,9 +408,12 @@ _PADROES_LEGADOS = {
     "squat": ("squat_bilateral", "squat_unilateral"),
 }
 
-# Proporção mínima de compostos em demandas de nível "regiao".
-# Ex: 0.6 = ao menos 60% dos exercícios serão compostos.
-# Só se aplica quando o escopo tem tanto compostos quanto isolados.
+# DEPRECATED na Etapa 3: a regra 60% compostos foi aposentada da
+# pré-alocação porque emerge naturalmente dos pesos das âncoras subregião
+# (empurrar_compostos:3 vs empurrar_isolados:2 dá ~60% composto em peito).
+# Mantida pra retrocompat de import e usada APENAS no caminho fallback de
+# gerar_sessao_por_demandas standalone (regiões sem ANCORAS_POR_REGIAO
+# definida — caso atual: cardio).
 PROPORCAO_COMPOSTOS = 0.6
 
 
@@ -1279,7 +1282,9 @@ class _Slot:
     nivel: str                  # "regiao" | "subregiao" | "padrao"
     escopo_alocacao: str       # subregião ou padrão fixado pra este slot
     escopo_demanda_original: str  # escopo da demanda mãe (regiao quando vem de regiao)
-    requer_composto: bool      # True = a quota composta da demanda mãe ainda não foi cumprida
+    # requer_composto aposentado na Etapa 3: quota composta emerge dos pesos
+    # das âncoras subregião. Mantido como kwarg opcional pra retrocompat.
+    requer_composto: bool = False
 
 
 def _peso_nivel(nivel: str) -> int:
@@ -1405,12 +1410,13 @@ def _calcular_escassez(
     """Número de candidatos viáveis (modo estrito) pra esse slot.
 
     Quanto menor, mais escasso, mais prioritário na ordenação. Slot com
-    `requer_composto=True` filtra só compostos (mais restritivo).
+    Etapa 3: filtro composto aposentado. A quota composta agora emerge
+    dos pesos das âncoras subregião (Hamilton sobre ANCORAS_POR_SUBREGIAO),
+    não de uma flag separada no slot.
     """
-    filtro = "composto" if slot.requer_composto else None
     cands = _candidatos_estritos(
         banco, slot.nivel, slot.escopo_alocacao, cfg_treino,
-        nomes_bloqueados, familias_bloqueadas, filtro_purpose=filtro,
+        nomes_bloqueados, familias_bloqueadas, filtro_purpose=None,
     )
     return len(cands)
 
@@ -1419,95 +1425,153 @@ def _decompor_demanda_subregiao(
     subregiao: str,
     qtd: int,
     padroes_obrigatorios: Optional[list[str]] = None,
-) -> list[tuple[str, str, int]]:
+) -> tuple[list[tuple[str, str, int]], list[dict]]:
     """Decompõe demanda subregião em sub-demandas por padrão.
 
-    Estratégia análoga à decomposição região: garante 1 de cada padrão da
-    subregião + ciclar entre eles. Preserva paridade clínica que o cycling
-    do `_selecionar_ciclando` legacy entregava (ex: costas(4) → 2 remadas +
-    2 puxadas, em vez de 3:1 puxando pra proporção do banco).
-
-    Subregiões com 1 padrão só (panturrilha, adutores no banco atual) viram
-    qtd vagas do padrão único.
+    Etapa 3: usa ANCORAS_POR_SUBREGIAO quando definida pra distribuir vagas
+    pelos pesos via Hamilton's Largest Remainder. Subregiões sem âncoras
+    (core_dinamico, core_isometrico, bracos, adutores) caem em fallback
+    Etapa 2 (cycling uniforme 1-de-cada).
 
     `padroes_obrigatorios`: padrões da subregião que devem ter ≥ 1 vaga
-    (suporte a travados — D3.1). Se houver mais obrigatórios que `qtd`,
-    sorteia entre os obrigatórios.
+    (suporte a travados — D3.1). No caminho com âncoras, força inclusão
+    doando 1 vaga da maior quota se necessário.
+
+    Returns:
+        (sub_demandas, avisos):
+          sub_demandas = [("padrao", padrao, qtd), ...]
+          avisos = lista de avisos `ancora_nao_cumprida` propagados de
+            calcular_quotas (chave/escopo/nivel populados).
     """
     padroes = list(SUBREGIAO_PARA_PADROES.get(subregiao, []))
     if not padroes or qtd <= 0:
-        return []
+        return [], []
 
     obrig = [p for p in (padroes_obrigatorios or []) if p in padroes]
 
+    # ── Caminho com âncoras (Etapa 3) ────────────────────────────────────
+    if subregiao in ANCORAS_POR_SUBREGIAO:
+        quotas, avisos = _quotas_de_subregiao(subregiao, qtd)
+
+        # Garantir que cada padrão obrigatório (travado) tem ≥1 vaga.
+        # Se a quota não cobre, doar 1 da maior quota pro travado.
+        for p_trav in obrig:
+            if quotas.get(p_trav, 0) == 0:
+                if quotas:
+                    p_doador = max(quotas, key=lambda k: (quotas[k], k))
+                    if quotas[p_doador] > 1:
+                        quotas[p_doador] -= 1
+                        quotas[p_trav] = 1
+
+        return [("padrao", p, q) for p, q in quotas.items() if q > 0], avisos
+
+    # ── Caminho fallback (Etapa 2 — cycling uniforme) ────────────────────
     if qtd <= len(obrig):
         escolhidos = random.sample(obrig, qtd)
-        return [("padrao", p, 1) for p in escolhidos]
+        return [("padrao", p, 1) for p in escolhidos], []
 
-    # 1 vaga pra cada obrigatório, depois 1 de cada padrão remanescente
     alocacao = {p: 1 for p in obrig}
     vagas_restantes = qtd - len(obrig)
 
     nao_obrig = [p for p in padroes if p not in alocacao]
     if vagas_restantes > 0 and nao_obrig:
         n_cobrir = min(vagas_restantes, len(nao_obrig))
-        # Cobertura 1 de cada padrão restante (pra preservar paridade)
         nao_obrig_shuf = random.sample(nao_obrig, len(nao_obrig))
         for p in nao_obrig_shuf[:n_cobrir]:
             alocacao[p] = 1
         vagas_restantes -= n_cobrir
 
-    # Ciclar todas as vagas extras entre todos os padrões da subregião
     if vagas_restantes > 0:
         pool_shuf = random.sample(padroes, len(padroes))
         for i in range(vagas_restantes):
             p = pool_shuf[i % len(pool_shuf)]
             alocacao[p] = alocacao.get(p, 0) + 1
-    return [("padrao", p, qt) for p, qt in alocacao.items() if qt > 0]
+    return [("padrao", p, qt) for p, qt in alocacao.items() if qt > 0], []
 
 
 def _decompor_demanda_regiao(
     regiao: str,
     qtd: int,
     subregioes_obrigatorias: Optional[list[str]] = None,
-) -> list[tuple[str, str, int]]:
-    """Aplica regra essencial/acessório (D2.1) pra demanda região.
+) -> tuple[list[tuple[str, str, int]], list[dict]]:
+    """Decompõe demanda região em sub-demandas por subregião.
 
-    Retorna lista de sub-demandas `("subregiao", sub, qty)`. A ordem das
-    sub-demandas e a distribuição em ciclo dependem de `random.*` — chamador
-    deve setar seed se quiser determinismo.
+    Etapa 3: usa ANCORAS_POR_REGIAO quando definida pra distribuir vagas
+    pelas subregiões via Hamilton. Filtro pré-quotas preserva regra Etapa
+    2 D2.1: acessórias (obrigatoria=False) só competem se qtd > 2 ×
+    num_obrigatorias. Regiões sem âncoras caem em fallback Etapa 2
+    (essencial/acessório de SUBREGIOES_POR_REGIAO).
 
-    `subregioes_obrigatorias`: subregiões que devem ter ≥ 1 vaga (suporte a
-    travados — D3.1). Pode forçar inclusão de subregião acessória que
-    normalmente não competiria.
+    `subregioes_obrigatorias`: subregiões que devem ter ≥ 1 vaga (suporte
+    a travados — D3.1). Pode forçar inclusão de subregião com peso baixo.
+
+    Returns:
+        (sub_demandas, avisos):
+          sub_demandas = [("subregiao", subregiao, qtd), ...]
     """
+    if qtd <= 0:
+        return [], []
+
+    obrig = list(subregioes_obrigatorias or [])
+
+    # ── Caminho com âncoras (Etapa 3) ────────────────────────────────────
+    if regiao in ANCORAS_POR_REGIAO:
+        ancoras_raw = ANCORAS_POR_REGIAO[regiao]
+
+        # Filtro pré-quotas: acessórias só competem se qtd > 2 × num_obrig
+        # (preserva regra Etapa 2 D2.1 — essenciais não dividem espaço com
+        # acessórias em demandas pequenas). Travado em acessória força
+        # inclusão da acessória mesmo em qtd pequena.
+        n_obrig = sum(1 for a in ancoras_raw if a["obrigatoria"])
+        if n_obrig > 0 and qtd <= 2 * n_obrig:
+            ancoras_para_q = [
+                a for a in ancoras_raw
+                if a["obrigatoria"] or a["subregiao"] in obrig
+            ]
+        else:
+            ancoras_para_q = ancoras_raw
+
+        ancoras_dict = [
+            {"chave": a["subregiao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
+            for a in ancoras_para_q
+        ]
+        quotas, avisos = calcular_quotas(ancoras_dict, qtd)
+        for av in avisos:
+            av["nivel"] = "regiao"
+            av["escopo"] = regiao
+
+        # Travado força inclusão de subregião não coberta
+        for s_trav in obrig:
+            if quotas.get(s_trav, 0) == 0:
+                if quotas:
+                    s_doador = max(quotas, key=lambda k: (quotas[k], k))
+                    if quotas[s_doador] > 1:
+                        quotas[s_doador] -= 1
+                        quotas[s_trav] = 1
+
+        return [("subregiao", s, q) for s, q in quotas.items() if q > 0], avisos
+
+    # ── Caminho fallback (Etapa 2 — essencial/acessório) ────────────────
     if regiao not in SUBREGIOES_POR_REGIAO:
-        # Fallback: distribui uniformemente entre subregiões da região
+        # Fallback duplo: distribui uniformemente entre subregiões da região
         subs = REGIAO_PARA_SUBREGIOES.get(regiao, [])
         if not subs:
-            return []
-        return [("subregiao", sub, qtd // len(subs)) for sub in subs if qtd // len(subs) > 0]
+            return [], []
+        return [("subregiao", sub, qtd // len(subs)) for sub in subs if qtd // len(subs) > 0], []
 
     estrutura = SUBREGIOES_POR_REGIAO[regiao]
     essenciais = list(estrutura.get("essenciais", []))
     acessorias = list(estrutura.get("acessorias", []))
     todas_subs = essenciais + acessorias
+    obrig_validas = [s for s in obrig if s in todas_subs]
 
-    if qtd <= 0:
-        return []
+    if qtd <= len(obrig_validas):
+        escolhidos = random.sample(obrig_validas, qtd)
+        return [("subregiao", sub, 1) for sub in escolhidos], []
 
-    obrig = [s for s in (subregioes_obrigatorias or []) if s in todas_subs]
+    alocacao = {sub: 1 for sub in obrig_validas}
+    vagas_restantes = qtd - len(obrig_validas)
 
-    if qtd <= len(obrig):
-        # Mais obrigatórias que vagas: sortear qtd entre obrigatórias
-        escolhidos = random.sample(obrig, qtd)
-        return [("subregiao", sub, 1) for sub in escolhidos]
-
-    # 1 vaga pra cada obrigatória primeiro
-    alocacao = {sub: 1 for sub in obrig}
-    vagas_restantes = qtd - len(obrig)
-
-    # Cobre essenciais não-cobertas (até esgotar vagas)
     essenciais_faltantes = [s for s in essenciais if s not in alocacao]
     for sub in essenciais_faltantes:
         if vagas_restantes <= 0:
@@ -1516,15 +1580,10 @@ def _decompor_demanda_regiao(
         vagas_restantes -= 1
 
     if vagas_restantes <= 0:
-        return [("subregiao", sub, qt) for sub, qt in alocacao.items() if qt > 0]
+        return [("subregiao", sub, qt) for sub, qt in alocacao.items() if qt > 0], []
 
-    # Pool de ciclo: essenciais sempre; acessórias só se qtd > 2 × num_essenciais
-    # OU se há acessória obrigatória (já alocada acima — pool inclui acessórias).
-    inclui_acessorias = (qtd > 2 * len(essenciais)) or any(s in acessorias for s in obrig)
-    if inclui_acessorias and acessorias:
-        pool_ciclo = essenciais + acessorias
-    else:
-        pool_ciclo = essenciais
+    inclui_acessorias = (qtd > 2 * len(essenciais)) or any(s in acessorias for s in obrig_validas)
+    pool_ciclo = essenciais + acessorias if (inclui_acessorias and acessorias) else essenciais
 
     if vagas_restantes > 0 and pool_ciclo:
         pool_shuffled = random.sample(pool_ciclo, len(pool_ciclo))
@@ -1532,7 +1591,7 @@ def _decompor_demanda_regiao(
             sub = pool_shuffled[i % len(pool_shuffled)]
             alocacao[sub] = alocacao.get(sub, 0) + 1
 
-    return [("subregiao", sub, qt) for sub, qt in alocacao.items() if qt > 0]
+    return [("subregiao", sub, qt) for sub, qt in alocacao.items() if qt > 0], []
 
 
 def _slot_compativel_com_travado(slot: _Slot, ex: Exercicio) -> bool:
@@ -1602,8 +1661,7 @@ def pre_alocar_rotina(
     # Estrutura intermediária: pra cada (t_idx, d_idx_original), guardamos:
     #   - demanda original (nivel, escopo, qtd)
     #   - sub-demandas (apenas pra região; pra subregião/padrão é a própria)
-    #   - quota composta restante (apenas pra região)
-    quota_composta: dict[tuple[int, int], int] = {}
+    # Etapa 3: quota_composta aposentada (pesos das âncoras decidem composto/iso).
     quota_total: dict[tuple[int, int], tuple[str, str, int]] = {}
     sub_demandas_por_origem: dict[tuple[int, int], list[tuple[str, str, int]]] = {}
 
@@ -1642,29 +1700,40 @@ def pre_alocar_rotina(
             })
 
             if nivel == "regiao":
-                # Quota composta global por demanda (D2.2: 60% por demanda região)
-                quota_composta[(t_idx, d_idx)] = math.ceil(qtd * PROPORCAO_COMPOSTOS)
                 # Decomposição em 2 níveis: região → subregião → padrão, com
-                # awareness de travados em ambos os níveis.
-                sub_dems_subregiao = _decompor_demanda_regiao(
+                # awareness de travados em ambos os níveis. Etapa 3: usa
+                # ANCORAS_POR_REGIAO + ANCORAS_POR_SUBREGIAO via Hamilton.
+                sub_dems_subregiao, avs_reg = _decompor_demanda_regiao(
                     escopo, qtd, subregioes_obrigatorias=subs_obrig,
                 )
+                for av in avs_reg:
+                    av["treino_idx"] = t_idx
+                    av["escopo_demanda"] = escopo
+                    avisos_rotina.append(av)
                 sub_dems_padrao: list[tuple[str, str, int]] = []
                 for (_n, sub_esc, sub_qt) in sub_dems_subregiao:
                     pads_obrig_sub = [
                         p for p in padroes_obrig
                         if PADRAO_PARA_SUBREGIAO.get(p) == sub_esc
                     ]
-                    sub_dems_padrao.extend(
-                        _decompor_demanda_subregiao(
-                            sub_esc, sub_qt, padroes_obrigatorios=pads_obrig_sub,
-                        )
+                    sub_dems_p, avs_sub = _decompor_demanda_subregiao(
+                        sub_esc, sub_qt, padroes_obrigatorios=pads_obrig_sub,
                     )
+                    sub_dems_padrao.extend(sub_dems_p)
+                    for av in avs_sub:
+                        av["treino_idx"] = t_idx
+                        av["escopo_demanda"] = escopo
+                        avisos_rotina.append(av)
                 sub_demandas_por_origem[(t_idx, d_idx)] = sub_dems_padrao
             elif nivel == "subregiao":
-                sub_demandas_por_origem[(t_idx, d_idx)] = _decompor_demanda_subregiao(
+                sub_dems_p, avs_sub = _decompor_demanda_subregiao(
                     escopo, qtd, padroes_obrigatorios=padroes_obrig,
                 )
+                sub_demandas_por_origem[(t_idx, d_idx)] = sub_dems_p
+                for av in avs_sub:
+                    av["treino_idx"] = t_idx
+                    av["escopo_demanda"] = escopo
+                    avisos_rotina.append(av)
             else:
                 sub_demandas_por_origem[(t_idx, d_idx)] = [(nivel, escopo, qtd)]
 
@@ -1696,9 +1765,6 @@ def pre_alocar_rotina(
                         familias_globais.add(ex.nome)
                         if ex.variacao_de:
                             familias_globais.add(ex.variacao_de)
-                        # Se região, decrementa quota composta se travado é composto
-                        if (t_idx, d_idx) in quota_composta and _eh_composto(ex):
-                            quota_composta[(t_idx, d_idx)] = max(0, quota_composta[(t_idx, d_idx)] - 1)
                         consumiu = True
                         break
                 if consumiu:
@@ -1725,35 +1791,21 @@ def pre_alocar_rotina(
                     nivel=sub_nivel,
                     escopo_alocacao=sub_escopo,
                     escopo_demanda_original=escopo_orig,
-                    requer_composto=False,  # marcado em loop separado abaixo
                 )
                 slots_pendentes.append(slot)
 
-    # Marca requer_composto pros primeiros N slots de cada demanda região
-    # (N = quota composta restante após travados). Como a ordem dos slots
-    # ainda não foi ordenada por escassez, o requer_composto vai pra TODOS
-    # os slots da demanda; a flag é decrementada conforme compostos são
-    # alocados. Slot só fica "obriga composto" enquanto há quota.
-    # Implementação: a flag é dinâmica — recalculada antes de cada iteração.
-
     # ─── Etapa D: passe 1 (estrito) ──────────────────────────────────────
+    # Etapa 3: quota composta aposentada. Pesos das âncoras subregião
+    # decidem distribuição composto/isolado (empurrar_compostos:3 vs
+    # empurrar_isolados:2 já dá ~60% composto em peito).
     slots_para_relax: list[_Slot] = []
     while slots_pendentes:
-        # Atualizar requer_composto dinamicamente. Slot herda quota composta
-        # da demanda região mãe (presente em quota_composta sse origem é região).
-        for slot in slots_pendentes:
-            slot.requer_composto = (
-                (slot.treino_idx, slot.d_idx_original) in quota_composta
-                and quota_composta[(slot.treino_idx, slot.d_idx_original)] > 0
-            )
-
         # Calcular escassez de cada slot pendente
         def _escassez_slot(s: _Slot) -> int:
             cfg_t = configs_norm[s.treino_idx]
             return _calcular_escassez(s, banco, cfg_t, nomes_globais, familias_globais)
 
         # Ordenação: (escassez_estrita, peso_nivel, jitter_seeded)
-        # jitter usa random.random() — seed do chamador é respeitada.
         slots_pendentes.sort(
             key=lambda s: (_escassez_slot(s), _peso_nivel(s.nivel), random.random())
         )
@@ -1761,21 +1813,11 @@ def pre_alocar_rotina(
         slot = slots_pendentes.pop(0)
         cfg_t = configs_norm[slot.treino_idx]
 
-        # Tentar alocar com filtro composto se requer_composto
         cands = _candidatos_estritos(
             banco, slot.nivel, slot.escopo_alocacao, cfg_t,
             nomes_globais, familias_globais,
-            filtro_purpose="composto" if slot.requer_composto else None,
+            filtro_purpose=None,
         )
-        # Se requer_composto mas não há composto disponível, tenta sem filtro
-        # (slot ainda conta na quota composta mas aceita isolado — quota fica
-        # em deficit que será detectado em etapas futuras via âncoras).
-        if slot.requer_composto and not cands:
-            cands = _candidatos_estritos(
-                banco, slot.nivel, slot.escopo_alocacao, cfg_t,
-                nomes_globais, familias_globais,
-                filtro_purpose=None,
-            )
 
         if cands:
             escolhido = random.choice(cands)
@@ -1784,10 +1826,6 @@ def pre_alocar_rotina(
             familias_globais.add(escolhido.nome)
             if escolhido.variacao_de:
                 familias_globais.add(escolhido.variacao_de)
-            # Decrementa quota composta se aplicável
-            chave = (slot.treino_idx, slot.d_idx_original)
-            if chave in quota_composta and _eh_composto(escolhido):
-                quota_composta[chave] = max(0, quota_composta[chave] - 1)
         else:
             # Slot sem candidatos no estrito → vira candidato a relax
             slots_para_relax.append(slot)

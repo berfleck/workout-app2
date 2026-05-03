@@ -57,7 +57,6 @@ def test_lower_4_distribui_anterior_e_posterior_balanceado(banco):
 # ----- 2: composto de cada âncora em upper(3) × 2 — Etapa 3 ---------------
 
 
-@pytest.mark.xfail(strict=True, reason="Etapa 3: âncoras protegidas garantem composto")
 def test_upper_3x2treinos_tem_composto_de_cada_ancora(banco):
     """Em 100 rotinas upper(3) × 2 treinos, ambos treinos devem ter pelo
     menos 1 composto de peito (empurrar_compostos). Hoje há rotinas onde
@@ -107,7 +106,6 @@ def test_perna_anterior_3x3_respeita_quota_3_2(banco):
 # ----- 4: distribuição 3:2:1 em perna_posterior(6) — Etapa 3 --------------
 
 
-@pytest.mark.xfail(strict=True, reason="Etapa 3: quotas proporcionais aos pesos")
 def test_perna_posterior_6_distribui_hinge_kneeflex_abducao_3_2_1(banco):
     """Em 100 rotinas perna_posterior(6) × 1, distribuição
     hinge:knee_flexion:abduction deve aproximar 3:2:1."""
@@ -192,7 +190,6 @@ def test_perna_anterior_3x3_cobre_bi_e_uni_em_cada_treino(banco):
 # ----- 7: aviso ancora_nao_cumprida em costas(1) — Etapa 3 ----------------
 
 
-@pytest.mark.xfail(strict=True, reason="Etapa 3: novo tipo de aviso")
 def test_costas_1x1_gera_aviso_ancora_nao_cumprida(banco):
     """Em costas(1) × 1, só uma vaga mas remadas e puxadas são ambas
     obrigatórias. Deve gerar aviso `ancora_nao_cumprida` (tipo de aviso

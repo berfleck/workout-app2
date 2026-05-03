@@ -64,54 +64,67 @@ def test_normalizar_config_epp_dict_lateralidade():
     assert out["lateralidade_por_padrao"] == {"hinge": {"bilateral": 1, "unilateral": 1}}
 
 
-# ─── _decompor_demanda_regiao ────────────────────────────────────────────
+# ─── _decompor_demanda_regiao (Etapa 3: nova assinatura + quotas) ───────
 
 
-def test_decompor_lower_2_so_essenciais():
+def test_decompor_lower_2_so_obrigatorias():
+    """lower(2): pesos 2:2:1. qtd ≤ 2×n_obrig=4 → filtro pré-quotas remove
+    panturrilha (acessória). Hamilton 2 vagas com 2:2 → (1, 1)."""
     random.seed(1)
-    sub_dems = _decompor_demanda_regiao("lower", 2)
+    sub_dems, _ = _decompor_demanda_regiao("lower", 2)
     qtd_por_sub = {sub: qt for _, sub, qt in sub_dems}
     assert qtd_por_sub == {"perna_anterior": 1, "perna_posterior": 1}
 
 
 def test_decompor_lower_4_acessorias_nao_competem():
-    """qtd=4, n_ess=2, 4 NÃO > 2×2=4. Acessórias não competem."""
+    """lower(4): qtd ≤ 2×n_obrig=4 → só obrigatórias. Hamilton 4 vagas com
+    2:2 → (2, 2). Comportamento Etapa 2 D2.1 preservado."""
     random.seed(2)
-    sub_dems = _decompor_demanda_regiao("lower", 4)
+    sub_dems, _ = _decompor_demanda_regiao("lower", 4)
     qtd_por_sub = {sub: qt for _, sub, qt in sub_dems}
     assert qtd_por_sub == {"perna_anterior": 2, "perna_posterior": 2}
 
 
-def test_decompor_lower_5_acessorias_competem():
-    """qtd=5, n_ess=2, 5 > 2×2=4. Acessórias entram no ciclo."""
+def test_decompor_lower_5_acessoria_entra():
+    """lower(5): qtd > 2×n_obrig=4 → todas âncoras competem. Hamilton 5
+    vagas com 2:2:1 → (2, 2, 1) exato."""
     random.seed(3)
-    sub_dems = _decompor_demanda_regiao("lower", 5)
+    sub_dems, _ = _decompor_demanda_regiao("lower", 5)
     qtd_por_sub = {sub: qt for _, sub, qt in sub_dems}
-    assert qtd_por_sub.get("perna_anterior", 0) >= 1
-    assert qtd_por_sub.get("perna_posterior", 0) >= 1
-    assert sum(qtd_por_sub.values()) == 5
+    assert qtd_por_sub == {"perna_anterior": 2, "perna_posterior": 2, "panturrilha": 1}
 
 
-def test_decompor_lower_6_um_de_cada():
-    """qtd=6, n_ess=2, 6 > 4. 1+1 essenciais + ciclo de 4 → 1 de cada (2+2+1+1)."""
+def test_decompor_lower_6_proporcional():
+    """lower(6): pesos 2:2:1 → Hamilton 6×(2/5,2/5,1/5)=(2.4,2.4,1.2)
+    → floor (2,2,1) restante=1; tie-break ordem → perna_ant +1 = (3,2,1).
+
+    NOTA: adutores NÃO está em ANCORAS_POR_REGIAO['lower'] (decisão clínica:
+    adutores entra só quando user pede explicitamente). Mudança vs Etapa 2
+    onde adutores aparecia via fallback essencial/acessório.
+    """
     random.seed(4)
-    sub_dems = _decompor_demanda_regiao("lower", 6)
+    sub_dems, _ = _decompor_demanda_regiao("lower", 6)
     qtd_por_sub = {sub: qt for _, sub, qt in sub_dems}
-    assert qtd_por_sub.get("perna_anterior", 0) == 2
+    assert qtd_por_sub.get("perna_anterior", 0) == 3
     assert qtd_por_sub.get("perna_posterior", 0) == 2
     assert qtd_por_sub.get("panturrilha", 0) == 1
-    assert qtd_por_sub.get("adutores", 0) == 1
+    assert "adutores" not in qtd_por_sub
 
 
-def test_decompor_upper_2_vagas_menores_que_essenciais():
-    """qtd=2, n_ess=3 (peito, costas, ombro). Sortea 2 das 3 com seed."""
+def test_decompor_upper_2_vagas_menores_que_obrigatorias():
+    """upper(2): n_obrig=3 (peito, costas, ombro), qtd<n_obrig → sorteio +
+    aviso. Etapa 3 substitui sample pré-quota por calcular_quotas que sortea
+    e emite ancora_nao_cumprida."""
     random.seed(5)
-    sub_dems = _decompor_demanda_regiao("upper", 2)
+    sub_dems, avisos = _decompor_demanda_regiao("upper", 2)
     qtd_por_sub = {sub: qt for _, sub, qt in sub_dems}
     assert sum(qtd_por_sub.values()) == 2
     assert all(qt == 1 for qt in qtd_por_sub.values())
     assert set(qtd_por_sub.keys()) <= {"peito", "costas", "ombro"}
     assert len(qtd_por_sub) == 2
+    # 1 obrigatória ficou de fora → aviso ancora_nao_cumprida
+    nao_cumpridas = [a for a in avisos if a.get("tipo") == "ancora_nao_cumprida"]
+    assert len(nao_cumpridas) == 1
 
 
 # ─── pre_alocar_rotina ──────────────────────────────────────────────────
@@ -153,18 +166,24 @@ def test_pre_alocar_lower_4_dois_e_dois_essenciais(banco):
     assert cnt_sub == {"perna_anterior": 2, "perna_posterior": 2}
 
 
-def test_pre_alocar_lower_6_um_de_cada_subregiao(banco):
-    """lower(6): 2+2 essenciais + 1+1 acessórias = 6."""
+def test_pre_alocar_lower_6_proporcional(banco):
+    """lower(6) Etapa 3: pesos 2:2:1 (perna_ant, perna_post, panturrilha).
+    Hamilton 6×(2/5,2/5,1/5)=(2.4,2.4,1.2) → floor (2,2,1) restante=1;
+    tie-break ordem → perna_ant +1 = (3,2,1).
+
+    Adutores NÃO entra (não está em ANCORAS_POR_REGIAO['lower']) — decisão
+    clínica da Etapa 3: adutores entra só quando user pede explicitamente.
+    """
     random.seed(12)
     cfg = {"demandas": [("regiao", "lower", 6)]}
     alocacao, _, _relax = pre_alocar_rotina(banco, [cfg])
     exs = _all_alocados(alocacao)
     assert len(exs) == 6
     cnt_sub = Counter(ex.subregiao for ex in exs)
-    assert cnt_sub.get("perna_anterior", 0) == 2
+    assert cnt_sub.get("perna_anterior", 0) == 3
     assert cnt_sub.get("perna_posterior", 0) == 2
     assert cnt_sub.get("panturrilha", 0) == 1
-    assert cnt_sub.get("adutores", 0) == 1
+    assert cnt_sub.get("adutores", 0) == 0
 
 
 def test_pre_alocar_subregiao_e_padrao_sem_decomposicao(banco):
@@ -184,14 +203,27 @@ def test_pre_alocar_subregiao_e_padrao_sem_decomposicao(banco):
     assert all(ex.padrao == "hinge" for ex in exs)
 
 
-def test_pre_alocar_quota_composto_em_regiao(banco):
-    """lower(5): pelo menos ceil(5×0.6)=3 compostos."""
-    random.seed(15)
-    cfg = {"demandas": [("regiao", "lower", 5)]}
-    alocacao, _, _relax = pre_alocar_rotina(banco, [cfg])
-    exs = _all_alocados(alocacao)
-    n_compostos = sum(1 for ex in exs if _eh_composto(ex))
-    assert n_compostos >= 3, f"esperado >= 3 compostos, obtido {n_compostos}"
+def test_pre_alocar_quota_composto_em_regiao_via_pesos(banco):
+    """lower(5) Etapa 3: quota composta emerge dos pesos das âncoras.
+
+    Hamilton aloca: perna_ant 2 (pesos squat_bi:3, squat_uni:2 → 1 bi + 1
+    uni), perna_post 2 (pesos hinge:3, knee:2, abd:1 → 1 hinge + 1 knee),
+    panturrilha 1 (flexao_plantar). Compostos: bi+hinge ≥ 2 garantidos.
+
+    NOTA: a regra dura 60% (PROPORCAO_COMPOSTOS) foi aposentada na Etapa 3.
+    Pesos das âncoras decidem composto/iso (empurrar_compostos:3 vs
+    empurrar_isolados:2 dá ~60% composto em peito naturalmente).
+    """
+    # Roda 100 seeds e checa que MEDIANA tem >= 2 compostos (não regra dura)
+    contagens = []
+    for s in range(100):
+        random.seed(s)
+        cfg = {"demandas": [("regiao", "lower", 5)]}
+        alocacao, _, _relax = pre_alocar_rotina(banco, [cfg])
+        exs = _all_alocados(alocacao)
+        contagens.append(sum(1 for ex in exs if _eh_composto(ex)))
+    media = sum(contagens) / len(contagens)
+    assert media >= 1.8, f"média compostos em lower(5) = {media:.2f} (esperado >= 1.8)"
 
 
 def test_pre_alocar_travado_consome_vaga(banco):
