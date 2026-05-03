@@ -844,8 +844,38 @@ def _bloqueio_cargas(ex_a: "Exercicio", ex_b: "Exercicio", thresholds: dict) -> 
     return False
 
 
-def pode_adicionar_ao_bloco(bloco_atual: list, candidato: Exercicio, tamanho_bloco: int) -> bool:
-    """Verifica se o candidato pode entrar no bloco respeitando a regra de fadiga."""
+def pode_adicionar_ao_bloco(
+    bloco_atual: list,
+    candidato: Exercicio,
+    tamanho_bloco: int,
+    cargas_config: dict | None = None,
+    exercicios_travados: list | set | None = None,
+) -> bool:
+    """Verifica se o candidato pode entrar no bloco.
+
+    Aplica duas regras hard, nesta ordem:
+
+    1. **Filtro de cargas** (Etapa 4 / HIB2). Se `cargas_config` é dict
+       não-vazio, par é avaliado por `_bloqueio_cargas`. Travados bypassam
+       — exercícios em `exercicios_travados` (lista de Exercicio ou set de
+       nomes) não são checados contra carga.
+    2. **Regra de fadiga**. Bloco 1-2: máx 1 alta-fadiga; bloco 3: máx 2.
+
+    `cargas_config=None` mantém comportamento pré-Etapa 4 (filtro OFF).
+    """
+    # 1. Filtro de cargas (Etapa 4)
+    if cargas_config:
+        travados_nomes = {
+            e.nome if hasattr(e, "nome") else e
+            for e in (exercicios_travados or [])
+        }
+        cand_travado = candidato.nome in travados_nomes
+        for ex in bloco_atual:
+            if ex.nome in travados_nomes or cand_travado:
+                continue
+            if _bloqueio_cargas(ex, candidato, cargas_config):
+                return False
+    # 2. Regra de fadiga (existente)
     max_alta_fadiga = 1 if tamanho_bloco <= 2 else 2
     alta_fadiga_no_bloco = sum(1 for e in bloco_atual if e.fadiga >= FADIGA_MAX_PAR)
     if candidato.fadiga >= FADIGA_MAX_PAR and alta_fadiga_no_bloco >= max_alta_fadiga:

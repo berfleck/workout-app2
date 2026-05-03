@@ -147,3 +147,78 @@ def test_bloqueio_cargas_simetrico():
     a = _make_ex("A", lombar=3)
     b = _make_ex("B", lombar=2)
     assert _bloqueio_cargas(a, b, HIB2) == _bloqueio_cargas(b, a, HIB2)
+
+
+# ---------------------------------------------------------------------------
+# Sub-PR 1.1 — integrar filtro em pode_adicionar_ao_bloco
+# ---------------------------------------------------------------------------
+
+def test_pode_adicionar_carga_off_nao_bloqueia():
+    """Sem cargas_config, comportamento idêntico ao pré-Etapa 4."""
+    from gerador_treino import pode_adicionar_ao_bloco
+    a = _make_ex("A", lombar=3)
+    b = _make_ex("B", lombar=3)
+    assert pode_adicionar_ao_bloco([a], b, 2) is True
+
+
+def test_pode_adicionar_carga_on_bloqueia_par_acima_threshold():
+    """Com cargas_config, par lombar 3+3=6 acima de threshold 5 é bloqueado."""
+    from gerador_treino import pode_adicionar_ao_bloco
+    a = _make_ex("A", lombar=3)
+    b = _make_ex("B", lombar=3)
+    assert pode_adicionar_ao_bloco([a], b, 2, cargas_config=HIB2) is False
+
+
+def test_pode_adicionar_carga_on_libera_par_abaixo_threshold():
+    """Soma 4 com threshold lombar=5 → não bloqueia."""
+    from gerador_treino import pode_adicionar_ao_bloco
+    a = _make_ex("A", lombar=2)
+    b = _make_ex("B", lombar=2)
+    assert pode_adicionar_ao_bloco([a], b, 2, cargas_config=HIB2) is True
+
+
+def test_pode_adicionar_travados_bypassam_carga_lista_exercicios():
+    """Travados (passados como lista de Exercicio) bypassam filtro de cargas."""
+    from gerador_treino import pode_adicionar_ao_bloco
+    a = _make_ex("A_travado", lombar=3)
+    b = _make_ex("B", lombar=3)
+    travados = [a]
+    assert pode_adicionar_ao_bloco(
+        [a], b, 2, cargas_config=HIB2, exercicios_travados=travados
+    ) is True
+
+
+def test_pode_adicionar_travados_bypassam_carga_set_de_nomes():
+    """Travados passados como set de nomes também bypassam."""
+    from gerador_treino import pode_adicionar_ao_bloco
+    a = _make_ex("A_travado", lombar=3)
+    b = _make_ex("B_travado", lombar=3)
+    travados_nomes = {"A_travado", "B_travado"}
+    assert pode_adicionar_ao_bloco(
+        [a], b, 2, cargas_config=HIB2, exercicios_travados=travados_nomes
+    ) is True
+
+
+def test_pode_adicionar_carga_bloco_3_par_a_par():
+    """Em bloco de 3, filtro é par-a-par (não soma trio)."""
+    from gerador_treino import pode_adicionar_ao_bloco
+    a = _make_ex("A", grip=2)
+    b = _make_ex("B", grip=2)
+    # C+A=5 OK, C+B=5 OK (não somam grip=6 → trio passaria)
+    c = _make_ex("C", grip=3)
+    assert pode_adicionar_ao_bloco([a, b], c, 3, cargas_config=HIB2) is True
+    # Mas C2+A=6 ≥ 6 → C2 deve ser rejeitado
+    c2 = _make_ex("C2", grip=4)
+    assert pode_adicionar_ao_bloco([a, b], c2, 3, cargas_config=HIB2) is False
+
+
+def test_pode_adicionar_carga_e_fadiga_independentes():
+    """Filtro de cargas roda antes de fadiga; ambos podem bloquear."""
+    from gerador_treino import pode_adicionar_ao_bloco
+    # Par bloqueado por carga E candidato com fadiga 4 (também violaria fadiga)
+    a = _make_ex("A", lombar=3, fadiga=4)
+    b = _make_ex("B", lombar=3, fadiga=4)
+    # Carga bloqueia → return False (não importa fadiga)
+    assert pode_adicionar_ao_bloco([a], b, 2, cargas_config=HIB2) is False
+    # Sem carga, fadiga ainda bloqueia (max_alta_fadiga=1 em bloco 2)
+    assert pode_adicionar_ao_bloco([a], b, 2, cargas_config=None) is False
