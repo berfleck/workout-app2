@@ -189,3 +189,88 @@ def test_quota_lista_vazia():
     quotas, avisos = calcular_quotas([], vagas=3)
     assert quotas == {}
     assert avisos == []
+
+
+# ─── Invariantes (devem valer pra qualquer config) ─────────────────────
+
+
+def test_quota_invariante_soma_igual_a_vagas():
+    """Sum(quotas.values()) == vagas (exceto quando lista de âncoras vazia)."""
+    casos = [
+        ([{"chave": "a", "peso": 1, "obrigatoria": True}], 5),
+        ([
+            {"chave": "a", "peso": 3, "obrigatoria": True},
+            {"chave": "b", "peso": 2, "obrigatoria": False},
+        ], 7),
+        ([
+            {"chave": "a", "peso": 2, "obrigatoria": True},
+            {"chave": "b", "peso": 2, "obrigatoria": True},
+            {"chave": "c", "peso": 1, "obrigatoria": True},
+        ], 11),
+    ]
+    for ancoras, vagas in casos:
+        random.seed(1)
+        quotas, _ = calcular_quotas(ancoras, vagas)
+        assert sum(quotas.values()) == vagas, (
+            f"ancoras={ancoras} vagas={vagas} quotas={quotas}"
+        )
+
+
+def test_quota_invariante_chaves_subset_das_ancoras():
+    """Toda chave em quotas vem de uma âncora."""
+    ancoras = [
+        {"chave": "a", "peso": 3, "obrigatoria": True},
+        {"chave": "b", "peso": 1, "obrigatoria": False},
+    ]
+    chaves_validas = {a["chave"] for a in ancoras}
+    for vagas in range(0, 20):
+        random.seed(vagas)
+        quotas, _ = calcular_quotas(ancoras, vagas)
+        assert set(quotas.keys()) <= chaves_validas
+
+
+def test_quota_invariante_obrigatoria_cumprida_em_ancoras_reais():
+    """Para os pesos clínicos reais (ANCORAS_POR_*), obrigatórias têm qtd >= 1
+    quando vagas >= num_obrigatorias.
+
+    NOTA: Hamilton puro NÃO garante obrigatórias em todos os pesos — uma
+    não-obrigatória com peso muito superior pode dominar todas as vagas.
+    Os pesos clínicos definidos (ratio máximo 3:1) não disparam esse edge
+    case. Este teste prova que a calibração real é segura.
+    """
+    from gerador_treino import ANCORAS_POR_REGIAO, ANCORAS_POR_SUBREGIAO
+
+    grupos = []
+    for regiao, ancoras_raw in ANCORAS_POR_REGIAO.items():
+        grupos.append((
+            f"regiao={regiao}",
+            [
+                {"chave": a["subregiao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
+                for a in ancoras_raw
+            ],
+        ))
+    for sub, ancoras_raw in ANCORAS_POR_SUBREGIAO.items():
+        grupos.append((
+            f"subregiao={sub}",
+            [
+                {"chave": a["padrao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
+                for a in ancoras_raw
+            ],
+        ))
+
+    for nome, ancoras in grupos:
+        n_obrig = sum(1 for a in ancoras if a["obrigatoria"])
+        if n_obrig == 0:
+            continue
+        for vagas in range(n_obrig, 15):
+            random.seed(vagas)
+            quotas, avisos = calcular_quotas(ancoras, vagas)
+            for a in ancoras:
+                if a["obrigatoria"]:
+                    assert quotas.get(a["chave"], 0) >= 1, (
+                        f"{nome} vagas={vagas}: obrig {a['chave']} tem "
+                        f"qtd={quotas.get(a['chave'])}; quotas={quotas}"
+                    )
+            # Sem avisos quando vagas >= n_obrig
+            avisos_nc = [v for v in avisos if v["tipo"] == "ancora_nao_cumprida"]
+            assert avisos_nc == [], f"{nome} vagas={vagas}: avisos={avisos_nc}"
