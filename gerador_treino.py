@@ -99,6 +99,94 @@ SUBREGIOES_POR_REGIAO: dict[str, dict[str, list[str]]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Etapa 3: Âncoras protegidas (peso + obrigatoriedade)
+# ---------------------------------------------------------------------------
+# Pesos definem QUOTAS proporcionais (independente do tamanho do banco).
+# Sorteio dentro do banco filtrado decide QUAL exercício específico preenche
+# cada vaga. Tie-break em arredondamento: obrigatórias > peso maior > ordem.
+#
+# Subregiões/padrões NÃO listados aqui caem em fallback Etapa 2 (cycling
+# uniforme via _decompor_demanda_*). Casos atuais sem âncora:
+#   - bracos (sub) e biceps/triceps (padrões): user pede explicitamente
+#   - adutores (sub) e adduction (padrão): user pede explicitamente
+#   - core_dinamico/core_isometrico: padrões internos a definir no futuro
+
+ANCORAS_POR_REGIAO: dict[str, list[dict]] = {
+    "upper": [
+        {"subregiao": "peito",  "peso": 2, "obrigatoria": True},
+        {"subregiao": "costas", "peso": 2, "obrigatoria": True},
+        {"subregiao": "ombro",  "peso": 1, "obrigatoria": True},
+    ],
+    "lower": [
+        {"subregiao": "perna_anterior",  "peso": 2, "obrigatoria": True},
+        {"subregiao": "perna_posterior", "peso": 2, "obrigatoria": True},
+        {"subregiao": "panturrilha",     "peso": 1, "obrigatoria": False},
+    ],
+    "core": [
+        {"subregiao": "core_dinamico",   "peso": 1, "obrigatoria": False},
+        {"subregiao": "core_isometrico", "peso": 1, "obrigatoria": False},
+    ],
+}
+
+ANCORAS_POR_SUBREGIAO: dict[str, list[dict]] = {
+    "peito": [
+        {"padrao": "empurrar_compostos", "peso": 3, "obrigatoria": True},
+        {"padrao": "empurrar_isolados",  "peso": 2, "obrigatoria": False},
+    ],
+    "costas": [
+        {"padrao": "remadas", "peso": 2, "obrigatoria": True},
+        {"padrao": "puxadas", "peso": 2, "obrigatoria": True},
+    ],
+    "ombro": [
+        {"padrao": "ombro_composto",  "peso": 3, "obrigatoria": True},
+        {"padrao": "ombro_isolado",   "peso": 2, "obrigatoria": False},
+        {"padrao": "posterior_ombro", "peso": 1, "obrigatoria": False},
+    ],
+    "perna_anterior": [
+        {"padrao": "squat_bilateral",  "peso": 3, "obrigatoria": True},
+        {"padrao": "squat_unilateral", "peso": 2, "obrigatoria": False},
+    ],
+    "perna_posterior": [
+        {"padrao": "hinge",        "peso": 3, "obrigatoria": True},
+        {"padrao": "knee_flexion", "peso": 2, "obrigatoria": False},
+        {"padrao": "abduction",    "peso": 1, "obrigatoria": False},
+    ],
+    "panturrilha": [
+        {"padrao": "flexao_plantar", "peso": 1, "obrigatoria": True},
+    ],
+    # core_dinamico, core_isometrico, bracos, adutores: sem âncoras
+    # (fallback pra cycling uniforme da Etapa 2).
+}
+
+
+def _validar_ancoras() -> None:
+    """Sanity check: nomes em ANCORAS_* batem com PADRAO_PARA_SUBREGIAO."""
+    for regiao, ancoras in ANCORAS_POR_REGIAO.items():
+        for a in ancoras:
+            sub = a["subregiao"]
+            assert sub in SUBREGIAO_PARA_REGIAO, (
+                f"ANCORAS_POR_REGIAO[{regiao!r}]: subregião '{sub}' não existe"
+            )
+            assert SUBREGIAO_PARA_REGIAO[sub] == regiao, (
+                f"ANCORAS_POR_REGIAO[{regiao!r}]: '{sub}' aponta pra "
+                f"'{SUBREGIAO_PARA_REGIAO[sub]}' em SUBREGIAO_PARA_REGIAO"
+            )
+    for sub, ancoras in ANCORAS_POR_SUBREGIAO.items():
+        for a in ancoras:
+            pad = a["padrao"]
+            assert pad in PADRAO_PARA_SUBREGIAO, (
+                f"ANCORAS_POR_SUBREGIAO[{sub!r}]: padrão '{pad}' não existe"
+            )
+            assert PADRAO_PARA_SUBREGIAO[pad] == sub, (
+                f"ANCORAS_POR_SUBREGIAO[{sub!r}]: '{pad}' aponta pra "
+                f"'{PADRAO_PARA_SUBREGIAO[pad]}' em PADRAO_PARA_SUBREGIAO"
+            )
+
+
+_validar_ancoras()
+
+
 # Classificação composto vs isolado é por EXERCÍCIO via coluna `purpose` do banco.
 # compound + explosive → composto. isolation + stability → isolado.
 # A constante PADROES_COMPOSTOS abaixo é mantida apenas pra retrocompatibilidade
