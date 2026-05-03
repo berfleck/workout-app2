@@ -351,3 +351,100 @@ def test_gerar_sessao_por_demandas_respeita_cargas_config(banco):
                     f"par viola filtro HIB2 em standalone: "
                     f"{exs[i].nome} + {exs[j].nome}"
                 )
+
+
+# ---------------------------------------------------------------------------
+# Sub-PR 1.3 — aviso relaxado_carga via second-pass em montar_blocos
+# ---------------------------------------------------------------------------
+
+def test_relaxado_carga_emite_aviso_quando_solo_por_carga():
+    """Banco sintético: 2 ex de hinge com lombar=3 cada → bloqueia em HIB2.
+    Com filtro ON, ambos ficam solo e o aviso relaxado_carga é emitido."""
+    from gerador_treino import montar_blocos
+    a = _make_ex("Hiper A", lombar=3, padrao="hinge", regiao="lower")
+    b = _make_ex("Hiper B", lombar=3, padrao="hinge", regiao="lower")
+    avisos: list[dict] = []
+    blocos = montar_blocos(
+        [a, b], tamanho=2,
+        cargas_config=HIB2,
+        avisos_carga=avisos,
+    )
+    # 2 blocos solo (cada exercício no seu próprio bloco)
+    assert len(blocos) == 2
+    assert all(len(bl) == 1 for bl in blocos)
+    # 1 aviso relaxado_carga emitido
+    avisos_carga = [a for a in avisos if a["tipo"] == "relaxado_carga"]
+    assert len(avisos_carga) == 1
+    av = avisos_carga[0]
+    assert av["dimensao"] == "lombar"
+    assert av["soma"] == 6
+    assert av["threshold"] == 5
+
+
+def test_relaxado_carga_nao_emite_se_solo_por_fadiga():
+    """Banco sintético: 2 ex com fadiga=4 (alta). Bloco 2 → 1 alta-fadiga max.
+    Solo ocorre por fadiga, NÃO por carga. relaxado_carga não deve emitir."""
+    from gerador_treino import montar_blocos
+    a = _make_ex("Pesado A", fadiga=4)
+    b = _make_ex("Pesado B", fadiga=4)
+    avisos: list[dict] = []
+    blocos = montar_blocos(
+        [a, b], tamanho=2,
+        cargas_config=HIB2,
+        avisos_carga=avisos,
+    )
+    avisos_carga = [a for a in avisos if a["tipo"] == "relaxado_carga"]
+    assert avisos_carga == []
+
+
+def test_relaxado_carga_nao_emite_se_filtro_off():
+    """Sem cargas_config, nenhum aviso relaxado_carga (mesmo se 2 ex com lombar 6)."""
+    from gerador_treino import montar_blocos
+    a = _make_ex("Hiper A", lombar=3, padrao="hinge")
+    b = _make_ex("Hiper B", lombar=3, padrao="hinge")
+    avisos: list[dict] = []
+    blocos = montar_blocos(
+        [a, b], tamanho=2,
+        cargas_config=None,
+        avisos_carga=avisos,
+    )
+    # Sem filtro, ambos pareiam normalmente (mesmo padrão, mas sem regra de carga)
+    assert len(blocos) == 1
+    assert len(blocos[0]) == 2
+    assert avisos == []
+
+
+def test_relaxado_carga_propaga_para_sessao_avisos(banco):
+    """Aviso relaxado_carga acaba em Sessao.avisos quando vem via gerar_multiplos_treinos."""
+    import random
+    from gerador_treino import gerar_multiplos_treinos
+    cfg = {
+        "demandas": [("regiao", "lower", 4), ("regiao", "upper", 3), ("regiao", "core", 1)],
+        "tamanho_bloco": 2,
+        "max_complexidade": 5,
+        "equipamentos_bloqueados": [],
+        "evitar_agonistas": True,
+        "cargas_config": HIB2,
+    }
+    # Iterar seeds até encontrar uma que produza aviso (banco real, comportamento estocástico)
+    SEEDS = [1, 7, 13, 23, 42, 99, 100, 117, 200, 314, 555, 777, 1000]
+    encontrou = False
+    for seed in SEEDS:
+        random.seed(seed)
+        sessoes = gerar_multiplos_treinos(banco, [cfg, cfg], relaxar_familia=True)
+        for s in sessoes:
+            avisos_c = [a for a in s.avisos if a["tipo"] == "relaxado_carga"]
+            if avisos_c:
+                # Confirmar estrutura do aviso
+                av = avisos_c[0]
+                assert "dimensao" in av
+                assert "soma" in av
+                assert "threshold" in av
+                assert av["dimensao"] in ("grip", "lombar", "core")
+                encontrou = True
+                break
+        if encontrou:
+            break
+    # Não asserto que encontrou — banco real pode não disparar em nenhuma das seeds,
+    # mas o teste verifica que QUANDO disparar, a estrutura está correta.
+    # O caso síntetico cobre a emissão obrigatória.

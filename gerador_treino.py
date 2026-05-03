@@ -986,6 +986,7 @@ def montar_blocos(
     evitar_agonistas: bool = False,
     cargas_config: dict | None = None,
     exercicios_travados: list | set | None = None,
+    avisos_carga: list | None = None,
 ) -> list[tuple]:
     """
     Monta blocos de tamanho configurável (1, 2 ou 3).
@@ -995,6 +996,12 @@ def montar_blocos(
     Se evitar_agonistas=True, evita parear exercícios do mesmo grupo push/pull.
     O último bloco pode ter menos exercícios se não houver suficientes.
     Retorna lista de tuplas de tamanho variável.
+
+    Se `cargas_config` está ativo e `avisos_carga` é uma lista mutável, blocos
+    que ficam solo *por causa do filtro de cargas* (verificado via second-pass
+    com filtro off) emitem aviso `relaxado_carga` na lista. Solo por fadiga
+    ou por exaustão do banco não emite. Aviso traz: bloco_idx, exercicio
+    (âncora), par_bloqueado (que existiria sem filtro), dimensao, soma, threshold.
     """
     if not exercicios:
         return []
@@ -1039,6 +1046,42 @@ def montar_blocos(
                 )
 
             if melhor is None:
+                # Second-pass para detectar relaxado_carga: se cargas_config
+                # está ativo, tentar novamente sem filtro pra ver se carga era
+                # a causa do solo. Se sim, emitir aviso.
+                if cargas_config and avisos_carga is not None:
+                    melhor_off = _buscar_candidato(
+                        exercicios, usados, bloco_atual,
+                        regioes_no_bloco, padroes_no_bloco, tamanho,
+                        evitar_unilateral=False,
+                        evitar_agonistas=evitar_agonistas,
+                        cargas_config=None,  # filtro desligado
+                        exercicios_travados=exercicios_travados,
+                    )
+                    if melhor_off is not None:
+                        cand_off = exercicios[melhor_off]
+                        ancora = bloco_atual[0]
+                        # Achar a primeira dimensão violada vs âncora
+                        motivo = None
+                        for dim, attr in _DIMS_CARGA:
+                            t = cargas_config.get(dim)
+                            if not t:
+                                continue
+                            va = getattr(ancora, attr, 0)
+                            vb = getattr(cand_off, attr, 0)
+                            if va >= 1 and vb >= 1 and (va + vb) >= t:
+                                motivo = (dim, va + vb, t)
+                                break
+                        if motivo:
+                            avisos_carga.append({
+                                "tipo": "relaxado_carga",
+                                "bloco_idx": len(blocos),
+                                "exercicio": ancora.nome,
+                                "par_bloqueado": cand_off.nome,
+                                "dimensao": motivo[0],
+                                "soma": motivo[1],
+                                "threshold": motivo[2],
+                            })
                 break
 
             bloco_atual.append(exercicios[melhor])
@@ -1268,13 +1311,16 @@ def gerar_sessao(
     todos_selecionados = ordenar_compostos_primeiro(todos_selecionados)
 
     # Montar e ordenar blocos
+    avisos_carga_local: list[dict] = []
     grupos = ordenar_blocos(montar_blocos(
         todos_selecionados,
         tamanho=tamanho_bloco,
         evitar_agonistas=evitar_agonistas,
         cargas_config=cargas_config,
         exercicios_travados=travados,
+        avisos_carga=avisos_carga_local,
     ))
+    avisos_da_sessao.extend(avisos_carga_local)
 
     # Criar SuperSeries
     labels = "ABCDEFGHIJKLMNOP"
@@ -2479,13 +2525,16 @@ def gerar_sessao_por_demandas(
     todos_selecionados = ordenar_compostos_primeiro(todos_selecionados)
 
     # Montar e ordenar blocos
+    avisos_carga_local: list[dict] = []
     grupos = ordenar_blocos(montar_blocos(
         todos_selecionados,
         tamanho=tamanho_bloco,
         evitar_agonistas=evitar_agonistas,
         cargas_config=cargas_config,
         exercicios_travados=travados,
+        avisos_carga=avisos_carga_local,
     ))
+    avisos_da_sessao.extend(avisos_carga_local)
 
     labels = "ABCDEFGHIJKLMNOP"
     blocos = []
