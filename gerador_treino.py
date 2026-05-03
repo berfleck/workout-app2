@@ -580,6 +580,10 @@ class Exercicio:
     series: Optional[int] = None
     reps: Optional[str] = None   # ex: "8-12", "10", "12-15"
     rir: Optional[int] = None    # Reps In Reserve 0-4
+    # Cargas (filtro Etapa 4 / HIB2). Default 0 = "não se aplica".
+    carga_grip: int = 0
+    carga_lombar: int = 0
+    demanda_core: int = 0
 
 
 @dataclass
@@ -611,6 +615,19 @@ def _str(val) -> str:
     except (TypeError, ValueError):
         pass
     return str(val).strip()
+
+
+def _int_or_zero(val) -> int:
+    """Converte célula do XLSX em int, retornando 0 para None/NaN/inválido."""
+    if val is None:
+        return 0
+    try:
+        f = float(val)
+        if math.isnan(f):
+            return 0
+        return int(f)
+    except (TypeError, ValueError):
+        return 0
 
 
 _EQ_FIXES = {
@@ -655,6 +672,9 @@ def carregar_banco(path: str) -> list[Exercicio]:
             similaridade=_str(row.get("similaridade")),
             musculo_primario=_str(row.get("musculo_primario")),
             obs=_str(row.get("obs")) or None,
+            carga_grip=_int_or_zero(row.get("carga_grip")),
+            carga_lombar=_int_or_zero(row.get("carga_lombar")),
+            demanda_core=_int_or_zero(row.get("demanda_core")),
         ))
     return exercicios
 
