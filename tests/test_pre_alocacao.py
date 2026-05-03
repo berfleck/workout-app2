@@ -251,20 +251,26 @@ def test_pre_alocar_multi_treino_sem_repetir_nomes(banco):
 
 
 def test_pre_alocar_aviso_incompleta_rotina_level(banco):
-    """Banco curto em peito + peito(3)×2 → maioria dos slots vira aviso."""
+    """Banco curto em peito + peito(3)×2 → maioria dos slots vira aviso.
+
+    Etapa 3: peito tem âncora obrigatória empurrar_compostos, então
+    slots desse padrão sem candidato viram `ancora_sem_candidatos`
+    (não `incompleta` genérico). Testa ambos os tipos como avisos
+    rotina-level válidos.
+    """
     random.seed(18)
-    # Mantém só 1 ex de peito (sem variacao_de pra evitar bloqueio em cadeia)
     banco_curto = [
         e for e in banco
         if e.subregiao != "peito" or e.nome == "Crossover Sentado"
     ]
     cfg = {"demandas": [("subregiao", "peito", 3)]}
     alocacao, avisos, _relax = pre_alocar_rotina(banco_curto, [cfg, cfg])
-    # 1 ex será alocado (no T1, ordem aleatória), e 5 slots ficam sem candidato
-    # → 5 avisos rotina-level. Mas com seed pode haver ≤ 5 (se 0 alocados, 6 avisos).
-    avisos_rot = [a for a in avisos if a.get("tipo") == "incompleta" and a.get("escopo") == "rotina"]
+    avisos_rot = [
+        a for a in avisos
+        if a.get("escopo") == "rotina"
+        and a.get("tipo") in ("incompleta", "ancora_sem_candidatos")
+    ]
     assert len(avisos_rot) >= 4, f"avisos: {avisos}"
-    # Cada aviso tem `escopo` e `escopo_demanda` populados
     for av in avisos_rot:
         assert av["escopo"] == "rotina"
         assert "escopo_demanda" in av

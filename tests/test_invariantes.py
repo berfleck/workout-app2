@@ -163,10 +163,16 @@ def test_avisos_tem_estrutura_valida(banco):
     ]
     cfg = {"demandas": [("subregiao", "peito", 2)]}
     sessoes = gerar_multiplos_treinos(banco_curto, [cfg, cfg], relaxar_familia=False)
+    tipos_validos = {
+        "incompleta",
+        "familia_repetida",
+        "ancora_nao_cumprida",     # Etapa 3: vagas < num_obrigatorias
+        "ancora_sem_candidatos",   # Etapa 3: obrigatória sem pool no banco
+    }
     for s in sessoes:
         for av in s.avisos:
             assert "tipo" in av, f"aviso sem 'tipo': {av}"
-            assert av["tipo"] in {"incompleta", "familia_repetida"}, (
+            assert av["tipo"] in tipos_validos, (
                 f"tipo invalido: {av['tipo']}"
             )
 

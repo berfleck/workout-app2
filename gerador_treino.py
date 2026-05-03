@@ -1969,31 +1969,60 @@ def pre_alocar_rotina(
                 relaxados_por_treino.setdefault(slot.treino_idx, []).append(escolhido.nome)
             else:
                 # Mesmo no relax não há candidato → aviso rotina-level
-                avisos_rotina.append({
-                    "tipo": "incompleta",
-                    "escopo": "rotina",
-                    "treino_idx": slot.treino_idx,
-                    "nivel": quota_total[(slot.treino_idx, slot.d_idx_original)][0],
-                    "escopo_demanda": slot.escopo_demanda_original,
-                    "nivel_alocacao": slot.nivel,
-                    "escopo_alocacao": slot.escopo_alocacao,
-                    "faltam": 1,
-                })
+                avisos_rotina.append(_aviso_slot_sem_candidato(
+                    slot, quota_total, motivo="banco_filtrado_vazio_apos_relax",
+                ))
     else:
         # relax desligado: slots_para_relax viram avisos diretamente
         for slot in slots_para_relax:
-            avisos_rotina.append({
-                "tipo": "incompleta",
-                "escopo": "rotina",
-                "treino_idx": slot.treino_idx,
-                "nivel": quota_total[(slot.treino_idx, slot.d_idx_original)][0],
-                "escopo_demanda": slot.escopo_demanda_original,
-                "nivel_alocacao": slot.nivel,
-                "escopo_alocacao": slot.escopo_alocacao,
-                "faltam": 1,
-            })
+            avisos_rotina.append(_aviso_slot_sem_candidato(
+                slot, quota_total, motivo="banco_filtrado_vazio",
+            ))
 
     return alocacao, avisos_rotina, relaxados_por_treino
+
+
+def _aviso_slot_sem_candidato(
+    slot: _Slot,
+    quota_total: dict,
+    motivo: str,
+) -> dict:
+    """Constrói aviso pra slot que não conseguiu ser preenchido.
+
+    Etapa 3: distingue `ancora_sem_candidatos` (slot é padrão de uma âncora
+    obrigatória que ficou sem pool no banco filtrado) de `incompleta`
+    genérico. Isso permite UI sinalizar diferente: âncora obrigatória sem
+    candidatos é problema clínico mais sério que demanda incompleta por
+    família esgotada.
+    """
+    nivel_dem = quota_total[(slot.treino_idx, slot.d_idx_original)][0]
+    sub_da_padrao = PADRAO_PARA_SUBREGIAO.get(slot.escopo_alocacao, "")
+    eh_obrigatoria = any(
+        a["padrao"] == slot.escopo_alocacao and a["obrigatoria"]
+        for a in ANCORAS_POR_SUBREGIAO.get(sub_da_padrao, [])
+    )
+    if eh_obrigatoria:
+        return {
+            "tipo": "ancora_sem_candidatos",
+            "escopo": "rotina",
+            "treino_idx": slot.treino_idx,
+            "nivel": nivel_dem,
+            "escopo_demanda": slot.escopo_demanda_original,
+            "padrao": slot.escopo_alocacao,
+            "subregiao": sub_da_padrao,
+            "motivo": motivo,
+            "faltam": 1,
+        }
+    return {
+        "tipo": "incompleta",
+        "escopo": "rotina",
+        "treino_idx": slot.treino_idx,
+        "nivel": nivel_dem,
+        "escopo_demanda": slot.escopo_demanda_original,
+        "nivel_alocacao": slot.nivel,
+        "escopo_alocacao": slot.escopo_alocacao,
+        "faltam": 1,
+    }
 
 
 def gerar_sessao_por_demandas(
