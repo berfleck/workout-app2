@@ -276,6 +276,48 @@ def calcular_quotas(
     return quotas, []
 
 
+def _quotas_de_regiao(regiao: str, vagas: int) -> tuple[dict[str, int], list[dict]]:
+    """Aplica ANCORAS_POR_REGIAO[regiao] a `vagas`. Quotas têm chave=subregiao.
+
+    Devolve ({}, []) quando região não tem âncoras (caso atual: cardio).
+    Avisos retornados têm campo `nivel="regiao"` e `escopo=regiao`.
+
+    NOTA: Hamilton puro sobre todas as âncoras da região. O filtro
+    pré-quotas (acessórias só competem se qtd > 2 × num_obrigatorias) é
+    responsabilidade do caller (`_decompor_demanda_regiao` na Sub-PR 2).
+    """
+    ancoras_raw = ANCORAS_POR_REGIAO.get(regiao, [])
+    ancoras = [
+        {"chave": a["subregiao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
+        for a in ancoras_raw
+    ]
+    quotas, avisos = calcular_quotas(ancoras, vagas)
+    for av in avisos:
+        av["nivel"] = "regiao"
+        av["escopo"] = regiao
+    return quotas, avisos
+
+
+def _quotas_de_subregiao(subregiao: str, vagas: int) -> tuple[dict[str, int], list[dict]]:
+    """Aplica ANCORAS_POR_SUBREGIAO[subregiao] a `vagas`. Quotas têm chave=padrao.
+
+    Devolve ({}, []) quando subregião não tem âncoras (caso atual:
+    core_dinamico, core_isometrico, bracos, adutores). Chamador deve cair
+    em fallback Etapa 2 (cycling uniforme via _decompor_demanda_subregiao).
+    Avisos retornados têm campo `nivel="subregiao"` e `escopo=subregiao`.
+    """
+    ancoras_raw = ANCORAS_POR_SUBREGIAO.get(subregiao, [])
+    ancoras = [
+        {"chave": a["padrao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
+        for a in ancoras_raw
+    ]
+    quotas, avisos = calcular_quotas(ancoras, vagas)
+    for av in avisos:
+        av["nivel"] = "subregiao"
+        av["escopo"] = subregiao
+    return quotas, avisos
+
+
 # Classificação composto vs isolado é por EXERCÍCIO via coluna `purpose` do banco.
 # compound + explosive → composto. isolation + stability → isolado.
 # A constante PADROES_COMPOSTOS abaixo é mantida apenas pra retrocompatibilidade

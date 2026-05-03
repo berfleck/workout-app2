@@ -274,3 +274,114 @@ def test_quota_invariante_obrigatoria_cumprida_em_ancoras_reais():
             # Sem avisos quando vagas >= n_obrig
             avisos_nc = [v for v in avisos if v["tipo"] == "ancora_nao_cumprida"]
             assert avisos_nc == [], f"{nome} vagas={vagas}: avisos={avisos_nc}"
+
+
+# ─── Helpers de aplicação à hierarquia ─────────────────────────────────
+
+
+def test_quotas_de_regiao_upper_6():
+    """upper(6): pesos 2:2:1 (peito, costas, ombro) → Hamilton 3:2:1.
+
+    6 × (2/5, 2/5, 1/5) = (2.4, 2.4, 1.2) → floor (2, 2, 1); resto
+    (0.4, 0.4, 0.2). Restante=1. Top resto empate entre peito/costas;
+    tie-break ordem definição → peito ganha +1. Final: (3, 2, 1).
+    """
+    from gerador_treino import _quotas_de_regiao
+    random.seed(1)
+    quotas, avisos = _quotas_de_regiao("upper", 6)
+    assert quotas == {"peito": 3, "costas": 2, "ombro": 1}
+    assert avisos == []
+
+
+def test_quotas_de_regiao_upper_5_paritaria():
+    """upper(5): pesos 2:2:1 → 2:2:1 exato (sem resto)."""
+    from gerador_treino import _quotas_de_regiao
+    random.seed(1)
+    quotas, _ = _quotas_de_regiao("upper", 5)
+    # 5 × (2/5, 2/5, 1/5) = (2, 2, 1) — limpo
+    assert quotas == {"peito": 2, "costas": 2, "ombro": 1}
+
+
+def test_quotas_de_regiao_lower_2_um_de_cada_essencial():
+    """lower(2): perna_ant + perna_post (obrig). Acessória panturrilha NÃO compete."""
+    from gerador_treino import _quotas_de_regiao
+    random.seed(1)
+    # Esse helper aplica Hamilton puro sobre TODAS as âncoras da região.
+    # O filtro pré-quotas (acessórias só em qtd > 2 × num_obrig) é
+    # responsabilidade do CALLER (_decompor_demanda_regiao). Aqui só
+    # testamos o helper puro: lower(2) com pesos 2:2:1 → 1:1:0 via Hamilton.
+    quotas, _ = _quotas_de_regiao("lower", 2)
+    # 2 × (2/5, 2/5, 1/5) = (0.8, 0.8, 0.4) → floor (0,0,0); restos
+    # ordenados (perna_ant 0.8, perna_post 0.8, panturrilha 0.4); top 2.
+    # Tie-break peso_maior + ordem: perna_ant (peso 2, idx 0), perna_post
+    # (peso 2, idx 1) ganham +1 cada. Final: (1, 1, 0).
+    assert quotas == {"perna_anterior": 1, "perna_posterior": 1}
+
+
+def test_quotas_de_regiao_lower_5_panturrilha_pode_aparecer():
+    """lower(5): peso 2:2:1 → Hamilton 2:2:1. Panturrilha entra."""
+    from gerador_treino import _quotas_de_regiao
+    random.seed(1)
+    quotas, _ = _quotas_de_regiao("lower", 5)
+    # 5 × (2/5, 2/5, 1/5) = (2, 2, 1) → floor (2,2,1) sum=5 ✓
+    assert quotas == {"perna_anterior": 2, "perna_posterior": 2, "panturrilha": 1}
+
+
+def test_quotas_de_regiao_sem_ancoras_devolve_vazio():
+    """Região sem âncoras (cardio) → quotas vazias, sem aviso."""
+    from gerador_treino import _quotas_de_regiao
+    quotas, avisos = _quotas_de_regiao("cardio", 3)
+    assert quotas == {}
+    assert avisos == []
+
+
+def test_quotas_de_subregiao_peito_2():
+    """peito(2): empurrar_compostos:3 (obrig) + empurrar_isolados:2 → 1+1."""
+    from gerador_treino import _quotas_de_subregiao
+    random.seed(1)
+    quotas, _ = _quotas_de_subregiao("peito", 2)
+    assert quotas == {"empurrar_compostos": 1, "empurrar_isolados": 1}
+
+
+def test_quotas_de_subregiao_perna_anterior_3():
+    """perna_anterior(3): bi:3 (obrig) + uni:2 → Hamilton (2,1)."""
+    from gerador_treino import _quotas_de_subregiao
+    random.seed(1)
+    quotas, _ = _quotas_de_subregiao("perna_anterior", 3)
+    # 3 × 3/5 = 1.8; 3 × 2/5 = 1.2 → floor (1,1) resto (0.8, 0.2) → +1 primeiro
+    assert quotas == {"squat_bilateral": 2, "squat_unilateral": 1}
+
+
+def test_quotas_de_subregiao_perna_posterior_6_3_2_1():
+    """perna_posterior(6): hinge:3 knee:2 abd:1 → Hamilton 3:2:1 exato."""
+    from gerador_treino import _quotas_de_subregiao
+    random.seed(1)
+    quotas, _ = _quotas_de_subregiao("perna_posterior", 6)
+    assert quotas == {"hinge": 3, "knee_flexion": 2, "abduction": 1}
+
+
+def test_quotas_de_subregiao_costas_4_paritaria():
+    """costas(4): remadas:2 puxadas:2 → 2:2."""
+    from gerador_treino import _quotas_de_subregiao
+    random.seed(1)
+    quotas, _ = _quotas_de_subregiao("costas", 4)
+    assert quotas == {"remadas": 2, "puxadas": 2}
+
+
+def test_quotas_de_subregiao_costas_1_emite_aviso():
+    """costas(1): 1 vaga, 2 obrigatórias → sorteio + aviso ancora_nao_cumprida."""
+    from gerador_treino import _quotas_de_subregiao
+    random.seed(7000)
+    quotas, avisos = _quotas_de_subregiao("costas", 1)
+    assert sum(quotas.values()) == 1
+    nao_cumpridas = [a for a in avisos if a["tipo"] == "ancora_nao_cumprida"]
+    assert len(nao_cumpridas) == 1
+    assert nao_cumpridas[0]["nivel"] == "subregiao"
+    assert nao_cumpridas[0]["escopo"] == "costas"
+
+
+def test_quotas_de_subregiao_sem_ancoras_devolve_vazio():
+    """Subregião sem âncoras (core_dinamico) → vazio (fallback Etapa 2)."""
+    from gerador_treino import _quotas_de_subregiao
+    quotas, _ = _quotas_de_subregiao("core_dinamico", 3)
+    assert quotas == {}
