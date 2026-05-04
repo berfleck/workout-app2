@@ -971,35 +971,25 @@ def _buscar_candidato(
     exercicios: list[Exercicio],
     usados: list[bool],
     bloco_atual: list[Exercicio],
-    regioes: set[str],
-    padroes: set[str],
     tamanho: int,
-    evitar_unilateral: bool = False,
     evitar_agonistas: bool = False,
     cargas_config: dict | None = None,
     exercicios_travados: list | set | None = None,
 ) -> int | None:
     """Retorna o índice do candidato escolhido via softmax top-K, ou None.
 
-    Substitui (Etapa 5) a cascata determinística de 16 combinações geo×sub
-    por scoring linear explícito + amostragem softmax. Filtros hard
-    (cargas, fadiga) continuam em `pode_adicionar_ao_bloco`. Os candidatos
-    que sobrevivem são scored via `_score_pareamento`; os top-K=3 vão para
-    softmax(T=200) e amostra-se 1.
+    Filtros hard (cargas, fadiga) continuam em `pode_adicionar_ao_bloco`. Os
+    candidatos que sobrevivem são scored via `_score_pareamento`; os top-K
+    (`SOFTMAX_TOP_K=3`) vão para softmax (`SOFTMAX_TEMPERATURA=200`) e
+    amostra-se 1.
 
-    Componentes do score (em `PESOS_SCORE_PAREAMENTO`):
+    Componentes do score em `PESOS_SCORE_PAREAMENTO`:
       +1000 região diferente do bloco
       +100  padrão diferente
       +50   grupo músculo-funcional diferente (se evitar_agonistas)
       +25   purpose composto/explosivo
       -75   2 unilaterais do mesmo grupo (anti-uni mesmo grupo)
       -10   2 unilaterais de grupos diferentes (anti-uni cross-group)
-
-    Parâmetros mantidos por compatibilidade com chamadas de `montar_blocos`:
-    - `regioes`/`padroes`: redundantes (derivados de `bloco_atual`); cleanup
-      em sub-PR 5.3
-    - `evitar_unilateral`: no-op — a regra anti-uni vive no score com
-      penalidade refinada (cleanup em sub-PR 5.3)
     """
     if not bloco_atual:
         return None
@@ -1041,12 +1031,10 @@ def montar_blocos(
 ) -> list[tuple]:
     """
     Monta blocos de tamanho configurável (1, 2 ou 3).
-    Prioriza regiões E padrões diferentes dentro do bloco para distribuir
-    categorias uniformemente (ex: não colocar 2 squats no mesmo bloco).
-    Em blocos de 2 exercícios, tenta evitar dois exercícios unilaterais juntos.
-    Se evitar_agonistas=True, evita parear exercícios do mesmo grupo push/pull.
-    O último bloco pode ter menos exercícios se não houver suficientes.
-    Retorna lista de tuplas de tamanho variável.
+    A escolha do par é feita por `_buscar_candidato` (Etapa 5: scoring linear
+    + softmax top-K). Score privilegia região e padrão diferentes dentro do
+    bloco, contraste muscular (não-agonista), parceiro composto, e penaliza
+    pares unilateral-unilateral conforme grupo musculo-funcional.
 
     Se `cargas_config` está ativo e `avisos_carga` é uma lista mutável, blocos
     que ficam solo *por causa do filtro de cargas* (verificado via second-pass
@@ -1068,33 +1056,14 @@ def montar_blocos(
 
         bloco_atual = [exercicios[i]]
         usados[i] = True
-        regioes_no_bloco = {exercicios[i].regiao}
-        padroes_no_bloco = {exercicios[i].padrao}
 
         while len(bloco_atual) < tamanho:
-            melhor = None
-
-            # Para blocos de 2: primeira passagem evitando 2 unilaterais
-            if tamanho <= 2:
-                melhor = _buscar_candidato(
-                    exercicios, usados, bloco_atual,
-                    regioes_no_bloco, padroes_no_bloco, tamanho,
-                    evitar_unilateral=True,
-                    evitar_agonistas=evitar_agonistas,
-                    cargas_config=cargas_config,
-                    exercicios_travados=exercicios_travados,
-                )
-
-            # Fallback (ou blocos de 3): sem restrição de unilateral
-            if melhor is None:
-                melhor = _buscar_candidato(
-                    exercicios, usados, bloco_atual,
-                    regioes_no_bloco, padroes_no_bloco, tamanho,
-                    evitar_unilateral=False,
-                    evitar_agonistas=evitar_agonistas,
-                    cargas_config=cargas_config,
-                    exercicios_travados=exercicios_travados,
-                )
+            melhor = _buscar_candidato(
+                exercicios, usados, bloco_atual, tamanho,
+                evitar_agonistas=evitar_agonistas,
+                cargas_config=cargas_config,
+                exercicios_travados=exercicios_travados,
+            )
 
             if melhor is None:
                 # Second-pass para detectar relaxado_carga: se cargas_config
@@ -1102,9 +1071,7 @@ def montar_blocos(
                 # a causa do solo. Se sim, emitir aviso.
                 if cargas_config and avisos_carga is not None:
                     melhor_off = _buscar_candidato(
-                        exercicios, usados, bloco_atual,
-                        regioes_no_bloco, padroes_no_bloco, tamanho,
-                        evitar_unilateral=False,
+                        exercicios, usados, bloco_atual, tamanho,
                         evitar_agonistas=evitar_agonistas,
                         cargas_config=None,  # filtro desligado
                         exercicios_travados=exercicios_travados,
@@ -1136,8 +1103,6 @@ def montar_blocos(
                 break
 
             bloco_atual.append(exercicios[melhor])
-            regioes_no_bloco.add(exercicios[melhor].regiao)
-            padroes_no_bloco.add(exercicios[melhor].padrao)
             usados[melhor] = True
 
         blocos.append(tuple(bloco_atual))

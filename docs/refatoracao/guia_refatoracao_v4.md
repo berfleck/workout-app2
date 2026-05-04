@@ -26,7 +26,14 @@
 > - Sub-PR 1 — filtro integrado em `pode_adicionar_ao_bloco` + `cargas_config` plumbado pelas 6 funções do motor + aviso `relaxado_carga` via second-pass + Flask `/gerar` e `/regerar` leem form — ✅ concluído
 > - Sub-PR 2 — 3 selects em `<details>` mobile-first + modal renderiza 5 tipos de aviso (R3 Etapa 3 fechado: `ancora_*` saem do silêncio) + persistência via JSON natural + log + atualização guia v4 — ✅ concluído
 >
-> Log detalhado em `docs/refatoracao/logs/etapa_4.md`. Próxima: Etapa 5 (score consolidado em `_buscar_candidato`).
+> Log detalhado em `docs/refatoracao/logs/etapa_4.md`.
+>
+> **Progresso da Etapa 5** (branch `refator-gerador`):
+> - Sub-PR 5.1 — `PESOS_SCORE_PAREAMENTO` + `_score_pareamento` puro standalone + 21 testes + harness `tools/medir_entropia_pareamentos.py` (baseline) — ✅ concluído
+> - Sub-PR 5.2 — softmax top-K=3 T=200 em `_buscar_candidato` + 10 snapshots regenerados c/ diagnóstico individual + `v_up_uni` xfail→pass (42.5% top-1) — ✅ concluído
+> - Sub-PR 5.3 — cleanup two-pass redundante em `montar_blocos` + assinatura simplificada de `_buscar_candidato` + log + atualização guia — ✅ concluído
+>
+> Log detalhado em `docs/refatoracao/logs/etapa_5.md`. Próxima: Etapa 6 (modelagem de tags multi-dimensionais — sem código).
 
 > Documento mestre para conduzir a refatoração do gerador de treinos.
 > Sintetiza o roteiro de `memoria_projeto.md`, o design de
