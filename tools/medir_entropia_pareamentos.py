@@ -111,6 +111,7 @@ def main():
         help=f"Arquivo de saída JSON (default: {OUT_DEFAULT.relative_to(ROOT)})",
     )
     args = parser.parse_args()
+    args.out = args.out.resolve()
 
     banco = carregar_banco(str(XLSX))
     print(f"Banco: {len(banco)} exercícios")

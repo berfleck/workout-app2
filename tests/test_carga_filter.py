@@ -266,8 +266,13 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     """Evidência forte: par documentado pelo harness (seed=1) some quando filtro liga.
 
     Sem filtro, seed=1 com cfg lower(4)+upper(3)+core(1)×2 produz par
-    'Hiperextensão 45°' + 'Remada Baixa Aberta' (lombar 3+2=5 viola HIB2).
-    Com filtro HIB2 ligado, esse par precisa desaparecer.
+    'Lev. Terra Sumô' + 'Remada Baixa Aberta' (grip 3+3=6 e lombar 3+2=5
+    violam HIB2). Com filtro HIB2 ligado, esse par precisa desaparecer.
+
+    Atualizado na Etapa 5 (Sub-PR 5.2): a seleção de candidato por softmax
+    mudou os pares emergentes em seed=1 — antes era 'Hiperextensão 45°' +
+    'Remada Baixa Aberta'. O par novo continua sendo evidência forte do
+    filtro (viola 2 dimensões em vez de 1).
     """
     import random
     from gerador_treino import gerar_multiplos_treinos
@@ -278,7 +283,7 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
         "equipamentos_bloqueados": [],
         "evitar_agonistas": True,
     }
-    PAR = {"Hiperextensão 45°", "Remada Baixa Aberta"}
+    PAR = {"Lev. Terra Sumô", "Remada Baixa Aberta"}
 
     def par_aparece(sessoes):
         for s in sessoes:
@@ -299,7 +304,7 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     cfg_on = {**cfg, "cargas_config": HIB2}
     s_on = gerar_multiplos_treinos(banco, [cfg_on, cfg_on], relaxar_familia=True)
     assert not par_aparece(s_on), (
-        "Filtro falhou: par 'Hiperextensão 45°' + 'Remada Baixa Aberta' "
+        "Filtro falhou: par 'Lev. Terra Sumô' + 'Remada Baixa Aberta' "
         "apareceu mesmo com cargas_config HIB2 ativo."
     )
 

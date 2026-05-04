@@ -253,12 +253,16 @@ def test_triceps_2_aceita_francesa_e_polia(banco):
 # ----- 10: pareamento V-Up Uni + Tríceps Uni — Etapa 5 -------------------
 
 
-@pytest.mark.xfail(strict=True, reason="Etapa 5: score consolidado em _buscar_candidato")
 def test_v_up_uni_pareia_com_triceps_uni_nao_com_hollow(banco):
     """Cenário: 2 unilaterais (V-Up Unilateral + Tríceps Unilateral Polia)
     + 1 isométrico extra. Pareamento ideal: V-Up Uni ↔ Tríceps Uni
-    (regiões diferentes, contraste muscular), isométrico solo. Hoje a
-    regra anti-2-unilaterais cega força V-Up + isométrico num bloco."""
+    (regiões diferentes, contraste muscular), isométrico solo.
+
+    Resolvido na Etapa 5 (Sub-PR 5.2): score de pareamento substituiu a
+    cascata determinística + regra anti-uni cega. Anti-uni virou penalty
+    sensível a contraste muscular: -75 mesmo grupo, -10 grupos diferentes.
+    V-Up Uni + Tríceps Uni: +1000 (regiao diff) +100 (pad diff) +50
+    (não-agonista) -10 (uni-uni cross-group) = +1140 vs Hollow Hold +50."""
     nomes_alvo = {"V-Up Unilateral", "Tríceps Unilateral Polia"}
     travados_dispon = [e for e in banco if e.nome in nomes_alvo]
     if len(travados_dispon) < 2:

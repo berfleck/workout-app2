@@ -1,0 +1,85 @@
+{
+  "core_3_uni_pair": {
+    "descricao": "core_isometrico(1) + 2 unilaterais travados (V-Up Uni + Tríceps Uni)",
+    "n_iter": 100,
+    "total_blocos": 200,
+    "blocos_unicos": 17,
+    "entropia_bits": 3.1825,
+    "entropia_max_bits": 4.0875,
+    "entropia_normalizada": 0.7786,
+    "top_5_pareamentos": [
+      {
+        "bloco": [
+          "Tríceps Unilateral Polia",
+          "V-Up Unilateral"
+        ],
+        "frequencia": 85
+      },
+      {
+        "bloco": [
+          "V-Up Unilateral"
+        ],
+        "frequencia": 14
+      },
+      {
+        "bloco": [
+          "Prancha Feijao"
+        ],
+        "frequencia": 11
+      },
+      {
+        "bloco": [
+          "Prancha Alternada"
+        ],
+        "frequencia": 10
+      },
+      {
+        "bloco": [
+          "Prancha Lateral"
+        ],
+        "frequencia": 9
+      }
+    ]
+  },
+  "lower_4_upper_3": {
+    "descricao": "lower(4) + upper(3) — config multi-região representativa",
+    "n_iter": 100,
+    "total_blocos": 401,
+    "blocos_unicos": 263,
+    "entropia_bits": 7.5531,
+    "entropia_max_bits": 8.0389,
+    "entropia_normalizada": 0.9396,
+    "top_5_pareamentos": [
+      {
+        "bloco": [
+          "Cadeira Flexora"
+        ],
+        "frequencia": 19
+      },
+      {
+        "bloco": [
+          "Nordic Curl"
+        ],
+        "frequencia": 17
+      },
+      {
+        "bloco": [
+          "Flexão Joelhos Slide"
+        ],
+        "frequencia": 16
+      },
+      {
+        "bloco": [
+          "Flexão Joelhos Feijão"
+        ],
+        "frequencia": 13
+      },
+      {
+        "bloco": [
+          "Box Jump"
+        ],
+        "frequencia": 7
+      }
+    ]
+  }
+}

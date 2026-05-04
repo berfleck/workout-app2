@@ -979,89 +979,56 @@ def _buscar_candidato(
     cargas_config: dict | None = None,
     exercicios_travados: list | set | None = None,
 ) -> int | None:
+    """Retorna o índice do candidato escolhido via softmax top-K, ou None.
+
+    Substitui (Etapa 5) a cascata determinística de 16 combinações geo×sub
+    por scoring linear explícito + amostragem softmax. Filtros hard
+    (cargas, fadiga) continuam em `pode_adicionar_ao_bloco`. Os candidatos
+    que sobrevivem são scored via `_score_pareamento`; os top-K=3 vão para
+    softmax(T=200) e amostra-se 1.
+
+    Componentes do score (em `PESOS_SCORE_PAREAMENTO`):
+      +1000 região diferente do bloco
+      +100  padrão diferente
+      +50   grupo músculo-funcional diferente (se evitar_agonistas)
+      +25   purpose composto/explosivo
+      -75   2 unilaterais do mesmo grupo (anti-uni mesmo grupo)
+      -10   2 unilaterais de grupos diferentes (anti-uni cross-group)
+
+    Parâmetros mantidos por compatibilidade com chamadas de `montar_blocos`:
+    - `regioes`/`padroes`: redundantes (derivados de `bloco_atual`); cleanup
+      em sub-PR 5.3
+    - `evitar_unilateral`: no-op — a regra anti-uni vive no score com
+      penalidade refinada (cleanup em sub-PR 5.3)
     """
-    Retorna o índice do melhor candidato para entrar no bloco, ou None.
+    if not bloco_atual:
+        return None
 
-    Prioridades geográficas (P1 > P2 > P3 > P4):
-      P1: região diferente E padrão diferente
-      P2: região diferente
-      P3: padrão diferente
-      P4: qualquer válido
-
-    Dentro de cada prioridade, sub-preferências qualitativas (melhor → pior):
-      1. Não-agonista E preferido (parceiro composto)
-      2. Não-agonista
-      3. Preferido (parceiro composto)
-      4. Sem restrição adicional (fallback)
-
-    "Não-agonista": o candidato não pertence ao mesmo grupo push/pull do âncora.
-    "Preferido": candidato com purpose == "compound" — compostos procuram parceiros
-    compostos para formar blocos pesados; isolados também buscam compostos como parceiros.
-    Se evitar_agonistas=False, a regra de agonistas é ignorada.
-    Se evitar_unilateral=True e já há um unilateral no bloco, candidatos unilaterais
-    são ignorados (mas usados no último fallback se necessário).
-    """
-    n = len(exercicios)
-    ja_tem_uni = evitar_unilateral and any(e.unilateral == "unilateral" for e in bloco_atual)
-    anchor_purpose = bloco_atual[0].purpose if bloco_atual else None
-
-    # Grupos musculares já presentes no bloco (para evitar agonistas)
-    grupos_no_bloco: set[str] = set()
-    if evitar_agonistas:
-        for e in bloco_atual:
-            g = GRUPO_MUSCULAR_PADRAO.get(e.padrao)
-            if g:
-                grupos_no_bloco.add(g)
-
-    def aceita(j: int) -> bool:
+    # Coleta candidatos hard-aceitáveis e seus scores
+    candidatos: list[tuple[int, int]] = []
+    for j in range(len(exercicios)):
         if usados[j]:
-            return False
+            continue
         if not pode_adicionar_ao_bloco(
             bloco_atual, exercicios[j], tamanho,
             cargas_config=cargas_config,
             exercicios_travados=exercicios_travados,
         ):
-            return False
-        if ja_tem_uni and exercicios[j].unilateral == "unilateral":
-            return False
-        return True
+            continue
+        s = _score_pareamento(exercicios[j], bloco_atual, evitar_agonistas)
+        candidatos.append((j, s))
 
-    def nao_agonista(j: int) -> bool:
-        if not evitar_agonistas:
-            return True
-        g = GRUPO_MUSCULAR_PADRAO.get(exercicios[j].padrao)
-        return g not in grupos_no_bloco
-
-    def preferido(j: int) -> bool:
-        # Compostos são sempre o parceiro ideal, independente do purpose do âncora.
-        # Para âncora composta: forma blocos compound+compound (mais pesados primeiro).
-        # Para âncora isolada: puxa um composto para o bloco (superset equilibrado).
-        return exercicios[j].purpose == "compound"
-
-    def _primeiro(geo_fn, extra_fn) -> int | None:
-        for j in range(n):
-            if aceita(j) and geo_fn(j) and extra_fn(j):
-                return j
+    if not candidatos:
         return None
 
-    # Prioridades geográficas
-    p1 = lambda j: exercicios[j].regiao not in regioes and exercicios[j].padrao not in padroes
-    p2 = lambda j: exercicios[j].regiao not in regioes
-    p3 = lambda j: exercicios[j].padrao not in padroes
-    p4 = lambda j: True
-
-    # Sub-preferências qualitativas
-    sub1 = lambda j: nao_agonista(j) and preferido(j)
-    sub2 = lambda j: nao_agonista(j)
-    sub3 = lambda j: preferido(j)
-    sub4 = lambda j: True
-
-    for geo in [p1, p2, p3, p4]:
-        for sub in [sub1, sub2, sub3, sub4]:
-            r = _primeiro(geo, sub)
-            if r is not None:
-                return r
-    return None
+    # Top-K por score; softmax com normalização por max (evita overflow do exp)
+    candidatos.sort(key=lambda t: t[1], reverse=True)
+    top = candidatos[:SOFTMAX_TOP_K]
+    max_s = top[0][1]
+    exps = [math.exp((s - max_s) / SOFTMAX_TEMPERATURA) for _, s in top]
+    total = sum(exps)
+    pesos = [e / total for e in exps]
+    return random.choices([j for j, _ in top], weights=pesos, k=1)[0]
 
 
 def montar_blocos(
