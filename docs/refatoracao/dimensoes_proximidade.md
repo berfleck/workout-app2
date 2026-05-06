@@ -112,22 +112,72 @@ Três contextos de proximidade com pesos distintos:
   comportamento "lembrar de 4-6 semanas atrás" se mostrar necessário,
   reabre na Etapa 7 — é dívida aceita.
 
-### 1.4 Família estrita é HARD filter
+### 1.4 Família estrita — hard INTRA + soft INTER alto
 
-`familia_estrita` (refinamento do `variacao_de` atual) opera como hard
-filter em INTRA e INTER. Não é tag de penalidade — bloqueia diretamente.
+**Decisão revisada na Sessão 2 (2026-05-06).** Versão original
+(Sessão 1) registrava `familia_estrita` como hard filter em INTRA e
+INTER. Auditoria identificou inconsistência conceitual: a Etapa 6
+refinou famílias para granularidade fina (Supino → Reto + Inclinado;
+Prancha → frontal + lateral; criação de `subida_elevada` no G4) sem
+recalibrar o mecanismo de proteção. Hard duplo era apropriado pra
+famílias "categoria muscular ampla" antigas, não pra famílias
+refinadas onde os membros são variações próximas mas distintas.
+
+**Definição corrigida:**
+
+- **INTRA: hard filter.** Mesmo treino com 2 membros da mesma família
+  refinada continua redundante (Step Up + Passada Dos Steps; 2 supinos
+  retos). Hard é proteção limpa que evita depender só do score.
+- **INTER: soft com peso alto.** Famílias refinadas justificam
+  variabilidade entre treinos da mesma rotina — Step Up segunda +
+  Recuo do Estepe sexta é aceitável; 2 supinos retos em treinos
+  diferentes é tolerável quando histórico/banco apertam. Score alto
+  desencoraja, banco apertado permite.
+- **HISTÓRICO: toggle ON/OFF** (peso integral quando ON, zero quando
+  OFF). Mecânica diferente — janela R-1 only, sem decaimento.
+
+**Calibração de pesos (categórica — escala numérica final na Etapa 7):**
+
+| Contexto | Peso | Comportamento |
+|---|---|---|
+| INTRA | Crítico (hard) | Bloqueia diretamente |
+| INTER | **Alto (soft)** | ~80% do peso INTRA quando convertido pra escala numérica; gerador prefere variar entre famílias antes de repetir |
+| HISTÓRICO (R-1) | Crítico (toggle) | Quando toggle ON, peso integral; quando OFF, zero |
+
+**Alinhamento com guia v4 original:** o guia v4 (Etapa 6, linhas
+817-820) propunha pesos numéricos `100 INTRA / 80 INTER / 60
+HISTÓRICO`. A Sessão 1 desviou para hard duplo INTRA+INTER sem
+justificativa registrada. A redefinição da Sessão 2 retorna ao
+espírito original (peso alto soft INTER, não hard binário).
+
+**Implicação na sub-pendência "2 retos + 1 inclinado em 3 treinos"
+(registrada na Sessão 1 pós-auditoria):** ✅ **RESOLVIDA.** Cenário
+P5(c) do G1 (rotina 3-treinos com 2 retos + 1 inclinado) deixa de
+estar bloqueado pelo hard INTER — soft INTER alto desencoraja mas
+permite quando outras alternativas se esgotam.
+
+**Implicação no toggle `relaxar_familia` do app (já implementado):**
+semântica fica ambígua na nova realidade (INTER já é soft por padrão).
+Decisão sobre destino do toggle fica pra Etapa 7 — possíveis caminhos:
+(i) toggle desaparece (soft INTER cobre o caso de banco apertado por
+si só), (ii) toggle vira ignorar penalty INTER, (iii) toggle vira
+slider de peso INTER. Decidir pós-simulação.
 
 **Diretriz para curadoria de famílias estritas (Fase 2/Etapa 7):**
 
-- Famílias devem refletir **variações biomecânicas estritas** do mesmo
-  exercício (Slide ≈ Feijão), não categoria muscular ampla (não fazer
+- Famílias devem refletir **variações biomecânicas estritas ou próximas**
+  do mesmo exercício (Slide ≈ Feijão; Step Up ≈ Passada Dos Steps —
+  ambos com apoio elevado), não categoria muscular ampla (não fazer
   todos os tríceps com `variacao_de = "Tríceps"`).
 - **Lateralidade NÃO faz parte da família estrita** — é dimensão
   separada. Famílias gêmeas bi/uni unificam (ex: `stiff` + `stiff uni`
   viram `stiff` único; `Recuo` + `Recuo Alternado` já estão unificados).
 - Famílias podem ser refinadas para distinguir mecânicas
   significativamente diferentes (ex: separar `prancha frontal` de
-  `prancha lateral` — anti-extensão vs anti-lateroflexão).
+  `prancha lateral` — anti-extensão vs anti-lateroflexão; criação de
+  `subida_elevada` no G4 — apoio elevado vs solo).
+- Soft INTER alto absorve a "fricção" do refinamento — variação dentro
+  da família refinada entre treinos é aceitável quando o banco aperta.
 
 ### 1.5 Escopo de aplicação das penalidades (importante — não confundir
 com "cobertura universal")
@@ -250,7 +300,7 @@ INTER. Refinamento resolve.
 
 | Dimensão | INTRA | INTER | HISTÓRICO (R-1) |
 |---|---|---|---|
-| `familia_estrita` | Crítico (hard) | Crítico (hard) | Crítico (toggle) |
+| `familia_estrita` | Crítico (hard) | **Alto (soft)** | Crítico (toggle) |
 | `plano_corporal` (reto/inclinado) | **Alto** | **Médio-alto** (3 retos = Ruim) | Médio |
 | `equipamento_grupo` | **Baixo (tiebreaker)** | Baixo | Baixo |
 | `pegada` | (a definir) | (a definir) | (a definir) |
@@ -317,7 +367,7 @@ TRX.
 
 | Dimensão | INTRA | INTER | HISTÓRICO (R-1) |
 |---|---|---|---|
-| `familia_estrita` | Crítico (hard) | Crítico (hard) | Crítico (toggle) |
+| `familia_estrita` | Crítico (hard) | **Alto (soft)** | Crítico (toggle) |
 | `lateralidade` | **Crítico (~hard)** | **Baixo (regra fraca)** | 0 |
 | `pegada` | Alto | Alto | Médio |
 | `plano_corporal` | Médio | Médio-alto (3 iguais = Ruim) | Baixo |
@@ -381,7 +431,7 @@ Polia, Pulldown Braço Estendido, Barra Aberta + Barra Supinada
 
 | Dimensão | INTRA | INTER | HISTÓRICO (R-1) |
 |---|---|---|---|
-| `familia_estrita` | Crítico | Crítico | Crítico (toggle) |
+| `familia_estrita` | Crítico (hard) | **Alto (soft)** | Crítico (toggle) |
 | `pegada` | Alto | Alto | Médio |
 | `equipamento_grupo` | Médio | Baixo | Baixo |
 | `lateralidade` | Médio | Baixo (regra fraca) | 0 |
@@ -410,48 +460,94 @@ Polia, Pulldown Braço Estendido, Barra Aberta + Barra Supinada
 
 ---
 
-### Grupo 4 — Agachamentos (17 exercícios mapeados)
+### Grupo 4 — Agachamentos (17 atuais + Recuo do Estepe futuro = 18 exercícios)
+
+> **Refinamento de família aplicado na Sessão 2 (2026-05-06).** Caminho 5
+> aprovado: criação de família estrita nova **`subida_elevada`** que
+> agrupa Step Up + Step Up Alt + Passada Dos Steps + Recuo do Estepe
+> (cadastro futuro). Resolve **estruturalmente o Caso 2**
+> ("Step Up + Passada Dos Steps INTRA") via modelagem ativa de proximidade
+> biomecânica, sem refinar padrão nem dual-weight em equipamento.
 
 **Exercícios:** Agachamento Livre, Goblet, Smith, Leg Press, Cadeira
 Extensora, Box Jump (6 bilaterais); Búlgaro, Passada, Passada Dos
 Steps, Recuo, Recuo Alternado, Recuo C/ Barra, Step Up, Step Up Alt.,
-Walking Lunges, Agach. Lateral, Slide Board Lateral (11 unilaterais).
+Walking Lunges, Agach. Lateral, Slide Board Lateral (11 unilaterais)
++ Recuo do Estepe (cadastro novo, item 26 do Anexo).
 
-**Tags por exercício:**
+**Tags por exercício (após refinamento de família):**
 
 | Dimensão | Aplica | Notas |
 |---|---|---|
-| `familia_estrita` | ✓ | `Agachamento`, `passada`, `Recuo`, `Step up`, `walking lunges`, `agach. lateral`, sem família (Box Jump, Cadeira, Búlgaro, Leg Press) |
+| `familia_estrita` | ✓ | `Agachamento` (bi: Livre/Goblet/Smith), `passada` (só Passada normal — Passada Dos Steps movida pra subida_elevada), `Recuo` (regular/Alternado/C Barra), **`subida_elevada`** (Step Up + Step Up Alt + Passada Dos Steps + Recuo do Estepe), `walking lunges`, `agach. lateral` (regular + Slide Board), sem família (Box Jump, Cadeira, Búlgaro, Leg Press) |
 | `equipamento_grupo` | ✓ | barra, barra_guiada, halter, maquina, caixa, vazio (Box Jump, Slide Board) |
 | `lateralidade` | ✓ | já é padrão refinado (`squat_bilateral` / `squat_unilateral`); peso INTRA = MÉDIO |
 | `pegada` | ❌ | não cabe em squats |
 | `plano_corporal` | ❌ | lateralidade + família já cobrem |
 
-**Calibração inicial:**
+**Calibração inicial (revisada Sessão 2 — INTER soft):**
 
 | Dimensão | INTRA | INTER | HISTÓRICO (R-1) |
 |---|---|---|---|
-| `familia_estrita` | Crítico | Crítico | Crítico (toggle) |
+| `familia_estrita` | Crítico (hard) | **Alto (soft)** | Crítico (toggle) |
 | `lateralidade` | **Médio** (não crítico — bi+uni complementares) | Baixo (regra fraca diversificar) | 0 |
-| `equipamento_grupo` | Médio (alto p/ par caixa+caixa) | Baixo | Baixo |
+| `equipamento_grupo` | Médio | Baixo | Baixo |
 
 **Decisões clínicas registradas:**
 
 - **Bilateral + unilateral são complementares** em squats (combinação
   recomendada em treinos de perna). Diferente de remadas. Lateralidade
   INTRA = médio, não crítico.
-- **Step Up + Passada Dos Steps = Ruim** porque ambos com `caixa` e
-  "objetivo da caixa em ambos é o mesmo: aumentar ROM do quadril".
-  Confirma a tag `caixa` como tag de equipamento clínica.
+- **Step Up + Passada Dos Steps + Recuo do Estepe = subgrupo "ainda
+  mais parecido"** dentro dos unilaterais (Sessão 2). Mecânica comum:
+  pé em apoio elevado, ROM de quadril ampliado, demanda de equilíbrio
+  pela superfície. **Justifica família estrita própria
+  `subida_elevada`** — captura "variação biomecânica próxima",
+  consistente com Seção 1.4 (famílias devem refletir variações
+  biomecânicas, não nome semântico).
+- **Caminho 5 escolhido sobre alternativas:**
+  - Caminho 1 (dual-weight em equipamento_grupo): rejeitado — complica
+    calibração e compromete validação cross-grupo dos 12 cenários
+  - Caminho 4 (split padrão `squat_unilateral` em step/chão): rejeitado
+    — adiciona padrão novo, mexe em UI/configs/templates, retrocompat
+    ruim
+  - Caminho 5 (família `subida_elevada`): escolhido — mecânica
+    biomecânica explícita; padrão e equipamento intactos; menor
+    mudança de banco (1 valor novo + 4 reclassificações)
+- **Reclassificação de família estrita decidida (Sessão 2):**
+  - Step Up: `Step up` → `subida_elevada`
+  - Step Up Alt.: `Step up` → `subida_elevada`
+  - Passada Dos Steps: `passada` → `subida_elevada`
+  - Recuo do Estepe (cadastro futuro): `subida_elevada` desde já
+- **Trade-off aceito:** par "Passada (regular) + Passada Dos Steps"
+  perde hard de família (saem de famílias diferentes agora). Anti_uni
+  -75 INTRA continua penalizando o par. Clinicamente é correção, não
+  regressão — Passada normal e Passada Dos Steps são biomecanicamente
+  diferentes (presença da caixa muda mecânica fundamental).
 - **Box Jump é caso especial de timing, não proximidade** — "explosivo
   exige musculatura fresca" é regra de sequenciamento, não modelada
-  via tags. Box Jump pode sair do banco (decisão pendente do user).
+  via tags. Box Jump fica em `squat_bilateral` SEM família — apesar
+  de usar caixa, o uso clínico é diferente dos 4 unilaterais de
+  `subida_elevada`. Decisão sobre remover do banco fica pendente
+  separadamente (item 33 do Anexo 4.3).
 - **Sub-distinção uni-estático vs uni-deslocamento** (Búlgaro+Passada =
   Ruim; Búlgaro+Walking Lunges = "menos pior") **NÃO é modelada** —
   aceito como dívida. Sistema atual (`anti_uni_mesmo_grupo`) trata
   ambos como Ruim, sem capturar a nuance "menos pior".
 - **Posição_carga não modelada** — já capturada pelo filtro de cargas
   (Etapa 4).
+
+**Validação cruzada Caminho 5 + redefinição familia_estrita:**
+
+| Cenário | Mecanismo de proteção | Resultado |
+|---|---|---|
+| Step Up + Passada Dos Steps INTRA | hard família `subida_elevada` | bloqueado ✓ |
+| Step Up + Step Up Alt INTRA | hard família | bloqueado ✓ |
+| Step Up T1 + Recuo do Estepe T2 | soft INTER alto família | desincentivado; permite quando banco aperta ✓ |
+| Step Up + Búlgaro INTRA | famílias dif, mesmo padrão, anti_uni -75 | comportamento atual ✓ |
+| Passada (reg) + Passada Dos Steps INTRA | famílias dif, mesmo padrão, anti_uni -75 | mudança de comportamento (era hard); correção clínica ✓ |
+| Passada (reg) T1 + Passada Dos Steps T2 | famílias dif → soft INTER não aplica | OK pelo modelo; correção clínica ✓ |
+| Box Jump + Step Up INTRA | famílias dif (Box Jump sem), padrões dif (bi vs uni), padrao_diff +100 | comportamento atual ✓ |
 
 ---
 
@@ -480,7 +576,7 @@ Good Morning, Hiperextensão 45°.
 
 | Dimensão | INTRA | INTER | HISTÓRICO (R-1) |
 |---|---|---|---|
-| `familia_estrita` | Crítico | Crítico | Crítico (toggle) |
+| `familia_estrita` | Crítico (hard) | **Alto (soft)** | Crítico (toggle) |
 | `plano_corporal` | **Alto** (vetor primário) | **Alto** (3 mesmos = Ruim) | Médio |
 | `equipamento_grupo` | Médio | Baixo | Baixo |
 | `lateralidade` | Médio | Baixo (regra fraca) | 0 |
@@ -523,7 +619,7 @@ trabalho.
 
 | Dimensão | INTRA | INTER | HISTÓRICO (R-1) |
 |---|---|---|---|
-| `familia_estrita` | Crítico (resolve Slide+Feijão) | Crítico | Crítico (toggle) |
+| `familia_estrita` | Crítico (hard, resolve Slide+Feijão) | **Alto (soft)** | Crítico (toggle) |
 | `equipamento_grupo` | Médio | Baixo | Baixo |
 | `lateralidade` | Médio (anti_uni mantida, ociosa hoje) | Baixo | 0 |
 
@@ -563,7 +659,7 @@ equipamento corda).
 
 | Dimensão | INTRA | INTER | HISTÓRICO (R-1) |
 |---|---|---|---|
-| `familia_estrita` | Crítico | Crítico | Crítico (toggle) |
+| `familia_estrita` | Crítico (hard) | **Alto (soft)** | Crítico (toggle) |
 | `equipamento_grupo` | Médio | Baixo | Baixo |
 | `lateralidade` | Médio (anti_uni) | Baixo | 0 |
 
@@ -576,56 +672,98 @@ equipamento corda).
 
 ---
 
-### Grupo 8 — Pranchas / Core Isométrico (11 atuais + 4 INFRA novos)
+### Grupo 8 — Core (20 atuais + 5 cadastros novos = 25 exercícios)
 
-**Exercícios atuais:** Prancha (regular/Alternada/Bola/Feijão/Renegade/
-Slideboard), Prancha Lateral, Dead Bug (regular/C Anilha/C Bola), Hollow
-Hold, Pallof Press, Roda Abdominal.
+> **Refator estrutural aplicado na Sessão 2 (2026-05-06).** Estrutura
+> antiga (1 subregião `core` + 2 padrões `core_isometrico`/`core_dinamico`)
+> substituída por hierarquia mais expressiva. Resolve **estruturalmente
+> o Caso 1** ("Pranchas Frontal+Lateral INTRA") via modelagem ativa —
+> sem dimensão nova.
 
-**Cadastros novos massivos — família INFRA:**
+**Promoção subregião:** `core` → **`core_isometrico` + `core_dinamico`**
+(promovidos de padrão).
 
-- Infra Alternado
-- Infra Suspenso (na barra fixa)
-- Infra Chão (bilateral)
-- Infra Roll-Up (flexão quadril + rolagem tronco)
-- **Reclassificar:** Dead Bug C/ Anilha + Dead Bug C/ Bola → mover para
-  família **INFRA** (mecânica de flexão de quadril, não anti-extensão
-  clássica)
+**4 padrões refinados** atravessando as 2 subregiões (iso = anti-X,
+dyn = X):
 
-**Separação de família estrita:**
+| Padrão | iso (anti-X) | dyn (X) |
+|---|---|---|
+| `flexao_tronco` | anti-flexão (Pranchas, Hollow, Roda) | flexão (Crunch, Abd Bicicleta) |
+| `flexao_lateral` | anti-lateroflexão (Prancha Lateral) | lateroflexão (futuro) |
+| `rotacao_tronco` | anti-rotação (Pallof Press) | rotação (Russian Twist — cadastro novo) |
+| `flexao_quadril` | controle estabilizatório (Dead Bug ×3) | flexão dinâmica (V-Up, Canoinha, INFRA ×4) |
 
-- `prancha frontal` (Frontal regular + Bola + Feijão + Slide + Renegade
-  + Alternada)
-- `prancha lateral` (apenas Prancha Lateral)
+**Mapeamento completo (25 exercícios — 20 atuais + Russian Twist + 4
+INFRA novos):**
 
-**Tags por exercício:**
+| Padrão / Subregião | core_isometrico | core_dinamico |
+|---|---|---|
+| `flexao_tronco` | Prancha (regular/Alternada/Bola/Feijão/Slide/Renegade), Hollow Hold, Roda Abdominal | Crunch (Chão/Bola/Cabo), Abd Bicicleta |
+| `flexao_lateral` | Prancha Lateral | (vazio — futuro) |
+| `rotacao_tronco` | Pallof Press | **Russian Twist** (cadastro novo) |
+| `flexao_quadril` | Dead Bug, Dead Bug C/ Anilha, Dead Bug C/ Bola | V-Up, V-Up Unilateral, **Canoinha** (reclassificada), INFRA Alternado/Suspenso/Chão/Roll-Up (4 novos) |
+
+**Reclassificações decididas:**
+
+- **Canoinha:** padrão `core_dinamico` (antigo) → `flexao_quadril` dyn
+  (pareia com V-Up/INFRA)
+- **Roda Abdominal:** subregião `core_isometrico` mantida; padrão →
+  `flexao_tronco` (componente concêntrico de flexão + excêntrico de
+  anti-extensão; foco anti-extensão dominante)
+- **Prancha Renegade:** padrão → `flexao_tronco` (família "prancha
+  frontal" agrupa; componente anti-rotação reconhecido mas curadoria
+  simplificada)
+- **Abd Bicicleta:** padrão → `flexao_tronco` dyn (foco visual é
+  crunch; rotação é tempero, não dominante)
+- **V-Up / V-Up Uni:** padrão → `flexao_quadril` dyn (alinha com
+  INFRAs; protege par "V-Up + INFRA Suspenso" de sair OK pelo modelo)
+- **Lateralidades** (verificadas no banco, sem mudança):
+  - Dead Bug regular: `unilateral` (alterna membros)
+  - Dead Bug C/ Anilha: `bilateral` (movimentos simultâneos com peso)
+  - Dead Bug C/ Bola: `unilateral` (alterna membros)
+  - V-Up: `bilateral`; V-Up Uni: `unilateral`
+
+**Tags de proximidade por exercício (após refator):**
 
 | Dimensão | Aplica | Notas |
 |---|---|---|
-| `familia_estrita` | ✓ chave | `prancha frontal`, `prancha lateral`, `Dead bug`, `INFRA`, `crunch`, `v-up`, sem família (Hollow, Pallof, Roda) |
-| `equipamento_grupo` | ✓ | corporal, bola, feijão, polia, ab_wheel, barra (Infra Suspenso), vazio (Slide) |
-| `lateralidade` | ✓ | bi/uni, anti_uni vale |
+| `familia_estrita` | ✓ chave | `prancha frontal`, `prancha lateral`, `Dead bug`, `INFRA`, `crunch`, `v-up`, **`russian twist`** (novo); sem família (Hollow Hold, Pallof Press, Roda Abdominal, Canoinha) |
+| `equipamento_grupo` | ✓ | corporal, bola, feijão, polia, ab_wheel, barra (Infra Suspenso), vazio (Slide, Russian Twist a definir) |
+| `lateralidade` | ✓ | bi/uni; anti_uni vale |
 | `pegada` | ❌ | — |
-| `plano_corporal` | ❌ | NÃO modelar (diretriz user) |
-| `plano_estabilizacao` (anti-ext/lat/rot) | ❌ DESCARTADA | personal-edita |
+| `plano_corporal` | ❌ | NÃO modelar (decisão mantida) |
+| `plano_estabilizacao` (anti-ext/lat/rot) | ❌ DESCARTADA | refator estrutural absorve via padrão |
 
-**Calibração inicial:**
+**Calibração inicial (sem mudança):**
 
 | Dimensão | INTRA | INTER | HISTÓRICO (R-1) |
 |---|---|---|---|
-| `familia_estrita` | Crítico | Crítico | Crítico (toggle) |
+| `familia_estrita` | Crítico (hard) | **Alto (soft)** | Crítico (toggle) |
 | `equipamento_grupo` | Baixo (instabilidade conta mas não justifica granularidade) | Baixo | Baixo |
 | `lateralidade` | Médio (anti_uni padrão) | Baixo | 0 |
 
-**Tensão Frontal+Lateral resolvida pragmaticamente:**
+**Resolução estrutural do Caso 1 (Prancha Frontal + Lateral INTRA):**
 
-> **Separar famílias** (`prancha frontal` + `prancha lateral`) — isso
-> permite que **INTER** ambas possam aparecer (treinos diferentes).
-> **INTRA**, o sistema NÃO bloqueia o pareamento Frontal+Lateral, mas a
-> abundância de outras famílias em core (Dead Bug, INFRA, Crunch,
-> Hollow, Pallof, Roda, V-Up) faz o gerador naturalmente preferir
-> diversificar. Se eventualmente sair Frontal+Lateral juntas, **personal
-> edita** (princípio 1.1). Sem dimensão nova.
+Após refator, Prancha Frontal e Prancha Lateral têm:
+
+- **Famílias estritas separadas** (`prancha frontal` ≠ `prancha lateral`)
+- **Padrões diferentes** (`flexao_tronco` ≠ `flexao_lateral`) — score
+  `padrao_diff` da Etapa 5 desincentiva o par
+- **Mesma subregião** (`core_isometrico`) — única dimensão coincidente
+
+Resultado: par recebe penalidade no score (modelagem ativa) +
+abundância de famílias dyn (Crunch, V-Up, INFRA, Russian Twist) faz
+gerador preferir iso+dyn mix em `core(2)` via cycling natural da Etapa
+3. **Caso 1 sai da seção "Decisões a re-validar".**
+
+**Decisão sobre dimensão `tipo_core` (considerada e descartada):**
+
+> Sessão 2 considerou adicionar dimensão narrow-scope `tipo_core`
+> (iso/dyn) ao invés do refator estrutural. Descartada porque o refator
+> de subregião+padrão **captura o mesmo efeito via mecanismos
+> existentes** (Etapa 5 score `regiao_diff`/`padrao_diff` + Etapa 3
+> demanda hierárquica) — sem custar dimensão nova. Set de 5 dimensões
+> mantido.
 
 ---
 
@@ -720,10 +858,13 @@ Lista consolidada para a Etapa 7 (que faz a migração efetiva do XLSX).
 | 11 | Flexão Joelhos Feijão + Flexão Joelhos Slide | Renomear `variacao_de = flexao deitado` (era `flexao joelhos` — todos exercícios são flexão de joelhos; nome novo une movimento + posição) |
 | 12 | Tríceps Polia Alta | Renomear para **Tríceps Pushdown** |
 | 13 | Pranchas | Separar família: `prancha frontal` (Frontal + Bola + Feijão + Slide + Renegade + Alternada) e `prancha lateral` (apenas Prancha Lateral) |
-| 14 | Dead Bug C/ Anilha + Dead Bug C/ Bola | Mover para família **INFRA** (mecânica de flexão de quadril, não anti-extensão) |
+| 14 | ~~Dead Bug C/ Anilha + Dead Bug C/ Bola → família INFRA~~ | **SUPERSEDIDO pelo item 15-quater** (refator estrutural CORE — Dead Bugs ficam em família `Dead bug` + padrão `flexao_quadril` em iso; INFRAs em família `INFRA` + padrão `flexao_quadril` em dyn). |
 | 15 | Step Up + Step Up Alt + Passada Dos Steps | `equipamento_grupo = caixa` (caixa prevalece sobre halter pela regra de precedência semântica) |
 | 15-bis | **Supino — refinar família por ângulo** | **`Supino` → `Supino Reto`** (Reto Barra/Halteres/Anilha) **+ `Supino Inclinado`** (Smith Inclinado e cadastros futuros). Caminho B aprovado pelo user. Justificativa: G1 P5 INTER pressupõe 3 supinos coexistindo (1 inclinado + 2 retos), incompatível com família única + hard INTER. |
 | 15-ter | **Cadastrar `plano_corporal` em todos exercícios de peito** | Supinos (reto/inclinado), Crucifixos (reto/inclinado), Crossovers (reto/inclinado conforme cadastro), Apoios (vazio — não diferencia clinicamente). Substitui `angulo_movimento` proposto inicialmente. |
+| 15-quater | **Refator estrutural CORE** (Sessão 2 — 2026-05-06) | Promove subregião e refina padrão. Mudanças: (i) **Subregião:** `core` → **`core_isometrico` + `core_dinamico`** (promovidos de padrão); (ii) **Padrão:** 2 antigos → **4 refinados** (`flexao_tronco`, `flexao_lateral`, `rotacao_tronco`, `flexao_quadril`) atravessando as 2 subregiões; (iii) **Reclassificações de padrão:** Canoinha (subregião dyn mantida; padrão → `flexao_quadril` dyn), Roda Abdominal (iso mantida; padrão → `flexao_tronco`), Prancha Renegade (`flexao_tronco`), Abd Bicicleta (`flexao_tronco` dyn), V-Up/V-Up Uni (`flexao_quadril` dyn). Afeta ~22 linhas no banco + atualização de `PADRAO_PARA_SUBREGIAO`/`SUBREGIAO_PARA_REGIAO` em `gerador_treino.py` + compat via `_PADROES_LEGADOS` (`core_isometrico`/`core_dinamico` legado expandem nos 4 novos padrões refinados conforme a subregião). UI não muda (subregião continua selecionável). **Resolve estruturalmente o Caso 1** (Prancha Frontal+Lateral INTRA). Detalhes na Seção 2 G8. |
+| 15-quinquies | **Família estrita `subida_elevada` no G4** (Sessão 2 — 2026-05-06) | Caminho 5 aprovado para o Caso 2. Cria família estrita nova **`subida_elevada`** agrupando exercícios com mecânica de pé em apoio elevado + ROM hip ampliado. Reclassificações: Step Up (`Step up` → `subida_elevada`), Step Up Alt. (`Step up` → `subida_elevada`), Passada Dos Steps (`passada` → `subida_elevada`), Recuo do Estepe (cadastro futuro item 26 — entra com família `subida_elevada` desde já). Afeta 4 linhas no banco. Padrão `squat_unilateral` intacto. Equipamento_grupo intacto. Box Jump fica em `squat_bilateral` SEM família (uso clínico distinto — explosivo, não modelado por proximidade). **Resolve estruturalmente o Caso 2** (Step Up + Passada Dos Steps INTRA). Trade-off aceito: par "Passada (regular) + Passada Dos Steps" perde hard de família — anti_uni -75 INTRA continua penalizando; soft INTER alto desincentiva. Correção clínica, não regressão. Detalhes na Seção 2 G4. |
+| 15-sexies | **Redefinição `familia_estrita` = hard INTRA + soft INTER alto** (Sessão 2 — 2026-05-06) | Sessão 1 registrou família como hard INTRA+INTER sem justificativa registrada, divergindo do guia v4 original (`100 INTRA / 80 INTER / 60 HISTÓRICO`). Refinamento posterior das famílias (Supino Reto/Inclinado, prancha frontal/lateral, subida_elevada, etc.) não recalibrou o mecanismo de proteção. **Redefinição uniforme:** INTRA hard (mesmo treino com 2 membros da mesma família refinada continua redundante); **INTER soft com peso ~80% do INTRA** (variação dentro de família refinada entre treinos é aceitável quando banco aperta). HISTÓRICO mantém toggle ON/OFF. Implica em código: (i) `_buscar_candidato`/`montar_blocos` precisam aplicar família como soft penalty no INTER (não filtro hard); (ii) toggle `relaxar_familia` atual (default ON) fica com semântica ambígua — decisão sobre destino fica pra Etapa 7 pós-simulação (caminhos: desaparecer, virar binário ignorar/respeitar penalty INTER, ou virar slider de peso). **Resolve sub-pendência "2 retos + 1 inclinado bloqueado pelo hard INTER"** (P5(c) do G1). Detalhes na Seção 1.4. |
 
 ### 4.2 Cadastros novos sugeridos
 
@@ -739,18 +880,19 @@ Lista consolidada para a Etapa 7 (que faz a migração efetiva do XLSX).
 | 23 | Puxada Unilateral Polia | Resolve a lacuna "lateralidade=0 em puxadas hoje" |
 | 24 | Pulldown Braço Estendido | Polia ajustável, isolation (`plano_corporal = pullover`) |
 | 25 | Barra Aberta + Barra Supinada | Substituem `Barra` genérica como família mãe |
-| 26 | Recuo do Estepe | `equipamento_grupo = caixa` |
+| 26 | Recuo do Estepe | Cadastro novo: `padrao=squat_unilateral`, `familia_estrita=subida_elevada` (item 15-quinquies), `equipamento_grupo=caixa`, `lateralidade=unilateral`. |
 | 27 | Tríceps Francês Corda | Família `Tríceps Francês`, equipamento corda |
 | 28 | Infra Alternado | Nova família INFRA |
 | 29 | Infra Suspenso (na barra fixa) | Nova família INFRA |
 | 30 | Infra Chão (bilateral) | Nova família INFRA |
 | 31 | Infra Roll-Up | Nova família INFRA — flexão quadril + rolagem tronco |
+| 32 | **Russian Twist** | Cadastro novo (Sessão 2): `subregiao=core_dinamico`, `padrao=rotacao_tronco`, `familia_estrita=russian twist`, `equipamento_grupo=(a definir — corporal/halter/medicine ball)`, `lateralidade=bilateral`. Wood Chop foi considerado e **NÃO será cadastrado**. |
 
 ### 4.3 Decisões pendentes pro user
 
 | # | Item | Aguarda decisão |
 |---|---|---|
-| 32 | Box Jump | Fica ou sai do banco? Caso de "timing/sequenciamento" não modelado. |
+| 33 | Box Jump | Fica ou sai do banco? Caso de "timing/sequenciamento" não modelado. |
 
 ---
 
@@ -781,66 +923,46 @@ Aplicação retroativa da diretriz da Seção 1.1: identificar casos onde
 modelagem ativa pedida pelo user pode ter sido substituída
 silenciosamente por "abundância probabilística + personal edita".
 
-**Caso 1 — Pranchas Frontal + Lateral INTRA (G8)**
+**Caso 1 — Pranchas Frontal + Lateral INTRA (G8) — ✅ RESOLVIDO ESTRUTURALMENTE (Sessão 2 — 2026-05-06)**
 
-- **User pediu (modelagem ativa):** *"precisamos de uma forma de evitar
-  que o app junte 2 pranchas (até mesmo frontal/comum + lateral) se o
-  usuário pedir core(2). app deve priorizar inserir um abdominal de
-  outro tipo"*
-- **Como ficou registrado (regressão silenciosa):** *"sistema NÃO
-  bloqueia o pareamento Frontal+Lateral, mas a abundância de outras
-  famílias em core (Dead Bug, INFRA, Crunch, Hollow, Pallof, Roda,
-  V-Up) faz o gerador naturalmente preferir diversificar. Personal
-  edita."*
-- **Status:** ⚠️ REGRESSÃO. Re-validar.
-- **Tensão com decisão clara do user:** mais à frente em G8 Q2, user
-  disse "(2) não modelar plano_estabilizacao — adiciona complexidade
-  desnecessária". As duas afirmações estão em tensão. Ele quer o
-  efeito (evitar 2 pranchas frontal+lateral) sem criar a dimensão
-  formal (anti-extensão / anti-lateroflexão / anti-rotação como tag).
-- **Caminhos possíveis para re-validar:**
-  - **(a)** Criar tag `categoria_core` (sub-categorias dentro de
-    core_isometrico: ventral / lateral / anti-rotação / dorsal /
-    flexão de tronco / flexão de quadril) com peso INTRA alto.
-    Estrutura mais "limpa" mas adiciona dimensão (estoura orçamento
-    se for dimensão; ou vira valor de `plano_corporal` em core).
-  - **(b)** Estender mecanismo de âncoras (Etapa 3) para operar dentro
-    da subregião `core_isometrico` em granularidade fina (ex:
-    "rotina com core(2) deve diversificar entre 2 categorias").
-    Reaproveita infra existente.
-  - **(c)** Aceitar como dívida e mover pra Etapa 7 — registrar que
-    fica bloqueado na simulação, calibrar lá.
+> **Resolução:** refator estrutural CORE aplicado (item 15-quater do
+> Anexo). `core` virou 2 subregiões + 4 padrões refinados. Prancha
+> Frontal (`flexao_tronco`) e Prancha Lateral (`flexao_lateral`) agora
+> têm padrões diferentes — `padrao_diff` da Etapa 5 desincentiva o
+> par. Modelagem ativa, não regressão. Detalhes na Seção 2 G8.
+>
+> **Histórico (preservado para auditoria):** user pediu modelagem
+> ativa ("precisamos de uma forma de evitar que o app junte 2
+> pranchas"); Sessão 1 registrou como "abundância probabilística +
+> personal edita" (regressão silenciosa). Sessão 2 reabriu e
+> resolveu via refator estrutural. Os 3 caminhos discutidos
+> originalmente (a/b/c — `categoria_core`, âncoras, dívida) foram
+> SUPERSEDIDOS pelo refator (caminho não-listado, mais limpo que os 3).
 
-**Caso 2 — Step Up + Passada Dos Steps INTRA (G4)**
+**Caso 2 — Step Up + Passada Dos Steps INTRA (G4) — ✅ RESOLVIDO ESTRUTURALMENTE (Sessão 2 — 2026-05-06)**
 
-- **User pediu (modelagem ativa):** *"(v) Ruim - muito similares e o
-  objetivo da caixa em ambos é o mesmo: aumentar amplitude de
-  movimento do quadril no exercício (profundidade)"*
-- **Como ficou registrado (regressão indireta):** quando equipamento
-  virou tiebreaker peso BAIXO INTRA (após validação dos 12 cenários
-  cross-grupo), o caso Step Up + Passada Dos Steps virou "OK pelo
-  modelo" — outras dimensões empatam, equipamento é só desempate.
-- **Status:** ⚠️ REGRESSÃO INDIRETA. Re-validar.
-- **Por que aconteceu:** os 12 cenários da validação não incluíram
-  esse par específico (mesma subregião + mesmo equipamento `caixa` +
-  famílias diferentes + ambos unilaterais). User pode não ter
-  percebido que "equipamento BAIXO" iria contradizer "Step Up +
-  Passada Dos Steps = Ruim".
-- **Caminhos possíveis para re-validar:**
-  - **(a)** Modelo híbrido — `equipamento_grupo` tem peso BAIXO
-    "logístico" (barra/halter/polia/etc.) mas peso ALTO em valores
-    "específicos" (`caixa`, `banda_elastica`). Mais complexo de
-    calibrar, mas captura a intuição clínica de "caixa repetida =
-    propósito clínico repetido".
-  - **(b)** Mover `caixa` (e talvez `banda_elastica`) pra fora de
-    `equipamento_grupo` e tratar como **sub-tag de plano_corporal** ou
-    família estrita (Step Up, Passada Dos Steps, Step Up Alt, Recuo
-    do Estepe ganham `familia_estrita = exercicio_em_caixa` — unifica
-    em família única que hard bloqueia).
-  - **(c)** Aceitar como dívida — argumento: a regra `anti_uni` da
-    Etapa 5 já cobre parcialmente Step Up + Passada Dos Steps (ambos
-    unilaterais). O par fica desincentivado pela lateralidade, ainda
-    que não pelo equipamento. Avaliar via simulação na Etapa 7.
+> **Resolução:** Caminho 5 aprovado — criação de família estrita nova
+> **`subida_elevada`** (item 15-quinquies do Anexo) que agrupa Step
+> Up + Step Up Alt + Passada Dos Steps + Recuo do Estepe (cadastro
+> futuro). Hard INTRA bloqueia o par. Detalhes na Seção 2 G4.
+>
+> **Histórico (preservado para auditoria):** Sessão 1 marcou Step Up +
+> Passada Dos Steps como Ruim com justificativa clínica explícita; com
+> equipamento_grupo virando tiebreaker BAIXO INTRA, este par virou "OK
+> pelo modelo" (regressão indireta). Sessão 2 reabriu e resolveu via
+> família estrita biomecânica.
+>
+> **Caminhos discutidos e descartados em favor do Caminho 5:**
+> - (1) Dual-weight em equipamento_grupo (BAIXO logístico / ALTO
+>   específico) — complica calibração, compromete validação
+>   cross-grupo dos 12 cenários
+> - (2) `caixa` vira família estrita ou plano_corporal — mistura
+>   conceitos
+> - (3) Dívida pra Etapa 7 — anti-padrão escopo→rigor
+> - (4) Split padrão `squat_unilateral` (step/chão) — mexe em UI/
+>   configs/templates, retrocompat ruim, padrão_diff = 0 não resolve
+>   o par crítico
+> - **(5) Família estrita biomecânica `subida_elevada`** ✓ — escolhido
 
 **Caso 3 — Sub-distinção uni-estático vs uni-deslocamento (G4)**
 
@@ -851,26 +973,27 @@ silenciosamente por "abundância probabilística + personal edita".
 - **Status:** ✅ Não é regressão — user aceitou explicitamente como
   dívida com justificativa.
 
-### Sub-pendência registrada (decisão para Etapa 7)
+### Sub-pendência "2 retos + 1 inclinado bloqueado pelo hard INTER" — ✅ RESOLVIDA (Sessão 2 — 2026-05-06)
 
-**"2 retos + 1 inclinado bloqueado pelo hard INTER"** — caso de borda
-residual do Caminho B. Com `Supino Reto` como família única (Reto
-Barra + Reto Halteres + Reto Anilha juntos) e `familia_estrita` hard
-INTER, o cenário "2 retos diferentes em treinos diferentes" (P5(c)
-do G1, marcado OK pelo user) fica operacionalmente bloqueado.
-
-Três caminhos possíveis (sem decisão urgente — fica pra Etapa 7,
-junto com destino final do hard INTER):
-
-- **(a)** Refinamento extremo: cada exercício vira sua família.
-  Esvazia o hard filter.
-- **(b)** Aceitar como dívida: rotina típica raramente tem 2+ peito
-  por treino; sistema diversifica via Crucifixo/Crossover/Apoio.
-- **(c)** Soft INTER: remover hard INTER de família, deixar score
-  resolver. Fica naturalmente coerente.
-
-Provavelmente fica resolvido naturalmente quando o destino do hard
-INTER for decidido após simulação na Etapa 7.
+> **Resolução:** redefinição de `familia_estrita` como **hard INTRA +
+> soft INTER alto** (Seção 1.4). Caminho (c) original confirmado e
+> aplicado uniformemente a todas as famílias refinadas da Etapa 6.
+>
+> **Por que estava bloqueado:** Sessão 1 registrou `familia_estrita`
+> como hard duplo (INTRA + INTER) sem justificativa registrada,
+> divergindo do guia v4 original que propunha pesos numéricos
+> `100 INTRA / 80 INTER / 60 HISTÓRICO`. Refinamento posterior das
+> famílias (Supino Reto/Inclinado, prancha frontal/lateral, etc.) não
+> recalibrou o mecanismo de proteção, deixando hard INTER excessivo
+> para famílias que agora agrupam variações próximas mas distintas.
+>
+> **Como soft INTER resolve P5(c):** com Supino Reto agrupando 3
+> equipamentos (Barra/Halteres/Anilha), rotina 3-treinos com 2 retos
+> + 1 inclinado é desincentivada pelo soft (gerador prefere variar)
+> mas permitida quando outras alternativas se esgotam. Comportamento
+> alinhado com a aprovação do user em P5(c) ("OK").
+>
+> Detalhes na Seção 1.4 redefinida.
 
 ### Para Fase 3 (calibração de pesos)
 
@@ -926,17 +1049,31 @@ diversidade temporal, controle do personal sobre variabilidade.
   - Família `Supino` refinada (`Supino Reto` + `Supino Inclinado`)
   - `equipamento_grupo` esclarecido como tiebreaker (peso BAIXO INTRA)
   - Set de 5 dimensões congelado (Caminho B aprovado)
-- ⏳ **Fase 2 — derivação final das dimensões** — em grande parte
-  resolvida; restam consolidar regra de cadastro e decidir pendências
-  menores
+- ⏳ **Fase 2 — em curso** — Sessão 2 (2026-05-06):
+  - ✅ **Caso 1 (Frontal+Lateral)** resolvido por refator estrutural
+    CORE (subregião + 4 padrões refinados, item 15-quater do Anexo)
+  - ✅ **Dimensão `tipo_core`** considerada e descartada (refator
+    estrutural absorve via mecanismos existentes)
+  - ✅ **Russian Twist** cadastrado; Wood Chop NÃO cadastrar
+  - ✅ **Caso 2 (Step Up + Passada Dos Steps)** resolvido por família
+    estrita biomecânica `subida_elevada` (Caminho 5; item 15-quinquies
+    do Anexo)
+  - ✅ **Redefinição `familia_estrita` = hard INTRA + soft INTER**
+    aplicada uniformemente (item 15-sexies; resolve sub-pendência "2
+    retos + 1 inclinado bloqueado pelo hard INTER")
+  - ⏳ **Box Jump** (decisão fica/sai)
+  - ⏳ **Lacuna pegada G1** (estimativa inicial INTRA/INTER/HIST)
+  - ⏳ **Regra de cadastro consolidada**
 - ⏳ **Fase 3 — calibração de pesos** — pendente próxima sessão
 - ⏳ **Fase 4 — estratégia de preenchimento** — pendente próxima sessão
 
 **Próximos passos:**
 
-1. Personal revisa este documento revisado + transcript de auditoria
-2. Próxima sessão arranca consolidando Fase 2 (regra de cadastro,
-   decisões pendentes residuais como Box Jump) e partindo para Fase 3
+1. Concluir Fase 2 residual (Caso 2 + Box Jump + lacuna pegada +
+   regra de cadastro)
+2. Avançar para Fase 3 (calibração numérica)
 3. Documento será atualizado in-place a cada fase
 
-*Documento parcial. Última atualização: 2026-05-05 (correções pós-auditoria).*
+*Documento parcial. Última atualização: 2026-05-06 (Sessão 2 — refator
+estrutural CORE + família `subida_elevada` G4 + redefinição
+`familia_estrita` hard INTRA + soft INTER alto).*

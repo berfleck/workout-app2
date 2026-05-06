@@ -1,8 +1,8 @@
 # Etapa 6 — Trabalho preparatório das tags multi-dimensionais
 
-**Status:** parcial — Fase 1 completa **+ correções pós-auditoria
-aplicadas (2026-05-05)**. Fase 2 em grande parte resolvida; Fases 3-4
-pendentes próxima sessão.
+**Status:** parcial — Fase 1 completa + correções pós-auditoria
+(2026-05-05) + **Sessão 2 (2026-05-06): refator estrutural CORE
+aplicado**. Fase 2 em curso; Fases 3-4 pendentes.
 
 **Branch:** `refator-gerador` · **Sem mudança de código** — etapa de
 modelagem clínica e arquitetural que produz especificação para a Etapa 7.
@@ -300,6 +300,203 @@ lateralidade, pegada, plano_corporal). Limite rígido respeitado.
 - [ ] Header de progresso do `guia_refatoracao_v4.md` atualizado (no
       final da etapa)
 - [ ] Aprovação do user para avançar para Etapa 7
+
+---
+
+## Sessão 2 (2026-05-06) — Refator estrutural CORE
+
+### Contexto
+
+Iniciada para tackle dos 5 itens residuais da Fase 2 enumerados na
+memória `project_etapa_6_fase_1.md`. Ordem proposta: Caso 1 → Caso 2 →
+Box Jump → lacuna pegada → regra de cadastro.
+
+Durante o tackle do Caso 1 (Pranchas Frontal+Lateral INTRA), user
+identificou e propôs **solução estruturalmente superior** que tornou
+todos os 3 caminhos discutidos originalmente (a/b/c) obsoletos.
+
+### Decisão estrutural — refator CORE
+
+**Problema diagnosticado (user):** o "budget de 5 dimensões" estava
+funcionando como bloqueio injustificado a modelagens clínicas
+adequadas. CORE tinha estrutura achatada (1 subregião, 2 padrões),
+diferente das outras regiões que têm múltiplas subregiões.
+
+**Reframe:** o budget era proxy contra inflação injustificada de
+dimensões — não restrição absoluta. Critério real é cost-benefit por
+dimensão. E mais: parte do que parecia "dimensão nova" pode ser
+expressa via refator estrutural reusando mecanismos existentes.
+
+**Refator aplicado (item 15-quater do Anexo):**
+
+- **Subregião:** `core` → **`core_isometrico`** + **`core_dinamico`**
+  (promovidos de padrão)
+- **Padrão:** 2 antigos → **4 refinados** atravessando ambas
+  subregiões (iso = anti-X, dyn = X):
+  - `flexao_tronco`
+  - `flexao_lateral`
+  - `rotacao_tronco`
+  - `flexao_quadril`
+
+**Mapeamento de 25 exercícios** (20 atuais + Russian Twist + 4 INFRA
+novos) detalhado em G8 do `dimensoes_proximidade.md`.
+
+**Reclassificações decididas durante a sessão:**
+
+- Canoinha: padrão (mantém core_dinamico) → `flexao_quadril` dyn
+  (pareia com V-Up/INFRA)
+- Roda Abdominal: subregião iso mantida; padrão → `flexao_tronco`
+- Prancha Renegade: padrão → `flexao_tronco` (componente
+  anti-rotação reconhecido mas curadoria simplificada)
+- Abd Bicicleta: padrão → `flexao_tronco` dyn
+- V-Up / V-Up Uni: padrão → `flexao_quadril` dyn
+- Item 14 do Anexo (Dead Bug C/Anilha + C/Bola → família INFRA)
+  SUPERSEDIDO — Dead Bugs ficam em família `Dead bug`; padrão
+  `flexao_quadril` em iso captura a parte de flexão de quadril
+
+**Lateralidades verificadas no banco** (sem mudança):
+
+- Dead Bug regular: unilateral (alterna)
+- Dead Bug C/ Anilha: bilateral (peso unificado)
+- Dead Bug C/ Bola: unilateral (alterna)
+- V-Up: bilateral; V-Up Uni: unilateral
+- Pallof Press: unilateral (executa um lado por vez)
+
+**Cadastro novo decidido:** Russian Twist (subregiao=core_dinamico,
+padrao=rotacao_tronco). Wood Chop **NÃO** cadastrar (decisão user).
+
+### Por que isso é melhor que os 3 caminhos da Sessão 1
+
+Os 3 caminhos discutidos para Caso 1 eram:
+
+- (a) Tag `categoria_core` — adicionaria dimensão nova
+- (b) Âncoras na subregião core_isometrico — mecanismo extra
+- (c) Aceitar como dívida — regressão silenciosa explícita
+
+O refator estrutural:
+
+1. **Não custa dimensão nova** — set de 5 mantido
+2. **Reusa mecanismos existentes** — score `regiao_diff`/`padrao_diff`
+   da Etapa 5 e demanda hierárquica da Etapa 3 já implementam o
+   comportamento desejado
+3. **Resolve mais que o Caso 1** — também captura "rotina só-iso"
+   ou "só-dyn" via cycling natural em `regiao core(N)`
+4. **É modelagem ativa** — Caso 1 sai de "abundância probabilística +
+   personal edita" para "score desincentiva par" + "abundância amplifica"
+
+### Decisão também considerada e descartada
+
+**Dimensão `tipo_core` (iso/dyn) narrow-scope.** Proposta inicial
+durante a sessão. User contra-propôs o refator estrutural (mais
+limpo). `tipo_core` torna-se redundante com o refator porque a
+informação iso/dyn já vive na subregião e o mecanismo de penalty por
+subregião igual já existe no score.
+
+### Caso 2 — Caminho 5 (família estrita biomecânica `subida_elevada`)
+
+Após o refator CORE, user reabriu a discussão do Caso 2 (Step Up +
+Passada Dos Steps INTRA). Discutimos 4 caminhos da Sessão 1 + Caminho
+4 (split padrão squat_unilateral) e o user propôs **Caminho 5**:
+criar família estrita nova capturando a mecânica biomecânica comum
+(pé em apoio elevado + ROM hip ampliado).
+
+**Decisão aprovada:** família **`subida_elevada`** agrupando:
+
+- Step Up
+- Step Up Alt.
+- Passada Dos Steps
+- Recuo do Estepe (cadastro futuro)
+
+Padrão `squat_unilateral` intacto. Equipamento_grupo intacto. Box
+Jump fica em `squat_bilateral` SEM família (uso clínico distinto).
+
+**Trade-off aceito:** par "Passada (regular) + Passada Dos Steps"
+perde hard de família (saem de famílias diferentes agora). Anti_uni
+INTRA continua penalizando. Clinicamente é correção, não regressão
+— Passada normal e Passada Dos Steps são biomecanicamente diferentes
+(presença da caixa muda mecânica fundamental).
+
+**Por que Caminho 5 venceu:**
+
+- Padrão e equipamento intactos (sem regressão de configs/templates)
+- Captura mecânica biomecânica explicitamente (alinha com Seção 1.4)
+- Menor mudança de banco entre as opções (1 valor novo +
+  4 reclassificações de família estrita)
+- Cobre Recuo do Estepe naturalmente (cadastro futuro herda família)
+- Box Jump fica isolado (caso especial de timing, não proximidade)
+
+### Redefinição `familia_estrita` — hard INTRA + soft INTER alto
+
+User identificou inconsistência conceitual durante a discussão do
+Caminho 5: a Etapa 6 refinou famílias para granularidade fina (Supino
+→ Reto + Inclinado; Prancha → frontal + lateral; criação de
+`subida_elevada`) sem recalibrar o mecanismo de proteção. Hard duplo
+INTRA+INTER era apropriado pra famílias "categoria muscular ampla"
+antigas, não pra famílias refinadas.
+
+Auditoria do histórico:
+
+- **Guia v4 original (Etapa 6)** propunha pesos numéricos
+  `100 INTRA / 80 INTER / 60 HISTÓRICO` — soft com peso alto.
+- **Sessão 1 desviou para hard duplo** sem justificativa registrada.
+- **Refinamento posterior das famílias** ignorou o desvio.
+
+**Decisão aprovada (Sessão 2):** redefinir `familia_estrita` como:
+
+- **INTRA: hard filter** (mantém — mesmo treino com 2 membros é
+  redundância)
+- **INTER: soft com peso alto** (~80% do INTRA)
+- **HISTÓRICO: toggle ON/OFF** (sem mudança)
+
+Aplicada uniformemente a todas as 8 tabelas de calibração dos grupos.
+
+**Sub-pendência "2 retos + 1 inclinado bloqueado pelo hard INTER"
+(P5(c) do G1, registrada na Sessão 1 pós-auditoria) — RESOLVIDA**
+pela redefinição. Caminho (c) original confirmado.
+
+**Implicação no toggle `relaxar_familia` do app:** semântica fica
+ambígua na nova realidade (INTER já é soft por padrão). Decisão
+sobre destino do toggle fica pra Etapa 7 (pós-simulação).
+
+### Lição metodológica reforçada
+
+A Sessão 2 confirmou e estendeu a lição da Sessão 1 sobre
+**escopo vs rigor**:
+
+- "Budget de N dimensões" funciona como proxy contra inflação
+  injustificada, não como restrição absoluta.
+- Quando user identifica modelagem clinicamente justificada,
+  considerar:
+  1. **Refator estrutural reusando mecanismos existentes**
+     (subregião/padrão/score) — ex: refator CORE
+  2. **Refinamento de família estrita** quando há proximidade
+     biomecânica clara — ex: `subida_elevada`
+  3. **Recalibração de mecanismos existentes** quando o refinamento
+     prévio criou friction — ex: redefinição
+     `familia_estrita = hard INTRA + soft INTER`
+  4. **Adicionar dimensão narrow-scope** apenas se 1-3 não cobrem
+
+### Itens da Fase 2 ainda pendentes
+
+- Box Jump (decisão fica/sai)
+- Lacuna pegada G1 (estimativa inicial INTRA/INTER/HIST)
+- Regra de cadastro consolidada
+
+### Atualizações em arquivos
+
+- `dimensoes_proximidade.md`:
+  - G8 reescrito (refator CORE) + G4 reescrito (Caminho 5)
+  - Seção 1.4 redefinida (hard INTRA + soft INTER alto)
+  - 8 tabelas de calibração atualizadas (INTER de família = "Alto
+    (soft)")
+  - Caso 1 e Caso 2 marcados ✅ em "Decisões a re-validar"
+  - Sub-pendência "2 retos + 1 inclinado" marcada ✅ resolvida
+  - Anexo de Consertos: itens 14 (supersedido), 15-quater (refator
+    CORE), 15-quinquies (subida_elevada G4), 15-sexies (redefinição
+    família), 26 (Recuo do Estepe atualizado), 32 (Russian Twist),
+    33 (Box Jump renumerado)
+  - Status do documento atualizado
+- `logs/etapa_6.md`: esta seção (Sessão 2 ampliada).
 
 ---
 
