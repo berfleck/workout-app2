@@ -296,15 +296,28 @@ INTER. Refinamento resolve.
 > a transversalidade (Crucifixo Reto + Supino Reto = mais incomoda que
 > Crucifixo Reto + Supino Inclinado).
 
-**Calibração inicial:**
+**Calibração inicial (Sessão 2 — pegada fixada como Médio + tag `variante_pontual` nova):**
 
 | Dimensão | INTRA | INTER | HISTÓRICO (R-1) |
 |---|---|---|---|
 | `familia_estrita` | Crítico (hard) | **Alto (soft)** | Crítico (toggle) |
 | `plano_corporal` (reto/inclinado) | **Alto** | **Médio-alto** (3 retos = Ruim) | Médio |
 | `equipamento_grupo` | **Baixo (tiebreaker)** | Baixo | Baixo |
-| `pegada` | (a definir) | (a definir) | (a definir) |
+| `pegada` | Médio | Médio | Médio |
 | `lateralidade` | Médio (anti_uni — ocioso hoje, todos bi) | Baixo | 0 |
+| **`variante_pontual`** (Supino Fechado, Apoio Fechado — futuros) | **Alto** | **Soft Crítico** (~95% bloqueio efetivo, mesma subregião) | Médio |
+
+> **Pegada fixada em "Médio" em todos os contextos** (Sessão 2 —
+> 2026-05-06): vetor primário em supinos é ângulo (`plano_corporal`
+> reto/inclinado), não pegada. Pegada vira fator desempate adicional.
+> Calibração final na Etapa 7 via simulação.
+
+> **Tag `variante_pontual`** nova (Sessão 2): boolean cobrindo "uso
+> pontual cross-family" — Supino Fechado + Apoio Fechado têm famílias
+> diferentes (`Supino Reto` vs `Apoio`) mas compartilham caráter
+> "pontual" e raramente devem coexistir na rotina. Tag opera dentro
+> da subregião (peito por enquanto). Detalhes em Seção 3 e Anexo
+> item 15-septies.
 
 **Cenário de validação (caso supino-inclinado-em-T1):**
 
@@ -767,17 +780,33 @@ gerador preferir iso+dyn mix em `core(2)` via cycling natural da Etapa
 
 ---
 
-## 3. Dimensões consolidadas (preliminar — Fase 2 vai congelar)
+## 3. Dimensões consolidadas
 
-**Set FINAL congelado de 5 dimensões (após correções pós-Fase 1):**
+**Set final: 5 dimensões core + 1 narrow-scope booleana (Sessão 2 ampliada).**
+
+**Dimensões core (5):**
 
 | # | Dimensão | Tipo | Valores | Aceita vazio? |
 |---|---|---|---|---|
-| 1 | `familia_estrita` | hard filter | curado pelo personal (refinada por ângulo onde necessário, ex: Supino Reto vs Supino Inclinado) | ✓ |
+| 1 | `familia_estrita` | hard INTRA + soft INTER alto | curado pelo personal (refinada por ângulo/mecânica onde necessário: Supino Reto vs Inclinado; subida_elevada agrupando exercícios em apoio elevado) | ✓ |
 | 2 | `equipamento_grupo` | enum 8+vazio (tiebreaker) | barra, barra_guiada, halter, polia, corporal, maquina, caixa, banda_elastica | ✓ |
 | 3 | `lateralidade` | enum 2 | bilateral, unilateral | ❌ (sempre uma das duas) |
 | 4 | `pegada` | enum 4 + matriz custom 4×4 | aberta, neutra, pronada, supinada | ✓ (em squats, hinges, knee_flex, tríceps, pranchas) |
 | 5 | `plano_corporal` | enum não-universal | varia por grupo: reto/inclinado (supinos), curvada/baixa/apoiada/etc (remadas), em_pe/deitado (hinges), pullover/vazio (puxadas), vazio (squats/knee_flex/tríceps/pranchas) | ✓ |
+
+**Dimensão narrow-scope adicional (Sessão 2):**
+
+| # | Dimensão | Tipo | Valores | Escopo |
+|---|---|---|---|---|
+| 6 | `variante_pontual` | boolean (default false) | true/false | Cross-family **dentro da mesma subregião**; `true` em exercícios de uso pontual que raramente devem coexistir na rotina (Supino Fechado, Apoio Fechado — peito); calibração inicial INTRA Alto / INTER Soft Crítico (~95% bloqueio) / HIST Médio. Generalizável: qualquer "uso pontual" cross-family futuro reusa a tag dentro do escopo da própria subregião. |
+
+> **Filosofia de "narrow-scope":** budget de 5 dimensões (Sessão 1) é
+> proxy contra inflação injustificada, não restrição absoluta. Tags
+> narrow-scope com case clínico forte e cost baixo (data simples,
+> escopo restrito) passam o critério custo-benefício. `variante_pontual`
+> é o segundo precedente (após `pegada` e `plano_corporal` serem
+> não-universais). Se aparecer outro caso similar no futuro, mesma
+> análise se aplica.
 
 > **Nota — absorção de `angulo_movimento`:** dimensão proposta
 > originalmente no guia v4 como separada. Após validação, foi
@@ -788,6 +817,11 @@ gerador preferir iso+dyn mix em `core(2)` via cycling natural da Etapa
 > **Nota — `musculo_alvo_especifico` descartada:** dimensão proposta
 > no guia v4 (cabeça do tríceps). User confirmou em G7 que famílias
 > resolvem. Não entra no set.
+
+> **Nota — `tipo_core` (iso/dyn) considerada e descartada:** Sessão 2
+> propôs como narrow-scope; refator estrutural CORE absorve via
+> mecanismos existentes (subregião + padrão refinados). Não entra no
+> set.
 
 > **Nota — equipamento como tiebreaker:** peso BAIXO INTRA reflete que
 > equipamento NÃO incomoda entre exercícios clinicamente diversos, mas
@@ -865,6 +899,8 @@ Lista consolidada para a Etapa 7 (que faz a migração efetiva do XLSX).
 | 15-quater | **Refator estrutural CORE** (Sessão 2 — 2026-05-06) | Promove subregião e refina padrão. Mudanças: (i) **Subregião:** `core` → **`core_isometrico` + `core_dinamico`** (promovidos de padrão); (ii) **Padrão:** 2 antigos → **4 refinados** (`flexao_tronco`, `flexao_lateral`, `rotacao_tronco`, `flexao_quadril`) atravessando as 2 subregiões; (iii) **Reclassificações de padrão:** Canoinha (subregião dyn mantida; padrão → `flexao_quadril` dyn), Roda Abdominal (iso mantida; padrão → `flexao_tronco`), Prancha Renegade (`flexao_tronco`), Abd Bicicleta (`flexao_tronco` dyn), V-Up/V-Up Uni (`flexao_quadril` dyn). Afeta ~22 linhas no banco + atualização de `PADRAO_PARA_SUBREGIAO`/`SUBREGIAO_PARA_REGIAO` em `gerador_treino.py` + compat via `_PADROES_LEGADOS` (`core_isometrico`/`core_dinamico` legado expandem nos 4 novos padrões refinados conforme a subregião). UI não muda (subregião continua selecionável). **Resolve estruturalmente o Caso 1** (Prancha Frontal+Lateral INTRA). Detalhes na Seção 2 G8. |
 | 15-quinquies | **Família estrita `subida_elevada` no G4** (Sessão 2 — 2026-05-06) | Caminho 5 aprovado para o Caso 2. Cria família estrita nova **`subida_elevada`** agrupando exercícios com mecânica de pé em apoio elevado + ROM hip ampliado. Reclassificações: Step Up (`Step up` → `subida_elevada`), Step Up Alt. (`Step up` → `subida_elevada`), Passada Dos Steps (`passada` → `subida_elevada`), Recuo do Estepe (cadastro futuro item 26 — entra com família `subida_elevada` desde já). Afeta 4 linhas no banco. Padrão `squat_unilateral` intacto. Equipamento_grupo intacto. Box Jump fica em `squat_bilateral` SEM família (uso clínico distinto — explosivo, não modelado por proximidade). **Resolve estruturalmente o Caso 2** (Step Up + Passada Dos Steps INTRA). Trade-off aceito: par "Passada (regular) + Passada Dos Steps" perde hard de família — anti_uni -75 INTRA continua penalizando; soft INTER alto desincentiva. Correção clínica, não regressão. Detalhes na Seção 2 G4. |
 | 15-sexies | **Redefinição `familia_estrita` = hard INTRA + soft INTER alto** (Sessão 2 — 2026-05-06) | Sessão 1 registrou família como hard INTRA+INTER sem justificativa registrada, divergindo do guia v4 original (`100 INTRA / 80 INTER / 60 HISTÓRICO`). Refinamento posterior das famílias (Supino Reto/Inclinado, prancha frontal/lateral, subida_elevada, etc.) não recalibrou o mecanismo de proteção. **Redefinição uniforme:** INTRA hard (mesmo treino com 2 membros da mesma família refinada continua redundante); **INTER soft com peso ~80% do INTRA** (variação dentro de família refinada entre treinos é aceitável quando banco aperta). HISTÓRICO mantém toggle ON/OFF. Implica em código: (i) `_buscar_candidato`/`montar_blocos` precisam aplicar família como soft penalty no INTER (não filtro hard); (ii) toggle `relaxar_familia` atual (default ON) fica com semântica ambígua — decisão sobre destino fica pra Etapa 7 pós-simulação (caminhos: desaparecer, virar binário ignorar/respeitar penalty INTER, ou virar slider de peso). **Resolve sub-pendência "2 retos + 1 inclinado bloqueado pelo hard INTER"** (P5(c) do G1). Detalhes na Seção 1.4. |
+| 15-septies | **Tag `variante_pontual`** (Sessão 2 — 2026-05-06) | Adicionar coluna `variante_pontual` (boolean, default `false`) ao XLSX. Marca `true` em: Supino Fechado (cadastro futuro), Apoio Fechado (cadastro futuro). Cobre uso pontual cross-family dentro da subregião peito (e generalizável a outras subregiões no futuro). Calibração inicial: INTRA Alto / INTER Soft Crítico (~95% bloqueio efetivo) / HIST Médio. Semântica clínica: max 1 exercício com `variante_pontual=true` por rotina dentro da subregião. Implementação Etapa 7: `carregar_banco` lê coluna; score INTRA/INTER aplica penalty alta quando ambos têm `variante_pontual=true` E mesma subregião. Dimensão #6 do set (narrow-scope, ver Seção 3). |
+| 15-octies | **Coluna `ativo` no XLSX** (Sessão 2 — 2026-05-06) | Adicionar coluna boolean `ativo` (default `true`). `carregar_banco` filtra `ativo=true` antes de retornar exercícios. Permite "exercícios na geladeira" — cadastrados mas não em uso pelo gerador. Vantagens sobre remover linhas: histórico de rotinas antigas preserva referências; reativação trivial; uma linha por exercício (sem duplicação ao re-cadastrar). Aplicação imediata: **Box Jump → `ativo=false`** (item 33 do Anexo 4.3 resolvido — fica no banco mas inativo, não entra na geração). |
 
 ### 4.2 Cadastros novos sugeridos
 
@@ -892,7 +928,7 @@ Lista consolidada para a Etapa 7 (que faz a migração efetiva do XLSX).
 
 | # | Item | Aguarda decisão |
 |---|---|---|
-| 33 | Box Jump | Fica ou sai do banco? Caso de "timing/sequenciamento" não modelado. |
+| ~~33~~ | ~~Box Jump~~ | ✅ **RESOLVIDO (Sessão 2):** fica no banco com `ativo=false` (item 15-octies). |
 
 ---
 
@@ -1041,6 +1077,157 @@ diversidade temporal, controle do personal sobre variabilidade.
 
 ---
 
+## 7. Regra de Cadastro Consolidada
+
+> **Adicionada na Sessão 2 (2026-05-06).** Consolidação das diretrizes
+> que emergiram ao longo da Etapa 6. Serve de referência ao cadastrar
+> exercícios novos (na Etapa 7 e adiante) e ao avaliar refinamentos
+> futuros do banco.
+
+### 7.1 Família estrita (`familia_estrita`)
+
+1. **Reflete variações biomecânicas estritas ou próximas** do mesmo
+   exercício — não categoria muscular ampla. Ex: NÃO cadastrar todos
+   os tríceps com `variacao_de = "Tríceps"`. Cada cabeça/movimento
+   ganha família própria (Coice, Pushdown, Francês, Mergulho, Testa).
+2. **Famílias gêmeas bi/uni unificam** — lateralidade é dimensão
+   separada. Ex: `stiff` + `stiff uni` = `stiff` único; Recuo + Recuo
+   Alternado já estão unificados.
+3. **Refinamento por ângulo** quando ROM/cadeia muscular muda
+   significativamente. Ex: Supino Reto vs Supino Inclinado.
+4. **Refinamento por mecânica próxima** quando proximidade
+   biomecânica é forte mesmo entre famílias atualmente diferentes.
+   Ex: `subida_elevada` no G4 (Step Up + Step Up Alt + Passada Dos
+   Steps + Recuo do Estepe — pé em apoio elevado, ROM hip ampliado).
+5. **Opera hard INTRA + soft INTER alto** (Seção 1.4). Default
+   uniforme em todas as famílias refinadas da Etapa 6.
+
+### 7.2 Equipamento (`equipamento_grupo`)
+
+6. **8 níveis nomeados + vazio:**
+   `barra/barra_guiada/halter/polia/corporal/maquina/caixa/banda_elastica`.
+7. **Precedência semântica** quando o exercício combina elementos —
+   escolher o que mais define proximidade clínica. Ex: Step Up =
+   `caixa` (não `halter`); Recuo do Estepe = `caixa` (não `halter`).
+8. **Aceita vazio** quando nenhum equipamento aproxima de outros via
+   essa dimensão. Ex: TRX, Box Jump, Slide Board.
+9. **Peso BAIXO INTRA (tiebreaker)** — não inflar pra resolver casos
+   clínicos. Quando aparecer caso onde equipamento parece "vetor
+   primário", usar refinamento de família ou padrão (caso `caixa` →
+   família `subida_elevada`, NÃO dual-weight em equipamento).
+
+### 7.3 Pegada (`pegada`)
+
+10. **4 valores enumerados:** `aberta`, `neutra`, `pronada`, `supinada`.
+11. **Distância via matriz custom 4×4** (Seção 3.1) — não binária.
+    Captura sub-estrutura: `aberta = pronada-wide`; `pronada =
+    pronada-fechada`; `aberta ↔ pronada = 1`; `aberta ↔ supinada = 3`.
+12. **Aceita vazio** em grupos onde não diferencia: squats, hinges,
+    knee_flex, tríceps, pranchas. Em puxadas tem 3 valores efetivos
+    (sem pronada-fechada).
+
+### 7.4 Plano corporal (`plano_corporal`)
+
+13. **Não-universal — valores variam por grupo:**
+    - **Supinos:** `reto` / `inclinado` (absorve `angulo_movimento`)
+    - **Remadas:** `curvada` / `baixa_sentada` / `apoiada` /
+      `unilateral_apoiada` / `suspensao`
+    - **Hinges (extensão de quadril):** `em_pe` / `deitado`
+    - **Puxadas:** vazio (default) / `pullover`
+    - **Squats / knee_flex / tríceps / pranchas / core:** vazio
+14. **Aceita vazio** em grupos onde não diferencia.
+
+### 7.5 Lateralidade (`lateralidade`)
+
+15. **Cobertura universal** — sempre `bilateral` ou `unilateral`,
+    nunca vazio.
+16. **Não faz parte de família estrita** — é dimensão separada
+    (regra simétrica à diretriz 2). Famílias gêmeas bi/uni unificam.
+17. **Pesos por grupo** — Crítico em remadas; Médio em squats/hinges;
+    Médio (anti_uni padrão) em outros.
+
+### 7.6 Estrutura subregião/padrão
+
+18. **CORE refinado** (item 15-quater do Anexo): subregião
+    `core_isometrico`/`core_dinamico` (de padrão); padrão
+    `flexao_tronco`/`flexao_lateral`/`rotacao_tronco`/`flexao_quadril`
+    (cross-subregião).
+19. **Squats refinados** (Etapa 1): `squat_bilateral` /
+    `squat_unilateral`.
+20. **Antes de adicionar dimensão narrow-scope, considerar nessa
+    ordem:**
+    1. **Refator estrutural** reusando subregião/padrão (ex: refator
+       CORE absorveu `tipo_core`)
+    2. **Refinamento de família estrita** quando há proximidade
+       biomecânica clara (ex: `subida_elevada`)
+    3. **Recalibração de mecanismo existente** quando refinamento
+       prévio criou friction (ex: redefinição
+       `familia_estrita = hard INTRA + soft INTER`)
+    4. **Adicionar dimensão narrow-scope** apenas se 1-3 não cobrem
+       (ex: `variante_pontual` — uso pontual cross-family same-subregião)
+
+### 7.7 Tag narrow-scope `variante_pontual`
+
+21. **Boolean default `false`.** Marca `true` em exercícios com uso
+    pontual cross-family dentro da subregião. Hoje: Supino Fechado,
+    Apoio Fechado (cadastros futuros). Calibração: INTRA Alto / INTER
+    Soft Crítico (~95% bloqueio efetivo) / HIST Médio. Escopo: cross-
+    family **dentro da mesma subregião**. Generalizável a outros
+    "usos pontuais" futuros sem precisar refinar a tag.
+
+### 7.8 Status `ativo`
+
+22. **Coluna `ativo`** (boolean default `true`). Marca `false` em
+    exercícios cadastrados mas não em uso pelo gerador (item 15-octies
+    do Anexo). `carregar_banco` filtra `ativo=true`. Aplicação imediata:
+    Box Jump.
+
+### 7.9 Dimensões descartadas (NÃO cadastrar)
+
+| Dimensão descartada | Motivo |
+|---|---|
+| `musculo_alvo_especifico` (cabeça do tríceps) | Famílias estritas refinadas resolvem |
+| `posicao_carga` (axial/frontal/distal) | Filtro de cargas Etapa 4 já cobre |
+| `padrao_execucao` | Lateralidade + família já cobrem |
+| `plano_estabilizacao` (anti-ext/lat/rot) | Refator estrutural CORE absorve via padrão |
+| `tipo_core` (iso/dyn) | Refator estrutural CORE absorve via subregião |
+
+### 7.10 Checklist de cadastro pra exercício novo
+
+Ao cadastrar um exercício novo no XLSX, preencher na ordem:
+
+1. `nome` — único no banco
+2. `subregiao` — qual das ~12 subregiões (peito, costas, ombro, etc.)
+3. `padrao` — qual padrão dentro da subregião (com refinamentos da
+   Etapa 6 onde aplicável: squat_bilateral/unilateral; flexao_tronco
+   etc. em CORE)
+4. `variacao_de` (= `familia_estrita`) — família refinada conforme
+   diretrizes 1-5; pode ser vazio se exercício é "solo" (Hollow Hold,
+   Pallof Press, Búlgaro, etc.)
+5. `lateralidade` — bilateral ou unilateral (sempre preenchido)
+6. `purpose` — compound / isolation / explosive / stability
+7. `complexidade` (1-5) e `fadiga` (1-5)
+8. `eq_primario` (texto livre) e `equipamento_grupo` (8 níveis +
+   vazio, conforme diretrizes 6-9)
+9. `pegada` — quando aplicável (diretrizes 10-12); vazio em
+   squats/hinges/knee_flex/tríceps/pranchas
+10. `plano_corporal` — quando aplicável (diretriz 13); vazio em
+    grupos onde não diferencia
+11. `variante_pontual` — boolean (default `false`); `true` em casos
+    pontuais cross-family same-subregião
+12. `ativo` — boolean (default `true`)
+13. `musculo_primario`, `obs` — texto descritivo
+
+**Validação cruzada antes de cadastrar:** percorrer diretrizes 1-22 e
+confirmar que o cadastro proposto:
+
+- Não cria família "categoria muscular ampla" (diretriz 1)
+- Não duplica conceito já modelado (diretriz 20)
+- Tem cobertura coerente com escopo das dimensões (Seção 1.5)
+- Não viola decisões prévias (Seção 2 dos 8 grupos)
+
+---
+
 ## Status do documento
 
 - ✅ **Fase 1 — análise dos 8 grupos** — completa
@@ -1049,7 +1236,7 @@ diversidade temporal, controle do personal sobre variabilidade.
   - Família `Supino` refinada (`Supino Reto` + `Supino Inclinado`)
   - `equipamento_grupo` esclarecido como tiebreaker (peso BAIXO INTRA)
   - Set de 5 dimensões congelado (Caminho B aprovado)
-- ⏳ **Fase 2 — em curso** — Sessão 2 (2026-05-06):
+- ✅ **Fase 2 — completa** — Sessão 2 (2026-05-06):
   - ✅ **Caso 1 (Frontal+Lateral)** resolvido por refator estrutural
     CORE (subregião + 4 padrões refinados, item 15-quater do Anexo)
   - ✅ **Dimensão `tipo_core`** considerada e descartada (refator
@@ -1061,19 +1248,26 @@ diversidade temporal, controle do personal sobre variabilidade.
   - ✅ **Redefinição `familia_estrita` = hard INTRA + soft INTER**
     aplicada uniformemente (item 15-sexies; resolve sub-pendência "2
     retos + 1 inclinado bloqueado pelo hard INTER")
-  - ⏳ **Box Jump** (decisão fica/sai)
-  - ⏳ **Lacuna pegada G1** (estimativa inicial INTRA/INTER/HIST)
-  - ⏳ **Regra de cadastro consolidada**
+  - ✅ **Tag `variante_pontual`** (#6 narrow-scope) — Supino Fechado +
+    Apoio Fechado, hard cross-family efetivo INTER (item 15-septies)
+  - ✅ **Coluna `ativo`** + Box Jump como `ativo=false` (item 15-octies;
+    item 33 do Anexo 4.3 resolvido)
+  - ✅ **Pegada G1** fixada em Médio (calibração inicial)
+  - ✅ **Regra de cadastro consolidada** (Seção 7 — 22 diretrizes +
+    checklist de cadastro)
 - ⏳ **Fase 3 — calibração de pesos** — pendente próxima sessão
 - ⏳ **Fase 4 — estratégia de preenchimento** — pendente próxima sessão
 
 **Próximos passos:**
 
-1. Concluir Fase 2 residual (Caso 2 + Box Jump + lacuna pegada +
-   regra de cadastro)
-2. Avançar para Fase 3 (calibração numérica)
+1. Iniciar Fase 3 (calibração numérica de pesos categóricos →
+   escala numérica), provavelmente junto com simulação inicial
+2. Fase 4 (estratégia de preenchimento dos 125+ exercícios)
 3. Documento será atualizado in-place a cada fase
 
-*Documento parcial. Última atualização: 2026-05-06 (Sessão 2 — refator
-estrutural CORE + família `subida_elevada` G4 + redefinição
-`familia_estrita` hard INTRA + soft INTER alto).*
+*Documento com Fases 1+2 fechadas. Última atualização: 2026-05-06
+(Sessão 2 ampliada — refator estrutural CORE + família `subida_elevada`
+G4 + redefinição `familia_estrita` hard INTRA + soft INTER alto + tag
+`variante_pontual` narrow-scope + coluna `ativo` no XLSX + Box Jump
+inativo + pegada G1 fixada Médio + Seção 7 com regra de cadastro
+consolidada). Próxima sessão: Fase 3 (calibração numérica de pesos).*

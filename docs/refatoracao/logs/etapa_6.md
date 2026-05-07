@@ -1,8 +1,7 @@
 # Etapa 6 — Trabalho preparatório das tags multi-dimensionais
 
-**Status:** parcial — Fase 1 completa + correções pós-auditoria
-(2026-05-05) + **Sessão 2 (2026-05-06): refator estrutural CORE
-aplicado**. Fase 2 em curso; Fases 3-4 pendentes.
+**Status:** Fase 1 + Fase 2 completas. Fases 3-4 pendentes próxima
+sessão. Última atualização: 2026-05-06 (Sessão 2 ampliada).
 
 **Branch:** `refator-gerador` · **Sem mudança de código** — etapa de
 modelagem clínica e arquitetural que produz especificação para a Etapa 7.
@@ -275,11 +274,19 @@ lateralidade, pegada, plano_corporal). Limite rígido respeitado.
 - [x] Vinhetas HISTÓRICO usadas para calibrar peso temporal
 - [x] Síntese parcial gravada em `dimensoes_proximidade.md`
 
-### Fase 2 — em grande parte resolvida
+### Fase 2 — completa ✅ (Sessão 2 — 2026-05-06)
 
-- [x] Set final de dimensões congelado (5 dimensões canônicas — pós-auditoria)
-- [ ] Regra de cadastro consolidada
-- [ ] Decisões pendentes da Fase 1 resolvidas (Box Jump, lacuna pegada)
+- [x] Set final de dimensões congelado (5 core + 1 narrow-scope
+      `variante_pontual` — pós-Sessão 2 ampliada)
+- [x] Regra de cadastro consolidada (Seção 7 do `dimensoes_proximidade.md`)
+- [x] Decisões pendentes da Fase 1 resolvidas:
+  - [x] Caso 1 (Frontal+Lateral) — refator estrutural CORE
+  - [x] Caso 2 (Step Up + Passada Dos Steps) — família `subida_elevada`
+  - [x] Sub-pendência supino INTER — redefinição familia_estrita soft
+  - [x] Box Jump — `ativo=false` (item 33)
+  - [x] Lacuna pegada G1 — Médio em todos
+- [x] Cadastros novos confirmados: Russian Twist (Wood Chop NÃO)
+- [x] Coluna `ativo` adicionada (item 15-octies)
 
 ### Fase 3 — pendente
 
@@ -476,11 +483,99 @@ A Sessão 2 confirmou e estendeu a lição da Sessão 1 sobre
      `familia_estrita = hard INTRA + soft INTER`
   4. **Adicionar dimensão narrow-scope** apenas se 1-3 não cobrem
 
-### Itens da Fase 2 ainda pendentes
+### Box Jump + coluna `ativo` no XLSX
 
-- Box Jump (decisão fica/sai)
-- Lacuna pegada G1 (estimativa inicial INTRA/INTER/HIST)
-- Regra de cadastro consolidada
+User decidiu: Box Jump fica no banco mas `ativo=false`. Decisão
+estendida pra criar coluna nova `ativo` (boolean, default `true`) no
+XLSX. `carregar_banco` filtra `ativo=true` antes de retornar.
+
+Vantagens sobre remover linha:
+- Histórico de rotinas antigas preserva referências ao exercício
+- Reativação trivial (toggle no XLSX)
+- Uma linha por exercício (sem duplicação ao re-cadastrar)
+- Permite cadastrar exercícios em desenvolvimento sem afetar gerador
+
+Itens novos no Anexo: 15-octies (coluna `ativo`) + Box Jump como
+aplicação imediata. Item 33 do Anexo 4.3 (pendência fica/sai)
+✅ resolvido.
+
+### Pegada G1 + tag `variante_pontual`
+
+User identificou problema durante a discussão de "lacuna pegada G1":
+variante "fechada" (Supino Fechado, Apoio Fechado — cadastros futuros)
+é uso pontual; quer regra "max 1 por rotina cross-family dentro da
+subregião peito".
+
+Análise de 4 caminhos:
+- (α) refinar pegada em 5º valor `fechada` — quebra matriz 4×4
+- (β) tag booleana `variante_pontual` — ✓ escolhida
+- (γ) família virtual `peito_fechado` — viola Seção 1.4
+- (δ) âncora reversa rotação-level — mecanismo novo
+
+**Decisão: tag `variante_pontual`** (boolean, default `false`):
+- Marca `true` em Supino Fechado + Apoio Fechado (futuros)
+- Escopo: cross-family **dentro da mesma subregião**
+- Calibração: INTRA Alto / INTER Soft Crítico (~95% bloqueio
+  efetivo) / HIST Médio
+- Generalizável: qualquer "uso pontual cross-family" futuro reusa
+  tag dentro do escopo da própria subregião
+
+**Pegada G1 fixada como "Médio" em todos os contextos** (calibração
+inicial). Vetor primário em supinos é ângulo (`plano_corporal`); pegada
+vira fator desempate.
+
+Set de dimensões: 5 core + 1 narrow-scope booleana = 6 total. Filosofia:
+budget de 5 é proxy contra inflação injustificada, não restrição
+absoluta. Tags narrow-scope com case clínico forte e cost baixo
+passam o critério custo-benefício. `variante_pontual` é o segundo
+precedente (após `pegada` e `plano_corporal` serem não-universais).
+
+Item novo no Anexo: 15-septies (tag `variante_pontual`).
+
+### Regra de cadastro consolidada — Seção 7 nova em `dimensoes_proximidade.md`
+
+User aprovou as 22 diretrizes propostas (sem comentários adicionais).
+Seção 7 nova adicionada ao documento, organizada em:
+
+- 7.1 Família estrita (5 diretrizes)
+- 7.2 Equipamento (4 diretrizes)
+- 7.3 Pegada (3 diretrizes)
+- 7.4 Plano corporal (2 diretrizes)
+- 7.5 Lateralidade (3 diretrizes)
+- 7.6 Estrutura subregião/padrão (3 diretrizes)
+- 7.7 Tag `variante_pontual` (1 diretriz)
+- 7.8 Status `ativo` (1 diretriz)
+- 7.9 Dimensões descartadas (5 explicitamente NÃO cadastrar)
+- 7.10 Checklist de cadastro pra exercício novo (passo-a-passo)
+
+**Fase 2 fechada.**
+
+### Resumo da Sessão 2 (2026-05-06)
+
+Sessão produziu 7 decisões de design grandes:
+
+1. Refator estrutural CORE (subregião + 4 padrões refinados)
+2. Família estrita `subida_elevada` no G4 (Caminho 5 do Caso 2)
+3. Redefinição `familia_estrita` = hard INTRA + soft INTER alto
+4. Tag `variante_pontual` (#6 narrow-scope)
+5. Coluna `ativo` no XLSX + Box Jump inativo
+6. Pegada G1 fixada Médio (calibração inicial)
+7. Seção 7 — Regra de cadastro consolidada (22 diretrizes)
+
+Resolveu Caso 1, Caso 2, sub-pendência "2 retos + 1 inclinado", item
+33 do Anexo (Box Jump), lacuna pegada G1.
+
+Cadastrou Russian Twist (rotacao_tronco dyn) — Wood Chop NÃO
+cadastrar.
+
+### Próximos passos
+
+- **Fase 3 (próxima sessão):** calibração numérica de pesos
+  (Crítico/Alto/Médio/Baixo/0 → escala 0-1000 ou similar) alinhada
+  com sistema de score da Etapa 5. Provavelmente junto com simulação
+  inicial pra validar pesos.
+- **Fase 4 (subsequente):** estratégia de preenchimento dos 125+
+  exercícios + validação cruzada final com 8 problemas conhecidos.
 
 ### Atualizações em arquivos
 
