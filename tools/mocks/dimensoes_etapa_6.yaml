@@ -1,0 +1,177 @@
+# Mocks das dimensões da Etapa 6 (família refinada + 5 dims core + 1 narrow-scope).
+#
+# Usado pelo harness `tools/calibrar_pesos_dimensoes.py` (Fase 3 / E.1).
+# NÃO altera o XLSX. Loader sobrescreve `variacao_de` no Exercicio in-memory
+# (origem=cadastrado) ou cria Exercicio in-memory (origem=mock_futuro) antes
+# de chamar o gerador.
+#
+# Campos:
+#   - origem: "cadastrado" → exercício existe no XLSX, overlay sobrescreve
+#       campos de proximidade. APENAS `familia_estrita` afeta o gerador
+#       atual (via `Exercicio.variacao_de`); outras dims ficam disponíveis
+#       num dict separado pro stub `_penalty_proximidade` futuro.
+#   - origem: "mock_futuro" → cadastro futuro da Etapa 6/7. Loader cria
+#       Exercicio com defaults pros campos não-overlay (campo `extras`).
+#
+# Sources das decisões:
+#   - Etapa 6 Sessão 1+2 — `docs/refatoracao/dimensoes_proximidade.md`
+#   - Anexo de consertos itens 15-bis (Supino refinado), 15-quinquies
+#     (subida_elevada), 15-septies (variante_pontual), 15-octies (ativo).
+
+exercicios:
+
+  # =========================================================================
+  # G1 — PEITO (cobertura cenário 1.1, 2.1, 2.3, 5.1)
+  # =========================================================================
+  # Supinos refinados em Reto vs Inclinado (Anexo item 15-bis).
+
+  - nome: "Supino Com Barra"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Supino Reto"
+      plano_corporal: "reto"
+      pegada: "pronada"
+      equipamento_grupo: "barra"
+      variante_pontual: false
+
+  - nome: "Supino Com Halteres"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Supino Reto"
+      plano_corporal: "reto"
+      pegada: "pronada"
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Supino Com Anilha"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Supino Reto"
+      plano_corporal: "reto"
+      pegada: "pronada"
+      equipamento_grupo: "barra"  # Anilha tratada como barra (Anexo item 9 análogo)
+      variante_pontual: false
+
+  - nome: "Supino Smith Inclinado"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Supino Inclinado"
+      plano_corporal: "inclinado"
+      pegada: "pronada"
+      equipamento_grupo: "barra_guiada"
+      variante_pontual: false
+
+  - nome: "Apoio"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Apoio"
+      plano_corporal: null  # apoios não diferenciam reto/inclinado clinicamente
+      pegada: "pronada"
+      equipamento_grupo: "corporal"
+      variante_pontual: false
+
+  - nome: "Apoio Ajoelhado"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Apoio"
+      plano_corporal: null
+      pegada: "pronada"
+      equipamento_grupo: "corporal"
+      variante_pontual: false
+
+  - nome: "Apoio Elevado"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Apoio"
+      plano_corporal: null
+      pegada: "pronada"
+      equipamento_grupo: "corporal"
+      variante_pontual: false
+
+  - nome: "Crucifixo Halteres"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "crucifixo"
+      plano_corporal: "reto"
+      pegada: "neutra"
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Crossover"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "crossover"
+      plano_corporal: "reto"
+      pegada: "neutra"
+      equipamento_grupo: "polia"
+      variante_pontual: false
+
+  - nome: "Crossover Sentado"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "crossover"
+      plano_corporal: "reto"
+      pegada: "neutra"
+      equipamento_grupo: "polia"
+      variante_pontual: false
+
+  # Cadastros futuros (mock_futuro) — Anexo itens 16, 17
+
+  - nome: "Apoio Fechado"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "Apoio"
+      plano_corporal: null
+      pegada: "pronada"
+      equipamento_grupo: "corporal"
+      variante_pontual: true  # Anexo 15-septies
+    extras:
+      regiao: "upper"
+      subregiao: "peito"
+      padrao: "empurrar_compostos"
+      purpose: "compound"
+      unilateral: "bilateral"
+      complexidade: 2
+      fadiga: 3
+      eq_primario: "Sem equipamento"
+      musculo_primario: "Peitoral"
+
+  - nome: "Supino Fechado"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "Supino Reto"
+      plano_corporal: "reto"
+      pegada: "pronada"  # pronada-fechada — matriz 4×4 ainda usa "pronada"
+      equipamento_grupo: "barra"
+      variante_pontual: true
+    extras:
+      regiao: "upper"
+      subregiao: "peito"
+      padrao: "empurrar_compostos"
+      purpose: "compound"
+      unilateral: "bilateral"
+      complexidade: 3
+      fadiga: 4
+      eq_primario: "Barra"
+      musculo_primario: "Peitoral"
+
+  # =========================================================================
+  # G2 — REMADAS (cobertura futura: cenário 2.2 Setup A)
+  # TODO E.1.b — preencher antes de ativar 2.2
+  # =========================================================================
+
+  # =========================================================================
+  # G4 — AGACHAMENTOS (cobertura futura: cenários 3.2, 3.3)
+  # TODO E.1.b — preencher Step Up, Step Up Alt, Passada, Passada Dos Steps
+  # com família refinada subida_elevada (Anexo item 15-quinquies);
+  # Recuo do Estepe como mock_futuro (Anexo item 26).
+  # =========================================================================
+
+  # =========================================================================
+  # G8 — CORE (cobertura futura: cenário 6.1)
+  # TODO E.1.b — preencher Pranchas (frontal vs lateral), Crunch, V-Up,
+  # INFRA Suspenso (mock_futuro), Russian Twist (mock_futuro), com refator
+  # estrutural CORE (Anexo item 15-quater): subregiões core_isometrico/
+  # core_dinamico já existentes; padrões refinados em flexao_tronco/
+  # flexao_lateral/rotacao_tronco/flexao_quadril ainda não migrados.
+  # =========================================================================
