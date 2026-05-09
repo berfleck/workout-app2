@@ -193,17 +193,23 @@ predicado e migração.
 - **Plano Fase 7.6 — calibração C coordinate descent:**
   - Ordem: família INTER → plano+pegada (acopladas) → lateralidade
     soft → HISTÓRICO → equipamento_grupo (último, tiebreaker).
-  - Cap **5-10 rounds/dim** + validação cruzada.
+  - **Cap MÁXIMO 10 rounds/dim** + validação cruzada (Seção 8.12 / C.3
+    reforçada Sessão 12). Não brute-force além de 10 rounds — abrir
+    discussão estrutural se não convergir.
+  - **Teto HIST** (Seção 8.11 / A.3.bis registrada Sessão 12):
+    multiplicador HIST máximo permitido = **1.2** (sobre soft_alto
+    -50 = -60), pra preservar invariante "pior caso família INTER+HIST
+    > -100". Sugestão "2.5x" da Seção 8.15.8 viola essa restrição —
+    ignorar. Se 1.2x não fechar 4.1 < 10%, parar e abrir ramo "setup
+    B do refinamento métrica 4.1" (R-1 estrutura DIFERENTE).
   - **Alvos explícitos:**
     - 2.3: faixa **2-10%** (atual 0% over-correção, reduzir peso INTRA)
     - 2.4 sub: **~70%** (atual 89.90%, reduzir peso INTRA squat)
     - 3.1: **10-15%** (atual 0%)
     - 3.2: **<10%** (atual 0%)
-    - 4.1: **<10% slots** (atual 22.18%, aumentar peso/multiplicador
-      HIST — gap real ~12 pp, auditoria pós-7.5 reconciliou números
-      Sessão 11 vs Sessão 12 que mediam unidades diferentes; ver
-      Seção 8.15.8 subseção "Reconciliação dos números 4.1 e drift
-      do 5.2")
+    - 4.1: **<10% slots** (atual 22.18%, aumentar multiplicador
+      HIST dentro do teto 1.2x — gap real ~12 pp, ver Seção 8.15.8
+      "Reconciliação")
 
 **Pendências em aberto pra Etapa 7** (Seção 8.15.7 + atualização 8.15.8):
 

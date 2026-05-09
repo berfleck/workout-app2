@@ -373,6 +373,44 @@ calibrado em densidade artificial pode over-corrigir o uso real.
 Esta diretriz é **complementar** à 1.8.1 — densificação é OK desde
 que a calibração resultante passe pelo loop de validação realista.
 
+#### 1.8.3 Auditar números informais antes de premissar decisão (Nota de processo #4)
+
+Números reportados informalmente em sessões anteriores devem ser
+auditados antes de virar premissa de decisão arquitetural.
+
+**Origem (Sessão 12 / pós-auditoria 7.5):** Sessão 11 reportou
+"~1.34 overlap/rotina = 7.4% slots" como debug informal durante a
+investigação do achado da métrica 4.1. Esse número virou base da
+escolha **Opção A** do refinamento da métrica 4.1 (Sessão 12), com a
+previsão acoplada "vira OK sem calibração nova". Auditoria pós-7.5
+(re-rodada formal com 1000 iters decompondo eventos por dim) mostrou
+o número real = **22.18%** — ~3× a estimativa informal. Ver Seção
+8.15.8 subseção "Reconciliação".
+
+**Decisão A permanece correta** — métrica contínua é genuinamente
+melhor que binária pra capturar o mecanismo HIST. Mas a previsão
+acoplada ("número já está perto do alvo") estava errada e teria
+levado a Fase 7.6 a calibrar com expectativa subestimada do gap.
+
+**Lição:** medições informais de debug devem ser **re-rodadas
+formalmente** (mesma janela, mesmas seeds, decomposição clara de
+unidades) antes de ancorar decisões arquiteturais ou de calibração.
+Estimativas "~1+~1=~2" não substituem auditoria com 1000 iters.
+
+**Procedimento operacional:**
+
+1. Quando uma sessão reporta número observado durante debug
+   (especialmente em justificativa de decisão), **anotar como
+   "informal — auditar antes de premissar"**.
+2. Antes de fase seguinte usar o número como ponto de partida,
+   **re-rodar com método formal** (harness completo, N_ITER padrão,
+   pesos default explícitos).
+3. Se diferença material (>20% relativo), reabrir a decisão acoplada
+   ao número original.
+
+Esta diretriz é **complementar** à 1.8.1 e 1.8.2 — completa o ciclo
+"densificação OK, validação realista, auditoria de números informais".
+
 ---
 
 ## 2. Síntese da Fase 1 — análise dos 8 grupos
@@ -2036,6 +2074,45 @@ a flexibilidade que motivou tirar do hard em primeiro lugar (Sessão
 expectativa 20-50%) é o teste empírico: se estourar pra 60-70% em C,
 revisitar; mas estrutura está coerente.
 
+**A.3.bis — Teto matemático da calibração HIST (registrado pré-7.6,
+Sessão 12).**
+
+A calibração da dim HIST em 7.6 vai ajustar
+`familia_estrita.historico_r1_multiplicador` (ou o peso base) pra
+fechar 4.1 < 10% slots. Pra preservar a invariante "pior caso
+família INTER+HIST > -100" (margem contra `padrao_diff +100` —
+Seção 1.4 + raciocínio acima), há **teto explícito** no
+multiplicador HIST:
+
+- Família INTER fixo em -40 (multiplicador 0.8 sobre soft_alto -50;
+  D3.1 default global). Calibração 7.6 pode ajustar família INTER
+  na primeira dim, mas o teto do termo HIST recalcula em função do
+  valor escolhido lá.
+- Com família INTER -40, o teto do termo HIST é **-60** (somando
+  com -40 dá -100, no limite — qualquer aperto adicional viola a
+  invariante).
+- Multiplicador HIST máximo permitido: **1.2** (sobre soft_alto -50
+  = -60). Default atual = 1.0 (-50).
+
+**Sugestões fora do teto = automaticamente inválidas.** A nota
+"multiplicador 2.5x" da Seção 8.15.8 (escrita antes deste teto ser
+registrado) viola a invariante (-50 × 2.5 = -125 > -100 limite) e
+NÃO deve ser usada.
+
+**Procedimento se 1.2x não fechar 4.1 < 10%:** parar, não brute-force
+peso além do teto. Reabrir discussão com 2 ramos:
+- (i) **Setup B do refinamento métrica 4.1** (registrado Seção 8.15.7
+  item 7 como alternativa à A): R-1 estrutura DIFERENTE da rotina
+  nova (Variante A R-1 ↔ Variante B nova). Banco com mais "ar" pra
+  HIST cobrir sem forçar peso.
+- (ii) **Revisitar B/A** (estrutura ou escala) — se HIST genuinamente
+  precisa peso > -60 pra funcionar, é sinal de que a hierarquia
+  semântica precisa reabrir, não que o peso deve ser forçado.
+
+Esta restrição está alinhada à diretriz da Seção 8.12 / C.1 —
+"calibração fina informada", não brute-force. O teto evita que 7.6
+"resolva" 4.1 destruindo invariante arquitetural validada em A.3.
+
 ### 8.12 C — calibração fina iterativa via harness (fechado — Sessão 6, 2026-05-08)
 
 4 sub-questões fechadas. C fecha o **processo** de calibração; os
@@ -2081,6 +2158,24 @@ importante do critério.
 **Cap 5-10 rounds/dim:** salvaguarda contra oscilação infinita em
 torno de ponto onde estrutura não permite convergência. Sem cap,
 calibração pode virar gasto desnecessário de tempo.
+
+**Reforço pré-7.6 (Sessão 12):** o cap **MÁXIMO ABSOLUTO é 10
+rounds por dim**. Se 10 rounds em uma dim não fecharem o alvo do
+cenário primário daquela dim:
+
+- **Parar** — não brute-force além de 10 rounds.
+- **Abrir discussão estrutural** — "o setup do cenário ou a estrutura
+  do peso está incorreto pra a propriedade que estamos tentando
+  capturar". A não-convergência em 10 rounds é sinal de que a
+  arquitetura da dim ou o setup do cenário precisam revisar (B ou
+  A), não que o peso precisa ser empurrado mais longe.
+- **Aplica explicitamente à dim HIST e à 4.1**: se 10 rounds
+  ajustando multiplicador HIST (dentro do teto -60 da A.3.bis) não
+  fecharem 4.1 < 10%, abrir o ramo "setup B do refinamento métrica
+  4.1" (R-1 estrutura DIFERENTE — Variante A R-1 ↔ Variante B nova),
+  registrado Seção 8.15.7 item 7 como alternativa à A.
+- **Mesma regra vale pras outras 4 dims** (família INTER, plano+pegada,
+  lateralidade soft, equipamento_grupo) — 10 rounds e parar.
 
 **C.4 — Timing: sequencial após E.1.b2 + calibrar contra stub harness
 + sanity pós-Etapa 7.**
