@@ -2822,7 +2822,8 @@ class ConfigPesosProximidade:
 **Defaults concretos a derivar de Seção 2 (8 grupos):**
 
 - `familia_estrita` INTRA = soft_critico (-100, hard intra continua
-  no predicado 7.2)
+  no predicado 7.2) ⚠️ **CORRIGIDO Sessão 8 (2026-05-09) → soft_alto
+  (-50)** (ver Nota de correção 8.15.2.bis abaixo)
 - `pegada` INTRA = soft_alto (-50) — override em squats/hinges = N/A
 - `plano_corporal` INTRA = soft_alto (-50) em hinges/remadas/supinos;
   N/A em squats/core
@@ -2830,6 +2831,43 @@ class ConfigPesosProximidade:
   (Seção 7.2 / item 9-bis Sessão 7c)
 - `variante_pontual` INTRA = soft_critico (-100, hard no predicado);
   INTER 0.95 (D1.c)
+
+> **Nota de correção 8.15.2.bis (Sessão 8 — 2026-05-09):** o item
+> `familia_estrita INTRA = soft_critico (-100)` acima é **shorthand**.
+> Foi escrito pensando só no INTRA isolado (que é hard no predicado
+> 7.2 e portanto não usa peso INTRA pra penalizar) e não considerou
+> que o **rótulo INTRA cascata pra INTER e HIST via multiplicador**
+> na estrutura B (Seção 8.10). Com `soft_critico` como base, a cascata
+> daria INTER -80 + HIST -100 = pior caso **-180**, contradizendo
+> a tabela A.3 da Seção 8.11 que documenta explicitamente:
+>
+> | Categoria | INTRA | INTER (×0.8) | INTER override |
+> |---|---|---|---|
+> | Alto | -50 | **-40** | família ×0.80 = **-40** (mesmo) |
+>
+> e o pior caso INTER família (-40) + HIST família (-50) = **-90**,
+> ancorando a semântica "soft alto -90 < padrao_diff +100 → desencoraja
+> mas permite" da Seção 1.4.
+>
+> **Decisão Sessão 8 fechou em favor de A.3:** `familia_estrita`
+> INTRA = `soft_alto` (-50). INTRA continua hard no predicado 7.2
+> (label não é usado pra penalizar INTRA — só pra ancorar INTER e HIST
+> via multiplicador). Com -50: INTER -40, HIST -50, pior caso INTER+HIST
+> = -90 ✓.
+>
+> **Três fontes históricas a preservar como referência cruzada** (não
+> reabrir essa discussão sem evidência empírica nova):
+>
+> 1. **Seção 1.4** (Sessão 2): "INTER: Alto (soft) — ~80% do peso INTRA
+>    quando convertido pra escala numérica". Categoria do INTER é "Alto",
+>    não "Crítico". Coerente com base INTRA Alto -50.
+> 2. **Seção 8.11 A.3** (Sessão 6): tabela explícita Alto INTRA -50 →
+>    INTER -40; pior caso família INTER+HIST = -90.
+> 3. **Seção 8.15.2** (Sessão 7c): shorthand `soft_critico` que omitiu
+>    cascata INTER/HIST. **Esta nota corrige** sem alterar o item
+>    original (preservado como referência histórica).
+>
+> Implementado em `pesos_proximidade.py` (Fase 7.1 — Sessão 8).
 
 **Decisões resolvidas pré-Sessão 8** (originalmente listadas como
 ambiguidades antecipadas, fechadas pelo user no fechamento da 7c):
