@@ -3183,7 +3183,8 @@ intencional (anti_uni Etapa 5 segue ortogonal em `_score_pareamento`).
 | 3.3 | 48.20% | 49.90% | OK | Dentro 20-50% (famílias dif) |
 | **4.1** | **100%** | **100%** | **FAIL** | **Achado Fase 7.4** ↓ |
 | 4.2 | 100% | 100% | OK | Toggle OFF informativo |
-| 5.2, 6.1, 6.2 | inalterados | inalterados | OK | Não regrediu |
+| 5.2 | 17.20% | 34.60% | OK | "inalterado" loose pré-auditoria 7.5; drift real surge na 7.3 (score-aware), confirmado pós-7.5 — ver 8.15.8 |
+| 6.1, 6.2 | inalterados | inalterados | OK | Não regrediu |
 
 **Achado importante 4.1 (registrar pra 7.5/7.6):** mesmo com peso HIST
 brutal (×50 = -2500), 4.1 permanece 100% violação. Rotina nova e R-1
@@ -3248,6 +3249,214 @@ melhoria. **Refinamento da métrica 4.1 fica pra Fase 7.5 ou 7.6:**
    - **A:** métrica contínua "% slots com overlap" (alvo <10%).
    - **B:** setup com R-1 estrutura DIFERENTE da rotina nova
      (Variante A R-1 ↔ Variante B nova).
+
+   **Resolvido na Fase 7.5 — opção A** (Sessão 12, 2026-05-09). Ver
+   Seção 8.15.8.
+
+#### 8.15.8 Fechamento Fase 7.5 (Sessão 12 — 2026-05-09)
+
+**Entregue:**
+
+1. **Refinamento métrica 4.1 — opção A** (decisão Sessão 12). Harness
+   (`tools/calibrar_pesos_dimensoes.py`) ganhou suporte a métrica
+   contínua agregada cross-iter via novo campo
+   `Cenario.metrica_continua_fn: Optional[ContinuaFn] = None` que
+   devolve `(slots_violando, slots_total, detalhe)` por iter. Quando
+   presente, o runner soma numerador e denominador cross-iter e gateia
+   em `pct = sum(viol)/sum(total)` — bypass do `metrica_fn` binário
+   (ainda required pelo dataclass; 4.x usa stub). Caminho binário
+   legado intacto pra todos os outros cenários.
+2. **Cenários 4.1 + 4.2 migrados pra contínua.** Métrica nova:
+   `_metrica_4_x_continua_factory` conta nome OR família match com R-1
+   por slot (granularidade alinhada a D3.3). Alvo 4.1 = **<10% slots**
+   (predicate `lambda pct: pct < 10.0`). 4.2 mantém predicate
+   informativo (`>=0%`) pra preservar gap 4.2-4.1 como sinal do
+   mecanismo HIST.
+3. **Cenário 5.1 implementado fora do harness** (decisão Sessão 12 —
+   pytest determinístico em vez de Monte Carlo). Arquivo novo
+   `tests/test_score_proximidade_cross_region.py` com 13 testes
+   parametrizados:
+   - **5.1.a** — INTRA cross-region score=0 (5 pares cross-region com
+     pegada/plano/equipamento iguais → escopo same-subregião filtra)
+   - **5.1.b** — INTER cross-region score=0 (mesmos 5 pares com
+     famílias DIFERENTES → variante_pontual + 3 dims same-subregião
+     filtram)
+   - **5.1.c** — INTER família estrita universal (caso patológico
+     mesma família cross-region dispara — intencional, Seção 1.5)
+   - **5.1.d** — HIST match cross-region (granularidade nome/família,
+     não subregião — D3.3 intencional)
+   - HIST sem match cross-region score=0 (sanity simétrica)
+
+   Razão da escolha: 5.1 é determinística por natureza (verifica
+   propriedade de função pura `_score_proximidade`). Monte Carlo no
+   harness não acrescenta sinal e foge do padrão dos outros cenários.
+   Slot `# TODO E.2: 5.1` removido do dict `CENARIOS`.
+
+**Resultados harness pós-Fase 7.5 (16 cenários, 1000 iters cada):**
+
+| ID | Pré-Etapa 7 | Pós-7.4 | Pós-7.5 | Status | Notas |
+|---|---|---|---|---|---|
+| 1.1 | 0% | 0% | 0% | OK | mantido |
+| 1.2 | 0% | 0% | 0% | OK | mantido |
+| 1.3 | 3.80% FAIL | 0% | 0% | OK | predicado 7.2 mantém |
+| 2.1 | 0% | 0% | 0% | OK | mantido |
+| 2.2A | 4.30% FAIL | 0% | 0% | OK | predicado 7.2 mantém |
+| 2.2B | 0% | 0% | 0% | OK | mantido |
+| **2.3** | 5.20% | **0% FAIL** | **0% FAIL** | FAIL | over-correção persiste — calibração 7.6 |
+| 2.4 | 100% (sub 94.9%) | 100% (sub n/d) | 100% (sub 89.90%) | OK | alvo ~70% sub pós-7.6 |
+| 3.1 | 0% | 0% | 0% | OK | esperado 10-15% pós-7.6 |
+| 3.2 | 0% | 0% | 0% | OK | esperado <10% pós-7.6 |
+| 3.3 | 41.80% | 49.90% | 49.90% | OK | dentro 20-50% (famílias dif) |
+| **4.1** | 100% binária | 100% binária | **22.18% slots FAIL** | FAIL | métrica refinada A; alvo <10% pós-7.6 |
+| 4.2 | 100% binária | 100% binária | 70.72% slots | OK | informativo; gap 4.2-4.1 = 48.54 pp |
+| 5.2 | 17.20% | 34.60% (real, doc dizia 17.20% loose) | 34.60% | OK | drift surge na 7.3 — score-aware (auditoria pós-7.5) |
+| 6.1 | 0% (sec 100%) | 0% (sec 100%) | 0% (sec 100%) | OK | mantido |
+| 6.2 | 0% (sub-a 0.20%) | 0% (sub-a 0%) | 0% (sub-a 0.80%) | OK | dentro <5% |
+
+**14/16 OK + 2 FAIL esperados (2.3 e 4.1) — todos calibração 7.6.**
+
+**Achados Fase 7.5:**
+
+- **4.1 = 22.18% slots** com métrica contínua. Mecanismo HIST default
+  (peso `familia_estrita.peso_historico = -50`) reduz overlap mas
+  não fecha <10% — calibração 7.6 ajusta peso (multiplicador HIST > 1.0
+  ou peso base mais negativo).
+- **Gap 4.2 - 4.1 = 70.72% - 22.18% = 48.54 pp** = magnitude do efeito
+  do toggle HIST. Sinal claro de que o mecanismo está ativo.
+- **5.2 drift de 17.20% → 34.60%** observado pós-7.4 mas não
+  registrado precisamente em 8.15.6 ("inalterados" foi aproximação
+  loose). Atribuição confirmada na auditoria pós-7.5 — ver subseção
+  "Reconciliação dos números 4.1 e drift do 5.2" abaixo.
+
+**Reconciliação dos números 4.1 e drift do 5.2 (auditoria pós-7.5):**
+
+Antes da Fase 7.6 começar a calibrar pesos, foram fechadas 2 checagens
+de fundamento (não calibrar antes de saber se o ponto de partida é o
+que pensamos).
+
+***Checagem 1 — Sessão 11 ("~13 → ~1.34") vs Sessão 12 ("22.18% slots"):***
+
+Reconciliação executada via auditoria com 1000 iters do cenário 4.1 nos
+pesos default atuais, decompondo eventos por dimensão:
+
+| Métrica (HIST ON, default -50) | Valor real (audit pós-7.5) |
+|---|---|
+| nomes events / rotina | 1.67 |
+| famílias events / rotina | 3.48 |
+| **nomes + famílias events / rotina** | **5.15** |
+| slots OR / rotina (matchnome OU família) | 3.55 |
+| slots OR % | **22.17%** |
+
+| Métrica (HIST OFF) | Valor real (audit pós-7.5) |
+|---|---|
+| nomes events / rotina | 5.73 |
+| famílias events / rotina | 10.45 |
+| **nomes + famílias events / rotina** | **16.18** |
+| slots OR / rotina | 11.32 |
+| slots OR % | **70.72%** |
+
+Comparação com Sessão 11 ("debug Sessão 11"):
+
+| Sessão 11 reportou | Auditoria pós-7.5 |
+|---|---|
+| Sem HIST: ~5 nomes + ~8 famílias = ~13 events | 5.73 + 10.45 = **16.18 events** (subestimou ~25%) |
+| Com HIST -50: ~1 nome + ~1 família = ~2 events | 1.67 + 3.48 = **5.15 events** (subestimou ~2.5×) |
+| "Score reduz overlap de ~13 pra ~1.34 por rotina" | número 1.34 não bate com nenhuma decomposição |
+
+**Conclusão:** os números da Sessão 11 foram **estimativas informais
+de debug**, não medições formais com 1000 iters. As aproximações "~1
+nome + ~1 família" subestimaram em ~2.5× o overlap real com peso
+default (5.15 events). O número "1.34" não é reproduzível — provável
+confusão de unidades durante observação manual.
+
+A previsão Sessão 12 "alvo <10% pós-7.6 sem calibração" baseou-se em:
+- Numerador subestimado (~1.34 em vez de ~3.55)
+- Denominador errado (~18 slots em vez de 16)
+
+**Resultado:** os 22.18% pós-7.5 são a medição correta de partida.
+Calibração 7.6 do peso HIST é necessária pra fechar <10%. Não há bug
+no mecanismo HIST — `_score_historico` aplica penalty corretamente
+quando candidato match nome ou família com R-1 (granularidade D3.3).
+
+Os 2 números (Sessão 11 vs Sessão 12) **não são comparáveis** — medem
+unidades diferentes (events somados vs slots OR únicos), em janelas
+diferentes (debug informal vs 1000 iters formais). **Rejeitar
+"previsão batida" como base pra calibração 7.6** — usar 22.18% como
+ponto de partida real.
+
+***Checagem 2 — drift 5.2 (17.20% → 34.60%):***
+
+Re-rodado 5.2 nos commits intermediários da Etapa 7 (1000 iters cada):
+
+| Commit | Fase | 5.2 |
+|---|---|---|
+| `1dad822` | pré-Etapa 7 | **17.20%** |
+| `74ba730` | pós-7.2 (predicado hard) | 17.20% (mantido) |
+| `8822ba7` | **pós-7.3 (score INTRA + score-aware)** | **34.60%** ← drift surge aqui |
+| `22d7923` | pós-7.4 (INTER + HIST + Caminho A) | 34.60% (estabilizado) |
+| `HEAD` | pós-7.5 | 34.60% (mantido) |
+
+**Causa atribuída:** introdução de `_selecionar_cand_score_aware` na
+Fase 7.3 substituiu `random.choice(cands)` por seleção via softmax
+top-K com `random.choices(weights=...)` em 2 call-sites de
+`pre_alocar_rotina`. A mudança altera ordem e quantidade de consumo
+de `random` entre seeds — mesmo seed produz outra sequência de
+escolhas. Hipótese do user confirmada empiricamente.
+
+**Não é regressão funcional.** 5.2 mede V-Up Uni + Tríceps Uni
+pareados no mesmo bloco com `exercicios_travados`. Pareamento
+continua acontecendo em **65.40% das rotinas** (= 100 - 34.60),
+dentro do gate "<50% violações" original. Magnitude do efeito:
+17.20% → 34.60% = pareamento caiu de 82.80% para 65.40% (-17.4 pp),
+porque a softmax top-K introduz aleatoriedade controlada onde antes
+era escolha uniforme — V-Up + Tríceps deixou de ser sempre o pareamento
+"natural". Comportamento esperado do score-aware (Etapa 5 já fez
+mudança análoga em `_score_pareamento`); efeito secundário benigno.
+
+**Pendência registrada:** baseline 5.2 atualizada de 17.20% pra 34.60%
+em todos os pontos da doc (8.15.3, 8.15.6, 8.15.8). Calibração 7.6 não
+afeta 5.2 (cenário usa `exercicios_travados` que bypassa proximidade
+soft).
+
+**Suíte pytest pós-7.5:** 174 passados (= 161 baseline pós-7.4 + 13
+novos do `test_score_proximidade_cross_region.py`) + 13 snapshots, 1
+skip pré-existente. Sem snapshots regerados (mecanismo do gerador
+intacto na Fase 7.5).
+
+**Pendências fechadas/atualizadas:**
+
+- Item 3 da Seção 8.15.7 (Cenário 5.1) — fechado em pytest, não no
+  harness.
+- Item 7 da Seção 8.15.7 (Refinamento métrica 4.1) — fechado via
+  opção A.
+
+**Pendências em aberto pra Etapa 7 (continuam abertas):**
+
+- Item 1 (bug retrocompat `("subregiao", "core", N)`) — Etapa 8 ou
+  refator estrutural CORE.
+- Item 2 (refator estrutural CORE real) — Etapa 8 ou Fase 4.
+- Item 4 (mock_futuros pro XLSX) — Fase 4.
+- Item 5 (cycling determinístico de subregião) — pós-Etapa 7.
+- Item 6 (UI HIST exposed) — pós-Etapa 7 (não bloqueia 7.6).
+
+**Próxima sessão (Fase 7.6):** calibração C coordinate descent.
+Ordem das 5 dims (Seção 8.12 / C):
+1. **família INTER** (-40 default; mexe 3.1, 3.2, 3.3 e 4.x via HIST)
+2. **plano + pegada** (acopladas; mexe 2.3 e 2.1)
+3. **lateralidade soft** (anti_uni; mexe 2.4 e 2.2B)
+4. **HISTÓRICO** (mexe 4.1 — alvo <10%)
+5. **equipamento_grupo** (último, tiebreaker)
+
+Cap **5-10 rounds/dim** + validação cruzada (Seção 8.12 / C). Alvos
+explícitos:
+- 2.3: faixa 2-10% (over-correção atual = 0%, reduzir peso INTRA)
+- 2.4 sub: ~70% (atual 89.90%, reduzir peso INTRA squat)
+- 3.1: 10-15% (atual 0%)
+- 3.2: <10% (atual 0%)
+- 4.1: <10% slots (atual 22.18%, **gap real maior do que Sessão 11
+  estimou** — ver 8.15.8 reconciliação. Aumento de peso HIST
+  precisa fechar gap de ~12 pp; multiplicador HIST de 1.0 → ~2.5x
+  é plausível como ponto de partida, calibrar com 5-10 rounds)
 
 ---
 

@@ -96,8 +96,9 @@ fecharam E.1.b2: 78 mocks YAML em 8 grupos + 16 cenários no harness +
 ## Etapa 7 — plano e decisões fechadas (não reabrir sem motivo forte)
 
 Plano consolidado na Sessão 7c (2026-05-09). **Fases 7.1 ✅ Sessão 8
-+ 7.2 ✅ Sessão 9 + 7.3 ✅ Sessão 10 + 7.4 ✅ Sessão 11 (todas
-2026-05-09).** Sessão 12 arranca Fase 7.5. Decisões já fechadas:
++ 7.2 ✅ Sessão 9 + 7.3 ✅ Sessão 10 + 7.4 ✅ Sessão 11 + 7.5 ✅
+Sessão 12 (todas 2026-05-09).** Sessão 13 arranca Fase 7.6 (calibração
+C coordinate descent). Decisões já fechadas:
 
 **Branch:** `etapa-7` (criado Sessão 8 a partir de `refator-gerador`).
 Sem sub-branches por fase (1 PR por fase no mesmo branch).
@@ -146,8 +147,18 @@ de INTER+HIST):**
    Refinamento métrica fica pra 7.5 (registrado Seção 8.15.7 item 7).
    8 snapshots + 1 fixture hardcoded ajustadas; 1 teste reformulado
    (`test_crossover_sentado_coexistencia_INTER_e_rara_pos_caminho_A`).
-5. **7.5** — E.2 validação (re-rodar 16 cenários + cenário 5.1
-   implementado).
+5. **7.5 ✅ Sessão 12** — E.2 validação. (a) Métrica 4.1 refinada
+   pra contínua "% slots com overlap" (opção A): novo
+   `Cenario.metrica_continua_fn` no harness + branch contínuo no
+   runner agregando cross-iter (`pct = sum(viol)/sum(total)`). 4.1
+   = **22.18% slots** pré-calibração; alvo <10% pós-7.6. 4.2 =
+   70.72% (informativo; gap 4.2-4.1 = 48.54 pp confirma efeito
+   HIST). (b) Cenário 5.1 implementado como pytest determinístico
+   em `tests/test_score_proximidade_cross_region.py` (13 testes
+   parametrizados — INTRA/INTER/HIST cross-region) — fora do
+   harness, decisão Sessão 12. (c) Harness 14/16 OK + 2 FAIL
+   esperados (2.3 + 4.1, calibração 7.6). 5.2 drift pós-7.4
+   17.20%→34.60% registrado (não regressão funcional).
 6. **7.6** — C calibração coordinate descent (5 dims em ordem:
    família INTER → plano+pegada → lateralidade soft → HISTÓRICO →
    equipamento). Cap 5-10 rounds/dim.
@@ -164,40 +175,55 @@ independente da migração família INTER; vitória rápida em
 iterativa); Caminho C da D3.2 não obriga acoplamento entre
 predicado e migração.
 
-**Documentos fonte de verdade pra Sessão 12 (Fase 7.5):**
+**Documentos fonte de verdade pra Sessão 13 (Fase 7.6):**
 
-- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.15.6 (fechamento
-  Fase 7.4 — Caminho A clean break, achado métrica 4.1) + Seção 8.15.7
-  itens 6-7 (UI HIST exposed pendência + métrica 4.1 refinamento)
-- `gerador_treino.py` `_score_proximidade` (~linha 1577) — branches
-  `"intra"` + `"inter"` + `"historico"` populados. `pre_alocar_rotina`
-  chama via `_selecionar_cand_score_aware(cands, intra, inter, hist,
-  pesos)`. Caminho A removeu `familias_globais` como filtro hard
-  (passa `set()` em vez)
-- **Plano Fase 7.5 — E.2 validação:**
-  - Implementar cenário **5.1** (sanity escopo cross-region, pendente)
-  - **Refinar métrica 4.1** (achado 7.4): (A) métrica contínua "% slots
-    com overlap" OU (B) setup R-1 estrutura DIFERENTE da rotina nova.
-    Decisão pendente — consultar user.
-  - Re-rodar 16 cenários completo + diff vs baseline pré-Etapa 7
+- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.15.8 (fechamento
+  Fase 7.5 — métrica 4.1 contínua opção A + cenário 5.1 em pytest +
+  16 cenários re-rodados)
+- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.12 / C (processo
+  de calibração coordinate descent — ordem das 5 dims, cap 5-10
+  rounds, validação cruzada como salvaguarda)
+- `pesos_proximidade.py` — pesos atuais (A.3). Calibração 7.6 ajusta
+  defaults globais ou overrides por subregião na hierarquia 2 níveis.
+  Argumento `pesos_override: ConfigPesosProximidade | None = None` em
+  `gerar_multiplos_treinos` permite testar combinações sem contaminar
+  globais (B.4).
+- `tools/calibrar_pesos_dimensoes.py` harness pronto. Métrica 4.1
+  contínua via `metrica_continua_fn`.
+- **Plano Fase 7.6 — calibração C coordinate descent:**
+  - Ordem: família INTER → plano+pegada (acopladas) → lateralidade
+    soft → HISTÓRICO → equipamento_grupo (último, tiebreaker).
+  - Cap **5-10 rounds/dim** + validação cruzada.
+  - **Alvos explícitos:**
+    - 2.3: faixa **2-10%** (atual 0% over-correção, reduzir peso INTRA)
+    - 2.4 sub: **~70%** (atual 89.90%, reduzir peso INTRA squat)
+    - 3.1: **10-15%** (atual 0%)
+    - 3.2: **<10%** (atual 0%)
+    - 4.1: **<10% slots** (atual 22.18%, aumentar peso/multiplicador
+      HIST — gap real ~12 pp, auditoria pós-7.5 reconciliou números
+      Sessão 11 vs Sessão 12 que mediam unidades diferentes; ver
+      Seção 8.15.8 subseção "Reconciliação dos números 4.1 e drift
+      do 5.2")
 
-**Pendências em aberto pra Etapa 7** (registradas Seção 8.15.7):
+**Pendências em aberto pra Etapa 7** (Seção 8.15.7 + atualização 8.15.8):
 
-1. Bug retrocompat `("subregiao", "core", N)` (resolução em 7.4 ou
-   junto com migração estrutural CORE).
+1. Bug retrocompat `("subregiao", "core", N)` — Etapa 8 ou junto com
+   migração estrutural CORE.
 2. Refator estrutural CORE real (padrões `flexao_tronco`/etc) —
    pode ficar pra Etapa 8 ou Fase 4.
-3. Cenário 5.1 — implementar em Fase 7.5.
+3. ~~Cenário 5.1 — implementar em Fase 7.5.~~ ✅ **Fechado em pytest
+   determinístico** (`tests/test_score_proximidade_cross_region.py`,
+   13 testes parametrizados — Fase 7.5 / Sessão 12).
 4. Mock_futuros (11 exercícios) vão pro XLSX na Fase 4.
 5. Cycling determinístico de subregião (achado paralelo Sessão 7a)
    — investigar se relevante pós-Etapa 7.
 6. **UI Histórico exposed** (Sessão 11 / Fase 7.4): contrato
    programatic `gerar_multiplos_treinos(historico_r1=...)` pronto, mas
    sem UI/integração SQLite. Toggle UI + leitura R-1 do banco fica
-   pra fase posterior — não bloqueia 7.5/7.6.
-7. **Refinamento métrica 4.1** (Sessão 11 / Fase 7.4): métrica binária
-   "≥1 overlap dispara violação" estruturalmente impossível ficar <5%
-   no setup atual (R-1 = rotina nova). Refinar em Fase 7.5.
+   pra fase posterior — não bloqueia 7.6.
+7. ~~**Refinamento métrica 4.1**.~~ ✅ **Fechado opção A** (Fase 7.5 /
+   Sessão 12) — métrica contínua "% slots com overlap" agregada
+   cross-iter. Alvo <10% pós-7.6.
 
 ## Stack
 

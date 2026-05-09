@@ -237,14 +237,27 @@ class CenarioResultado:
 SecundariaFn = Callable[[list[Sessao], dict[str, MockDimensoes]],
                         tuple[bool, str]]
 
+# Etapa 7 Fase 7.5: assinatura da métrica contínua agregada. Per-iter devolve
+# `(slots_violando, slots_total, detalhe)`; runner soma o numerador e o
+# denominador cross-iter e gateia status no `pct` resultante. Usada em 4.1/4.2
+# pra capturar mecanismo HIST além do gate binário pré-7.4 (Seção 8.15.6 —
+# "% slots com overlap" da opção A do refinamento da métrica 4.1).
+ContinuaFn = Callable[[list[Sessao], dict[str, MockDimensoes]],
+                       tuple[int, int, str]]
+
 
 @dataclass
 class Cenario:
     """Definição de um cenário-âncora da E.0.
 
-    `metrica_fn` é o gate de status (primária). `metricas_secundarias` é
-    uma lista opcional de sinais informativos paralelos — runner reporta
-    a taxa de cada uma mas NÃO afeta o status do cenário.
+    `metrica_fn` é o gate de status (primária) **modo binário** — runner
+    conta % iterações com violação. `metrica_continua_fn` (Fase 7.5) é o
+    gate de status **modo contínuo agregado** — runner soma slots_violando
+    e slots_total cross-iter e gateia em `pct = sum(viol)/sum(total)`.
+    Quando ambos definidos, contínua tem precedência (binária só popula CSV).
+    `metricas_secundarias` é uma lista opcional de sinais informativos
+    paralelos — runner reporta a taxa de cada uma mas NÃO afeta o status
+    do cenário.
 
     Útil pra distinguir "calibração da Etapa 6 over-penalizou" (primária)
     de "trade-offs de âncora — Etapa 3" ou "validação realista do anti_uni
@@ -273,6 +286,11 @@ class Cenario:
     # OFF (default). Cenário 4.1 usa pra ativar HISTÓRICO; 4.2 deixa None.
     historico_r1_factory: Optional[Callable[[list[Exercicio]],
                                               list[Sessao]]] = None
+    # Etapa 7 Fase 7.5: métrica contínua agregada (opcional). Quando
+    # presente, o runner ignora `metrica_fn` pra gate de status e usa
+    # razão agregada cross-iter. Refinamento métrica 4.1 (Seção 8.15.6
+    # achado pós-7.4 — opção A do user na Sessão 12).
+    metrica_continua_fn: Optional[ContinuaFn] = None
 
 
 def _seed_hash(cenario_id: str, seed: int) -> str:
@@ -1271,12 +1289,20 @@ CENARIO_3_1 = Cenario(
 # Seção 2.2 — exato setup do 6.2 (Decisão 3 Sessão 7b / Seção 8.14.4).
 # R-1 é gerada UMA vez com seed dedicada (99999) e fixada entre todas as iters.
 #
-# 4.1 (toggle ON, esperado <5% pos-Etapa 7): % rotinas onde >=1 nome OU
-#   família da R-1 reaparece. Pos-Fase 7.4: harness PASSA list[Sessao] da
-#   R-1 pra `gerar_multiplos_treinos(historico_r1=...)` — score HIST aplica
+# 4.1 (toggle ON, esperado <10% pós-7.6): **% slots com overlap**
+#   agregado cross-iter (refinamento contínuo Fase 7.5 — opção A do user
+#   na Sessão 12; Seção 8.15.6 achado pós-7.4). Métrica binária pré-7.5
+#   ("≥1 dispara violação") era estruturalmente impossível ficar <5%
+#   porque R-1 e rotina nova compartilham mesma estrutura Variante B 2x.
+#   Mecanismo HIST entrega ~1.34 overlap/rotina ÷ ~18 slots ≈ 7-8%
+#   pré-calibração; 7.6 ajusta peso pra fechar <10% com folga.
+#   Pos-Fase 7.4: harness PASSA list[Sessao] da R-1 pra
+#   `gerar_multiplos_treinos(historico_r1=...)` — score HIST aplica
 #   penalty quando candidato match nome ou família com R-1.
 # 4.2 (toggle OFF, esperado alto): aceita repetição. `historico_r1=None`
 #   (default) = comportamento sem score HIST. Predicate informativo.
+#   Mesma métrica contínua de 4.1 — comparação significativa é o GAP
+#   4.2 - 4.1 = magnitude do efeito do toggle HIST.
 # ---------------------------------------------------------------------------
 
 _R1_SEED = 99999  # Seed fixa pra rotina semana anterior
@@ -1369,34 +1395,63 @@ def _cfg_4_x(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
 _R1_CACHE: dict[str, tuple[set[str], set[str]]] = {}
 
 
-def _metrica_4_x_factory(banco_ref: list[Exercicio]):
-    """Factory que captura banco pra métrica 4.x (precisa pra gerar R-1)."""
+def _metrica_4_x_continua_factory(banco_ref: list[Exercicio]):
+    """Factory contínua (Fase 7.5 — refinamento métrica 4.1, opção A).
+
+    Devolve `(slots_overlap, slots_total, detalhe)` por iteração — o runner
+    soma cross-iter e gateia em `pct = sum(overlap)/sum(total)` agregado.
+
+    Substitui o gate binário "≥1 slot overlap dispara violação" identificado
+    como estruturalmente impossível ficar <5% no setup R-1=rotina nova
+    (Seção 8.15.6 — achado Fase 7.4). Mecanismo HIST entrega ~1.34
+    overlap/rotina ÷ ~18 slots ≈ 7.4% pré-calibração.
+
+    Granularidade nome OR família alinhada a D3.3 (penalty única por
+    candidato no `_score_proximidade` HIST).
+    """
     def _m(sessoes: list[Sessao],
-           dims: dict[str, MockDimensoes]) -> tuple[bool, str]:  # noqa: ARG001
+           dims: dict[str, MockDimensoes]) -> tuple[int, int, str]:  # noqa: ARG001
         if "r1" not in _R1_CACHE:
             _R1_CACHE["r1"] = _gerar_r1_variante_b(banco_ref)
         nomes_r1, fams_r1 = _R1_CACHE["r1"]
-        nomes_atuais: set[str] = set()
-        fams_atuais: set[str] = set()
+        slots_total = 0
+        slots_overlap = 0
+        amostra_nomes: list[str] = []
+        amostra_fams: list[str] = []
         for s in sessoes:
             for bloco in s.blocos:
                 for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
                     if ex is None:
                         continue
-                    nomes_atuais.add(ex.nome)
-                    if ex.variacao_de:
-                        fams_atuais.add(ex.variacao_de)
-        nomes_overlap = nomes_atuais & nomes_r1
-        fams_overlap = fams_atuais & fams_r1
-        if nomes_overlap or fams_overlap:
-            detalhes = []
-            if nomes_overlap:
-                detalhes.append(f"nomes={sorted(nomes_overlap)[:3]}")
-            if fams_overlap:
-                detalhes.append(f"fams={sorted(fams_overlap)[:3]}")
-            return True, "; ".join(detalhes)
-        return False, ""
+                    slots_total += 1
+                    name_match = ex.nome in nomes_r1
+                    fam_match = bool(ex.variacao_de) and ex.variacao_de in fams_r1
+                    if name_match or fam_match:
+                        slots_overlap += 1
+                        if name_match and len(amostra_nomes) < 3:
+                            amostra_nomes.append(ex.nome)
+                        if (fam_match and ex.variacao_de
+                                and len(amostra_fams) < 3):
+                            amostra_fams.append(ex.variacao_de)
+        if slots_overlap == 0:
+            return 0, slots_total, ""
+        partes = [f"{slots_overlap}/{slots_total} slots"]
+        if amostra_nomes:
+            partes.append(f"nomes={amostra_nomes}")
+        if amostra_fams:
+            partes.append(f"fams={amostra_fams}")
+        return slots_overlap, slots_total, "; ".join(partes)
     return _m
+
+
+def _metrica_4_x_stub(sessoes: list[Sessao],  # noqa: ARG001
+                       dims: dict[str, MockDimensoes]  # noqa: ARG001
+                       ) -> tuple[bool, str]:
+    """Stub do `metrica_fn` pra 4.x — não chamado quando contínua está setada
+    (runner usa `metrica_continua_fn` direto). Existe só pra satisfazer o
+    contrato required do dataclass `Cenario.metrica_fn`.
+    """
+    return False, ""
 
 
 # Cenários instanciados em main() depois de `banco` estar disponível.
@@ -1416,6 +1471,10 @@ def _make_cenario_4_x(cenario_id: str, nome: str, expectativa: str,
     OFF (default sem score HIST).
 
     R-1 cacheada em `_R1_SESSOES_CACHE` pra evitar regerar a cada iter.
+
+    Fase 7.5 — métrica contínua "% slots com overlap" agregada cross-iter
+    (refinamento opção A da Sessão 12). `metrica_fn` fica como stub
+    (não chamado pelo runner quando `metrica_continua_fn` setada).
     """
     hist_factory: Optional[Callable[[list[Exercicio]], list[Sessao]]] = None
     if toggle_on:
@@ -1433,7 +1492,8 @@ def _make_cenario_4_x(cenario_id: str, nome: str, expectativa: str,
         expectativa_predicate=predicate,
         config_factory=_cfg_4_x,
         n_treinos=2,
-        metrica_fn=_metrica_4_x_factory(banco),
+        metrica_fn=_metrica_4_x_stub,
+        metrica_continua_fn=_metrica_4_x_continua_factory(banco),
         historico_r1_factory=hist_factory,
     )
 
@@ -1451,13 +1511,18 @@ CENARIO_4_2: Cenario = None  # type: ignore
 
 
 def _patch_cenarios_4_x(banco: list[Exercicio]) -> None:
-    """Inicializa CENARIO_4_1 e CENARIO_4_2 com banco real. Chamar em main()."""
+    """Inicializa CENARIO_4_1 e CENARIO_4_2 com banco real. Chamar em main().
+
+    Fase 7.5 — métrica contínua "% slots com overlap" (opção A da Sessão 12).
+    Alvo 4.1 = <10% pós-calibração 7.6 (mecanismo HIST default já entrega
+    ~7-8%; calibração final em 7.6 decide o número exato).
+    """
     global CENARIO_4_1, CENARIO_4_2
     CENARIO_4_1 = _make_cenario_4_x(
         cenario_id="4.1",
         nome="HISTÓRICO toggle ON evita R-1",
-        expectativa="<5% (pos-Etapa 7; pre = baseline alto FAIL)",
-        predicate=lambda pct: pct < 5.0,
+        expectativa="<10% slots (Fase 7.5 contínua)",
+        predicate=lambda pct: pct < 10.0,
         banco=banco,
         toggle_on=True,
     )
@@ -1466,8 +1531,8 @@ def _patch_cenarios_4_x(banco: list[Exercicio]) -> None:
         nome="HISTÓRICO toggle OFF aceita repetição",
         expectativa="alto (informativo — toggle OFF aceita)",
         # Predicate informativo — sempre passa (cenário só registra
-        # baseline; comparação significativa vem pos-Etapa 7 quando
-        # toggle ON for implementado e divergir do OFF).
+        # baseline pós-Etapa 7; comparação significativa é o gap entre
+        # 4.1 e 4.2 = magnitude do efeito do toggle HIST).
         predicate=lambda pct: pct >= 0.0,
         banco=banco,
         toggle_on=False,
@@ -1494,7 +1559,8 @@ CENARIOS: dict[str, Cenario] = {
     "5.2": CENARIO_5_2,
     "6.1": CENARIO_6_1,
     "6.2": CENARIO_6_2,
-    # TODO E.2: 5.1
+    # 5.1 vive em `tests/test_score_proximidade_cross_region.py` como
+    # pytest determinístico (decisão Fase 7.5 / Sessão 12 — Seção 8.15.8).
 }
 
 
@@ -1508,12 +1574,21 @@ def rodar_cenario(banco: list[Exercicio], dims: dict[str, MockDimensoes],
                                           list[CenarioResultado]]:
     """Roda `n_iter` iterações e devolve (% primária, [(label, %)], iters).
 
+    **Modo binário (default)** — `pct = 100 * n_violacoes / n_iter`.
+    **Modo contínuo (Fase 7.5)** — quando `cenario.metrica_continua_fn` é
+    setada, `pct = 100 * sum(slots_violando) / sum(slots_total)` agregado
+    cross-iter. Per-iter `violacao` no CSV é `slots_violando > 0` (sinal
+    binário paralelo pra auditoria).
+
     Lista de secundárias preserva ordem da declaração no Cenario. Vazia
     quando cenário não tem secundárias.
     """
     iteracoes: list[CenarioResultado] = []
     n_violacoes = 0
     n_secundarias = [0] * len(cenario.metricas_secundarias)
+    cont_overlap_total = 0
+    cont_slots_total = 0
+    eh_continua = cenario.metrica_continua_fn is not None
     for i in range(1, n_iter + 1):
         random.seed(i)
         configs = cenario.config_factory(banco)
@@ -1539,7 +1614,14 @@ def rodar_cenario(banco: list[Exercicio], dims: dict[str, MockDimensoes],
             relaxar_familia=cenario.relaxar_familia,
             historico_r1=hist_r1,
         )
-        violacao, detalhe = cenario.metrica_fn(sessoes, dims)
+        if eh_continua:
+            slots_o, slots_t, detalhe = cenario.metrica_continua_fn(  # type: ignore[misc]
+                sessoes, dims)
+            cont_overlap_total += slots_o
+            cont_slots_total += slots_t
+            violacao = slots_o > 0
+        else:
+            violacao, detalhe = cenario.metrica_fn(sessoes, dims)
         # Primeira secundária persiste no CSV (back-compat); extras só na tela.
         sec_viol_csv: Optional[bool] = None
         sec_det_csv = ""
@@ -1562,7 +1644,11 @@ def rodar_cenario(banco: list[Exercicio], dims: dict[str, MockDimensoes],
         ))
         if violacao:
             n_violacoes += 1
-    pct = 100.0 * n_violacoes / n_iter
+    if eh_continua:
+        pct = (100.0 * cont_overlap_total / cont_slots_total
+               if cont_slots_total > 0 else 0.0)
+    else:
+        pct = 100.0 * n_violacoes / n_iter
     pcts_sec = [(label, 100.0 * n / n_iter)
                  for (label, _fn), n in zip(cenario.metricas_secundarias,
                                              n_secundarias)]
@@ -1646,7 +1732,11 @@ def main() -> None:
         resultados.append((cen, pct, pcts_sec))
         todas_iteracoes.extend(iteracoes)
         n_viol = sum(1 for it in iteracoes if it.violacao)
-        print(f"  Violações   : {n_viol}/{args.n_iter} ({pct:.2f}%)")
+        if cen.metrica_continua_fn is not None:
+            print(f"  Iters c/ overlap : {n_viol}/{args.n_iter}")
+            print(f"  % slots overlap  : {pct:.2f}% (agregado cross-iter)")
+        else:
+            print(f"  Violações   : {n_viol}/{args.n_iter} ({pct:.2f}%)")
         for label, pct_sec in pcts_sec:
             print(f"  >> {label}: {pct_sec:.2f}%")
         if n_viol and n_viol <= 5:
