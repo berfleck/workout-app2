@@ -3149,7 +3149,26 @@ intencional (anti_uni Etapa 5 segue ortogonal em `_score_pareamento`).
   (lombar 3+2=5 viola HIB2). Score INTER mudou consumo de `random`.
 - 8 snapshots de regressão atualizados (shifts benignos do score INTER
   + Caminho A — algumas famílias agora podem coexistir cross-treino,
-  esperado pré-calibração 7.6).
+  esperado pré-calibração 7.6). **Não são testes removidos** — os 8
+  testes continuam vivos, só os snapshots capturados foram regerados
+  via `pytest --snapshot-update`. Lista exata (em
+  `tests/__snapshots__/test_regressao.ambr`):
+  1. `test_upper_3_lower_2_core_2_3treinos_seed42`
+  2. `test_full_body_4treinos_seed1`
+  3. `test_template_empurrar_puxar_seed7`
+  4. `test_upper_3x2treinos_seed11`
+  5. `test_perna_anterior_3x3treinos_seed3`
+  6. `test_perna_posterior_2x2treinos_seed5`
+  7. `test_peito_3x2treinos_seed13`
+  8. `test_full_body_4treinos_seed1_HIB2`
+
+  **Causa única raiz:** Caminho A removeu `familias_globais` como
+  filtro hard + score INTER + HIST acrescentou novas chamadas a
+  `random` em `pre_alocar_rotina`. Mesmo seed produz outra sequência.
+  Verificação manual de `test_full_body_4treinos_seed1` confirmou
+  shift benigno (famílias coexistindo cross-treino — `desenv uni`,
+  `Supino`, `Adução quadril`, `Apoio`, `Desenvolvimento`, `Pullover`,
+  2× cada — comportamento Caminho A esperado).
 
 **Harness pós-Fase 7.4 — 14/16 OK + 2 FAIL ainda esperados:**
 
