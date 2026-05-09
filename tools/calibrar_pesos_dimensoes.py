@@ -223,13 +223,26 @@ class CenarioResultado:
     secundaria_detalhe: str = ""
 
 
+SecundariaFn = Callable[[list[Sessao], dict[str, MockDimensoes]],
+                        tuple[bool, str]]
+
+
 @dataclass
 class Cenario:
     """Definição de um cenário-âncora da E.0.
 
-    `metrica_fn` é o gate de status (primária). `metrica_secundaria_fn` é
-    sinal informativo paralelo — quando presente, runner reporta a taxa
-    da secundária mas NÃO afeta o status do cenário.
+    `metrica_fn` é o gate de status (primária). `metricas_secundarias` é
+    uma lista opcional de sinais informativos paralelos — runner reporta
+    a taxa de cada uma mas NÃO afeta o status do cenário.
+
+    Útil pra distinguir "calibração da Etapa 6 over-penalizou" (primária)
+    de "trade-offs de âncora — Etapa 3" ou "validação realista do anti_uni
+    em setup Variante B" (secundárias). Ex: 6.1 (1 secundária E3); 6.2
+    (2 secundárias — sub-métricas a e b da Nota de processo #2 da
+    Seção 8.6).
+
+    CSV de auditoria persiste só a PRIMEIRA secundária pra back-compat;
+    extras aparecem só no output impresso.
     """
     id: str
     nome: str
@@ -242,14 +255,8 @@ class Cenario:
                           tuple[bool, str]]  # (violacao?, detalhe)
     relaxar_familia: bool = False
     iteracoes: list[CenarioResultado] = field(default_factory=list)
-    # Métrica secundária opcional. Quando presente, reportada como sinal
-    # paralelo no output. Útil pra distinguir "calibração da Etapa 6 over-
-    # penalizou" (primária) de "configuração apertada gera trade-offs de
-    # âncora — Etapa 3" (secundária). Ex: 6.1 happy path.
-    metrica_secundaria_fn: Optional[Callable[[list[Sessao],
-                                              dict[str, MockDimensoes]],
-                                             tuple[bool, str]]] = None
-    metrica_secundaria_descricao: str = ""
+    metricas_secundarias: list[tuple[str, SecundariaFn]] = field(
+        default_factory=list)
 
 
 def _seed_hash(cenario_id: str, seed: int) -> str:
@@ -583,8 +590,149 @@ CENARIO_6_1 = Cenario(
     config_factory=_cfg_6_1,
     n_treinos=2,
     metrica_fn=_metrica_6_1_primaria,
-    metrica_secundaria_fn=_metrica_6_1_secundaria,
-    metrica_secundaria_descricao="% com ancora_nao_cumprida (Etapa 3, informativo)",
+    metricas_secundarias=[
+        ("% com ancora_nao_cumprida (Etapa 3, informativo)",
+         _metrica_6_1_secundaria),
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# Cenário 6.2 — Happy path Variante B (Empurrar/Puxar split, granularidade
+# subregião). Promovido pra pré-D2 na Sessão 6 (auditoria E.0). Cobre a
+# metade do uso real 2x semana que 6.1 não cobre + vira proxy realista pros
+# gotchas de 1.2 e 2.2A via 2 sub-métricas (Nota de processo #2 da Seção 8.6).
+#
+# Configuração (configuracoes_comuns.md Seção 2.2 Variante B):
+#   T1 (Empurrar + perna posterior):
+#       peito(2) + ombro(1) + perna_posterior(3) + core(1) + tríceps(1)
+#   T2 (Puxar + perna anterior):
+#       costas(3) + perna_anterior(3) + core(1) + bíceps(1)
+#
+# Métricas:
+#   - Primária : avisos E6 (incompleta + familia_repetida) — gate <5%
+#   - Sub-a   : % blocos com 2+ unilaterais do mesmo grupo musculo-funcional
+#                (proxy realista pra calibração do anti_uni soft -75)
+#   - Sub-b   : % rotinas com 2+ unilaterais em costas no T2
+#                (proxy realista pra calibração do hard contextual D1.d)
+# ---------------------------------------------------------------------------
+
+def _cfg_6_2(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
+    # Tríceps em T1 e bíceps em T2 são fixos via granularidade padrão (não
+    # subregião `bracos`, que cycla entre os dois sem garantir o split do
+    # uso real Variante B descrito em `configuracoes_comuns.md` Seção 2.2).
+    #
+    # Core: usa `core_dinamico` em T1 e `core_isometrico` em T2 (alternância
+    # clínica natural). A subregião legacy `core` (que `configuracoes_comuns.md`
+    # menciona como `core(1)`) foi refatorada na Sessão 2 da Fase 1 (item
+    # 15-quater) em `core_dinamico` + `core_isometrico`. Retrocompat existe
+    # em `_padroes_de_escopo` mas NÃO no caminho de alocação principal —
+    # `("subregiao", "core", 1)` falha com `qtd_obtida=0`. Bug paralelo
+    # registrado pra investigação separada (fora do escopo Sessão 6).
+    base_t1 = {
+        "demandas": [
+            ("subregiao", "peito", 2),
+            ("subregiao", "ombro", 1),
+            ("subregiao", "perna_posterior", 3),
+            ("subregiao", "core_dinamico", 1),
+            ("padrao", "triceps", 1),
+        ],
+        "tamanho_bloco": 2,
+        "evitar_agonistas": True,
+        "max_complexidade": 5,
+    }
+    base_t2 = {
+        "demandas": [
+            ("subregiao", "costas", 3),
+            ("subregiao", "perna_anterior", 3),
+            ("subregiao", "core_isometrico", 1),
+            ("padrao", "biceps", 1),
+        ],
+        "tamanho_bloco": 2,
+        "evitar_agonistas": True,
+        "max_complexidade": 5,
+    }
+    return [base_t1, base_t2]
+
+
+def _metrica_6_2_primaria(sessoes: list[Sessao],
+                          dims: dict[str, MockDimensoes]) -> tuple[bool, str]:  # noqa: ARG001
+    """Métrica primária — gate de status: % rotinas com aviso de calibração
+    da Etapa 6 (incompleta, familia_repetida). Mesma lógica do 6.1.
+    """
+    avisos_etapa_6: list[str] = []
+    subregioes_afetadas: set[str] = set()
+    for sessao in sessoes:
+        for av in sessao.avisos:
+            tipo = av.get("tipo", "?")
+            if tipo in _AVISOS_ETAPA_6:
+                avisos_etapa_6.append(tipo)
+                esc = av.get("escopo_demanda", "")
+                if esc:
+                    subregioes_afetadas.add(esc)
+    if not avisos_etapa_6:
+        return False, ""
+    return True, (f"avisos_E6={avisos_etapa_6[:3]} "
+                  f"subregioes={sorted(subregioes_afetadas)}")
+
+
+def _metrica_6_2_sub_a(sessoes: list[Sessao],
+                        dims: dict[str, MockDimensoes]) -> tuple[bool, str]:  # noqa: ARG001
+    """Sub-métrica a — % rotinas com bloco contendo 2+ unilaterais do mesmo
+    grupo musculo-funcional. Generaliza a métrica do 1.2 pra setup realista
+    Variante B (onde anti_uni só pode disparar entre exercícios de subregiões
+    diferentes que coexistam num bloco — ex: V-Up Uni + Tríceps Uni).
+    Tracking pro gotcha "calibrar denso, validar realista".
+    """
+    for sessao in sessoes:
+        for bloco in sessao.blocos:
+            unis_por_grupo: dict[str, list[str]] = {}
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                if ex is None or ex.unilateral != "unilateral":
+                    continue
+                grupo = GRUPO_MUSCULAR_PADRAO.get(ex.padrao, "?")
+                unis_por_grupo.setdefault(grupo, []).append(ex.nome)
+            for grupo, nomes in unis_por_grupo.items():
+                if len(nomes) >= 2:
+                    return True, f"bloco {bloco.label} grupo='{grupo}' 2+ unis: {nomes}"
+    return False, ""
+
+
+def _metrica_6_2_sub_b(sessoes: list[Sessao],
+                        dims: dict[str, MockDimensoes]) -> tuple[bool, str]:  # noqa: ARG001
+    """Sub-métrica b — % rotinas com 2+ unilaterais em costas (treino T2,
+    `costas(3)` da Variante B). Tracking pro gotcha do hard contextual D1.d
+    em setup realista (vs `remadas(2)` patológico do 2.2A).
+    """
+    for sessao in sessoes:
+        unis_costas: list[str] = []
+        for bloco in sessao.blocos:
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                if ex is None:
+                    continue
+                if ex.subregiao == "costas" and ex.unilateral == "unilateral":
+                    unis_costas.append(ex.nome)
+        if len(unis_costas) >= 2:
+            return True, f"costas 2+ unis: {unis_costas}"
+    return False, ""
+
+
+CENARIO_6_2 = Cenario(
+    id="6.2",
+    nome="Happy path Variante B (subregião, Empurrar/Puxar)",
+    setup_descricao="peito(2)+ombro(1)+perna_post(3)+core(1)+bracos(1) // "
+                    "costas(3)+perna_ant(3)+core(1)+bracos(1), 1000 rotinas",
+    expectativa_descricao="<5% (E6 only)",
+    expectativa_predicate=lambda pct: pct < 5.0,
+    config_factory=_cfg_6_2,
+    n_treinos=2,
+    metrica_fn=_metrica_6_2_primaria,
+    metricas_secundarias=[
+        ("% blocos com 2+ unis mesmo grupo (proxy 1.2 realista)",
+         _metrica_6_2_sub_a),
+        ("% rotinas com 2+ unis em costas T2 (proxy 2.2A realista)",
+         _metrica_6_2_sub_b),
+    ],
 )
 
 
@@ -595,7 +743,10 @@ CENARIOS: dict[str, Cenario] = {
     "2.2A": CENARIO_2_2_A,
     "5.2": CENARIO_5_2,
     "6.1": CENARIO_6_1,
-    # TODO E.1.b2 (pós-D2/D3): 2.1, 2.2B, 2.3, 3.1, 3.2, 3.3, 4.1, 4.2
+    "6.2": CENARIO_6_2,
+    # TODO E.1.b2 (pós-D2/D3): 2.1, 2.2B (perna_anterior(3)),
+    #                          2.3 (timebox costas(3) — depende mocks G2),
+    #                          3.1 (Variante B 3x A1/A2), 3.2, 3.3, 4.1, 4.2
     # TODO E.2: 5.1
 }
 
@@ -606,26 +757,46 @@ CENARIOS: dict[str, Cenario] = {
 
 def rodar_cenario(banco: list[Exercicio], dims: dict[str, MockDimensoes],
                    cenario: Cenario,
-                   n_iter: int) -> tuple[float, Optional[float], list[CenarioResultado]]:
-    """Roda `n_iter` iterações e devolve (% primária, % secundária|None, iters)."""
+                   n_iter: int) -> tuple[float, list[tuple[str, float]],
+                                          list[CenarioResultado]]:
+    """Roda `n_iter` iterações e devolve (% primária, [(label, %)], iters).
+
+    Lista de secundárias preserva ordem da declaração no Cenario. Vazia
+    quando cenário não tem secundárias.
+    """
     iteracoes: list[CenarioResultado] = []
     n_violacoes = 0
-    n_secundaria = 0
-    tem_secundaria = cenario.metrica_secundaria_fn is not None
+    n_secundarias = [0] * len(cenario.metricas_secundarias)
     for i in range(1, n_iter + 1):
         random.seed(i)
         configs = cenario.config_factory(banco)
+        # Quando factory retorna 1 config, replica n_treinos vezes (mesma config
+        # em todos os treinos — caso 1.1, 6.1, etc.). Quando retorna lista com
+        # len == n_treinos, usa direto (caso 6.2 — Variante B com configs
+        # diferentes por treino).
+        if len(configs) == 1:
+            configs_treinos = configs * cenario.n_treinos
+        elif len(configs) == cenario.n_treinos:
+            configs_treinos = configs
+        else:
+            raise ValueError(
+                f"Cenário {cenario.id}: config_factory retornou "
+                f"{len(configs)} configs, esperado 1 ou {cenario.n_treinos}")
         sessoes = gerar_multiplos_treinos(
-            banco, configs * cenario.n_treinos,
+            banco, configs_treinos,
             relaxar_familia=cenario.relaxar_familia,
         )
         violacao, detalhe = cenario.metrica_fn(sessoes, dims)
-        sec_viol: Optional[bool] = None
-        sec_det = ""
-        if tem_secundaria:
-            sec_viol, sec_det = cenario.metrica_secundaria_fn(sessoes, dims)
-            if sec_viol:
-                n_secundaria += 1
+        # Primeira secundária persiste no CSV (back-compat); extras só na tela.
+        sec_viol_csv: Optional[bool] = None
+        sec_det_csv = ""
+        for j, (_label, fn) in enumerate(cenario.metricas_secundarias):
+            sv, sd = fn(sessoes, dims)
+            if sv:
+                n_secundarias[j] += 1
+            if j == 0:
+                sec_viol_csv = sv
+                sec_det_csv = sd
         iteracoes.append(CenarioResultado(
             cenario_id=cenario.id,
             iter_idx=i,
@@ -633,32 +804,35 @@ def rodar_cenario(banco: list[Exercicio], dims: dict[str, MockDimensoes],
             seed_hash=_seed_hash(cenario.id, i),
             violacao=violacao,
             detalhe=detalhe,
-            secundaria_violacao=sec_viol,
-            secundaria_detalhe=sec_det,
+            secundaria_violacao=sec_viol_csv,
+            secundaria_detalhe=sec_det_csv,
         ))
         if violacao:
             n_violacoes += 1
     pct = 100.0 * n_violacoes / n_iter
-    pct_sec = (100.0 * n_secundaria / n_iter) if tem_secundaria else None
-    return pct, pct_sec, iteracoes
+    pcts_sec = [(label, 100.0 * n / n_iter)
+                 for (label, _fn), n in zip(cenario.metricas_secundarias,
+                                             n_secundarias)]
+    return pct, pcts_sec, iteracoes
 
 
-def _imprimir_tabela(resultados: list[tuple[Cenario, float, Optional[float]]]) -> None:
+def _imprimir_tabela(resultados: list[tuple[Cenario, float,
+                                                list[tuple[str, float]]]]) -> None:
     """Tabela de cenários com expectativa vs observado.
 
-    Quando cenário tem métrica secundária, imprime linha extra com prefixo
-    └─ informativa, sem afetar status.
+    Cada métrica secundária do cenário vira uma linha informativa com prefixo
+    `>> secundaria:`, sem afetar status.
     """
     print()
     print("=" * 100)
     print(f"{'ID':<5} {'Cenário':<45} {'Esperado':<18} {'Observado':<12} {'Status':<8}")
     print("=" * 100)
-    for cen, pct, pct_sec in resultados:
+    for cen, pct, pcts_sec in resultados:
         status = "OK" if cen.expectativa_predicate(pct) else "FAIL"
         print(f"{cen.id:<5} {cen.nome:<45} {cen.expectativa_descricao:<18} "
               f"{pct:>6.2f}%     {status:<8}")
-        if pct_sec is not None:
-            print(f"      >> secundaria: {cen.metrica_secundaria_descricao:<55}"
+        for label, pct_sec in pcts_sec:
+            print(f"      >> secundaria: {label:<55}"
                   f"{pct_sec:>6.2f}%     [info]")
     print("=" * 100)
 
@@ -703,25 +877,24 @@ def main() -> None:
             sys.exit(1)
         ids = [args.cenario]
 
-    resultados: list[tuple[Cenario, float, Optional[float]]] = []
+    resultados: list[tuple[Cenario, float, list[tuple[str, float]]]] = []
     todas_iteracoes: list[CenarioResultado] = []
     for cid in ids:
         cen = CENARIOS[cid]
         print(f"\n[{cid}] {cen.nome}")
         print(f"  Setup       : {cen.setup_descricao}")
         print(f"  Expectativa : {cen.expectativa_descricao}")
-        if cen.metrica_secundaria_fn:
-            print(f"  Secundária  : {cen.metrica_secundaria_descricao}")
+        for label, _fn in cen.metricas_secundarias:
+            print(f"  Secundária  : {label}")
         print(f"  Rodando {args.n_iter} iterações...")
-        pct, pct_sec, iteracoes = rodar_cenario(banco, dims, cen, args.n_iter)
+        pct, pcts_sec, iteracoes = rodar_cenario(banco, dims, cen, args.n_iter)
         cen.iteracoes = iteracoes
-        resultados.append((cen, pct, pct_sec))
+        resultados.append((cen, pct, pcts_sec))
         todas_iteracoes.extend(iteracoes)
         n_viol = sum(1 for it in iteracoes if it.violacao)
         print(f"  Violações   : {n_viol}/{args.n_iter} ({pct:.2f}%)")
-        if pct_sec is not None:
-            n_sec = sum(1 for it in iteracoes if it.secundaria_violacao)
-            print(f"  Secundária  : {n_sec}/{args.n_iter} ({pct_sec:.2f}%)")
+        for label, pct_sec in pcts_sec:
+            print(f"  >> {label}: {pct_sec:.2f}%")
         if n_viol and n_viol <= 5:
             print("  Detalhes das violações:")
             for it in iteracoes:

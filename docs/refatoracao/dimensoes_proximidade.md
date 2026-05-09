@@ -305,6 +305,74 @@ equipamento_grupo, lateralidade Médio em outras subregiões) NÃO
 entram no predicado — vivem em `_score_pareamento` aditivamente,
 calibração via D2.
 
+### 1.8 Diretrizes de processo metodológico (registradas Sessão 6)
+
+Duas diretrizes que emergiram da Fase 3 e valem como **princípios
+gerais do projeto**, não específicos da auditoria onde foram
+identificadas. Promovidas pra esta seção pra que sessões futuras
+tratem como diretriz pro projeto inteiro, não como observação
+contextual da Sessão 6.
+
+#### 1.8.1 Densificação patológica ≠ anti-padrão escopo→rigor
+
+Setups patológicos em cenários de calibração (`peito(3)` em 1.1/1.3/
+2.1, `bracos(4)` em 1.2, `remadas(2)` em 2.2A) **não são regressão**
+do princípio "escopo, não rigor" da Seção 1.1. São **densidade
+artificial necessária** pra forçar coexistência rara virar mensurável
+em 1000 iters — sem isso, gates hard e penalties soft simplesmente
+não disparam frequência detectável.
+
+**Distinção operacional:**
+
+- **Densificação patológica:** o **setup do cenário** é denso pra
+  observar o mecanismo; a **calibração resultante** ainda é validada
+  contra setups realistas via 6.1/6.2. Pesquisa empírica saudável.
+- **Anti-padrão escopo→rigor (Seção 1.1):** o **mecanismo** é modelado
+  fraco ("personal corrige depois"), independente de setup. Regressão
+  silenciosa.
+
+**Como reconhecer cada caso:**
+
+- Se a expectativa numérica do cenário descreve **comportamento do
+  gate** (ex: 0% pra hard, faixa pra soft) **e a calibração que cai
+  dela é revalidada em setup realista**, é densificação. ✅
+- Se a expectativa é "quase nunca importa, deixa acontecer" e nenhuma
+  validação realista é feita, é regressão. ❌
+
+Esta diretriz fica registrada porque qualquer revisão futura vai ler
+os setups patológicos e questionar — corretamente, sem este registro.
+
+#### 1.8.2 Calibrar denso, validar realista (gotcha de calibração)
+
+Pesos calibrados contra cenários patológicos (1.2 `bracos(4)`,
+2.2A `remadas(2)`) precisam ser **revalidados contra sub-métricas em
+setup realista** antes de fechar a calibração da dim. Sem isso, peso
+calibrado em densidade artificial pode over-corrigir o uso real.
+
+**Procedimento operacional (aplica em D2 / A / C):**
+
+1. Calibrar peso candidato contra cenário patológico (densidade alta
+   → violação observável → ajuste mensurável).
+2. **Antes de fechar a dim**, rodar mesma versão do peso contra
+   sub-métricas em setup realista — proxies da Variante B 2x semana
+   no cenário 6.2 (sub-métrica a: `% blocos com 2+ unilaterais mesmo
+   grupo`; sub-métrica b: `% rotinas com 2+ unilaterais em costas T2`).
+3. Se peso calibrado em patológico over-corrige no realista
+   (ex: vira 0% num setup que aceitaria 5-10% como tolerável),
+   ajustar antes de fechar.
+
+**Mesma lógica vale pra outros pares denso/realista:**
+
+- 2.1 (densificado `peito(3)`) → validar peso `plano_corporal` em
+  `peito(2)` realista (Variante B T1).
+- 2.2B (já redefinido pra `perna_anterior(3)` realista — não precisa
+  proxy).
+- 2.3 (timebox `costas(3)` realista pendente — desbloqueia pós-mocks
+  G2).
+
+Esta diretriz é **complementar** à 1.8.1 — densificação é OK desde
+que a calibração resultante passe pelo loop de validação realista.
+
 ---
 
 ## 2. Síntese da Fase 1 — análise dos 8 grupos
@@ -1494,57 +1562,21 @@ de processo** + ações de implementação antes de D2.
 e 3.1 redefinidos), 7 ⚠️ patológico necessário (1 com timebox a
 resolver — 2.3), 0 ❓ pós-redefinições.
 
-**Nota de processo #1 — densificação patológica ≠ anti-padrão escopo→rigor:**
+**Notas de processo #1 e #2 — promovidas pra Seção 1.8.**
 
-Setups patológicos (`peito(3)` em 1.1/1.3/2.1, `bracos(4)` em 1.2,
-`remadas(2)` em 2.2A) **não são regressão** do princípio "escopo, não
-rigor" da Seção 1.1. São densidade artificial necessária pra forçar
-coexistência rara virar mensurável em 1000 iters — sem isso, gates
-hard e penalties soft simplesmente não disparam frequência detectável.
+As 2 notas de processo identificadas durante a auditoria foram
+**promovidas pra Seção 1.8 (diretrizes de processo metodológico)**
+após reconhecimento de que valem como princípios gerais do projeto,
+não como observações contextuais desta auditoria.
 
-Distinção operacional:
-
-- **Densificação patológica:** o **setup do cenário** é denso pra
-  observar o mecanismo; a **calibração resultante** ainda é validada
-  contra setups realistas via 6.1/6.2. Pesquisa empírica saudável.
-- **Anti-padrão escopo→rigor (Seção 1.1):** o **mecanismo** é modelado
-  fraco ("personal corrige depois"), independente de setup. Regressão
-  silenciosa.
-
-Como reconhecer cada caso:
-
-- Se a expectativa numérica do cenário descreve **comportamento do
-  gate** (ex: 0% pra hard, faixa pra soft) **e a calibração que cai
-  dela é revalidada em setup realista**, é densificação. ✅
-- Se a expectativa é "quase nunca importa, deixa acontecer" e nenhuma
-  validação realista é feita, é regressão. ❌
-
-Esta nota fica registrada porque qualquer revisão futura vai ler os
-setups patológicos e questionar — corretamente, sem este registro.
-
-**Nota de processo #2 — gotcha "calibrar denso, validar realista" (1.2 + 2.2A):**
-
-Quando peso final do anti_uni soft -75 (Etapa 5) e do hard contextual
-costas (D1.d) forem definidos / ajustados em D2:
-
-1. Calibrar primeiro contra `bracos(4) × 1 treino` (1.2 patológico) e
-   `remadas(2) × 1 treino` (2.2A patológico) pra ter densidade
-   observável da violação.
-2. **Antes de fechar D2**, validar peso resultante contra sub-métricas
-   do 6.2 em setup realista:
-   - **Sub-métrica a:** "% blocos com 2+ unilaterais de braço quando
-     bíceps(1) e tríceps(1) coexistem em Variante B" → mede impacto
-     do anti_uni em cenário onde 1 unilateral por treino é o normal.
-   - **Sub-métrica b:** "% rotinas com 2+ unilaterais em `costas(3)`
-     do treino T2 da Variante B" → mede hard contextual em uso real
-     (vs `remadas(2)` denso).
-3. Se peso calibrado em patológico over-corrige no realista (ex:
-   vira 0% num setup que aceitaria 5-10% como tolerável), ajustar
-   antes de fechar D2.
-
-Mesma lógica vale pra 2.1 (validar peso `plano_corporal` em `peito(2)`
-realista) e 2.2B (redefinido pra `perna_anterior(3)` realista direto;
-não precisa proxy).
+- **#1 — Densificação patológica ≠ anti-padrão escopo→rigor:**
+  ver Seção 1.8.1. Setups densos pra observar mecanismo são OK desde
+  que a calibração resultante seja revalidada em setup realista —
+  diferente de modelagem fraca de mecanismo (anti-padrão Seção 1.1).
+- **#2 — Calibrar denso, validar realista (gotcha):** ver Seção 1.8.2.
+  Pesos calibrados em patológico (1.2, 2.2A) precisam validação
+  contra sub-métricas do 6.2 antes de fechar D2/A. Mesma lógica pra
+  2.1 (validar em `peito(2)` realista) e 2.2B (redefinido direto).
 
 **Próximas ações antes de D2 fechar:**
 
@@ -1571,14 +1603,660 @@ permanece pausada. Quando reaberta, usar configurações de 6.1 + 6.2
 + Variante B 3x A1/A2; descartar `upper(5)+lower(5)+core(2)` (fora
 de escopo per `configuracoes_comuns.md` Seção 5).
 
-### 8.7 D2 — composição soft INTRA — em curso
+### 8.7 D2 — composição soft INTRA (fechado — Sessão 6, 2026-05-08)
 
-A ser documentado conforme decisões fecharem. Sub-questões abertas:
-filtros hard (já resolvidos em D1, recap), penalty soft INTRA
-composição com bônus existentes (`regiao_diff +1000`, `padrao_diff
-+100`), decisão par-a-par vs set-based (provisório no stub: par-a-par
-cumulativa). 3 tracking items do stub `_penalty_proximidade`
-permanecem (Seção 8.5).
+3 sub-questões fechadas. Calibração numérica final fica pra C
+(loop iterativo com harness).
+
+**D2.1 — Forma da penalty: constante por dim (Variante a).**
+
+Penalty binária "igual/diferente" com peso por subregião (Seção 1.2),
+não matriz de "distância categórica". Justificativa clínica: não há
+evidência de que pronada-supinada seja mais distante de pronada-neutra
+em prescrição de variedade — todas cumprem o papel de variar estímulo.
+Calibrar matriz 4×4 seria adivinhação travestida de precisão. Se caso
+concreto aparecer onde Variante a deixa passar algo claramente
+diferente, revisita.
+
+**D2.2 — Composição com bônus existentes: Caminho B com escala
+Crítico ~-100 / Alto ~-50 / Médio ~-20 / Baixo ~-5 (provisório).**
+
+Geo-diversidade (`regiao_diff +1000`) é sacrossanta — nenhuma penalty
+soft INTRA deve sobrescrever. Quando geo empata (2 candidatos cumprem
+a mesma vaga geográfica), penalty soft escolhe o que varia mais.
+Crítico ~-100 já rivaliza com `padrao_diff +100`, então cobre
+parcialmente o que Caminho C alternativo cobriria sem comprometer a
+hierarquia conceitual. Caso 2.1 (ranking ordinal supino-inclinado-T1)
+fica coberto pq dentro do mesmo padrão `empurrar_compostos`,
+`plano_corporal` Crítico vence o tie.
+
+Mapeamento Crítico/Alto/Médio/Baixo ↔ dims segue Seções 2-3-7 (peso
+por subregião). Calibração numérica final em C — números atuais são
+pontos de partida.
+
+**D2.3 — Par-a-par cumulativa.**
+
+Cada par de exercícios alocados no treino soma penalty de cada dim
+que colide. 3 supinos retos no mesmo treino = 3 pares × penalty
+cumulativa. Justificativa clínica: preserva gradiente discriminante —
+1 reto + 1 inclinado < 2 retos < 3 retos < 4 retos, todos
+progressivamente piores. Set-based achata (2 = 3 = 4) e perde a
+capacidade de discriminar caso 2.1.
+
+Custo computacional desprezível: 8 ex/treino = 28 pares por iteração.
+
+**3 tracking items do stub `_penalty_proximidade` (status pós-D2):**
+
+1. ⏳ Branches INTER + HISTÓRICO no stub — pendente em **D3**
+2. 🟡 Dimensões `lateralidade` + `variante_pontual` no stub — hard
+   parts fechadas em D1 (`_compativel_intra`); soft parts (lateralidade
+   Médio em outras subregiões; variante_pontual Soft Crítico INTER)
+   ainda dependem de D2 implementação efetiva em Etapa 7
+3. ✅ Decisão par-a-par vs set-based — fechado em D2.3 (par-a-par
+   cumulativa)
+
+**Próximas ações pós-D2:**
+
+1. Implementar 6.2 no harness com sub-métricas a/b (gate antes da
+   calibração C; permite validar peso anti_uni / hard contextual em
+   setup realista — Nota de processo #2 da Seção 8.6)
+2. Aplicar redefinições 2.2B / 3.1 quando E.1.b2 abrir
+3. Timebox 2.3 (`costas(3) × 1 treino`) — depende de mocks G2 (remadas
+   + puxadas com pegada/plano) que estão TODO. Adiado pra E.1.b2
+   junto com 2.2A
+4. D3 — INTER soft + HISTÓRICO toggle
+
+### 8.8 6.2 implementado no harness (Sessão 6 — 2026-05-08)
+
+Cenário 6.2 adicionado em `tools/calibrar_pesos_dimensoes.py` com
+métrica primária + 2 sub-métricas (a/b) da Nota de processo #2 da
+Seção 8.6. Refactor mínimo do `Cenario` dataclass: substituiu
+`metrica_secundaria_fn` singular por lista `metricas_secundarias` —
+permite múltiplas sub-métricas paralelas (mantém CSV back-compat).
+
+**Resultado de 1000 iterações:**
+
+| Métrica | Observado | Notas |
+|---|---|---|
+| Primária (avisos E6) | **0.00%** OK | Calibração Etapa 6 não over-penaliza Variante B realista |
+| Sub-a (% blocos 2+ unis mesmo grupo) | **0.30%** | Proxy realista do 1.2 — anti_uni raro naturalmente em Variante B (1 uni por subregião por treino é o normal) |
+| Sub-b (% rotinas 2+ unis costas T2) | **3.30%** | Proxy realista do 2.2A patológico (4.30%) — números próximos validam que setup denso não diverge dramaticamente do realista |
+
+**Achado paralelo registrado — bug retrocompat `subregiao=core`:**
+
+Ao montar 6.2 com `("subregiao", "core", 1)` (como descrito em
+`configuracoes_comuns.md` Seção 2.2 Variante B), o gerador retornou
+aviso `incompleta` com `qtd_obtida=0` em todas as iterações. Causa:
+a subregião legacy `core` foi refatorada na Sessão 2 da Fase 1 (item
+15-quater) em `core_dinamico` + `core_isometrico`. Retrocompat existe
+em `_padroes_de_escopo` (linha 1382 do `gerador_treino.py`) mas **não**
+é aplicada no caminho de alocação principal (`pre_alocar_rotina`),
+fazendo `("subregiao", "core", N)` falhar com 0 selecionados.
+
+**Workaround aplicado em 6.2:** usar `core_dinamico(1)` em T1 e
+`core_isometrico(1)` em T2 (alternância clínica natural). Comentário
+inline em `_cfg_6_2` documenta o workaround.
+
+**TODO separado** (não bloqueia Fase 3): investigar caminho de
+retrocompat em alocação. Caminhos: (i) estender retrocompat pra cobrir
+caminho principal, (ii) atualizar UI/templates pra usar nomes
+refatorados, (iii) deprecar `subregiao=core` legacy. Não é parte da
+Etapa 6 — é débito técnico do refator CORE da Sessão 2 que ficou
+parcial. Reabrir quando 6.2 ou outras configurações realistas forem
+expandidas.
+
+**Sub-métrica b confirma proxy do gotcha "calibrar denso, validar
+realista":** baseline patológico do 2.2A (4.30%) e proxy realista do
+6.2 (3.30%) ficaram **dentro de 1 ponto percentual**. Validação leve,
+mas indica que setup denso não over-amplifica a coexistência de unis
+em costas — peso final do hard contextual D1.d calibrado contra
+patológico provavelmente cobre o realista sem ajuste extra.
+Sub-métrica a (0.30%) é tão baixa que vira pouco informativa pra
+calibrar peso anti_uni — confirma que anti_uni em Variante B só
+dispara em casos de exception (V-Up Uni + Tríceps Uni do 5.2 etc.).
+
+### 8.9 D3 — INTER soft + HISTÓRICO toggle (fechado — Sessão 6, 2026-05-08)
+
+4 sub-questões fechadas. Calibração numérica final fica pra C.
+
+**D3.1 — Estrutura INTER soft: multiplicador global 0.8 com overrides
+documentados (Variante a).**
+
+Default INTER = 0.8 × peso INTRA por dim. Mantém calibração enxuta
+(1 número por dim + 1 fator global) e preserva hierarquia INTRA > INTER
+da Seção 1.4. Overrides explícitos (registrados em sessões anteriores):
+
+| Dim | Multiplicador INTER | Origem |
+|---|---|---|
+| `familia_estrita` | ~0.80 | Seção 1.4 (Sessão 2) |
+| `variante_pontual` | ~0.95 (Soft Crítico, quase hard) | D1.c (Sessão 4) |
+| Resto (`lateralidade`, `pegada`, `plano_corporal`, `equipamento_grupo`) | 0.80 default | D3.1 (Sessão 6) |
+
+Se calibração final em A/C revelar dim onde 0.8 destoa fortemente,
+abre override pontual com justificativa clínica. Sem evidência hoje
+pra peso INTER independente em todo o set — adicionar 5 parâmetros
+sem ganho proporcional.
+
+**D3.2 — Migração família INTER de hard pra soft alto: Caminho C
+(spec agora, migração estrutural em Etapa 7).**
+
+Hoje `pre_alocar_rotina` mantém `variacao_pais_globais: set[str]` que
+**bloqueia hard** candidatos cuja família já foi usada em outros
+treinos. Decisão Sessão 2 (Seção 1.4) move pra **soft alto via score**.
+
+D3 é especificação. Migração estrutural real (remoção do set hard +
+adição de penalty score) acontece na Etapa 7. Caminho A (clean break
+agora) força refator estrutural prematuro; Caminho B (coexistência
+hard+soft via toggle) polui calibração com 2 semânticas. Caminho C
+preserva código atual durante D3 e deixa decisão "A vs B" registrada
+como **ponto de auditoria pra Etapa 7**.
+
+Implicação no toggle `relaxar_familia` do app: ambiguidade já
+registrada em Seção 1.4 (decisão Etapa 7). D3 não muda nada.
+
+**D3.3 — HISTÓRICO toggle ON: granularidade nome + família, soma
+livre com INTER (sem clipping).**
+
+Quando toggle ON, penalty alta dispara quando:
+
+```
+cand.nome ∈ R-1.nomes  OR  cand.variacao_de ∈ R-1.familias
+```
+
+Granularidade (a) "só nome" deixaria passar variação cosmética sem
+variação funcional (Supino Reto Barra na R-1, Reto Halteres na nova →
+mesmo estímulo mecânico, escapa). Granularidade (c) "+ variante_pontual"
+sobrepõe Soft Crítico INTER que já cobre o caso via composição.
+
+**Composição com INTER sem clipping:** candidato que repete família
+em outro treino da rotina atual E na R-1 é o pior caso (~180% Alto =
+~80% INTER + ~100% HISTÓRICO). Soma livre faz sentido — desincentivo
+proporcional ao "duplo erro". Clipping aplainaria essa diferença
+clínica importante.
+
+Granularidade (b) Nome + família final. Variantes pontuais cruzando
+subregião: cobertas via composição INTER (Soft Crítico) + HISTÓRICO
+(Alto), não via regra dedicada. Mais simples.
+
+**D3.4 — Localização: HISTÓRICO entra na Fase 0 (`pre_alocar_rotina`)
+junto com INTER soft.**
+
+INTER soft e HISTÓRICO são penalties de **seleção global**, não de
+pareamento. Penalty em Fase 2 (`montar_blocos`) seria estranho — quando
+chega lá, exercícios já estão escolhidos. Unifica localização e
+simplifica função de score: uma chamada recebe `alocados_intra`,
+`alocados_inter`, `historico_r1` como args opcionais e devolve penalty
+composta. Fase 2 fica focada em pareamento INTRA puro.
+
+**Implementação Etapa 7 (esboço):**
+
+```python
+def gerar_multiplos_treinos(
+    banco, configs,
+    relaxar_familia: bool = False,  # legacy — decisão final Etapa 7
+    historico_r1: list[Sessao] | None = None,  # toggle OFF = None
+):
+    ...
+    # Fase 0: pre_alocar_rotina chama _score_proximidade(cand,
+    #         alocados_intra, alocados_inter, historico_r1, dims, pesos)
+    # Score acumula INTRA (D2 par-a-par) + INTER (multiplicador 0.8) +
+    # HISTÓRICO (peso integral se historico_r1 ≠ None)
+```
+
+**Cenários afetados (E.1.b2 quando D3 implementação real fechar):**
+
+| ID | Mecanismo testado | Expectativa |
+|---|---|---|
+| 3.1 | Variante B 3x A1/A2 com peito em ambos — INTER família soft Alto | 10-15% (desencoraja mas permite) |
+| 3.2 | Step Up + Recuo do Estepe — INTER família `subida_elevada` | <10% (banco não aperta) |
+| 3.3 | Passada + Passada Dos Steps — mesma família, banco mais aperta | 20-50% |
+| 4.1 | HISTÓRICO toggle ON, R-1 — nome + família | <3% |
+| 4.2 | HISTÓRICO toggle OFF | sem expectativa rigorosa (sanity) |
+
+**3 tracking items do stub `_penalty_proximidade` (status pós-D3):**
+
+1. ✅ Branches INTER + HISTÓRICO no stub — fechado em D3 (spec; impl
+   Etapa 7)
+2. ✅ Dimensões `lateralidade` + `variante_pontual` no stub — hard
+   parts D1; soft parts D2; INTER multiplicador D3
+3. ✅ Decisão final par-a-par vs set-based — fechado em D2.3
+
+### 8.10 B — estrutura de configuração de pesos (fechado — Sessão 6, 2026-05-08)
+
+5 sub-questões fechadas. Layout final do módulo + interface de
+override.
+
+**B.1 — Forma de armazenamento: módulo separado `pesos_proximidade.py`
+com dataclass.**
+
+Tira inflação do `gerador_treino.py` (~3000 linhas), formaliza
+estrutura via dataclass com type checking, mantém defaults em runtime
+sem overhead de parsing externo. YAML externo seria over-engineering
+pro tamanho do projeto (single-user, configuração via edição de
+código). Module-level constants no gerador misturariam "como funciona"
+com "quais valores usa", dificultando auditoria.
+
+**B.2 — Hierarquia de override: 2 níveis (default → subregião) +
+estrutura paralela `anti_uni`.**
+
+Lookup pra cada (dim, contexto):
+
+```
+peso(dim, contexto, subregião) =
+  override_subregião[dim][contexto][subregião]   ← se existe
+  ou default[dim][contexto]                       ← caso contrário
+```
+
+Sem override por padrão — Seção 1.5 ancora escopos em subregião.
+Hipotético override por padrão seria over-engineering sem evidência
+clínica.
+
+`anti_uni_mesmo_grupo` da Etapa 5 (peso por grupo muscular, não por
+subregião) vive em estrutura paralela ortogonal — não forçar duas
+semânticas distintas na mesma estrutura.
+
+**B.3 — Localização: raiz do projeto, arquivo único.**
+
+Coerente com padrão atual (`gerador_treino.py`, `database.py`,
+`gerar_imagem.py` todos na raiz). Subpasta sem múltiplos arquivos
+relacionados é estrutura sem conteúdo.
+
+**B.4 — Interface de override pro harness em C: argumento opcional
+`pesos_override: ConfigPesosProximidade | None = None`.**
+
+```python
+def gerar_multiplos_treinos(
+    banco, configs,
+    relaxar_familia: bool = False,
+    historico_r1: list[Sessao] | None = None,
+    pesos_override: ConfigPesosProximidade | None = None,  # B.4
+):
+    pesos = pesos_override or PESOS_DEFAULT
+    ...
+```
+
+Sem efeito colateral global. Cada chamada isolada. C varre variações
+em sequência ou paralelo sem contaminação cruzada. Global mutável é
+anti-pattern; env var acopla a SO desnecessariamente.
+
+**B.5 — Categóricos em B, mapping em A.**
+
+B contém labels categóricos (`"soft_critico"`, `"soft_alto"`,
+`"soft_medio"`, `"soft_baixo"`). A define mapping
+`{"soft_critico": -100, ...}`. Gerador resolve label → número via
+mapping ao calcular score.
+
+Mexer em escala (que C provavelmente vai fazer várias vezes na
+calibração fina) vira editar 1 lugar (mapping em A) em vez de N
+entradas (cada subregião × dim em B). Custo de indireção em debugging
+é pequeno comparado à flexibilidade ganha.
+
+**Estrutura final do módulo (esboço pra Etapa 7):**
+
+```python
+# pesos_proximidade.py
+
+from dataclasses import dataclass, field
+from typing import Optional
+
+# Labels categóricos (resolução numérica em A — ver mapping abaixo)
+ESCALA_NUMERICA = {
+    "soft_critico": -100,  # ← A define magnitude
+    "soft_alto":    -50,
+    "soft_medio":   -20,
+    "soft_baixo":    -5,
+    # "anti_uni_etapa5" definido separadamente (Seção 8.11 A.2)
+}
+
+@dataclass
+class PesoDim:
+    """Peso categórico de uma dimensão por contexto.
+    Override por subregião opcional (None = usa default global).
+    """
+    intra_default: str  # label categórico
+    intra_overrides: dict[str, str] = field(default_factory=dict)
+    inter_multiplicador: float = 0.8  # D3.1
+    inter_override: Optional[float] = None  # ex: variante_pontual=0.95
+    historico_r1_multiplicador: float = 1.0  # D3.3
+
+@dataclass
+class ConfigPesosProximidade:
+    pegada: PesoDim
+    plano_corporal: PesoDim
+    equipamento_grupo: PesoDim
+    # Hard parts (família, variante_pontual hard, lateralidade hard
+    # contextual costas) NÃO entram aqui — vivem no predicado
+    # `_compativel_intra` (Seção 1.7).
+    # Soft parts dessas dims que entram são variante_pontual INTER
+    # (Soft Crítico ~0.95) e família INTER (Soft Alto ~0.80) — campos
+    # adicionais a definir.
+    anti_uni_mesmo_grupo_pesos: dict[str, float]  # B.2 ortogonal
+
+PESOS_DEFAULT = ConfigPesosProximidade(...)  # ← A define defaults
+```
+
+A escala numérica e os defaults concretos ficam pra A. B fixou
+**onde e como** os pesos são representados.
+
+### 8.11 A — escala numérica final (fechado — Sessão 6, 2026-05-08)
+
+3 sub-questões fechadas. Mapping numérico final pra B referenciar.
+
+**A.1 — Magnitude + progressão INTRA confirmadas: D2.2 (-100/-50/
+-20/-5).**
+
+Mapping definitivo (referenciado por B.5):
+
+```python
+# pesos_proximidade.py
+ESCALA_NUMERICA = {
+    "soft_critico": -100,
+    "soft_alto":     -50,
+    "soft_medio":    -20,
+    "soft_baixo":     -5,
+}
+```
+
+Progressão custom (2.0× / 2.5× / 4.0×) reflete papéis funcionais
+distintos, não escala matemática limpa. Justificativas registradas:
+
+- **Crítico -100**: rivaliza com `padrao_diff +100` (Caminho B da
+  D2.2) — quando padrão empata, soft Crítico decide; quando padrão
+  difere, geo vence.
+- **Baixo -5**: deliberadamente tiny — equipamento_grupo é tiebreaker
+  (Seção 1.5), nunca acumula.
+- **Alternativas descartadas**: linear inflaria Baixo demais
+  (acumula); log puro subutilizaria Médio; Crítico -150 quebraria
+  hierarquia geo > soft.
+
+C pode iterar fino sobre estes números, mas baseline = D2.2.
+
+**A.2 — Anti_uni Etapa 5 (-75) fica fora da escala unificada (Variante
+c).**
+
+`anti_uni_mesmo_grupo = -75` continua como peso fixo da Etapa 5.
+Encaixa em estrutura paralela `anti_uni_mesmo_grupo_pesos` da B.2,
+ortogonal à escala categórica unificada.
+
+3 reforços da decisão:
+1. Mecanismo já validado empiricamente (cenário 5.2 passa em 1000
+   iters).
+2. B.2 já tratou anti_uni como ortogonal.
+3. Re-mapear sem evidência clínica = modificar mecanismo validado por
+   estética (anti-padrão).
+
+Risco real das variantes a/b: mover pareamento desejado V-Up Uni +
+Tríceps Uni pra fora do >50% target sem ganho proporcional.
+
+**A.3 — Derivados INTER e HISTÓRICO confirmados.**
+
+**INTER (multiplicador global 0.8 + overrides):**
+
+| Categoria | INTRA | INTER (×0.8) | INTER override |
+|---|---|---|---|
+| Crítico | -100 | -80 | — |
+| Alto | -50 | -40 | família ×0.80 = -40 (mesmo) |
+| Médio | -20 | -16 | — |
+| Baixo | -5 | -4 | — |
+| variante_pontual | -100 | — | ×0.95 = **-95** (quase hard, D1.c) |
+
+**HISTÓRICO toggle ON (multiplicador 1.0):**
+
+| Categoria | INTRA | HISTÓRICO ON |
+|---|---|---|
+| Crítico | -100 | -100 |
+| Alto | -50 | -50 |
+| Médio | -20 | -20 |
+| Baixo | -5 | -5 |
+
+**Pior caso família INTER + HISTÓRICO** (D3.3 soma livre):
+candidato repete família entre treinos E aparece na R-1 →
+INTER família (-40) + HISTÓRICO família (-50) = **-90**.
+
+Comparado com `padrao_diff +100`: penalty pior caso (-90) **não
+supera** o bônus geo (+100). É exatamente a semântica de "soft alto"
+da Seção 1.4: desencoraja fortemente mas permite quando banco aperta.
+Se -90 superasse +100, família INTER viraria hard de fato e perderia
+a flexibilidade que motivou tirar do hard em primeiro lugar (Sessão
+2). Cenário 3.3 (Passada+Passada Dos Steps com banco apertado,
+expectativa 20-50%) é o teste empírico: se estourar pra 60-70% em C,
+revisitar; mas estrutura está coerente.
+
+### 8.12 C — calibração fina iterativa via harness (fechado — Sessão 6, 2026-05-08)
+
+4 sub-questões fechadas. C fecha o **processo** de calibração; os
+números finais saem do processo (executado em sessão futura após
+E.1.b2 + Etapa 7).
+
+**C.1 — Estratégia: manual + coordinate descent.**
+
+Dev calibra 1 dim por vez fixando outras, baseado em hipótese clínica,
+observa cenários do harness, ajusta. Toda a fundamentação D1/D2/D3
+estabeleceu papel funcional explícito por peso — calibração aqui é
+afinamento informado, não exploração no escuro. Automação (grid/
+random/bayesiano) seria adequada se faltasse direcionamento; aqui
+sobra. Coordinate descent evita over-parameterização e mantém
+auditabilidade (quando algo melhora/piora, fica claro qual mudança
+causou).
+
+**C.2 — Ordem das dims: priorizada por cobertura + acoplamento clínico.**
+
+| Ordem | Dim | Cenários cobertos | Razão |
+|---|---|---|---|
+| 1 | Família INTER (multiplicador 0.80) | 3.1, 3.2, 3.3 | 3 cenários — mais informativo |
+| 2 | Plano_corporal + Pegada (acopladas) | 2.1, 2.3 | Em peito, supinos engajam ambas simultâneo — clínica diz que estão ligadas |
+| 3 | Lateralidade soft (Médio padrão) | 2.2B (perna_anterior) | 1 cenário; anti_uni -75 Etapa 5 já fixo ortogonal — auditoria mais que calibração |
+| 4 | HISTÓRICO toggle ON (multiplicador 1.0) | 4.1, 4.2 | Validar peso integral é adequado pra <3% R-1 e OFF sanity |
+| 5 | Equipamento_grupo (tiebreaker Baixo -5) | nenhum direto | Calibrar último — só atua quando tudo o mais já decidiu |
+
+**C.3 — Critério de parada: todos cenários nas faixas + cap 5-10 rounds/dim.**
+
+C termina quando:
+- Cenários hard (1.x, 2.2A): 0% (depende de Etapa 7 implementar
+  predicado, não de C)
+- Cenários soft caem nas faixas E.0 esperadas
+- Cenários sanity (5.x, 6.x) continuam OK
+- Sub-métricas 6.2 (a/b) ficam dentro de range similar a baselines
+  (<2× alteração)
+
+**Validação cruzada como salvaguarda:** ajustar peso pra fechar X não
+pode quebrar Y. Se quebrar, é signal de **calibração inconsistente**
+— revisita B ou A em vez de brute-force. Esta é a parte mais
+importante do critério.
+
+**Cap 5-10 rounds/dim:** salvaguarda contra oscilação infinita em
+torno de ponto onde estrutura não permite convergência. Sem cap,
+calibração pode virar gasto desnecessário de tempo.
+
+**C.4 — Timing: sequencial após E.1.b2 + calibrar contra stub harness
++ sanity pós-Etapa 7.**
+
+**Pré-condições:**
+1. Stub `_penalty_proximidade` no harness com 3 branches (INTRA +
+   INTER + HISTÓRICO)
+2. Mocks G2/G4/G8 com pegada/plano/equipamento populated (E.1.b2)
+3. Cenários 2.x/3.x/4.x implementados no harness (E.1.b2)
+
+**Sequencial após E.1.b2:** calibração de cada dim depende de todos
+os cenários que a testam — fragmentar (paralelo) gera retrabalho que
+excede o ganho de tempo. C arranca quando E.1.b2 fecha.
+
+**Calibrar contra stub harness:** stub é "a spec executável" — fiel
+ao predicado da Seção 1.7 + score soft das Seções 8.7+8.9. Se stub
+divergir do código real depois, é bug do stub/spec/código, não da
+calibração.
+
+**Sanity pós-Etapa 7:** após código real implementado, re-rodar
+harness pra confirmar que produz mesmas métricas que stub. Salvaguarda
+explícita que detecta divergência se houver.
+
+**Saída de C:**
+- Pesos numéricos finais em `pesos_proximidade.PESOS_DEFAULT` (B)
+- Registro de auditoria (CSV de iterações + justificativa por dim)
+- `pesos_override` continua disponível pra revisões futuras
+
+### 8.13 Fase 3 conceitual fechada — milestone Sessão 6
+
+Todas as decisões da Fase 3 fechadas em Sessão 6 (2026-05-08):
+
+| Bloco | Status | Sessão | Seção |
+|---|---|---|---|
+| E.0 — 13 cenários-âncora | ✅ | 3 | 8.2 |
+| E.1.a — pipeline harness | ✅ | 3 | 8.3 |
+| D1 — filtros hard centralizados | ✅ | 4 | 1.7 + 8.4 |
+| E.1.b parcial — 5 cenários | ✅ | 5 | 8.5 |
+| Auditoria E.0 vs uso real | ✅ | 6 | 8.6 |
+| D2 — composição soft INTRA | ✅ | 6 | 8.7 |
+| 6.2 happy path Variante B | ✅ | 6 | 8.8 |
+| D3 — INTER soft + HISTÓRICO toggle | ✅ | 6 | 8.9 |
+| B — estrutura configuração pesos | ✅ | 6 | 8.10 |
+| A — escala numérica final | ✅ | 6 | 8.11 |
+| C — calibração processo | ✅ | 6 | 8.12 |
+
+**O que falta pra Fase 3 fechar 100%:**
+
+- ⏳ **E.1.b2 — implementação dos 8 cenários soft restantes**
+  (2.1, 2.2B, 2.3, 3.1, 3.2, 3.3, 4.1, 4.2) + expansão de mocks
+  G2 (remadas+puxadas), G4 (squats refinados+subida_elevada),
+  G8 (core completo). Trabalho considerável (não-trivial em escopo
+  clínico — cada exercício precisa de pegada/plano/equipamento/
+  variante_pontual cadastrado).
+- ⏳ **C executado** — calibração real após E.1.b2 + Etapa 7
+- ⏳ **E.2 — validação completa**: 13 cenários + 8 problemas
+  conhecidos + re-rodar 1.3 e 2.2A pós-Etapa 7
+
+**Etapa 7** (implementação real no `gerador_treino.py`) acontece em
+paralelo ou após Fase 3 100% fechar. Etapa 7 implementa:
+- Predicado `_compativel_intra` (Seção 1.7)
+- Score soft INTRA (Seção 8.7 / D2)
+- Score INTER + HISTÓRICO (Seção 8.9 / D3)
+- Módulo `pesos_proximidade.py` (Seção 8.10 / B)
+- Mapping numérico (Seção 8.11 / A)
+- Migração família INTER hard → soft (D3.2 — decisão A vs B em Etapa 7)
+
+### 8.14 E.1.b2 / E.2 — pendentes
+
+A serem documentados conforme cada bloco fechar.
+
+---
+
+## 9. Fase 4 — estratégia de preenchimento dos 125+ exercícios
+
+> **Status:** protocolo registrado (Sessão 6 — 2026-05-08), execução
+> pendente. Acontece após Fase 3 fechar 100% (E.1.b2 + C executado +
+> E.2) e idealmente em paralelo com Etapa 7.
+
+A Fase 4 cadastra **as 5 dimensões de proximidade + variante_pontual**
+em todos os ~125 exercícios do banco. O risco principal não é
+volume — é **inconsistência entre exercícios análogos cadastrados em
+momentos diferentes** (ex: Stiff Halteres recebe `plano_corporal=
+"em_pe"` numa sessão; Stiff Smith recebe `plano_corporal="em_pe_guiado"`
+numa outra — divergência sem critério explícito).
+
+Pra evitar isso, Fase 4 segue **protocolo semi-automatizado** de
+revisão clínica estruturada — não "Code preenche tudo sozinho".
+
+### 9.1 Protocolo de preenchimento
+
+**Etapa 1 — Triagem inicial (Code automatizado).**
+
+Code classifica os ~125 exercícios em 3 categorias:
+
+- **🟢 Verde** — todas as 5 dimensões resolvem direto pelas 22
+  diretrizes da Seção 7 (Regra de Cadastro Consolidada). Sem
+  ambiguidade clínica. Ex: Supino Reto Halteres (família Supino Reto,
+  pegada pronada, plano reto, equipamento halter, lateralidade
+  bilateral, variante_pontual false — todas determinadas pela
+  diretriz).
+- **🟡 Amarelo** — 1-2 dimensões precisam de decisão clínica não
+  coberta pelas diretrizes. Ex: exercício com pegada que poderia ser
+  "neutra" ou "mista" dependendo da execução.
+- **🔴 Vermelho** — múltiplas zonas cinzentas. Tipicamente
+  exercícios novos sem análogo claro entre os já cadastrados.
+
+Triagem é output em tabela commitada (`docs/refatoracao/
+triagem_fase_4.md` ou similar), com decisão preliminar do Code +
+flag de zona cinzenta + exercícios análogos relevantes.
+
+**Etapa 2 — Preenchimento automático dos verdes (Code).**
+
+Code aplica as diretrizes da Seção 7 e cadastra todos os 🟢 verdes
+em XLSX. Output: tabela commitada das atribuições + diretriz aplicada
+em cada caso (rastreabilidade).
+
+**Etapa 3 — Conversa estruturada nos amarelos/vermelhos
+(personal + Code).**
+
+Code agrupa perguntas **por critério clínico**, não por exercício.
+Ex: em vez de "Stiff Halteres tem plano em_pe?" + "Stiff Smith tem
+plano em_pe_guiado?" + ..., agrupa: "Stiffs com guia (Smith, máquina,
+trilho fixo) — qual `plano_corporal`?" — uma pergunta resolve N
+exercícios.
+
+**Formato fixo de pergunta:**
+
+```
+[Critério/Subgrupo] — [N exercícios afetados]
+
+Proposta: [valor X com justificativa]
+Alternativa: [valor Y com cenário em que valeria]
+
+Pergunta concreta: [pergunta específica]
+```
+
+User responde uma vez genericamente; Code aplica em todos os
+exercícios afetados.
+
+**Etapa 4 — Registro de decisões cinzentas
+(`docs/refatoracao/decisoes_cadastro_etapa_7.md`).**
+
+Cada caso ambíguo decidido na Etapa 3 fica registrado:
+
+```
+## [Critério] — [data]
+
+**Caso:** [descrição da ambiguidade]
+**Decisão:** [valor escolhido]
+**Critério usado:** [justificativa clínica]
+**Exercícios afetados:** [lista]
+**Análogos futuros:** [como aplicar em cadastros novos]
+```
+
+Esse registro vira **fonte de verdade pra cadastros futuros** —
+exercícios novos que caem nas mesmas zonas cinzentas seguem o
+critério já decidido em vez de re-abrir a discussão.
+
+**Etapa 5 — Confirmação bloco a bloco antes de salvar no XLSX
+(preferencialmente Plan Mode).**
+
+Code apresenta diff proposto (XLSX antes / XLSX depois) em blocos
+por subregião (peito → costas → ombro → pernas → core → braços).
+User confirma cada bloco antes de salvar. Plan Mode evita rollback
+grande se decisão preliminar estiver errada — divergência aparece
+no diff antes de virar mudança commitada.
+
+### 9.2 Observação importante
+
+**Anti-padrão a evitar:** "Code preenche tudo sozinho seguindo as
+diretrizes" — sem revisão clínica estruturada, decisões marginais
+(que as diretrizes cobrem só parcialmente) viram acúmulo silencioso
+de inconsistência. As diretrizes da Seção 7 são *bom guia*, não
+*algoritmo determinístico exaustivo*.
+
+A 22ª diretriz é "quando em dúvida, pergunte" — Etapa 3 do protocolo
+acima implementa isso de forma escalável (perguntas agrupadas, não
+N×125 perguntas).
+
+### 9.3 Pré-condições antes de Fase 4 arrancar
+
+1. ✅ Set final de dimensões + diretrizes (Fase 1+2 — completo)
+2. ⏳ Estrutura `pesos_proximidade.py` (Etapa 7 — implementação real)
+3. ⏳ E.1.b2 + C + E.2 fechados (Fase 3 100%)
+
+Fase 4 pode arrancar quando Etapa 7 implementação estrutural fechar.
+Calibração refinada (C) pode acontecer em paralelo com Fase 4 se
+mocks já cobrirem dims de exercícios mais relevantes — desacoplar
+quando possível.
 
 ---
 
@@ -1621,20 +2299,62 @@ permanecem (Seção 8.5).
     4 redefinições (6.2 promovido pra pré-D2; 2.2B → `perna_anterior(3)`;
     3.1 → Variante B 3x A1/A2; 2.3 timebox); 2 notas de processo
     (densificação ≠ regressão; gotcha calibração denso/realista)
-  - ⏳ **6.2 implementação + timebox 2.3** (gate antes de D2)
-  - 🟡 **D2** — composição soft INTRA (em curso)
-  - ⏳ **D3 / B / A / C / E.1.b2 / E.2** — pendentes
-- ⏳ **Fase 4 — estratégia de preenchimento** — pendente
+  - ✅ **D2 — composição soft INTRA** (Sessão 6 — Seção 8.7) —
+    D2.1 Variante a (constante por dim); D2.2 Caminho B com escala
+    provisória ~-100/-50/-20/-5; D2.3 par-a-par cumulativa
+  - ✅ **6.2 implementado** (Sessão 6 — Seção 8.8) — primária 0.00%
+    OK; sub-a 0.30% / sub-b 3.30% baseline pre-Etapa 7. Refactor
+    Cenario dataclass pra suportar lista de secundárias. Achado
+    paralelo registrado (bug retrocompat `subregiao=core`).
+  - ✅ **D3 — INTER soft + HISTÓRICO toggle** (Sessão 6 — Seção 8.9)
+    — D3.1 multiplicador global 0.8 com overrides documentados
+    (família ~0.80, variante_pontual ~0.95); D3.2 Caminho C (spec
+    agora, migração estrutural Etapa 7); D3.3 granularidade nome +
+    família, soma livre com INTER; D3.4 localização Fase 0
+    (`pre_alocar_rotina`). 3 tracking items do stub fechados.
+  - ✅ **B — estrutura de configuração de pesos** (Sessão 6 — Seção
+    8.10) — B.1 módulo separado `pesos_proximidade.py` com dataclass;
+    B.2 hierarquia 2 níveis (default → subregião) + anti_uni
+    ortogonal; B.3 raiz do projeto arquivo único; B.4 argumento
+    opcional `pesos_override` na função geradora; B.5 labels
+    categóricos em B + mapping numérico em A.
+  - ✅ **A — escala numérica final** (Sessão 6 — Seção 8.11) — A.1
+    confirmou D2.2 (-100/-50/-20/-5); A.2 anti_uni -75 fora da escala
+    unificada (estrutura paralela); A.3 derivados INTER/HISTÓRICO
+    validados — pior caso família soft (-90) < bônus padrao_diff
+    (+100), preserva semântica "desencoraja mas permite".
+  - ✅ **C — calibração fina iterativa** (Sessão 6 — Seção 8.12) —
+    C.1 manual + coordinate descent; C.2 ordem família INTER →
+    Plano+Pegada → Lateralidade → HISTÓRICO → Equipamento; C.3
+    parar quando todos cenários nas faixas + cap 5-10 rounds/dim
+    + validação cruzada como salvaguarda; C.4 sequencial após
+    E.1.b2, calibrar contra stub harness, sanity pós-Etapa 7.
+  - 🎯 **Fase 3 conceitual 100% fechada** (Sessão 6 — Seção 8.13)
+    — todos blocos de decisão concluídos. Resta E.1.b2 (impl) +
+    C executado + E.2 (validação).
+  - ⏳ **Timebox 2.3** adiado pra E.1.b2 (depende de mocks G2)
+  - ⏳ **E.1.b2 — 8 cenários soft + mocks G2/G4/G8**
+  - ⏳ **C executado** (após E.1.b2 + Etapa 7)
+  - ⏳ **E.2 — validação completa**
+- 🟡 **Fase 4 — estratégia de preenchimento** — protocolo registrado
+  (Seção 9, Sessão 6); execução pendente após Etapa 7 estrutural
 
 **Próximos passos:**
 
-1. Implementar 6.2 no harness com sub-métricas a/b da Nota de processo #2
-2. Timebox 2.3 (15-30min) `costas(3) × 1 treino`
-3. D2 — composição soft INTRA + 3 tracking items do stub
-4. Aplicar redefinições 2.2B e 3.1 no harness (em E.1.b2)
-5. D3, B, A, C, E.1.b2, E.2 conforme calendário
+1. **E.1.b2 — implementação dos 8 cenários soft + expansão de mocks
+   G2/G4/G8.** Trabalho considerável (escopo clínico — cada exercício
+   precisa pegada/plano/equipamento/variante_pontual cadastrado +
+   8 metric/config functions no harness).
+2. Aplicar redefinições 2.2B (perna_anterior(3)) e 3.1 (Variante B
+   3x A1/A2) no harness conforme E.1.b2 implementa
+3. C executado — calibração real contra cenários soft completos
+4. E.2 — validação completa (13 cenários + 8 problemas conhecidos +
+   re-rodar 1.3 e 2.2A pós-Etapa 7)
+5. Investigar bug retrocompat `subregiao=core` em alocação principal
+   (Seção 8.8 — débito técnico)
 
-*Documento com Fases 1+2 fechadas e Fase 3 em curso. Última
-atualização: 2026-05-08 (Sessão 6 — auditoria E.0 fechada com 4
-redefinições + 2 notas de processo; 6.2 promovido pra pré-D2; D2
-aberto).*
+*Documento com Fases 1+2 fechadas e **Fase 3 conceitual 100% fechada**
+em Sessão 6 (2026-05-08 — Seção 8.13). Última atualização: 2026-05-08
+(Sessão 6 — todas decisões da Fase 3 fechadas; E.1.b2 + C execução +
+E.2 pendentes; Etapa 7 implementação real no gerador acontece em
+paralelo).*

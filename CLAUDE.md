@@ -20,6 +20,70 @@ Documentos de apoio (em `docs/refatoracao/`):
 
 Fonte de verdade operacional: `guia_refatoracao_v4.md`.
 
+## Etapa 6 Fase 3 — decisões fechadas (não reabrir sem motivo forte)
+
+A Fase 3 conceitual foi 100% fechada na Sessão 6 (2026-05-08).
+Todas as decisões abaixo estão consolidadas em
+`docs/refatoracao/dimensoes_proximidade.md` (Seções 1, 2, 7, 8) e
+devem ser tratadas como decididas em sessões futuras. Reabrir só
+mediante evidência clínica nova ou falha empírica em calibração C
+explícita — não por "será que faz sentido?" abstrato.
+
+**Filtros hard INTRA — predicado `_compativel_intra`** (Seção 1.7):
+3 regras hard centralizadas — (i) família refinada same-treino;
+(ii) `variante_pontual` cross-family same-subregião; (iii) lateralidade
+contextual via `SUBREGIOES_LATERALIDADE_HARD = frozenset({"costas"})`.
+Outras lateralidades soft via `anti_uni_mesmo_grupo` Etapa 5.
+
+**Set final de dimensões** (Seções 1-2): 5 core + 1 narrow-scope —
+`familia_estrita`, `lateralidade`, `pegada` (matriz 4×4),
+`plano_corporal`, `equipamento_grupo` (tiebreaker BAIXO INTRA),
+`variante_pontual`. 5 dims descartadas (`musculo_alvo_especifico`,
+`posicao_carga`, `padrao_execucao`, `plano_estabilizacao`, `tipo_core`).
+
+**Escala numérica** (Seção 8.11 / A): unificada **-100/-50/-20/-5**
+(Crítico/Alto/Médio/Baixo). `anti_uni_mesmo_grupo = -75` da Etapa 5
+fica **fora** da escala unificada em estrutura paralela
+(`anti_uni_mesmo_grupo_pesos`) — mecanismo já validado empiricamente
+não realinha sem evidência.
+
+**Multiplicadores INTER** (Seção 8.9 / D3.1): default global **0.8 ×
+INTRA**. Overrides explícitos:
+- `familia_estrita` INTER ≈ 0.80 (Soft Alto, Seção 1.4)
+- `variante_pontual` INTER ≈ 0.95 (Soft Crítico, D1.c)
+
+**HISTÓRICO toggle** (Seções 1.3, 8.9 / D3.3): janela R-1 only,
+peso integral (multiplicador 1.0) quando ON, zero quando OFF.
+Granularidade nome + família. Soma livre com INTER (sem clipping) —
+pior caso família INTER+HISTÓRICO = -90, intencionalmente menor que
+`padrao_diff +100` pra preservar semântica "soft alto desencoraja
+mas permite quando banco aperta" da Seção 1.4.
+
+**Estrutura de configuração** (Seção 8.10 / B): módulo separado
+`pesos_proximidade.py` na raiz com dataclass. Hierarquia 2 níveis
+(default global → override por subregião). `anti_uni` em estrutura
+paralela ortogonal. Labels categóricos em B (`"soft_critico"` etc),
+mapping numérico em A. Argumento opcional `pesos_override:
+ConfigPesosProximidade | None = None` em `gerar_multiplos_treinos`
+pra harness de calibração não contaminar globais.
+
+**Processo de calibração** (Seção 8.12 / C): manual + coordinate
+descent. Ordem das 5 dims: **família INTER → plano+pegada (acopladas)
+→ lateralidade soft → HISTÓRICO → equipamento_grupo (último,
+tiebreaker)**. Cap **5-10 rounds/dim** + validação cruzada como
+salvaguarda — se ajuste em X quebrar Y, é sinal pra revisitar B
+ou A em vez de brute-force calibração.
+
+**Migração família INTER hard → soft** (Seção 8.9 / D3.2): Caminho C
+— marca legacy em D3 (spec), execução estrutural em **Etapa 7**
+(remover `variacao_pais_globais` set hard + adicionar penalty score).
+Decisão "A clean break vs B coexistência" registrada como ponto de
+auditoria pra Etapa 7.
+
+**Implementação real fica pra Etapa 7.** Spec atual NÃO mexe no
+gerador real. Trabalho pendente da Fase 3 antes de Etapa 7: E.1.b2
+(8 cenários soft + mocks G2/G4/G8) → C executado → E.2 (validação).
+
 ## Stack
 
 Flask + Jinja2 + HTMX 2.0.4 + Tailwind CDN (`cdn.tailwindcss.com` com `@apply` em `<style type="text/tailwindcss">`) + SortableJS 1.15.3. Fonte: DM Sans. Cores: laranja `#e85d04`, fundo `#f9fafb`.
