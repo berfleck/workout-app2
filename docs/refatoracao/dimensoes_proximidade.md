@@ -3015,7 +3015,91 @@ costas. Realista também respeita o gate hard agora (era 3.30% no
 patológico antes, 0% agora). Sub-a (0.20%) inalterado — já era
 ínfimo, regra 3 só aplica em costas e sub-a mede outras subregiões.
 
-#### 8.15.5 Pendências em aberto pra Etapa 7
+#### 8.15.5 Fechamento Fase 7.3 (Sessão 10 — 2026-05-09)
+
+**Entregue:** função `_score_proximidade(cand, alocados, contexto,
+pesos_config)` em `gerador_treino.py` (linha ~1577) com branch INTRA
+implementado conforme D2 (Seção 8.7) — composição **par-a-par cumulativa**
+sobre 3 dims soft (pegada, plano_corporal, equipamento_grupo), escopo
+**same-subregião** (Seção 1.5), **constante por dim** sem matriz 4×4
+(D2.1 fechada). Branches INTER/HIST retornam 0.0 (Fase 7.4).
+
+**3 ambiguidades resolvidas pelo user antes de implementar (Sessão 10):**
+
+1. **Leitura das tags pelo gerador real:** **adicionar campos ao
+   `Exercicio`** (default `None`) — mesmo padrão da Fase 7.2 com
+   `variante_pontual`. Harness `_aplicar_overlay` propaga via overlay;
+   XLSX cadastra colunas reais na Fase 4.
+2. **Local do score INTRA:** **`pre_alocar_rotina` (alocados do treino)**,
+   não `_score_pareamento` (alocados do bloco). Aderente à D2.3
+   ("par-a-par no treino") e D3.4 (Fase 0 unifica INTER+HIST). Diverge do
+   shorthand no memory/CLAUDE.md mas alinha com a spec fechada Sessão 6.
+3. **Pegada:** **constante por dim**, não matriz 4×4. Aderente a D2.1
+   final. Reabertura pra matriz só com evidência empírica nova.
+
+**Mudanças estruturais:**
+
+1. Campos novos `Exercicio.pegada`, `Exercicio.plano_corporal`,
+   `Exercicio.equipamento_grupo` (default `None`). `carregar_banco` lê
+   colunas (graceful via `_str(...) or None` — banco real ainda não tem
+   coluna, fica `None`). `_aplicar_overlay` no harness propaga as 3 dims
+   pra Exercicios em-memória (era só `variante_pontual`).
+2. Helper `_selecionar_cand_score_aware(cands, alocados_intra, pesos)`
+   substitui `random.choice(cands)` nos 2 call-sites de `pre_alocar_rotina`
+   (passe estrito + passe relax). Reusa `SOFTMAX_TOP_K=3` /
+   `SOFTMAX_TEMPERATURA=200` da Etapa 5. Quando todos pontuam 0
+   (cross-subregião, tags ausentes ou nenhum par redundante), softmax cai
+   em uniforme — equivalente a `random.choice` antigo.
+3. Default `pesos_config = PESOS_DEFAULT` em `_score_proximidade` mantém
+   compatibilidade com calibração C (Fase 7.6) via `pesos_override`.
+
+**Impacto observado em testes existentes:**
+
+- 13 snapshots de regressão (`test_peito_3x2treinos_seed13`,
+  `test_full_body_4treinos_seed1`, etc.) tinham snapshots calibrados
+  contra a sequência de `random.choice`. A mudança pra
+  `random.choices(top, weights=pesos, k=1)` (mesmo com pesos uniformes)
+  consome `random` diferente, dessincronizando o resultado por seed.
+  Atualizados via `--snapshot-update`. Inspeção manual de 2 snapshots
+  confirmou shifts benignos (mesma família/padrão, só nome muda — Supino
+  Anilha → Supino Barra, etc.). Sem família repetida ou regressão clínica.
+- 1 teste de fixture hardcoded (`test_filtro_carga_realmente_dissolve_par_conhecido`):
+  par antigo `Lev. Terra Sumô + Remada Baixa Aberta` em seed=1 deixou de
+  ser produzido. Varredura de seeds achou novo par equivalente:
+  **`Lev. Terra + Barra Isométrica` em seed=9** (grip 3+3=6 viola HIB2).
+  Atualizado.
+- Suíte completa: 169 passados + 13 snapshots, 1 skip pré-existente.
+
+**Harness pós-7.3 — 14/16 OK + 2 FAIL esperados:**
+
+| ID | Pré-7.3 | Pós-7.3 | Status | Notas |
+|---|---|---|---|---|
+| 1.1, 1.2, 1.3, 2.2A, 2.2B | 0.00% | 0.00% | OK | Predicado 7.2 mantido |
+| 2.1 | 0.00% | 0.00% | OK | Espera 10-15% pós-7.4 |
+| **2.3** | **5.50%** | **0.00%** | **FAIL (2-10%)** | Over-correção; calibração 7.6 ajusta |
+| 2.4 | 100% | 100% | OK | Alvo ~70% pós-7.6 (sub-pareamento 89.90%) |
+| 3.1 | 0.00% | 0.00% | OK | Espera 10-15% pós-7.4 |
+| 3.2 | 0.00% | 0.00% | OK | Espera <10% pós-7.4 |
+| 3.3 | 41.80% | 48.20% | OK | Famílias dif, dentro de 20-50% |
+| **4.1** | **100%** | **100%** | **FAIL** | Aguarda HISTÓRICO toggle 7.4 |
+| 4.2 | 100% | 100% | OK | Toggle OFF informativo |
+| 5.2 | 17.20% | 34.60% | OK | Pareamento intencional Etapa 5 (<50%) |
+| 6.1 | 0.00% | 0.00% | OK | Não regrediu |
+| 6.2 | 0.00% | 0.00% | OK | Sub-a 1.00% / sub-b 0.00% |
+
+**2 FAILs anunciados pelo user prompt como esperados pra Fase 7.3:**
+- **2.3** — soft INTRA pegada+plano em costas, faixa 2-10% é "alvo
+  pós-calibração"; 0% é over-correção do peso default `-50` ainda não
+  calibrado. Direção certa (penalty desencoraja). Calibração final em 7.6.
+- **4.1** — HISTÓRICO toggle ainda não implementado, vira <5% pós-7.4.
+
+**Salto 5.2 17.20% → 34.60%** registrado: aumento na taxa de coexistência
+do par v_up_uni + tríceps_uni dentro do treino. Continua dentro do range
+"<50% (par esp >50%)" — a expectativa Etapa 5 é que esses unilaterais
+de grupos diferentes coexistam. Score-aware não muda esse pareamento
+intencional (anti_uni Etapa 5 segue ortogonal em `_score_pareamento`).
+
+#### 8.15.6 Pendências em aberto pra Etapa 7
 
 1. **Bug retrocompat `("subregiao", "core", N)`** falha alocação
    (`qtd_obtida=0`). Workaround atual: usar `core_dinamico`/

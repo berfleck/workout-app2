@@ -263,16 +263,18 @@ def test_gerar_multiplos_treinos_respeita_cargas_config(banco):
 
 
 def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
-    """Evidência forte: par documentado pelo harness (seed=1) some quando filtro liga.
+    """Evidência forte: par documentado pelo harness some quando filtro liga.
 
-    Sem filtro, seed=1 com cfg lower(4)+upper(3)+core(1)×2 produz par
-    'Lev. Terra Sumô' + 'Remada Baixa Aberta' (grip 3+3=6 e lombar 3+2=5
-    violam HIB2). Com filtro HIB2 ligado, esse par precisa desaparecer.
+    Sem filtro, seed=9 com cfg lower(4)+upper(3)+core(1)×2 produz par
+    'Lev. Terra' + 'Barra Isométrica' (grip 3+3=6 viola HIB2). Com filtro
+    HIB2 ligado, esse par precisa desaparecer.
 
-    Atualizado na Etapa 5 (Sub-PR 5.2): a seleção de candidato por softmax
-    mudou os pares emergentes em seed=1 — antes era 'Hiperextensão 45°' +
-    'Remada Baixa Aberta'. O par novo continua sendo evidência forte do
-    filtro (viola 2 dimensões em vez de 1).
+    Atualizado na Etapa 7 Fase 7.3: introdução do `_score_proximidade` em
+    `pre_alocar_rotina` (softmax score-aware substituindo `random.choice`)
+    mudou a sequência de chamadas a `random` e portanto os pares emergentes
+    por seed. Antes era seed=1 com 'Lev. Terra Sumô' + 'Remada Baixa Aberta';
+    novo par/seed encontrado via varredura preserva a evidência clínica do
+    filtro.
     """
     import random
     from gerador_treino import gerar_multiplos_treinos
@@ -283,7 +285,8 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
         "equipamentos_bloqueados": [],
         "evitar_agonistas": True,
     }
-    PAR = {"Lev. Terra Sumô", "Remada Baixa Aberta"}
+    PAR = {"Lev. Terra", "Barra Isométrica"}
+    SEED = 9
 
     def par_aparece(sessoes):
         for s in sessoes:
@@ -293,19 +296,19 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
                     return True
         return False
 
-    random.seed(1)
+    random.seed(SEED)
     s_off = gerar_multiplos_treinos(banco, [cfg, cfg], relaxar_familia=True)
     assert par_aparece(s_off), (
-        "Pré-condição falhou: harness disse que seed=1 produz o par sem filtro. "
-        "Se isso mudou, atualize o teste com par bloqueado novo do harness."
+        f"Pré-condição falhou: harness disse que seed={SEED} produz o par "
+        "sem filtro. Se isso mudou, atualize o teste com par bloqueado novo."
     )
 
-    random.seed(1)
+    random.seed(SEED)
     cfg_on = {**cfg, "cargas_config": HIB2}
     s_on = gerar_multiplos_treinos(banco, [cfg_on, cfg_on], relaxar_familia=True)
     assert not par_aparece(s_on), (
-        "Filtro falhou: par 'Lev. Terra Sumô' + 'Remada Baixa Aberta' "
-        "apareceu mesmo com cargas_config HIB2 ativo."
+        "Filtro falhou: par 'Lev. Terra' + 'Barra Isométrica' apareceu "
+        "mesmo com cargas_config HIB2 ativo."
     )
 
 

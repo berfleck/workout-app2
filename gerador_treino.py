@@ -12,7 +12,11 @@ import random
 from dataclasses import dataclass, field
 from typing import Optional
 
-from pesos_proximidade import SUBREGIOES_LATERALIDADE_HARD
+from pesos_proximidade import (
+    PESOS_DEFAULT,
+    SUBREGIOES_LATERALIDADE_HARD,
+    ConfigPesosProximidade,
+)
 
 # ---------------------------------------------------------------------------
 # Constantes
@@ -675,6 +679,13 @@ class Exercicio:
     # etc.). Hard INTRA via predicado `_compativel_intra` (D1.c). Default
     # False; banco real (XLSX) ainda não tem coluna — Fase 4 cadastra.
     variante_pontual: bool = False
+    # Dimensões de proximidade soft INTRA da Etapa 6 (Fase 7.3 — Seções
+    # 2/3/7). Default `None` = tag ausente (skip silencioso no score, ver
+    # `_score_proximidade`). Banco real (XLSX) ainda não tem colunas;
+    # harness propaga via overlay; Fase 4 cadastra.
+    pegada: Optional[str] = None
+    plano_corporal: Optional[str] = None
+    equipamento_grupo: Optional[str] = None
 
 
 @dataclass
@@ -766,6 +777,9 @@ def carregar_banco(path: str) -> list[Exercicio]:
             carga_grip=_int_or_zero(row.get("carga_grip")),
             carga_lombar=_int_or_zero(row.get("carga_lombar")),
             demanda_core=_int_or_zero(row.get("demanda_core")),
+            pegada=_str(row.get("pegada")) or None,
+            plano_corporal=_str(row.get("plano_corporal")) or None,
+            equipamento_grupo=_str(row.get("equipamento_grupo")) or None,
         ))
     return exercicios
 
@@ -1537,7 +1551,8 @@ def _compativel_intra(
        (D1.d). Subregiões "hard" listadas em `SUBREGIOES_LATERALIDADE_HARD`.
 
     Soft INTRA (pegada, plano_corporal, equipamento_grupo) NÃO entra aqui —
-    vive em `_score_pareamento` aditivamente (D2, Fase 7.3).
+    vive em `_score_proximidade` aditivamente (D2, Fase 7.3), aplicado
+    durante a seleção em `pre_alocar_rotina`.
     """
     for outro in alocados_intra:
         # 1. Família refinada same-treino
@@ -1560,6 +1575,101 @@ def _compativel_intra(
         ):
             return False
     return True
+
+
+def _score_proximidade(
+    cand: "Exercicio",
+    alocados: list["Exercicio"],
+    contexto: str,
+    pesos_config: ConfigPesosProximidade = PESOS_DEFAULT,
+) -> float:
+    """Penalty soft de proximidade (D2 — Etapa 6, Seção 8.7).
+
+    Composição **par-a-par cumulativa**: cada par (cand, outro) soma uma
+    penalty constante por dim que colide. Penalty é negativa — quanto maior
+    o módulo, mais o gerador desencoraja a escolha.
+
+    `contexto`:
+    - `"intra"` — pares dentro do MESMO treino (Fase 7.3, dims pegada,
+      plano_corporal, equipamento_grupo). Família estrita, variante_pontual
+      e lateralidade contextual costas são HARD via `_compativel_intra`
+      (Seção 1.7) — não entram aqui.
+    - `"inter"` / `"historico"` — Fase 7.4. Por enquanto retornam 0.0.
+
+    **Escopo de aplicação (Seção 1.5):** soft INTRA dispara só quando
+    `cand.subregiao == outro.subregiao`. Pares cross-subregião não somam
+    penalty soft.
+
+    **Tag ausente:** quando uma dim do cand ou do outro é `None`/`""`,
+    a dim é ignorada silenciosamente nesse par (banco real ainda não
+    tem cadastro completo — Fase 4 fecha; harness propaga via overlay).
+
+    **Pegada:** D2.1 fechou em **constante por dim** (igual/diferente),
+    não matriz 4×4 (Seção 8.7). Calibração final em 7.6.
+
+    Pesos vêm de `pesos_config.<dim>.peso_intra(subregiao)` com cascata
+    override→default (B.2). Subregiões marcadas N/A no override retornam
+    0 e a dim é silenciosamente ignorada.
+    """
+    if contexto != "intra":
+        return 0.0  # INTER + HIST ficam pra Fase 7.4
+
+    if not alocados:
+        return 0.0
+
+    total = 0.0
+    sub_cand = cand.subregiao
+    for outro in alocados:
+        if sub_cand != outro.subregiao:
+            continue  # soft INTRA = same-subregião only (Seção 1.5)
+        if cand.pegada and outro.pegada and cand.pegada == outro.pegada:
+            total += pesos_config.pegada.peso_intra(sub_cand)
+        if (
+            cand.plano_corporal
+            and outro.plano_corporal
+            and cand.plano_corporal == outro.plano_corporal
+        ):
+            total += pesos_config.plano_corporal.peso_intra(sub_cand)
+        if (
+            cand.equipamento_grupo
+            and outro.equipamento_grupo
+            and cand.equipamento_grupo == outro.equipamento_grupo
+        ):
+            total += pesos_config.equipamento_grupo.peso_intra(sub_cand)
+    return total
+
+
+def _selecionar_cand_score_aware(
+    cands: list["Exercicio"],
+    alocados_intra: list["Exercicio"],
+    pesos_config: ConfigPesosProximidade = PESOS_DEFAULT,
+) -> "Exercicio":
+    """Escolhe um candidato em `cands` ponderando pelo penalty soft INTRA.
+
+    Substitui `random.choice(cands)` em `pre_alocar_rotina` (Etapa 7,
+    Fase 7.3). Quando todos os candidatos pontuam 0 (cross-subregião,
+    tags ausentes ou nenhum par redundante), a softmax cai em distribuição
+    uniforme — equivalente a `random.choice` antigo.
+
+    Reusa `SOFTMAX_TOP_K` / `SOFTMAX_TEMPERATURA` da Etapa 5 (mesma escala
+    do `_score_pareamento`).
+    """
+    if not cands:
+        raise ValueError("cands vazio")
+    if len(cands) == 1 or not alocados_intra:
+        return random.choice(cands)
+
+    scored = [
+        (e, _score_proximidade(e, alocados_intra, "intra", pesos_config))
+        for e in cands
+    ]
+    scored.sort(key=lambda t: t[1], reverse=True)
+    top = scored[:SOFTMAX_TOP_K]
+    max_s = top[0][1]
+    exps = [math.exp((s - max_s) / SOFTMAX_TEMPERATURA) for _, s in top]
+    total = sum(exps)
+    pesos = [e / total for e in exps]
+    return random.choices([e for e, _ in top], weights=pesos, k=1)[0]
 
 
 def _candidatos_estritos(
@@ -2163,15 +2273,16 @@ def pre_alocar_rotina(
         slot = slots_pendentes.pop(0)
         cfg_t = configs_norm[slot.treino_idx]
 
+        alocados_t = _alocados_intra(slot.treino_idx)
         cands = _candidatos_estritos(
             banco, slot.nivel, slot.escopo_alocacao, cfg_t,
             nomes_globais, familias_globais,
             filtro_purpose=None,
-            alocados_intra=_alocados_intra(slot.treino_idx),
+            alocados_intra=alocados_t,
         )
 
         if cands:
-            escolhido = random.choice(cands)
+            escolhido = _selecionar_cand_score_aware(cands, alocados_t)
             alocacao[slot.treino_idx][slot.d_idx_original].append(escolhido)
             nomes_globais.add(escolhido.nome)
             familias_globais.add(escolhido.nome)
@@ -2200,14 +2311,15 @@ def pre_alocar_rotina(
             )
             slot = slots_para_relax.pop(0)
             cfg_t = configs_norm[slot.treino_idx]
+            alocados_t = _alocados_intra(slot.treino_idx)
             cands = _candidatos_estritos(
                 banco, slot.nivel, slot.escopo_alocacao, cfg_t,
                 nomes_globais, set(),  # família relaxada
                 filtro_purpose=None,
-                alocados_intra=_alocados_intra(slot.treino_idx),
+                alocados_intra=alocados_t,
             )
             if cands:
-                escolhido = random.choice(cands)
+                escolhido = _selecionar_cand_score_aware(cands, alocados_t)
                 alocacao[slot.treino_idx][slot.d_idx_original].append(escolhido)
                 nomes_globais.add(escolhido.nome)
                 # Família AINDA é tracked pra slots subsequentes do mesmo passe relax

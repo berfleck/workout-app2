@@ -96,8 +96,8 @@ fecharam E.1.b2: 78 mocks YAML em 8 grupos + 16 cenários no harness +
 ## Etapa 7 — plano e decisões fechadas (não reabrir sem motivo forte)
 
 Plano consolidado na Sessão 7c (2026-05-09). **Fases 7.1 ✅ Sessão 8
-+ 7.2 ✅ Sessão 9 (ambas 2026-05-09).** Sessão 10 arranca Fase 7.3.
-Decisões já fechadas:
++ 7.2 ✅ Sessão 9 + 7.3 ✅ Sessão 10 (todas 2026-05-09).** Sessão 11
+arranca Fase 7.4. Decisões já fechadas:
 
 **Branch:** `etapa-7` (criado Sessão 8 a partir de `refator-gerador`).
 Sem sub-branches por fase (1 PR por fase no mesmo branch).
@@ -121,9 +121,19 @@ de INTER+HIST):**
    **2.2A: 4.30% → 0.00% ✓**. Efeito secundário corretional: relax
    antes era over-permissivo (permitia família INTRA same-treino) —
    3 snapshots e 1 teste de razão atualizados.
-3. **7.3** — score soft INTRA (D2): plano + pegada matriz 4×4 +
-   equipamento + variante_pontual INTER. Anti_uni Etapa 5 mantido
-   ortogonal.
+3. **7.3 ✅ Sessão 10** — `_score_proximidade(cand, alocados, contexto,
+   pesos_config)` em `gerador_treino.py` (~linha 1577) com branch INTRA:
+   par-a-par cumulativa sobre 3 dims soft (pegada, plano_corporal,
+   equipamento_grupo), escopo same-subregião, **constante por dim**
+   (D2.1 final, sem matriz 4×4). Helper
+   `_selecionar_cand_score_aware` substitui `random.choice` nos 2
+   call-sites de `pre_alocar_rotina` (passe estrito + relax). 3 fields
+   novos no `Exercicio`: pegada/plano_corporal/equipamento_grupo.
+   **Harness 14/16 OK + 2 FAIL esperados:** 2.3 over-correta 5.50%→0%
+   (calibração 7.6 ajusta), 4.1 mantido 100% (aguarda 7.4). 1.3+2.2A
+   = 0% (predicado 7.2 mantido). 13 snapshots atualizados (shifts
+   benignos do score-aware) + 1 fixture hardcoded ajustada
+   (Lev. Terra+Barra Isométrica seed=9).
 4. **7.4** — score INTER + HISTÓRICO toggle ON/OFF + migração
    família INTER hard→soft (Caminho C). **Resolve 4.1 FAIL <5% +
    move 2.1+3.1 pra ~10-15%.**
@@ -145,22 +155,29 @@ independente da migração família INTER; vitória rápida em
 iterativa); Caminho C da D3.2 não obriga acoplamento entre
 predicado e migração.
 
-**Documentos fonte de verdade pra Sessão 10 (Fase 7.3):**
+**Documentos fonte de verdade pra Sessão 11 (Fase 7.4):**
 
-- `pesos_proximidade.py` (Fase 7.1) — `PESOS_DEFAULT.peso_intra(subregiao)`
-  já faz lookup com cascata override→default; usar em
-  `_score_pareamento` na Fase 7.3
-- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.7 (D2 — soft
-  INTRA fechado: par-a-par cumulativa, constante por dim, escala
-  -100/-50/-20/-5) + Seção 3.1 (matriz pegada 4×4) + Seção 8.15.4
-  (fechamento Fase 7.2)
-- `gerador_treino.py` `_score_pareamento` (~linha 488) — adicionar
-  penalty soft INTRA aditivo aos componentes existentes; anti_uni
-  Etapa 5 mantido ortogonal
-- `tools/calibrar_pesos_dimensoes.py` `_penalty_proximidade` stub —
-  spec de referência da composição par-a-par
+- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.9 (D3 — INTER
+  soft + HISTÓRICO toggle: D3.1 multiplicador 0.8 com overrides; D3.2
+  Caminho C migração família INTER hard→soft; D3.3 granularidade
+  nome+família soma livre; D3.4 Fase 0 `pre_alocar_rotina`) + Seção
+  8.11 A.3 (escala derivados INTER/HIST) + Seção 8.15.5 (fechamento
+  Fase 7.3 — 2 ambiguidades de implementação resolvidas Sessão 10)
+- `pesos_proximidade.py` — `PESOS_DEFAULT.peso_inter(subregiao)` e
+  `peso_historico(subregiao)` já fazem lookup com multiplicadores
+  (D3.1 0.8 default + override 0.95 variante_pontual; HIST 1.0
+  integral). Usar diretamente em `_score_proximidade` branches
+  INTER/HIST
+- `gerador_treino.py` `_score_proximidade` (~linha 1577) — branch
+  `"intra"` populado (Fase 7.3); plug em `pre_alocar_rotina`
+  precisa expandir helpers pra coletar `alocados_inter` (todos exs em
+  outros treinos) e `historico_r1` (R-1 quando toggle ON)
+- **Migração família INTER hard→soft (D3.2 Caminho C):** decisão
+  pendente A vs B — (A) clean break (remove `familias_globais` set
+  hard, score só) ou (B) coexistência (set + score). Ponto de
+  discussão pra Sessão 11.
 
-**Pendências em aberto pra Etapa 7** (registradas Seção 8.15.4):
+**Pendências em aberto pra Etapa 7** (registradas Seção 8.15.6):
 
 1. Bug retrocompat `("subregiao", "core", N)` (resolução em 7.4 ou
    junto com migração estrutural CORE).

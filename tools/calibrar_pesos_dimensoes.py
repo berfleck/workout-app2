@@ -104,16 +104,15 @@ def _carregar_mocks() -> tuple[dict[str, MockDimensoes], list[dict]]:
 
 def _aplicar_overlay(banco: list[Exercicio], dims: dict[str, MockDimensoes],
                      futuros: list[dict]) -> list[Exercicio]:
-    """Sobrescreve `variacao_de` + `variante_pontual` em Exercicios
-    cadastrados conforme mock e adiciona Exercicios mock_futuro ao banco.
+    """Sobrescreve dims da Etapa 6 em Exercicios cadastrados conforme mock
+    e adiciona Exercicios mock_futuro ao banco.
 
-    Etapa 7 Fase 7.2: `variante_pontual` agora é campo do `Exercicio`
-    (default False) e o predicado `_compativel_intra` lê dele direto.
-    Overlay propaga a tag do mock pra Exercicio em-memória — banco real
-    (XLSX) ainda não tem coluna; Fase 4 cadastra.
-
-    Demais dims (plano_corporal, pegada, equipamento_grupo) continuam só
-    no dict `dims` — entram no gerador via score soft INTRA na Fase 7.3.
+    Etapa 7 Fases 7.2 + 7.3: `variante_pontual`, `pegada`, `plano_corporal`
+    e `equipamento_grupo` são campos do `Exercicio` (default `None` /
+    `False`) e o gerador (predicado `_compativel_intra` + função
+    `_score_proximidade`) lê deles direto. Overlay propaga as tags do mock
+    pra Exercicio em-memória — banco real (XLSX) ainda não tem colunas;
+    Fase 4 cadastra.
     """
     nomes_cadastrados = {e.nome for e in banco}
     for ex in banco:
@@ -122,6 +121,9 @@ def _aplicar_overlay(banco: list[Exercicio], dims: dict[str, MockDimensoes],
             if mock.familia_estrita is not None:
                 ex.variacao_de = mock.familia_estrita
             ex.variante_pontual = mock.variante_pontual
+            ex.pegada = mock.pegada
+            ex.plano_corporal = mock.plano_corporal
+            ex.equipamento_grupo = mock.equipamento_grupo
 
     # Cria Exercicios pra mock_futuros não cadastrados.
     for item in futuros:
@@ -147,6 +149,9 @@ def _aplicar_overlay(banco: list[Exercicio], dims: dict[str, MockDimensoes],
             musculo_primario=extras.get("musculo_primario", ""),
             obs=None,
             variante_pontual=ex_dims.variante_pontual,
+            pegada=ex_dims.pegada,
+            plano_corporal=ex_dims.plano_corporal,
+            equipamento_grupo=ex_dims.equipamento_grupo,
         )
         banco.append(novo)
     return banco
