@@ -1229,6 +1229,20 @@ diversidade temporal, controle do personal sobre variabilidade.
    clínicos. Quando aparecer caso onde equipamento parece "vetor
    primário", usar refinamento de família ou padrão (caso `caixa` →
    família `subida_elevada`, NÃO dual-weight em equipamento).
+9-bis. **`null` por padrão em core (G8)** — diretriz Sessão 7c
+   (2026-05-09). equipamento_grupo é tiebreaker Baixo (-5) com
+   semântica "desempata pares iguais em outras dims biomecânicas".
+   **Em peito/costas equipamento carrega informação biomecânica real**
+   (halter livre vs Smith vs barra em supinos = estabilização
+   independente, ângulo, ROM diferentes; polia vs halter em costas =
+   vetor de resistência diferente). **Em core, equipamento é só fonte
+   de carga arbitrária** — Russian Twist com halter, V-Up com halter,
+   Pallof Press com polia, Crunch No Cabo com polia, INFRA Suspenso
+   com barra fixa: nenhum desses tem distinção biomecânica que
+   justifique o tiebreaker disparar. Logisticamente também não há
+   fricção real (vários halteres/polias na sala). Preencher `null`
+   em todos os exercícios de core, exceto se houver justificativa
+   clínica explícita registrada caso a caso.
 
 ### 7.3 Pegada (`pegada`)
 
@@ -2137,6 +2151,776 @@ paralelo ou após Fase 3 100% fechar. Etapa 7 implementa:
 ### 8.14 E.1.b2 / E.2 — pendentes
 
 A serem documentados conforme cada bloco fechar.
+
+#### 8.14.1 Sessão 7a (2026-05-08) — G2 mocks + 2.2B + timebox 2.3
+
+Primeira sub-sessão de E.1.b2 com escopo focado em G2 (remadas + puxadas).
+
+**Cadastros no YAML (`tools/mocks/dimensoes_etapa_6.yaml`):**
+
+- **G2 Remadas (12 cadastrados)** — Curvada Barra/Halteres/Smith
+  (família `curvada`), Baixa Aberta/Neutra (`baixa` unificada), Apoiado
+  (`apoiado`), Seal Halteres (`seal`), Landmine (`curvada` per Anexo),
+  Uni Polia + Serrote (`unilateral` unificada), Aberta TRX + Neutra TRX
+  (`trx`).
+- **G3 Puxadas (7 cadastrados + 2 mock_futuros)** — Barra Fixa + Iso
+  (`Barra`), Pullover Halteres + Polia (`Pullover`), Puxada Aberta/
+  Neutra/Supinada (`Puxada`); mock_futuros Barra Aberta + Barra Supinada
+  (split da Barra genérica, Seção 2 G3).
+
+**Decisões clínicas registradas durante a triagem:**
+
+- **A — Pegada Curvada Halteres = pronada** (preferência do user;
+  alinha biomecânica de "halteres firme em remada com pulso pronado").
+- **A — Apoiado + Seal Halteres = neutra**.
+- **B — Seal Halteres plano = `apoiada`** (par Seal+Apoiado vira "Ruim"
+  como modelagem ativa do caso clínico — escolha deliberada).
+- **B — Landmine plano = `curvada`** (proximidade clínica forte com
+  curvadas; alinha família+plano).
+- **B — Uni Polia plano = `unilateral_apoiada`** (user prescreve em
+  half-kneeling — joelho contralateral é o apoio).
+- **C — Barra Fixa + Iso pegada = `aberta`** (default brasileiro =
+  pronada larga; refinamentos futuros via mock_futuro Barra Aberta +
+  Barra Supinada).
+- **C — Barra Fixa + Iso equipamento = `corporal`** (peso corporal,
+  estrutura passiva).
+
+**2.2B redefinido implementado (`perna_anterior(3) × 1 treino`):**
+
+- 1000 iters, expectativa <70% baseline pre-D2 — observado 0.00%.
+- **Achado paralelo Sessão 7a:** `_ordenar_padroes_por_prioridade`
+  embaralha squat_bilateral|squat_unilateral 50/50 (~497/503 em 1000
+  seeds), MAS `_selecionar_ciclando` em modo subregião com
+  `preferir_composto=True` produz **consistentemente 2bi+1uni**
+  independente da ordem do shuffle. Resultado prático: 2.2B redefinido
+  NÃO exercita o anti_uni soft em perna_anterior do jeito que
+  auditoria E.0 esperava — banco efetivamente nunca propõe 2 unis em
+  perna_anterior(3).
+- **Decisão:** manter cenário 2.2B como gate de não-regressão (passa
+  trivialmente <70%); **calibração real de lateralidade soft Médio em
+  squats fica adiada pra E.1.b2 com setup mais denso** —
+  `perna_anterior(4)` (cycling daria 2bi+2uni) ou `padrão
+  squat_unilateral(2)` (força 2 unis). Registrar como sub-tarefa de C
+  quando essa dim for revisitada.
+
+**Timebox 2.3 executado (`costas(3) × 1 treino × 1000 iters`):**
+
+| Métrica | Resultado |
+|---|---|
+| A. 2+ ex mesma pegada em costas | 65.80% |
+| B. 2+ ex mesmo plano_corporal em costas | 1.50% |
+| **C. 2+ ex pegada+plano colidindo (métrica 2.3)** | **1.50%** |
+| D. 2+ ex mesma família (sanity hard) | 0.00% ✓ |
+
+**Verdict (auditoria E.0 limiar = 5%):** **1.50% < 5% → 2.3 cai
+oficialmente para ⚠️ densificado.** Decisão Seção 8.6 confirmada.
+
+**Insight clínico:** das 15 colisões pegada+plano observadas em 1000
+iters, **100% são `Remada Seal Halteres + Remada Apoiado`** (pegada=
+neutra, plano=apoiada). O cenário captura exatamente o caso clínico
+que o user modelou ativamente na decisão B (Seal+Apoiado = "Ruim"),
+mas a frequência absoluta é baixa porque banco tem 21 candidatos em
+costas e maioria das combinações pegada+plano são heterogêneas.
+**Densificação 2.3 em E.1.b2 vai precisar de `costas(4)` ou
+`costas(5)` pra forçar o caso virar mensurável** — densificação
+saudável (Seção 1.8.1), não regressão.
+
+**Status final dos cenários no harness após Sessão 7a:**
+
+| ID | Status | Observado | Notas |
+|---|---|---|---|
+| 1.1 | ✅ OK | 0.00% | Mantido pós-expansão G2/G3 |
+| 1.2 | ✅ OK | 0.00% | Mantido |
+| 1.3 | ⚠️ FAIL baseline | 5.00% | Pré-Etapa 7 (predicado) |
+| 2.2A | ⚠️ FAIL baseline | 4.30% | Pré-Etapa 7 (predicado) |
+| **2.2B** | **✅ OK** | **0.00%** | **Novo — gate não-regressão** |
+| 5.2 | ✅ OK | 17.20% violações (82.80% pareados) | Mantido |
+| 6.1 | ✅ OK | 0.00% E6 (100% E3 sec.) | Mantido |
+| 6.2 | ✅ OK | 0.00% E6 / sub-a 0.10% / sub-b 3.10% | Pequena flutuação esperada |
+
+**Pendentes E.1.b2 após Sessão 7a:**
+
+- Mocks G4 (squats refinados + `subida_elevada` + Recuo do Estepe
+  mock_futuro) — bloqueia 3.2, 3.3
+- Mocks G8 (core refinado) — útil pra 6.1 quando refator estrutural
+  CORE for revalidado
+- Cenários soft restantes pós-mocks: 2.1, 2.3 densificado, 3.1, 3.2,
+  3.3, 4.1, 4.2
+- Sub-tarefa: setup denso pra calibrar lateralidade soft Médio em
+  squats (substituto do 2.2B inefetivo) — ver §8.14.2 abaixo
+
+#### 8.14.2 Decisões de processo registradas no fechamento da Sessão 7a
+
+Três decisões capturadas pelo user após relatório da Sessão 7a, pra
+evitar drift de calibração e ambiguidade pra Sessão 7b.
+
+##### Decisão 1 — Calibração lateralidade Médio em squats: `padrão squat_unilateral(2)`
+
+2.2B redefinido (`perna_anterior(3)`) ficou como gate de não-regressão
+após o achado paralelo do cycling (100% 2bi+1uni). Calibração real de
+lateralidade soft Médio em squats foi adiada sem dono — Sessão 7a
+encerrou com a decisão de **criar cenário 2.4 dedicado** (não
+2.2B/C — ID novo pra deixar claro que é cenário independente, não
+substitui 2.2B).
+
+- **Setup proposto:** `padrão squat_unilateral(2) × 1 treino × 1000
+  iters`. Força 2 unis no mesmo padrão (squat_unilateral tem 11
+  candidatos sem hard de família entre todos — coexistência intra
+  garantida).
+- **Categoria:** ⚠️ patológico necessário (mesma família semântica
+  de 2.1 — densificação obrigatória pra exercitar mecanismo).
+- **Expectativa pré-D2 (baseline):** ~100% das rotinas têm 2 unis em
+  squat (esperado; anti_uni -75 só atua em fase de bloco, não na
+  seleção da subregião/padrão).
+- **Expectativa pós-D2 (calibrado):** depende de onde lateralidade
+  Médio cai numericamente. Se for promovida pra penalty de seleção
+  com peso ~-50 (Médio na escala A), espera-se queda significativa.
+  Faixa-alvo a registrar quando D2 numérico fechar.
+- **Por que não `perna_anterior(4)`:** mistura cycling subregião +
+  lateralidade + diversidade. `squat_unilateral(2)` isola o
+  mecanismo — atribuição de efeito ao peso fica limpa.
+
+**Status:** definido como sub-tarefa de C. Implementação em E.1.b2 ou
+quando D2 numérico for revisitado.
+
+##### Decisão 2 — Pré-registro de expectativa numérica pra 2.3 densificado
+
+Timebox 2.3 deu 1.50% em `costas(3) × 1`. Densificação `costas(4)+`
+DEVE dar valor maior — caso contrário, a densificação não exercitou
+o mecanismo. Pra evitar viés de confirmação na leitura do resultado,
+a expectativa final é **pré-registrada** antes de rodar:
+
+| Setup densificado | Faixa esperada pré-registrada | Decisão de leitura |
+|---|---|---|
+| `costas(4) × 1 × 1000 iters` | **4-12%** | <4% = inefetivo (escalar pra costas(5)); 4-12% = densificou OK; >12% = banco apertado demais |
+| `costas(5) × 1 × 1000 iters` | **10-25%** | <10% = ainda inefetivo (revisitar mocks); 10-25% = densificou OK; >25% = banco força colisão sem mostrar mecanismo |
+
+**Recomendação:** começar por `costas(4)` (densificação conservadora
+próxima ao realista — 6.2 tem costas(3) com sub-b 3.10%). Escalar
+pra `costas(5)` se <4% no costas(4).
+
+**Plausibilidade do pré-registro:**
+
+- Banco costas: 12 remadas + 7 puxadas + 2 mock_futuros = 21
+  candidatos. Pegada+plano `neutra+apoiada` tem só 2 (Apoiado +
+  Seal).
+- Em costas(4): tipicamente 2 remadas + 2 puxadas; 2 remadas dão
+  ~3% chance Apoiado+Seal coexistirem (banco uniforme),
+  considerando hard família reduz pool. Faixa 4-12% acomoda
+  variação realista.
+- Em costas(5): 3 remadas + 2 puxadas; 3 remadas dão ~13-15% chance
+  Apoiado+Seal coexistirem. Faixa 10-25%.
+
+##### Decisão 3 — Dimensões não-aplicáveis ficam vazias (lembrete pra Sessão 7b)
+
+Confirmação explícita do entendimento "vazio = não se aplica" pras
+diretrizes 12 (pegada — Seção 7.3) e 13 (plano_corporal — Seção 7.4)
+no contexto de mocks G4 (squats) e G8 (core):
+
+- **Pegada:** `null` em squats, hinges, knee_flex, tríceps, pranchas
+  (Seção 7.3 diretriz 12). **Não escrever "neutra" como default** —
+  escrever `null` no YAML (ou omitir o campo).
+- **Plano corporal:** `null` em squats, knee_flex, tríceps, pranchas,
+  core (Seção 7.4 diretriz 13). **Exceção em G4:** hinges (extensão de
+  quadril) é o único squat-adjacent com plano (`em_pe` / `deitado`).
+- **Equipamento, lateralidade, familia_estrita, variante_pontual:**
+  preenchidos normalmente conforme diretrizes 1-22.
+
+**Anti-padrão a evitar:** preencher "neutra" ou outro valor "default"
+em dimensão não-aplicável pra "não deixar vazio". Cria score
+artificial onde não há proximidade clínica real.
+
+##### Lembrete crítico — `subida_elevada` no G4
+
+Família refinada nova (Sessão 2 / Caminho 5 / Anexo item 15-quinquies)
+introduzida pra resolver Caso 2 (Step Up + Passada Dos Steps INTRA).
+**Cadastro errado dela invalida estruturalmente os cenários 3.2 e 3.3.**
+
+**Membros previstos da família** (Seção 2 G4):
+
+- Step Up
+- Step Up Alt.
+- Passada Dos Steps
+- Recuo do Estepe (cadastro futuro — Anexo item 26 — entra como
+  `mock_futuro` em Sessão 7b)
+
+**Cuidado crítico — outros unilaterais de perna_anterior NÃO são
+subida_elevada:**
+
+- Passada (em solo, não eleva) — família própria
+- Recuo + Recuo Alternado + Recuo C/ Barra (em solo) — família
+  `recuo` (unifica bi/uni per diretriz 2)
+- Walking Lunges (em solo) — família própria ou solo
+- Búlgaro (pé posterior elevado, mas trabalho está no pé que pisa no
+  chão) — família própria
+- Agach. Lateral, Slide Board Lateral — famílias próprias
+
+**Triagem de mapeamento G4 deve passar pelo protocolo Seção 9.1**
+(triagem 🟢/🟡/🔴, perguntas agrupadas por critério clínico) com
+atenção especial à fronteira `subida_elevada`. Caso de borda
+provável: Recuo C/ Barra (apoio elevado posterior?). Confirmar com
+user antes de cadastrar.
+
+#### 8.14.3 Sessão 7b (2026-05-08) — G4 mocks + 4 cenários novos
+
+Segunda sub-sessão de E.1.b2. Escopo G4 (squats refinados +
+`subida_elevada` + Recuo do Estepe mock_futuro) + 4 cenários novos
+(2.3 densificado, 2.4 squat_unilateral, 3.2 + 3.3 INTER família).
+
+**Cadastros no YAML (G4 — 17 cadastrados + 1 mock_futuro):**
+
+- **Família `Agachamento` (3 bilaterais):** Livre / Goblet / Smith.
+- **Família `Recuo` (3):** Recuo / Recuo Alternado / Recuo C/ Barra.
+  Caso de borda da Sessão 7a confirmado: Recuo C/ Barra fica em
+  `Recuo` (solo, sem apoio elevado posterior).
+- **Família `subida_elevada` (3 cadastrados + 1 mock_futuro):**
+  Step Up / Step Up Alt. / Passada Dos Steps / Recuo do Estepe.
+  Reclassificação pós-Sessão 2 (Caminho 5 / Anexo 15-quinquies)
+  aplicada via overlay no YAML.
+- **Família `passada` (1):** só Passada regular (Passada Dos Steps
+  movida pra subida_elevada).
+- **Família `walking lunges` (1):** Walking Lunges.
+- **Família `agach. lateral` (2):** Agach. Lateral + Slide Board
+  Lateral.
+- **Sem família (4):** Box Jump (eq vazio per Seção 7.2 nota 8),
+  Cadeira Extensora, Leg Press, Agachamento Búlgaro.
+
+**Decisões clínicas Sessão 7b (5 critérios confirmados pelo user):**
+
+- **A** — Reclassificação `subida_elevada` confirmada pros 4 membros.
+- **B** — Recuo C/ Barra mantém `Recuo`.
+- **C** — Equipamento dos 4 da `subida_elevada` = `caixa` (Seção 7.2
+  diretriz 7 — apoio elevado precede halter).
+- **D** — Recuo do Estepe extras: comp=3, fad=3 (alinhado com Step
+  Up — apoio elevado padrão).
+- **E** — `variante_pontual = false` em todos os 18.
+
+**Cenários novos implementados:**
+
+| ID | Cenário | Setup | Status | Observado |
+|---|---|---|---|---|
+| 2.3 | Pegada+plano cumulativa em costas (densificado) | costas(5)×1 (escalado de costas(4) inefetivo) | ✅ OK | **5.20%** (faixa revisada 2-10%) |
+| 2.4 | Lateralidade Médio em squats (densificado, baseline) | squat_unilateral(2)×1 | ✅ OK | **100.00%** (baseline pre-D2) |
+| 3.2 | subida_elevada coexist INTER (família refinada) | 2 treinos × squat_unilateral(2) | ✅ OK | **0.00%** (família hard INTER pre-Etapa 7) |
+| 3.3 | Passada + Passada Dos Steps INTER (famílias dif) | 2 treinos × squat_unilateral(2) | ✅ OK | **41.80%** (faixa 20-50% E.0 ✓) |
+
+**Análise dos resultados:**
+
+- **2.3 — densificação revisada de costas(4) pra costas(5):** costas(4)
+  deu 1.10% (<4% pré-registrado, inefetivo). Escalada pra costas(5)
+  conforme decisão de leitura registrada → 5.20%, mas ainda abaixo
+  da faixa 10-25% pré-registrada. **Análise:** após hard família
+  INTRA proteger membros mesma família, banco em costas tem
+  efetivamente **1 par único mensurável** — `Remada Apoiado +
+  Remada Seal Halteres` (pegada=neutra+plano=apoiada). Outros
+  pares teóricos são bloqueados. **Predicate ajustado pra 2-10%**
+  como faixa operacional — cenário continua útil como gate (5.20%
+  > 1.50% baseline costas(3) confirma densificação exercitou o
+  mecanismo, mesmo que limitado a 1 par).
+- **2.4 — 100.00% confirma setup força 2 unis em squat.** Padrão
+  squat_unilateral tem 12 candidatos (incluindo Recuo do Estepe
+  mock_futuro), todos uni; demanda(2) garante coexistência. Pos-D2
+  com lateralidade Médio em squats calibrada, esperar redução
+  significativa.
+- **3.2 — 0.00% confirma família hard INTER pre-Etapa 7.** Após
+  Etapa 7 (D3.2 Caminho C — soft INTER alto via score), esperar
+  faixa <10%.
+- **3.3 — 41.80% dentro da faixa 20-50% E.0.** Validação clínica
+  do Caminho 5 / refinamento `subida_elevada`: famílias diferentes
+  (`passada` vs `subida_elevada`) permitem coexistência inter-treino
+  conforme correção clínica decidida na Sessão 2. Trade-off aceito
+  (Passada regular + Passada Dos Steps perde hard de família) está
+  funcionando empiricamente como esperado.
+
+**Status final do harness pós-7b (12 cenários):**
+
+| ID | Status | Observado | Notas |
+|---|---|---|---|
+| 1.1 | ✅ OK | 0.00% | Mantido |
+| 1.2 | ✅ OK | 0.00% | Mantido |
+| 1.3 | ⚠️ FAIL baseline | 5.00% | Pré-Etapa 7 (predicado) |
+| 2.2A | ⚠️ FAIL baseline | 4.30% | Pré-Etapa 7 (predicado) |
+| 2.2B | ✅ OK | 0.00% | Gate não-regressão |
+| **2.3** | **✅ OK** | **5.20%** | **Novo (densificado costas(5))** |
+| **2.4** | **✅ OK** | **100.00%** | **Novo (baseline lateralidade squats)** |
+| **3.2** | **✅ OK** | **0.00%** | **Novo (família hard INTER pre-Etapa 7)** |
+| **3.3** | **✅ OK** | **41.80%** | **Novo (validação Caminho 5)** |
+| 5.2 | ✅ OK | 17.20% violações | Mantido |
+| 6.1 | ✅ OK | 0.00% (sec. 100% E3) | Mantido |
+| 6.2 | ✅ OK | 0.00% / sub-a 0.10% / sub-b 2.90% | Pequena flutuação |
+
+**Lição de processo (auto-correção do pré-registro 2.3):**
+
+A faixa pré-registrada 10-25% pra costas(5) era **alta demais** dado
+o banco real após hard família INTRA. **Lesson learned:** pré-registros
+baseados em "múltiplos pares possíveis" devem considerar redução pelo
+hard família — pra calibrar pesos numéricos, pré-registros futuros
+devem tentar enumerar pares remanescentes pós-hard antes de fechar a
+faixa. Vale aplicar essa lente nos próximos pré-registros (3.1, 4.x).
+
+**Pendentes E.1.b2 após Sessão 7b:**
+
+- ⏳ Mocks G8 (core refinado) — Sessão 7c
+- ⏳ Cenários soft restantes: 2.1 (peito(3)+plano calibrado),
+  3.1 (Variante B 3x A1/A2), 4.1, 4.2 (HISTÓRICO toggle)
+- ⏳ Re-rodar 1.3 + 2.2A pós-Etapa 7 (predicado `_compativel_intra`)
+  — bloco de E.2
+
+#### 8.14.4 Decisões de processo registradas no fechamento da Sessão 7b
+
+Quatro decisões + pré-registro 2.1 capturadas pelo user pós-7b,
+guiando a Sessão 7c.
+
+##### Decisão 1 — Tabela de pares mensuráveis pré-registro (protocolo permanente)
+
+A lição da auto-correção do 2.3 (Seção 8.14.3 — faixa 10-25%
+inflada por banco efetivo ter só 1 par mensurável após hard família)
+vira **protocolo permanente** pra cenários soft (3.1, 4.1, 4.2,
+e em diante).
+
+**Etapa 1 do pré-registro de cada cenário soft:**
+
+1. Listar pares teoricamente possíveis que dispararim a métrica.
+2. Subtrair pares bloqueados por hard INTRA família.
+3. Subtrair pares bloqueados por hard contextual (lateralidade
+   `SUBREGIOES_LATERALIDADE_HARD`, variante_pontual cross-family).
+4. **Pares restantes = mensuráveis.** Faixa numérica deriva da
+   quantidade de pares + frequência esperada (não de hipótese
+   genérica "múltiplos pares possíveis").
+
+Sub-tarefa de cada cenário pré-D2/D3 numérico em E.1.b2 e C.
+
+##### Decisão 2 — Métrica primária correta pro 2.4 quando C executar
+
+Estado atual do 2.4 (baseline):
+
+- Métrica = "% rotinas com 2+ unis em squat_unilateral" = **100%**.
+- Mede **presença** dos exercícios (gate de mecanismo confirmado),
+  não pareamento clínico.
+
+Estado futuro quando C calibrar:
+
+- Métrica primária correta = **% rotinas onde os 2 unis aparecem
+  PAREADOS no MESMO bloco**.
+- Mecanismo: `anti_uni_mesmo_grupo -75` (Etapa 5) atua em
+  `_score_pareamento`, não em seleção de subregião/padrão. Soft
+  Médio adicional em D2 também atua em pareamento.
+
+**Implementação em 7c:** adicionar como **métrica secundária**
+agora (capturando baseline de pareamento). Quando C executar,
+elevar pra primária.
+
+##### Decisão 3 — R-1 dos cenários 4.x usa rotina realista Variante B
+
+Pra simular HISTÓRICO (R-1) nos cenários 4.1 (toggle ON evita R-1)
+e 4.2 (toggle OFF aceita repetição), a R-1 não é sintética. Usa
+**rotina Variante B 2x da Seção 2.2 do `configuracoes_comuns.md`**:
+
+- T1 = peito(2) + ombro(1) + perna_post(3) + core_dinamico(1) +
+  tríceps(1) (exato setup do 6.2 T1)
+- T2 = costas(3) + perna_anterior(3) + core_isometrico(1) +
+  bíceps(1) (exato setup do 6.2 T2)
+
+R-1 fica **fixa** (uma só seed dedicada) entre todas as iters do
+cenário 4.x. Os exercícios dessa R-1 viram input pra HISTÓRICO
+ON/OFF.
+
+**Vantagem:** alinha calibração com uso real (vs R-1 sintética).
+Aplica diretriz 1.8.2 (calibrar denso, validar realista).
+
+##### Decisão 4 — G8 cadastro respeita refator CORE da Sessão 2
+
+**Estrutura confirmada pra Sessão 7c:**
+
+- **Subregiões:** `core_dinamico` e `core_isometrico` (NÃO `core`).
+- **Padrões refinados** (Sessão 2 da Fase 2 / Anexo 15-quater):
+  `flexao_tronco`, `flexao_lateral`, `rotacao_tronco`, `flexao_quadril`.
+  Cross-subregião — mesmo padrão pode aparecer em ambas subregiões
+  dependendo do exercício.
+- **Bug retrocompat (registrado Sessão 6 / Seção 8.8):** `("subregiao",
+  "core", N)` falha alocação (`qtd_obtida=0`). Cadastros futuros
+  G8 (mock_futuros) devem usar `core_dinamico` ou `core_isometrico`
+  nos extras, **nunca `core`**.
+
+**Escopo:** Section 2 G8 lista 20 atuais + 5 cadastros novos = 25
+exercícios.
+
+##### Pré-registro 2.1 — ranking ordinal Supino Reto vs Inclinado
+
+Cenário 2.1 redefinido (Seção 8.6 auditoria E.0): rotina 2 treinos
+× peito(2) cada. Pares mensuráveis pós-hard INTRA família:
+
+| Faixa | Pre-Etapa 7 (família INTER hard) | Pos-Etapa 7 (família INTER soft alto) | Status |
+|---|---|---|---|
+| % rotinas com 2 Supinos Retos (T1+T2) | **0%** (bloqueio hard) | **<15%** (soft alto) | mensurável |
+| % rotinas com 1 Reto + 1 Inclinado (T1+T2) | medir | **>40%** (par "Tolerável") | mensurável |
+| % rotinas com 2 Supinos Inclinados | **N/A** (1 Supino Inclinado no banco — Smith) | **N/A** | bloqueado pelo banco |
+
+**Limitação detectada protocolo Ponto 1:** banco atual tem só 1
+Supino Inclinado (Smith). 3ª faixa não é mensurável.
+
+**Decisão pendente pro user (resposta esperada antes de implementar
+2.1):** adicionar `Supino Inclinado Halteres` como mock_futuro G1
+pra completar ranking 3-faixas, ou registrar dívida e implementar
+2.1 com 2 faixas?
+
+##### Sub-tarefas concretas pra 7c (checklist)
+
+- [x] Triagem G8 (25 exs) com protocolo Seção 9.1
+- [x] Cadastrar G8 no YAML respeitando refator CORE (Decisão 4)
+- [x] Decidir + (se sim) cadastrar `Supino Inclinado Halteres`
+  mock_futuro G1 — confirmado, vai pro XLSX na Fase 4 junto com
+  outros mock_futuros
+- [x] Implementar 2.1 com tabela de pares pré-registrada
+- [x] Implementar 3.1 com tabela de pares pré-registrada
+- [x] Implementar 4.1 + 4.2 usando R-1 Variante B 2x (Decisão 3)
+- [x] Adicionar métrica secundária "pareamento" pro 2.4 (Decisão 2)
+- [x] Rodar harness completo + atualizar docs/memory pra fechar 7c
+
+#### 8.14.5 Sessão 7c (2026-05-09) — G8 mocks + 4 cenários novos + métrica 2.4
+
+Terceira sub-sessão de E.1.b2. Escopo G8 (core refinado — 20
+cadastrados + 5 mock_futuros = 25 exs) + Supino Inclinado Halteres
+mock_futuro G1 + 4 cenários novos (2.1, 3.1, 4.1, 4.2) + métrica
+secundária pareamento pro 2.4. Harness fechou em 16 cenários totais.
+
+**Cadastros no YAML:**
+
+- **G1 (mock_futuro novo):** `Supino Inclinado Halteres` —
+  completa ranking 3-faixas do 2.1 (banco antes só tinha 1 Supino
+  Inclinado, Smith). User confirmou que vai pro XLSX real na Fase
+  4 junto com os outros mock_futuros (Apoio Fechado, Supino Fechado,
+  Barra Aberta, Barra Supinada, Recuo do Estepe + os 5 do G8).
+- **G8 (25 cadastros):**
+  - Família `prancha frontal` (6 — reclassif Caso 1): Prancha,
+    Prancha Alternada, Prancha Bola, Prancha Feijão, Prancha
+    Slideboard, Prancha Renegade.
+  - Família `prancha lateral` (1): Prancha Lateral.
+  - Família `Dead bug` (3), `crunch` (4 — incluindo Abd Bicicleta),
+    `v-up` (2), `INFRA` (4 mock_futuros), `russian twist` (1
+    mock_futuro).
+  - Sem família (4): Hollow Hold, Pallof Press, Roda Abdominal,
+    Canoinha.
+
+**Decisões clínicas Sessão 7c (6 critérios confirmados pelo user):**
+
+- **A** — Reclassificação 7 pranchas (6 frontais + 1 lateral)
+  confirmada.
+- **B** — Equipamento em superfícies não-padrão = `null`
+  (Bola, Feijão, Slide Board, Ab Wheel, Banco). **Anilha ajustada
+  de halter pra null** (uso clínico Dead Bug C/ Anilha = anilha
+  solo nas mãos, similar supino fechado mas mais fácil setup).
+- **C** — Prancha Renegade equipamento = `corporal` (proposta 1 —
+  variante leve sem halter).
+- **D** — INFRAs mock_futuros: Alternado uni+comp2/fad2; Suspenso
+  bi+comp4/fad3; Chão bi+comp2/fad2; Roll-Up bi+comp3/fad3.
+- **E** — Russian Twist mock_futuro: bi+comp3/fad3+halteres no eq_primario.
+- **F** — `variante_pontual = false` em todos 25.
+
+**Diretriz nova registrada na Seção 7.2 (item 9-bis) — correção
+retroativa pós-cadastro:**
+
+User trouxe correção clínica importante após cadastro G8 inicial:
+**equipamento_grupo = `null` por padrão em todo G8 (core)**. Razão
+clínica:
+
+- equipamento_grupo é tiebreaker Baixo (-5) com semântica "desempata
+  pares iguais em outras dims biomecânicas".
+- **Em peito/costas equipamento carrega info biomecânica real**
+  (halter livre vs Smith vs barra em supinos = estabilização
+  independente, ângulo, ROM diferentes).
+- **Em core, equipamento é só fonte de carga arbitrária.** Russian
+  Twist com halter, V-Up com halter, Pallof Press com polia,
+  Crunch No Cabo com polia, INFRA Suspenso com barra fixa: nenhum
+  desses tem distinção biomecânica que justifique o tiebreaker
+  disparar. Logisticamente também não há fricção real (vários
+  halteres/polias na sala).
+
+Aplicação retroativa: 17 exercícios G8 com equipamento_grupo
+não-null (corporal/polia/halter/barra) ajustados pra `null`. Cadastro
+G8 final tem TODOS os 25 com equipamento_grupo = null (validado
+empiricamente).
+
+**Cenários novos implementados (4 + métrica secundária 2.4):**
+
+| ID | Cenário | Setup | Status | Observado |
+|---|---|---|---|---|
+| 2.1 | Ranking ordinal Reto vs Inclinado | 2 treinos × peito(2) | ✅ OK | **0.00%** (pre-Etapa 7 hard INTER família; sub-Reto 0%, sub-Inclinado 0%) |
+| 3.1 | Variante B 3x A1/A2 — Reto INTER | A1 + B + A2 | ✅ OK | **0.00%** (pre-Etapa 7 hard INTER família) |
+| 4.1 | HISTÓRICO toggle ON evita R-1 | Variante B 2x + R-1 fixa Variante B | ⚠️ FAIL baseline | **100.00%** (esperado pre-Etapa 7 — HISTÓRICO não implementado) |
+| 4.2 | HISTÓRICO toggle OFF aceita repetição | mesmo setup 4.1 | ✅ OK informativo | **100.00%** (toggle OFF aceita) |
+| 2.4 | (sub-métrica nova) % rotinas com 2 unis pareados no MESMO bloco | mesmo setup 2.4 | informativa | **94.90%** |
+
+**Análise dos resultados:**
+
+- **2.1 — 0.00% confirma família hard INTER pre-Etapa 7.** Sub-Reto
+  0% e sub-Inclinado 0% mostram que `variacao_pais_globais` set
+  bloqueia mesmo família entre treinos. Pos-Etapa 7 (D3.2 Caminho C
+  — soft INTER alto), esperar <15% cada faixa.
+- **3.1 — 0.00% mesma análise.** A1 + A2 com hard INTER família não
+  permite Supino Reto em ambos.
+- **4.1 — 100.00% confirma HISTÓRICO não implementado pre-Etapa 7.**
+  Toda nova rotina Variante B 2x repete pelo menos 1 nome ou
+  família da R-1 (alta convergência clínica natural). FAIL baseline
+  esperado; pos-Etapa 7 com toggle ON deve cair pra <5%.
+- **4.2 — 100.00% confirma toggle OFF aceita repetição.** Predicate
+  informativo (`pct >= 0`) — sempre passa pre-Etapa 7. Pos-Etapa 7,
+  4.1 e 4.2 vão divergir (4.1 cai, 4.2 fica alto) — calibração de
+  toggle.
+- **2.4 sub-pareamento — 94.90% INSIGHT IMPORTANTE.** Dos 100%
+  rotinas com 2 unis em squat, **94.90% têm os 2 unis PAREADOS no
+  mesmo bloco**. Anti_uni -75 atual reduz pareamento de ~100%
+  (sem proteção) pra 94.9% — apenas 5pp redução. **Implicação pra
+  calibração C:** peso -75 atual da Etapa 5 é mensurável mas
+  modesto em squats. Pode justificar peso mais alto pós-D2 quando
+  lateralidade Médio for calibrada (alvo: levar pareamento abaixo
+  de ~70%? Calibração numérica em C decide).
+
+**Status final do harness pós-7c (16 cenários):**
+
+| ID | Status | Observado | Notas |
+|---|---|---|---|
+| 1.1 | ✅ OK | 0.00% | Mantido |
+| 1.2 | ✅ OK | 0.00% | Mantido |
+| 1.3 | ⚠️ FAIL baseline | 3.80% | Pré-Etapa 7 (era 5.00% — flutuação por mocks G8 expandidos) |
+| **2.1** | **✅ OK** | **0.00%** | **Novo — pre-Etapa 7 hard INTER família** |
+| 2.2A | ⚠️ FAIL baseline | 4.30% | Pré-Etapa 7 |
+| 2.2B | ✅ OK | 0.00% | Gate não-regressão |
+| 2.3 | ✅ OK | 5.20% | Densificado costas(5) |
+| 2.4 | ✅ OK | 100.00% | Sub-pareamento **94.90%** (alvo C) |
+| **3.1** | **✅ OK** | **0.00%** | **Novo — Variante B 3x A1/A2** |
+| 3.2 | ✅ OK | 0.00% | Mantido |
+| 3.3 | ✅ OK | 41.80% | Mantido |
+| **4.1** | **⚠️ FAIL baseline** | **100.00%** | **Novo — HISTÓRICO toggle não impl pré-Etapa 7** |
+| **4.2** | **✅ OK informativo** | **100.00%** | **Novo — toggle OFF aceita** |
+| 5.2 | ✅ OK | 17.20% violações | Mantido |
+| 6.1 | ✅ OK | 0.00% (sec. 100% E3) | Mantido |
+| 6.2 | ✅ OK | 0.00% / sub-a 0.20% / sub-b 2.80% | Pequena flutuação |
+
+**3 FAIL baseline pre-Etapa 7 (esperados):** 1.3 (variante_pontual
+hard), 2.2A (lateralidade hard contextual costas), 4.1 (HISTÓRICO
+toggle ON). Todos vão passar pos-Etapa 7 quando predicado
+`_compativel_intra` + escala numérica + HISTÓRICO toggle forem
+implementados.
+
+**E.1.b2 — fechado.** Todos os 8 cenários soft pendentes
+implementados (2.1, 2.3 densificado, 2.4, 3.1, 3.2, 3.3, 4.1, 4.2)
++ ajustes 2.2B (gate) + cenários 1.x/5.2/6.x mantidos. Total 16
+cenários.
+
+**Próximo:** **C — calibração fina iterativa** após Etapa 7 estrutural
+(ou, se possível, em paralelo). Ordem das dims (Seção 8.12 / C.2):
+**família INTER → plano+pegada acopladas → lateralidade soft →
+HISTÓRICO toggle → equipamento_grupo (tiebreaker, último)**. Cap
+5-10 rounds/dim + validação cruzada.
+
+**Insights pra calibração C registrados em 7c:**
+
+- **Anti_uni -75 modesto em squats:** sub-métrica 2.4 mostra 94.9%
+  pareamento — peso -75 reduz só 5pp. Calibração C de lateralidade
+  Médio em squats deve considerar peso mais agressivo (ex: -100
+  Crítico) pra atingir alvo ~70% pareamento.
+- **3.3 41.80% confirma faixa E.0 20-50%** — Caminho 5 funcionando
+  empiricamente (famílias dif permitem coexistência).
+- **2.3 só captura par Apoiado+Seal** (1 par mensurável após hard
+  família INTRA). Pré-registros futuros devem aplicar protocolo
+  Decisão 1 da Sessão 7b.
+
+### 8.15 Fechamento Etapa 6 + transição pra Etapa 7 (Sessão 7c — 2026-05-09)
+
+> **Status final Etapa 6:** Fase 1 (análise 8 grupos) ✅ + Fase 2
+> (set 5 dims + 1 narrow-scope) ✅ + Fase 3 (calibração conceitual +
+> harness 16 cenários + 78 mocks YAML) ✅. **Etapa 6 concluída em
+> 2026-05-09.** Especificação consolidada em Seções 1-9 deste
+> documento. Próxima: **Etapa 7 — implementação estrutural no
+> gerador real.**
+
+#### 8.15.1 Plano Etapa 7 — 6 fases consolidadas
+
+Decisões fechadas pré-Sessão 8 (registradas em 7c):
+
+- **Branch:** novo `etapa-7` a partir de `refator-gerador`. Sem
+  sub-branches por fase (1 PR por fase no mesmo branch).
+- **Granularidade Fase 7.1:** módulo completo (dataclass + defaults
+  globais + overrides por subregião + estrutura paralela anti_uni +
+  mapping labels→numérico). **Ressalva:** se ambiguidade na Seção
+  8.10 / B aparecer durante implementação (ex: estrutura exata do
+  mapping labels→numérico, comportamento de override do
+  `anti_uni_pesos`), parar e perguntar antes de implementar.
+- **Ordem Fase 7.2 → 7.3 → 7.4:** predicado hard primeiro (vitória
+  rápida 1.3 + 2.2A → 0%), depois soft INTRA (D2), depois INTER +
+  HISTÓRICO + migração família INTER hard→soft (D3.2 Caminho C).
+  Razão: predicado é arquiteturalmente independente da migração
+  família INTER; validação incremental facilita debug em 7.3 (mais
+  iterativa); Caminho C não obriga acoplamento entre predicado e
+  migração.
+
+**Plano consolidado:**
+
+| Fase | Escopo | Bloqueia | Tamanho estimado |
+|---|---|---|---|
+| **7.1** | Módulo `pesos_proximidade.py` completo | - | médio (1 sessão) |
+| **7.2** | Predicado `_compativel_intra` (3 regras hard) | resolve 1.3 + 2.2A FAIL → 0% | médio (1 sessão) |
+| **7.3** | Score soft INTRA (D2) | calibração C INTRA | grande (1-2 sessões) |
+| **7.4** | Score INTER + HISTÓRICO + migração família | resolve 4.1, move 2.1+3.1 | grande (1-2 sessões) |
+| **7.5** | Validação E.2 (re-rodar 16 + 5.1 implementado) | - | pequena (1 sessão) |
+| **7.6** | C calibração coordinate descent | - | médio (1-2 sessões) |
+
+**Total estimado:** 6-9 sessões (4-6 pra 7.1-7.5 + 1-2 pra 7.6).
+
+#### 8.15.2 Pré-condições Sessão 8 (Fase 7.1)
+
+**Arquivo a criar:** `pesos_proximidade.py` na raiz do projeto
+(decisão B.3 — alinha com padrão `gerador_treino.py` /
+`database.py` na raiz).
+
+**Documentos de referência:** `dimensoes_proximidade.md` Seção 8.10
+(estrutura B) + Seção 8.11 (escala A) + Seção 1.7 (predicado D1 —
+pra Fase 7.2 depois) + Seção 2 (8 grupos — defaults concretos por
+dim derivam daí).
+
+**Estrutura proposta** (referência, pode iterar durante implementação):
+
+```python
+# pesos_proximidade.py (raiz do projeto)
+from dataclasses import dataclass, field
+
+# Mapping numérico A.1 (Seção 8.11)
+ESCALA_NUMERICA = {
+    "soft_critico": -100,
+    "soft_alto": -50,
+    "soft_medio": -20,
+    "soft_baixo": -5,
+}
+
+@dataclass
+class PesoPorContexto:
+    """Label categórico por dim em INTRA + multiplicadores INTER/HIST."""
+    intra: str  # label de ESCALA_NUMERICA
+    inter_multiplicador: float = 0.8  # default global D3.1
+    historico_multiplicador: float = 1.0  # toggle ON D3.3 (zero quando OFF)
+
+@dataclass
+class ConfigPesosProximidade:
+    """Defaults globais por dim + overrides por subregião + anti_uni paralelo."""
+    # Defaults globais — aplicados quando subregião não tem override
+    familia_estrita: PesoPorContexto = ...  # INTER 0.80 explícito (override D3.1)
+    pegada: PesoPorContexto = ...
+    plano_corporal: PesoPorContexto = ...
+    equipamento_grupo: PesoPorContexto = ...
+    variante_pontual: PesoPorContexto = ...  # INTER 0.95 explícito (D1.c)
+
+    # Overrides por subregião — dim → subregião → label
+    overrides_subregiao: dict[str, dict[str, PesoPorContexto]] = field(
+        default_factory=dict
+    )
+
+    # Estrutura paralela B.2 — peso por grupo musculo-funcional
+    anti_uni_mesmo_grupo_pesos: dict[str, float] = field(...)  # default -75 Etapa 5
+```
+
+**Defaults concretos a derivar de Seção 2 (8 grupos):**
+
+- `familia_estrita` INTRA = soft_critico (-100, hard intra continua
+  no predicado 7.2)
+- `pegada` INTRA = soft_alto (-50) — override em squats/hinges = N/A
+- `plano_corporal` INTRA = soft_alto (-50) em hinges/remadas/supinos;
+  N/A em squats/core
+- `equipamento_grupo` INTRA = soft_baixo (-5) tiebreaker; N/A em core
+  (Seção 7.2 / item 9-bis Sessão 7c)
+- `variante_pontual` INTRA = soft_critico (-100, hard no predicado);
+  INTER 0.95 (D1.c)
+
+**Decisões resolvidas pré-Sessão 8** (originalmente listadas como
+ambiguidades antecipadas, fechadas pelo user no fechamento da 7c):
+
+1. **`anti_uni_mesmo_grupo_pesos` parametrizável + estrutura paralela
+   com peso direto.** Tensão entre A.2 (ortogonalidade da escala) e
+   C.2 (parametrização) resolve quando separa as dimensões: as duas
+   são compatíveis. **Estrutura final:** `anti_uni_mesmo_grupo_pesos:
+   dict[grupo, peso]` (granularidade por grupo musculo-funcional).
+   **Default inicial:** `-75` pra todos os grupos (mantém comportamento
+   Etapa 5 validado em 5.2). **Calibração C 7.6** pode ajustar global
+   ou por grupo específico. **Razão:** travar -75 no código
+   contradiria o motivo de ter módulo de pesos separado.
+2. **Override de subregião por dim quando dim "não aplica":** ex
+   `pegada` em squats. Cadastro YAML põe `null`; código deve
+   skip silenciosamente (return 0 penalty). Registrar na docstring
+   da função `_score_proximidade`.
+3. **Pra cross-subregião** (ex: `equipamento_grupo` cross-grupo —
+   Seção 1.6): aplica peso default global. Sem override.
+4. **Função `_score_proximidade` vive em `gerador_treino.py`.**
+   Dados (`pesos_proximidade.py`) e comportamento
+   (`gerador_treino.py`) ficam separados — refletindo divisão real:
+   pesos = configuração declarativa (mexe ao calibrar);
+   `_score_proximidade` = lógica imperativa (mexe ao mudar algoritmo).
+   **Razões adicionais:** alternativa acoplaria recalibração com
+   mudança de algoritmo; quebraria padrão atual; força import
+   desnecessário porque função é chamada de dois lugares dentro do
+   `gerador_treino.py` (`_score_pareamento` em 7.3 +
+   `pre_alocar_rotina` em 7.4). **Assinatura proposta:**
+   ```python
+   def _score_proximidade(
+       cand: Exercicio,
+       alocados: list[Exercicio],
+       contexto: str,  # "intra" | "inter" | "historico"
+       pesos_config: ConfigPesosProximidade = PESOS_DEFAULT,
+   ) -> float:
+       ...
+   ```
+   `ConfigPesosProximidade` importada de `pesos_proximidade.py`.
+
+#### 8.15.3 Status final do harness (baseline pré-Etapa 7)
+
+**16 cenários** — comparação pós-Etapa 7 vai usar estes números:
+
+| ID | Status atual | Observado pré-Etapa 7 | Esperado pós-Etapa 7 |
+|---|---|---|---|
+| 1.1 | OK | 0.00% | 0.00% (mantido) |
+| 1.2 | OK | 0.00% | 0.00% (mantido) |
+| **1.3** | **FAIL baseline** | **3.80%** | **0%** (predicado 7.2) |
+| 2.1 | OK | 0.00% | ~10-15% (soft INTER 7.4) |
+| **2.2A** | **FAIL baseline** | **4.30%** | **0%** (predicado 7.2) |
+| 2.2B | OK gate | 0.00% | mantido |
+| 2.3 | OK | 5.20% | calibrar 7.3+7.6 |
+| 2.4 | OK | 100% (sub-pareamento 94.9%) | calibrar 7.3+7.6 (alvo ~70%) |
+| 3.1 | OK | 0.00% | ~10-15% (soft INTER 7.4) |
+| 3.2 | OK | 0.00% | <10% (soft INTER 7.4) |
+| 3.3 | OK | 41.80% | mantido (famílias dif) |
+| **4.1** | **FAIL baseline** | **100.00%** | **<5%** (HIST toggle 7.4) |
+| 4.2 | OK informativo | 100.00% | mantido (toggle OFF aceita) |
+| 5.2 | OK | 17.20% violações | mantido |
+| 6.1 | OK | 0.00% (sec. 100% E3) | NÃO regredir |
+| 6.2 | OK | 0.00% (sub-a 0.20% / sub-b 2.80%) | NÃO regredir |
+
+**3 FAIL baseline pré-Etapa 7 esperados:** 1.3 + 2.2A + 4.1 — todos
+viram OK quando 7.2 + 7.4 implementarem predicado e HISTÓRICO toggle.
+
+#### 8.15.4 Pendências em aberto pra Etapa 7
+
+1. **Bug retrocompat `("subregiao", "core", N)`** falha alocação
+   (`qtd_obtida=0`). Workaround atual: usar `core_dinamico`/
+   `core_isometrico` direto. **Resolução:** Fase 7.4 ou junto com
+   migração estrutural CORE (refator real dos padrões
+   `flexao_tronco`/etc — pode ficar pra Etapa 8 ou ser incorporado
+   em alguma fase 7.x). Não afeta diretamente as 6 fases planejadas.
+2. **Refator estrutural CORE real (Sessão 2 / Anexo 15-quater):**
+   migração padrão `core_dinamico`/`core_isometrico` →
+   `flexao_tronco`/`flexao_lateral`/`rotacao_tronco`/`flexao_quadril`
+   no banco real. Não bloqueia Etapa 7 — mocks atuais usam
+   retrocompat. Pode ficar pra Etapa 8 ou Fase 4.
+3. **Cenário 5.1** (sanity escopo cross-region — regiões dif não
+   disparam soft) — pendente E.2. Implementar em **Fase 7.5** junto
+   com validação completa.
+4. **Mock_futuros vão pro XLSX na Fase 4** (11 exercícios:
+   Apoio Fechado, Supino Fechado, Supino Inclinado Halteres,
+   Barra Aberta, Barra Supinada, Recuo do Estepe, Russian Twist,
+   INFRA Alternado/Suspenso/Chão/Roll-Up). Confirmação user
+   Sessão 7c. Fase 4 protocolo já registrado Seção 9.
+5. **Cycling determinístico de subregião** (achado paralelo Sessão 7a):
+   `_selecionar_ciclando` em modo subregião com `preferir_composto=True`
+   produz 100% mesmo padrão sequence — investigar se relevante
+   pós-Etapa 7 (pode afetar calibração C se houver).
 
 ---
 

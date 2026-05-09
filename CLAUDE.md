@@ -12,6 +12,14 @@ exercícios, ou em rotas que toquem o motor de geração, ler o guia
 e identificar em qual etapa o trabalho atual se encaixa. Não
 acumular mudanças de etapas diferentes no mesmo PR.
 
+**Log por etapa — manter atualizado.** Cada etapa tem log próprio em
+`docs/refatoracao/logs/etapa_N.md`. O log é atualizado **ao fim de
+cada sessão substantiva** — registra contexto da sessão, decisões
+grandes, surpresas/desvios e atualizações em outros arquivos. **Não
+duplicar conteúdo de docs especializados** (`dimensoes_proximidade.md`
+etc) — usar ponteiros pra seções específicas. Padrão de granularidade:
+seguir o que está nas Sessões 1-2 do `etapa_6.md` como referência.
+
 Documentos de apoio (em `docs/refatoracao/`):
 - `memoria_projeto.md` — contexto histórico (HIB2, casos clínicos,
   conceitos). Tem nota de superação parcial no topo: consultar com
@@ -81,8 +89,70 @@ Decisão "A clean break vs B coexistência" registrada como ponto de
 auditoria pra Etapa 7.
 
 **Implementação real fica pra Etapa 7.** Spec atual NÃO mexe no
-gerador real. Trabalho pendente da Fase 3 antes de Etapa 7: E.1.b2
-(8 cenários soft + mocks G2/G4/G8) → C executado → E.2 (validação).
+gerador real. **Etapa 6 concluída em 2026-05-09** (Sessões 7a/7b/7c
+fecharam E.1.b2: 78 mocks YAML em 8 grupos + 16 cenários no harness +
+3 FAIL baseline pré-Etapa 7 esperados — 1.3, 2.2A, 4.1).
+
+## Etapa 7 — plano e decisões fechadas (não reabrir sem motivo forte)
+
+Plano consolidado na Sessão 7c (2026-05-09). Sessão 8 arranca da
+Fase 7.1 com contexto limpo. Decisões já fechadas:
+
+**Branch:** novo `etapa-7` a partir de `refator-gerador`. Sem
+sub-branches por fase (1 PR por fase no mesmo branch).
+
+**Ordem das 6 fases (Ordem A — predicado antes de soft INTRA antes
+de INTER+HIST):**
+
+1. **7.1** — módulo `pesos_proximidade.py` completo (dataclass +
+   defaults globais + overrides por subregião + estrutura paralela
+   `anti_uni_mesmo_grupo_pesos` + mapping labels→numérico).
+2. **7.2** — predicado `_compativel_intra` (3 regras hard: família
+   + variante_pontual + lateralidade contextual costas).
+   **Resolve 1.3 + 2.2A FAIL → 0%.**
+3. **7.3** — score soft INTRA (D2): plano + pegada matriz 4×4 +
+   equipamento + variante_pontual INTER. Anti_uni Etapa 5 mantido
+   ortogonal.
+4. **7.4** — score INTER + HISTÓRICO toggle ON/OFF + migração
+   família INTER hard→soft (Caminho C). **Resolve 4.1 FAIL <5% +
+   move 2.1+3.1 pra ~10-15%.**
+5. **7.5** — E.2 validação (re-rodar 16 cenários + cenário 5.1
+   implementado).
+6. **7.6** — C calibração coordinate descent (5 dims em ordem:
+   família INTER → plano+pegada → lateralidade soft → HISTÓRICO →
+   equipamento). Cap 5-10 rounds/dim.
+
+**Granularidade Fase 7.1:** módulo completo (não incremental).
+**Ressalva:** se ambiguidade na Seção 8.10 / B aparecer durante
+implementação (ex: estrutura exata do mapping labels→numérico,
+comportamento de override do `anti_uni_pesos`, onde fica a função
+de score que aplica pesos), parar e perguntar antes de implementar.
+
+**Razão da Ordem A** (Sessão 7c): predicado é arquiteturalmente
+independente da migração família INTER; vitória rápida em
+1.3 + 2.2A; validação incremental facilita debug em 7.3 (mais
+iterativa); Caminho C da D3.2 não obriga acoplamento entre
+predicado e migração.
+
+**Documentos fonte de verdade pra Sessão 8:**
+
+- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.15 (plano
+  detalhado + pré-condições + status harness baseline)
+- Seção 8.10 (estrutura B) + Seção 8.11 (escala A) + Seção 1.7
+  (predicado D1) + Seção 2 (8 grupos — defaults concretos)
+- `docs/refatoracao/guia_refatoracao_v4.md` Etapa 7 (plano
+  consolidado em 6 fases)
+
+**Pendências em aberto pra Etapa 7** (registradas Seção 8.15.4):
+
+1. Bug retrocompat `("subregiao", "core", N)` (resolução em 7.4 ou
+   junto com migração estrutural CORE).
+2. Refator estrutural CORE real (padrões `flexao_tronco`/etc) —
+   pode ficar pra Etapa 8 ou Fase 4.
+3. Cenário 5.1 — implementar em Fase 7.5.
+4. Mock_futuros (11 exercícios) vão pro XLSX na Fase 4.
+5. Cycling determinístico de subregião (achado paralelo Sessão 7a)
+   — investigar se relevante pós-Etapa 7.
 
 ## Stack
 

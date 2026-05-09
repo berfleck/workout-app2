@@ -35,6 +35,49 @@
 >
 > Log detalhado em `docs/refatoracao/logs/etapa_5.md`. Próxima: Etapa 6 (modelagem de tags multi-dimensionais — sem código).
 
+> **Progresso da Etapa 6** (branch `refator-gerador`, sem código no motor):
+> - Fase 1 — análise dos 8 grupos (concluída Sessões 1-2)
+> - Fase 2 — set final de 5 dimensões + 1 narrow-scope (concluída Sessão 2)
+> - Fase 3 — calibração de pesos (conceitual + harness):
+>   - Decomposição metodológica E.0-E.2 + D1-D3 + B + A + C (Sessão 3)
+>   - Harness pipeline `tools/calibrar_pesos_dimensoes.py` (Sessão 3)
+>   - D1 filtros hard centralizados — predicado `_compativel_intra` (Sessão 4)
+>   - E.1.b parcial — 5 cenários (Sessão 5)
+>   - Auditoria E.0 vs uso real + D2 + 6.2 + D3 + B + A + C (Sessão 6)
+>   - **Sessões 7a/7b/7c (E.1.b2)**: cadastros de proximidade dos 8 grupos
+>     + 8 cenários soft + métrica secundária pareamento. Harness final
+>     **16 cenários** (12 OK + 1 informativo + 3 FAIL baseline pré-Etapa 7
+>     esperados — 1.3, 2.2A, 4.1).
+>   - **YAML de mocks final**: 78 entradas (G1-G8 cadastrados + 11
+>     mock_futuros — vão pro XLSX na Fase 4).
+> - **Etapa 6 concluída em 2026-05-09.** Especificação consolidada em
+>   `docs/refatoracao/dimensoes_proximidade.md` Seções 1-9. Próxima:
+>   Etapa 7 (refator estrutural pra implementar predicado + score
+>   soft no gerador real).
+
+> **Progresso da Etapa 7** (branch novo `etapa-7` a partir de
+> `refator-gerador`):
+> - Plano em **6 fases** consolidado (Sessão 7c — pré-condições
+>   registradas):
+>   - **7.1** — módulo `pesos_proximidade.py` completo (dataclass +
+>     defaults globais + overrides por subregião + estrutura paralela
+>     anti_uni + mapping labels→numérico)
+>   - **7.2** — predicado `_compativel_intra` (3 regras hard: família +
+>     variante_pontual + lateralidade contextual costas) → resolve
+>     1.3 e 2.2A FAIL → 0%
+>   - **7.3** — score soft INTRA (plano + pegada matriz 4×4 +
+>     equipamento + variante_pontual INTER + anti_uni mantido ortogonal)
+>   - **7.4** — score INTER + HISTÓRICO toggle ON/OFF + migração
+>     família INTER hard→soft (Caminho C, D3.2) → resolve 4.1 +
+>     move 2.1+3.1 pra faixa pos-Etapa 7
+>   - **7.5** — E.2 validação completa (16 cenários re-rodados +
+>     5.1 implementado)
+>   - **7.6** — C calibração coordinate descent (família INTER →
+>     plano+pegada acopladas → lateralidade soft → HISTÓRICO →
+>     equipamento_grupo). Cap 5-10 rounds/dim + validação cruzada.
+> - **Pré-condições Sessão 8 (Fase 7.1) registradas em**
+>   `docs/refatoracao/dimensoes_proximidade.md` **Seção 8.15**.
+
 > Documento mestre para conduzir a refatoração do gerador de treinos.
 > Sintetiza o roteiro de `memoria_projeto.md`, o design de
 > `refatoracao_visao_global.md`, e as recomendações das análises de
@@ -854,89 +897,148 @@ pesos diferentes por contexto e ponderação temporal no histórico.
 
 ---
 
-### Etapa 7 — Migração do banco e refatoração para sistema de penalidades
+### Etapa 7 — Migração estrutural do gerador (predicado + score soft + INTER + HISTÓRICO)
 
-**Objetivo.** Preencher os 125 exercícios com as novas tags definidas
-na Etapa 6, e migrar o gerador de filtros hard + score linear (Etapa
-5) para sistema de penalidades multi-dimensional com pesos
-diferenciados nos três contextos: INTRA (mesmo treino), INTER (mesma
-rotina) e HISTÓRICO (rotinas anteriores do aluno, ponderado por
-recência).
+> **Plano consolidado pós-Sessão 7c (2026-05-09).** Decisões D1-D3 +
+> B + A + C da Fase 3 da Etapa 6 viram código aqui. Branch novo
+> `etapa-7` a partir de `refator-gerador`. **Fase 4 (preenchimento dos
+> 125 exercícios no XLSX real) acontece em paralelo, pós-implementação
+> estrutural** (protocolo Seção 9 do `dimensoes_proximidade.md`).
 
-**Pré-requisitos.** Etapa 6 completa.
+**Objetivo.** Implementar no `gerador_treino.py` as decisões da Etapa
+6 — predicado hard centralizado, score soft INTRA/INTER/HISTÓRICO,
+módulo de pesos calibrável — e validar empiricamente via re-rodar
+o harness de 16 cenários (E.2). Migrar família INTER de hard
+(`variacao_pais_globais`) para soft alto via score (Caminho C, D3.2).
 
-**O que muda no código:**
+**Pré-requisitos.** Etapa 6 completa (Fase 3 + E.1.b2 fechados;
+spec consolidada em `dimensoes_proximidade.md` Seções 1-9).
 
-1. Adicionar colunas no XLSX e atualizar `carregar_banco` para os
-   novos campos.
-2. Preencher os 125 exercícios com as tags (curadoria humana com
-   regra de decisão documentada da Etapa 6).
-3. Substituir o sistema de score da Etapa 5 por sistema de
-   penalidades multi-dimensional. A função `_score_pareamento` ganha
-   componente de penalidade calculado contra as tags.
-4. Implementar os três contextos INTRA, INTER e HISTÓRICO: a função
-   de score recebe como parâmetro qual contexto está ativo e usa os
-   pesos apropriados.
-5. Implementar consulta ao histórico do aluno com ponderação por
-   recência:
-   - Função `coletar_exposicoes_historico(aluno_id, janela_semanas)`
-     que lê do SQLite todas as rotinas do aluno na janela e devolve
-     dict `{nome_exercicio: peso_decadente}`. Peso decai conforme a
-     curva calibrada (ex: 1.0 nas últimas 2 semanas, 0.5 em 3–4,
-     0.25 em 5–6, 0 antes).
-   - Esse dict é passado ao `_score_pareamento` quando contexto =
-     HISTÓRICO, e penaliza candidatos cujas tags casam com
-     exposições recentes.
-   - Janela de consulta default: 6 semanas. Configurável.
-6. Aposentar (ou reduzir drasticamente o peso de) o filtro hard de
-   família. Manter como fallback para compatibilidade, mas a regra
-   principal vira penalidade.
-7. Expor controles de variabilidade na UI (sliders ou dropdowns):
-   - "Variabilidade na semana": baixa / média / alta (ajusta peso
-     INTER)
-   - "Variabilidade no treino": baixa / média / alta (ajusta peso
-     INTRA)
-   - "Variabilidade no histórico": baixa / média / alta / desligado
-     (ajusta peso HISTÓRICO e janela de consulta)
-   - "Evitar repetição de equipamento": ligado / leve / desligado
+**Plano em 6 fases** (ordem A — predicado antes de soft INTRA antes
+de INTER+HIST; razão: vitória rápida em 1.3+2.2A, predicado é
+arquiteturalmente independente da migração família INTER, validação
+incremental):
 
-**Entregáveis.**
-- PR de migração do banco (XLSX + `carregar_banco`)
-- PR de motor (sistema de penalidades)
-- PR de UI (controles de variabilidade)
-- Documentação do mapeamento entre controles UI e pesos internos
+#### Fase 7.1 — Módulo `pesos_proximidade.py` completo
+
+Arquivo novo na raiz com dataclass `ConfigPesosProximidade`. Implementa
+estrutura de B (Seção 8.10), labels categóricos com mapping numérico
+A.1 (Seção 8.11), defaults globais + overrides por subregião,
+estrutura paralela `anti_uni_mesmo_grupo_pesos`. **Não muda
+comportamento do gerador** — só prepara fundação.
+
+#### Fase 7.2 — Predicado `_compativel_intra`
+
+Implementa as 3 regras hard INTRA (Seção 1.7) em `pre_alocar_rotina`:
+família refinada same-treino (continuidade do `variacao_pais_intra`
+atual), variante_pontual cross-family same-subregião (D1.c),
+lateralidade contextual via `SUBREGIOES_LATERALIDADE_HARD =
+frozenset({"costas"})` (D1.d). **Resolve 1.3 + 2.2A FAIL → 0%.**
+
+#### Fase 7.3 — Score soft INTRA
+
+Implementa penalty soft em `_score_pareamento` (ou função paralela):
+`plano_corporal`, `pegada` com matriz custom 4×4 (Seção 3.1),
+`equipamento_grupo` (tiebreaker BAIXO), `variante_pontual` INTER (D1.c
+soft crítico). Composição par-a-par cumulativa (D2.3). **Anti_uni
+da Etapa 5 mantido ortogonal** (estrutura paralela do B.2). Plugar no
+`_score_pareamento` somando ao score atual (geo-diversidade
++1000/+100 não é overridada; soft Crítico -100 rivaliza com
+padrao_diff +100).
+
+#### Fase 7.4 — Score INTER + HISTÓRICO toggle + migração família INTER
+
+3 sub-frentes em uma fase:
+
+(a) **Score INTER:** multiplicador 0.8 default × INTRA (Seção 8.9 /
+D3.1) + overrides explícitos (família 0.8, variante_pontual 0.95).
+Aplicado em `pre_alocar_rotina` Fase 0 (D3.4).
+
+(b) **HISTÓRICO toggle ON/OFF:** janela R-1 only, peso integral
+1.0 quando ON, zero quando OFF (Seção 1.3 + D3.3). Granularidade
+nome + família. Soma livre com INTER (sem clipping). UI toggle
+ON/OFF (não slider).
+
+(c) **Migração família INTER hard → soft (Caminho C, D3.2):**
+remover `variacao_pais_globais` set hard + adicionar penalty soft
+alto via score. Decisão A vs B (clean break vs coexistência) é
+ponto de auditoria desta fase.
+
+**Resolve 4.1 toggle ON FAIL → <5%; move 2.1 + 3.1 pra faixas
+pos-Etapa 7 (~10-15%).**
+
+#### Fase 7.5 — Validação E.2 (re-rodar harness completo)
+
+Re-roda os 16 cenários do harness após 7.2-7.4. Checklist
+operacional:
+
+- 1.3 + 2.2A: **FAIL → OK** (0% pós-predicado 7.2)
+- 4.1 toggle ON: **FAIL → OK** (<5% pós-HISTÓRICO 7.4)
+- 4.2 toggle OFF: ainda informativo (≈100%, sem mudança)
+- 2.1 + 3.1: 0% → ~10-15% (família INTER soft alto)
+- 3.2: 0% → faixa pos-Etapa 7 (esperar <10%)
+- 6.1 + 6.2: NÃO regredir (manter <5% E6 only)
+- 5.2: NÃO regredir (>50% pareados V-Up Uni + Tríceps Uni)
+- **Cenário 5.1 implementado nesta fase** (regiões dif não
+  disparam soft — sanity escopo cross-region; pendente E.2)
+
+#### Fase 7.6 — C calibração coordinate descent
+
+Após 7.5 confirmar que mecanismos funcionam, calibra pesos numéricos.
+Ordem das 5 dims (Seção 8.12 / C.2):
+
+1. Família INTER (3.1, 3.2, 3.3)
+2. Plano + pegada acopladas (2.1, 2.3)
+3. Lateralidade soft (2.2B, 2.4 sub-pareamento — alvo ~70%)
+4. HISTÓRICO toggle (4.1, 4.2)
+5. Equipamento_grupo (último — tiebreaker)
+
+Cap 5-10 rounds/dim + validação cruzada (ajuste em X não pode
+quebrar Y). Critério parar: cenários nas faixas E.0 + sub-métricas
+6.2 estáveis.
+
+**Especificação detalhada por fase:** `dimensoes_proximidade.md`
+Seção 8.15 (registrada pós-Sessão 7c).
+
+**Entregáveis** (1 PR por fase):
+- 7.1 → módulo `pesos_proximidade.py` + testes import/dataclass
+- 7.2 → predicado `_compativel_intra` em `gerador_treino.py` +
+  harness 1.3 + 2.2A em 0%
+- 7.3 → score soft INTRA + harness 2.2B/2.3/2.4 calibrável
+- 7.4 → score INTER + HISTÓRICO toggle + migração família INTER +
+  harness 4.1 < 5%
+- 7.5 → re-rodar 16 cenários + 5.1 implementado + relatório E.2
+- 7.6 → calibração C documentada (números finais em
+  `pesos_proximidade.py`)
 
 **Como validar.**
-1. Todos os testes pytest passando, incluindo testes específicos
-   para cada combinação INTRA/INTER/HISTÓRICO que resolve um problema
-   conhecido.
-2. Caso real prancha em `core(3)`: nunca deve gerar 3 pranchas
-   frontais; deve preferir trio com padrões de movimento distintos.
-3. Caso real tríceps em `triceps(2)`: deve aceitar Francesa + Polia
-   (cabeças diferentes); deve evitar Polia + Coice (mesma cabeça).
-4. Caso de HISTÓRICO: aluno com 6 rotinas anteriores onde Supino
-   Inclinado Halter aparece em 4 delas (semanas 1, 3, 5 e a atual
-   anterior). Nova geração deve evitar Supino Inclinado Halter
-   mesmo se a rotina anterior estrita não o tinha.
-5. Simulação A/B: rodar mesmas configs no sistema antigo (Etapa 5)
-   e novo (Etapa 7) e comparar diversidade e cobertura.
+1. Suíte pytest da Etapa 1 continua passando após cada fase.
+2. Harness `tools/calibrar_pesos_dimensoes.py` re-rodado após
+   cada fase + comparação com baseline pré-Etapa 7 (1.3=3.80%,
+   2.2A=4.30%, 4.1=100% → todos viram 0%/<5% pós-7.2/7.4).
+3. Sub-métricas 6.1 e 6.2 NÃO regridem (gate de não-regressão).
+4. Cenário 5.1 (regiões dif não disparam soft) implementado em 7.5.
 
 **Riscos.**
-- Etapa grande. Considerar dividir em sub-PRs (migração do banco;
-  motor sem UI; UI por cima; HISTÓRICO por cima).
-- Calibração dos pesos vai exigir várias rodadas de simulação. Não
-  tentar acertar de primeira.
-- O filtro hard de família existente pode entrar em conflito com
-  penalidades suaves. Ter clareza sobre qual prevalece em cada
-  contexto.
-- Performance da consulta de HISTÓRICO: aluno com longo histórico
-  pode ter dezenas de rotinas. Cachear a consulta por `aluno_id` ao
-  longo da geração (a janela não muda durante uma única geração).
-- Curva de decaimento do HISTÓRICO é parâmetro sensível. Decaimento
-  muito lento engessa rotinas; muito rápido vira "lembra só da
-  última semana", redundante com INTER. Calibrar com simulação.
-- Mudança de comportamento percebida pelo personal: rotinas vão
-  parecer diferentes mesmo em configs antigas. Documentar bem.
+- Etapa grande (estimativa 4-6 sessões pra 7.1-7.5 + 1-2 pra 7.6).
+- Calibração C vai exigir várias rodadas. Cap 5-10 rounds/dim
+  como salvaguarda (Seção 8.12).
+- Migração família INTER hard→soft (Caminho C, 7.4): decisão A
+  (clean break) vs B (coexistência) é ponto de auditoria.
+- Performance da consulta HISTÓRICO: janela R-1 only mantém
+  consulta enxuta (1 rotina anterior, não 4-6 semanas).
+
+**Ressalvas vs guia v4 original (anteriores à Etapa 6):**
+- HISTÓRICO janela R-1 only com peso integral (D3.3) — superseded
+  decaimento contínuo "1.0/0.5/0.25 por semana" do guia original.
+- UI HISTÓRICO toggle ON/OFF (D3.3) — superseded slider de 4
+  níveis "alta/média/baixa/desligado" do guia original.
+- Família INTRA continua hard (Seção 1.4); só INTER vira soft alto
+  (Caminho C) — superseded "aposentar filtro hard de família".
+- Mock_futuros (Apoio Fechado, Supino Fechado, Supino Inclinado
+  Halteres, Barra Aberta, Barra Supinada, Recuo do Estepe, Russian
+  Twist, INFRA Alternado/Suspenso/Chão/Roll-Up) vão pro XLSX na
+  Fase 4, não na Etapa 7.
 
 ---
 

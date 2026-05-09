@@ -462,6 +462,336 @@ CENARIO_2_2_A = Cenario(
 
 
 # ---------------------------------------------------------------------------
+# Cenário 2.2B — Lateralidade soft Médio perna_anterior (realista)
+#
+# Setup REDEFINIDO pela auditoria E.0 (Sessão 6, Seção 8.6): de
+# `squat_unilateral(2)` artificial pra `perna_anterior(3) × 1 treino` realista
+# (Variante B T2 do `configuracoes_comuns.md` Seção 2.2). perna_anterior é
+# subregião NÃO-hard contextual — lateralidade soft Médio via
+# `anti_uni_mesmo_grupo -75` (Etapa 5, ortogonal à escala unificada Etapa 6).
+#
+# **ACHADO PARALELO Sessão 7a (2026-05-08):** baseline observado = 0.00%
+# em 1000 iterações. Investigação confirmou que `_ordenar_padroes_por_prioridade`
+# embaralha squat_bilateral|squat_unilateral 50/50 (~497/503), mas
+# `_selecionar_ciclando` em modo subregião com `preferir_composto=True`
+# produz consistentemente 2bi+1uni — viés determinístico independente
+# da ordem do shuffle. Resultado prático: 2.2B redefinido NÃO exercita
+# o anti_uni soft em perna_anterior do jeito esperado (banco efetivamente
+# nunca propõe 2 unis em perna_anterior(3)). Predicate <70% passa
+# trivialmente; cenário continua útil como gate de "não regressão" mas
+# não calibra peso Médio. Calibração de lateralidade soft Médio em
+# squats provavelmente precisa de `perna_anterior(4)` ou
+# `padrão squat_unilateral(2)` em E.1.b2/D2 — investigar separado.
+# ---------------------------------------------------------------------------
+
+def _cfg_2_2_b(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
+    return [{
+        "demandas": [("subregiao", "perna_anterior", 3)],
+        "tamanho_bloco": 2,
+        "evitar_agonistas": True,
+        "max_complexidade": 5,
+    }]
+
+
+def _metrica_2_2_b(sessoes: list[Sessao],
+                    dims: dict[str, MockDimensoes]) -> tuple[bool, str]:  # noqa: ARG001
+    """Detecta 2+ unilaterais em mesma subregião perna_anterior na rotina."""
+    for sessao in sessoes:
+        unis_pa: list[str] = []
+        for bloco in sessao.blocos:
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                if ex is None:
+                    continue
+                if (ex.subregiao == "perna_anterior" and
+                        ex.unilateral == "unilateral"):
+                    unis_pa.append(ex.nome)
+        if len(unis_pa) >= 2:
+            return True, f"perna_anterior 2+ unis: {unis_pa}"
+    return False, ""
+
+
+CENARIO_2_2_B = Cenario(
+    id="2.2B",
+    nome="Lateralidade soft Médio perna_anterior (realista, baseline)",
+    setup_descricao="perna_anterior(3) × 1 treino, 1000 rotinas",
+    expectativa_descricao="<70% (baseline pre-D2)",
+    expectativa_predicate=lambda pct: pct < 70.0,
+    config_factory=_cfg_2_2_b,
+    n_treinos=1,
+    metrica_fn=_metrica_2_2_b,
+)
+
+
+# ---------------------------------------------------------------------------
+# Cenário 2.3 — Pegada+plano cumulativa em costas (densificado)
+#
+# Setup DENSIFICADO pós-timebox Sessão 7a (Seção 8.14.1): timebox
+# `costas(3) × 1 treino` deu 1.50% < 5% limiar → 2.3 oficialmente
+# ⚠️ densificado. Faixa pré-registrada (Seção 8.14.2 / Decisão 2):
+# `costas(4)` → **4-12% esperado**. <4% = inefetivo (escalar pra costas(5));
+# >12% = banco apertado demais.
+#
+# Métrica: 2+ ex com pegada+plano AMBOS iguais e não-vazios (colisão dupla).
+# 100% das colisões observadas em costas(3) Sessão 7a foram
+# `Remada Apoiado + Remada Seal Halteres` (pegada=neutra plano=apoiada) —
+# caso clínico modelado ativamente em Decisão B Sessão 7a.
+# ---------------------------------------------------------------------------
+
+def _cfg_2_3(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
+    # Setup ajustado pós-Sessão 7b (2026-05-08): costas(5) em vez de costas(4).
+    # costas(4) deu 1.10% (abaixo do limiar pré-registrado 4%); escalada pra
+    # costas(5) deu 5.20%. Predicate ajustado pra 2-10% baseline (faixa
+    # pré-registrada 10-25% revisada — banco efetivo tem só 1 par mensurável,
+    # Apoiado+Seal, após hard família INTRA proteger membros mesma família).
+    return [{
+        "demandas": [("subregiao", "costas", 5)],
+        "tamanho_bloco": 2,
+        "evitar_agonistas": True,
+        "max_complexidade": 5,
+    }]
+
+
+def _metrica_2_3(sessoes: list[Sessao],
+                  dims: dict[str, MockDimensoes]) -> tuple[bool, str]:
+    """Detecta 2+ ex em costas com pegada+plano AMBOS iguais e não-vazios."""
+    for sessao in sessoes:
+        ex_costas = [
+            (e, dims.get(e.nome))
+            for b in sessao.blocos
+            for e in (b.ex1, b.ex2, b.ex3)
+            if e is not None and e.subregiao == "costas"
+        ]
+        for i, (e1, d1) in enumerate(ex_costas):
+            if d1 is None:
+                continue
+            for (e2, d2) in ex_costas[i + 1:]:
+                if d2 is None:
+                    continue
+                if (d1.pegada and d1.pegada == d2.pegada and
+                        d1.plano_corporal and
+                        d1.plano_corporal == d2.plano_corporal):
+                    return True, (f"{e1.nome}+{e2.nome} "
+                                  f"pegada={d1.pegada} plano={d1.plano_corporal}")
+    return False, ""
+
+
+CENARIO_2_3 = Cenario(
+    id="2.3",
+    nome="Pegada+plano cumulativa em costas (densificado)",
+    setup_descricao="costas(5) × 1 treino, 1000 rotinas",
+    expectativa_descricao="2-10% (revisado Sessão 7b, pre-D2)",
+    expectativa_predicate=lambda pct: 2.0 <= pct < 10.0,
+    config_factory=_cfg_2_3,
+    n_treinos=1,
+    metrica_fn=_metrica_2_3,
+)
+
+
+# ---------------------------------------------------------------------------
+# Cenário 2.4 — Lateralidade Médio em squats (calibração dedicada)
+#
+# Cenário NOVO (Decisão 1 Sessão 7a — Seção 8.14.2): substituto operacional
+# do 2.2B (que virou gate de não-regressão por causa do cycling determinístico
+# 2bi+1uni em perna_anterior). 2.4 isola o mecanismo de lateralidade soft
+# Médio em squats forçando 2 unis no padrão `squat_unilateral`.
+#
+# Setup: `padrão squat_unilateral(2) × 1 treino`. Padrão tem 12 candidatos
+# (incluindo Recuo do Estepe mock_futuro), todos uni. Hard família protege
+# coexistência intra entre membros da mesma família refinada (Agachamento,
+# Recuo, subida_elevada, passada, walking lunges, agach. lateral, sem família
+# Búlgaro). Mas todos os 12 são uni — então 100% das rotinas têm 2 unis em
+# squat_unilateral.
+#
+# Categoria ⚠️ patológico necessário (família semântica de 2.1).
+# Pre-D2: ~100% baseline. Pos-D2 calibrado: depende do peso Médio na seleção;
+# faixa-alvo a registrar quando D2 numérico fechar.
+# ---------------------------------------------------------------------------
+
+def _cfg_2_4(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
+    return [{
+        "demandas": [("padrao", "squat_unilateral", 2)],
+        "tamanho_bloco": 2,
+        "evitar_agonistas": True,
+        "max_complexidade": 5,
+    }]
+
+
+def _metrica_2_4(sessoes: list[Sessao],
+                  dims: dict[str, MockDimensoes]) -> tuple[bool, str]:  # noqa: ARG001
+    """Métrica primária — % rotinas com 2+ unis no padrão squat_unilateral.
+
+    Mede PRESENÇA dos 2 unis (gate de mecanismo confirmado pre-D2).
+    Quando C executar, sec-a (pareamento mesmo bloco) vira primária —
+    Decisão 2 da Sessão 7b (Seção 8.14.4)."""
+    for sessao in sessoes:
+        unis_squat: list[str] = []
+        for bloco in sessao.blocos:
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                if ex is None:
+                    continue
+                if (ex.padrao == "squat_unilateral" and
+                        ex.unilateral == "unilateral"):
+                    unis_squat.append(ex.nome)
+        if len(unis_squat) >= 2:
+            return True, f"2+ unis squat: {unis_squat}"
+    return False, ""
+
+
+def _metrica_2_4_sub_a(sessoes: list[Sessao],
+                        dims: dict[str, MockDimensoes]) -> tuple[bool, str]:  # noqa: ARG001
+    """Sub-métrica a — % rotinas onde os 2 unis squat aparecem PAREADOS no
+    MESMO bloco (= alvo real da calibração de lateralidade Médio em squats).
+
+    `anti_uni_mesmo_grupo -75` (Etapa 5) atua em `_score_pareamento`, não na
+    seleção de subregião/padrão — então mecanismo opera só quando 2 unis
+    coincidem no mesmo bloco. Métrica vira primária quando C calibrar
+    lateralidade Médio em squats (Decisão 2 Sessão 7b).
+    """
+    for sessao in sessoes:
+        for bloco in sessao.blocos:
+            unis_squat_bloco: list[str] = []
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                if ex is None:
+                    continue
+                if (ex.padrao == "squat_unilateral" and
+                        ex.unilateral == "unilateral"):
+                    unis_squat_bloco.append(ex.nome)
+            if len(unis_squat_bloco) >= 2:
+                return True, (f"bloco {bloco.label} com 2+ unis squat: "
+                              f"{unis_squat_bloco}")
+    return False, ""
+
+
+CENARIO_2_4 = Cenario(
+    id="2.4",
+    nome="Lateralidade Médio em squats (densificado, baseline)",
+    setup_descricao="padrão squat_unilateral(2) × 1 treino, 1000 rotinas",
+    expectativa_descricao="~100% (baseline pre-D2)",
+    expectativa_predicate=lambda pct: pct >= 95.0,
+    config_factory=_cfg_2_4,
+    n_treinos=1,
+    metrica_fn=_metrica_2_4,
+    metricas_secundarias=[
+        ("% rotinas com 2 unis pareados no MESMO bloco (alvo C)",
+         _metrica_2_4_sub_a),
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# Cenário 3.2 — subida_elevada coexist INTER (família refinada nova)
+#
+# E.0 expectativa: <10% rotinas onde 2+ membros da família `subida_elevada`
+# coexistem em treinos diferentes. Pre-Etapa 7 (família INTER ainda hard via
+# `variacao_pais_globais`): esperado ~0% (hard bloqueia coexistência).
+# Pos-Etapa 7 (família INTER soft alto via score, D3.2 Caminho C): esperado
+# <10% (desincentiva mas permite quando banco aperta).
+#
+# Setup: 2 treinos × `padrão squat_unilateral(2)` cada (4 unis na rotina).
+# Banco squat_unilateral: 12 candidatos com 4 em subida_elevada (Step Up,
+# Step Up Alt., Passada Dos Steps, Recuo do Estepe mock_futuro).
+# ---------------------------------------------------------------------------
+
+def _cfg_3_2(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
+    return [{
+        "demandas": [("padrao", "squat_unilateral", 2)],
+        "tamanho_bloco": 2,
+        "evitar_agonistas": True,
+        "max_complexidade": 5,
+    }]
+
+
+def _metrica_3_2(sessoes: list[Sessao],
+                  dims: dict[str, MockDimensoes]) -> tuple[bool, str]:
+    """Detecta 2+ ex distintos da família `subida_elevada` na rotina total."""
+    nomes_se: list[str] = []
+    for sessao in sessoes:
+        for bloco in sessao.blocos:
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                if ex is None:
+                    continue
+                d = dims.get(ex.nome)
+                if d and d.familia_estrita == "subida_elevada":
+                    nomes_se.append(ex.nome)
+    nomes_distintos = set(nomes_se)
+    if len(nomes_distintos) >= 2:
+        return True, f"2+ subida_elevada na rotina: {sorted(nomes_distintos)}"
+    return False, ""
+
+
+CENARIO_3_2 = Cenario(
+    id="3.2",
+    nome="subida_elevada coexist INTER (família refinada)",
+    setup_descricao="2 treinos × squat_unilateral(2), 1000 rotinas",
+    expectativa_descricao="<10% (pre-Etapa 7 ~0%; pos <10%)",
+    expectativa_predicate=lambda pct: pct < 10.0,
+    config_factory=_cfg_3_2,
+    n_treinos=2,
+    metrica_fn=_metrica_3_2,
+)
+
+
+# ---------------------------------------------------------------------------
+# Cenário 3.3 — Passada + Passada Dos Steps INTER (famílias dif)
+#
+# E.0 expectativa: 20-50% rotinas onde Passada (família `passada`) coexiste
+# com QUALQUER membro de `subida_elevada` (incl. Passada Dos Steps) entre
+# treinos. Famílias DIFERENTES após reclassificação Sessão 2 — soft INTER
+# família NÃO atua (só dentro da mesma família). Frequência natural sem
+# penalty.
+#
+# Validação clínica do Caminho 5 (Seção 2 G4): trade-off aceito da
+# refinamento — Passada+Passada Dos Steps perde hard de família, mas
+# correção é clínica (mecanicas diferentes). Cenário confirma que o setup
+# funciona como esperado: famílias dif → coexistência permitida.
+#
+# Setup: idêntico ao 3.2 (2 treinos × squat_unilateral(2)).
+# Predicate: `pct < 80.0` (faixa wide pra catch absurdos; 20-50% é
+# referência E.0, baseline informativo).
+# ---------------------------------------------------------------------------
+
+def _cfg_3_3(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
+    return [{
+        "demandas": [("padrao", "squat_unilateral", 2)],
+        "tamanho_bloco": 2,
+        "evitar_agonistas": True,
+        "max_complexidade": 5,
+    }]
+
+
+def _metrica_3_3(sessoes: list[Sessao],
+                  dims: dict[str, MockDimensoes]) -> tuple[bool, str]:
+    """Detecta Passada (família `passada`) + qualquer subida_elevada
+    coexistindo na rotina (em treinos quaisquer)."""
+    todos_nomes: set[str] = set()
+    for sessao in sessoes:
+        for bloco in sessao.blocos:
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                if ex is not None:
+                    todos_nomes.add(ex.nome)
+    has_passada = "Passada" in todos_nomes
+    subidas_pres = [
+        n for n in todos_nomes
+        if dims.get(n) and dims[n].familia_estrita == "subida_elevada"
+    ]
+    if has_passada and subidas_pres:
+        return True, f"Passada + subida_elevada: {sorted(subidas_pres)}"
+    return False, ""
+
+
+CENARIO_3_3 = Cenario(
+    id="3.3",
+    nome="Passada + Passada Dos Steps INTER (famílias dif)",
+    setup_descricao="2 treinos × squat_unilateral(2), 1000 rotinas",
+    expectativa_descricao="20-50% (referência E.0, baseline)",
+    expectativa_predicate=lambda pct: pct < 80.0,
+    config_factory=_cfg_3_3,
+    n_treinos=2,
+    metrica_fn=_metrica_3_3,
+)
+
+
+# ---------------------------------------------------------------------------
 # Cenário 5.2 — Retroativo v_up_uni (não-regressão Etapa 5)
 #
 # Replica o cenário do tools/medir_entropia_pareamentos.py. Mede % de pareamento
@@ -736,17 +1066,383 @@ CENARIO_6_2 = Cenario(
 )
 
 
+# ---------------------------------------------------------------------------
+# Cenário 2.1 — Ranking ordinal Reto vs Inclinado (peito 2x2)
+#
+# Setup pre-registrado Sessão 7b (Seção 8.14.4 Pré-registro 2.1): 2 treinos
+# × peito(2) cada. Mock_futuro Supino Inclinado Halteres adicionado em 7c
+# (Decisão user) pra completar 3ª faixa mensurável.
+#
+# **Tabela de pares mensuráveis pós-hard INTRA família (protocolo Decisão 1):**
+# Banco peito após overlay: 4 Retos (3 cadastrados + 1 mock_futuro Supino
+# Fechado) + 2 Inclinados (Smith + Halteres mock_futuro) + 4 Apoios
+# (3 cadastrados + 1 mock_futuro Apoio Fechado) + 1 crucifixo + 2 crossover
+# = 13 cadastros válidos.
+#
+# Pares Reto+Reto INTER e Inclinado+Inclinado INTER: ambos bloqueados
+# pre-Etapa 7 por hard INTER família (`variacao_pais_globais` set). Pos-Etapa 7
+# (D3.2 Caminho C — soft INTER alto): expectativa <15% cada.
+# ---------------------------------------------------------------------------
+
+def _cfg_2_1(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
+    return [{
+        "demandas": [("subregiao", "peito", 2)],
+        "tamanho_bloco": 2,
+        "evitar_agonistas": True,
+        "max_complexidade": 5,
+    }]
+
+
+def _metrica_2_1(sessoes: list[Sessao],
+                  dims: dict[str, MockDimensoes]) -> tuple[bool, str]:
+    """Métrica primária — % rotinas com 2+ ex da MESMA família refinada peito
+    coexistindo entre treinos (Reto-Reto OU Inclinado-Inclinado).
+
+    Pre-Etapa 7: ~0% (hard INTER família via variacao_pais_globais).
+    Pos-Etapa 7: <30% somando ambas faixas (soft INTER alto desincentiva).
+    """
+    fams_peito_por_treino: list[set[str]] = []
+    for sessao in sessoes:
+        fams: set[str] = set()
+        for bloco in sessao.blocos:
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                if ex is None or ex.subregiao != "peito":
+                    continue
+                d = dims.get(ex.nome)
+                if d and d.familia_estrita in ("Supino Reto", "Supino Inclinado"):
+                    fams.add(d.familia_estrita)
+        fams_peito_por_treino.append(fams)
+    # Mesma família (Reto OU Inclinado) em 2+ treinos
+    for fam in ("Supino Reto", "Supino Inclinado"):
+        treinos_com_fam = sum(1 for f in fams_peito_por_treino if fam in f)
+        if treinos_com_fam >= 2:
+            return True, f"familia '{fam}' em {treinos_com_fam} treinos"
+    return False, ""
+
+
+def _metrica_2_1_sub_reto(sessoes: list[Sessao],
+                           dims: dict[str, MockDimensoes]) -> tuple[bool, str]:
+    """Sub-métrica — % rotinas com 2+ Supino Reto inter-treinos."""
+    treinos_com_reto = 0
+    for sessao in sessoes:
+        tem_reto = any(
+            dims.get(ex.nome) and dims[ex.nome].familia_estrita == "Supino Reto"
+            for bloco in sessao.blocos
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3)
+            if ex is not None
+        )
+        if tem_reto:
+            treinos_com_reto += 1
+    if treinos_com_reto >= 2:
+        return True, f"Supino Reto em {treinos_com_reto} treinos"
+    return False, ""
+
+
+def _metrica_2_1_sub_inclinado(sessoes: list[Sessao],
+                                dims: dict[str, MockDimensoes]) -> tuple[bool, str]:
+    """Sub-métrica — % rotinas com 2+ Supino Inclinado inter-treinos."""
+    treinos_com_inc = 0
+    for sessao in sessoes:
+        tem_inc = any(
+            dims.get(ex.nome) and dims[ex.nome].familia_estrita == "Supino Inclinado"
+            for bloco in sessao.blocos
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3)
+            if ex is not None
+        )
+        if tem_inc:
+            treinos_com_inc += 1
+    if treinos_com_inc >= 2:
+        return True, f"Supino Inclinado em {treinos_com_inc} treinos"
+    return False, ""
+
+
+CENARIO_2_1 = Cenario(
+    id="2.1",
+    nome="Ranking ordinal Supino Reto vs Inclinado (peito 2x2)",
+    setup_descricao="2 treinos × peito(2), 1000 rotinas",
+    expectativa_descricao="<30% (pre-Etapa 7 ~0%)",
+    expectativa_predicate=lambda pct: pct < 30.0,
+    config_factory=_cfg_2_1,
+    n_treinos=2,
+    metrica_fn=_metrica_2_1,
+    metricas_secundarias=[
+        ("% rotinas com 2+ Supino Reto inter-treinos",
+         _metrica_2_1_sub_reto),
+        ("% rotinas com 2+ Supino Inclinado inter-treinos",
+         _metrica_2_1_sub_inclinado),
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# Cenário 3.1 — Variante B 3x com peito em A1 e A2 (família INTER refinada)
+#
+# Setup REDEFINIDO pela auditoria E.0 (Sessão 6, Seção 8.6): de "rotina 3T
+# toda de peito" caricatural pra rotina realista Variante B 3x A1/A2 do
+# `configuracoes_comuns.md` Seção 2.3. Ciclo A-B-A: T1 (A1) e T3 (A2)
+# repetem peito; T2 (B) é puxar+anterior.
+#
+# Métrica: % rotinas onde Supino Reto coexiste em T1 (A1) E T3 (A2).
+# Pre-Etapa 7: ~0% (hard INTER família). Pos-Etapa 7: 10-15% (E.0
+# expectativa — soft INTER alto desincentiva mas permite quando aperta).
+# ---------------------------------------------------------------------------
+
+def _cfg_3_1(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
+    # T1 = A1 (Empurrar + perna_post)
+    a1 = {
+        "demandas": [
+            ("subregiao", "peito", 2),
+            ("subregiao", "ombro", 1),
+            ("subregiao", "perna_posterior", 3),
+            ("subregiao", "core_dinamico", 1),
+            ("padrao", "triceps", 1),
+        ],
+        "tamanho_bloco": 2,
+        "evitar_agonistas": True,
+        "max_complexidade": 5,
+    }
+    # T2 = B (Puxar + perna_anterior)
+    b = {
+        "demandas": [
+            ("subregiao", "costas", 3),
+            ("subregiao", "perna_anterior", 3),
+            ("subregiao", "core_isometrico", 1),
+            ("padrao", "biceps", 1),
+        ],
+        "tamanho_bloco": 2,
+        "evitar_agonistas": True,
+        "max_complexidade": 5,
+    }
+    # T3 = A2 (mesmo molde do A1)
+    a2 = dict(a1)
+    return [a1, b, a2]
+
+
+def _metrica_3_1(sessoes: list[Sessao],
+                  dims: dict[str, MockDimensoes]) -> tuple[bool, str]:
+    """% rotinas com Supino Reto em T1 (A1) E T3 (A2) simultaneamente."""
+    if len(sessoes) < 3:
+        return False, ""
+    t1, _, t3 = sessoes[0], sessoes[1], sessoes[2]
+    def _tem_reto(s):
+        return any(
+            dims.get(ex.nome) and dims[ex.nome].familia_estrita == "Supino Reto"
+            for bloco in s.blocos
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3)
+            if ex is not None
+        )
+    if _tem_reto(t1) and _tem_reto(t3):
+        return True, "Supino Reto em A1 (T1) E A2 (T3)"
+    return False, ""
+
+
+CENARIO_3_1 = Cenario(
+    id="3.1",
+    nome="Variante B 3x A1/A2 — Reto INTER (família refinada)",
+    setup_descricao="A1 + B + A2 (peito(2) em A1 e A2), 1000 rotinas",
+    expectativa_descricao="<20% (pre-Etapa 7 ~0%; pos 10-15%)",
+    expectativa_predicate=lambda pct: pct < 20.0,
+    config_factory=_cfg_3_1,
+    n_treinos=3,
+    metrica_fn=_metrica_3_1,
+)
+
+
+# ---------------------------------------------------------------------------
+# Cenários 4.1 + 4.2 — HISTÓRICO toggle ON/OFF
+#
+# R-1 (rotina semana anterior) = Variante B 2x do `configuracoes_comuns.md`
+# Seção 2.2 — exato setup do 6.2 (Decisão 3 Sessão 7b / Seção 8.14.4).
+# R-1 é gerada UMA vez com seed dedicada (99999) e fixada entre todas as iters.
+#
+# 4.1 (toggle ON, esperado <5% pos-Etapa 7): % rotinas onde >=1 nome OU
+#   família da R-1 reaparece. Pre-Etapa 7 (HISTÓRICO não implementado no
+#   gerador): FAIL baseline esperado — frequência igual a 4.2.
+# 4.2 (toggle OFF, esperado alto): aceita repetição. Pre-Etapa 7 = pos-Etapa 7
+#   (toggle OFF ≈ comportamento atual sem HISTÓRICO). Predicate informativo.
+# ---------------------------------------------------------------------------
+
+_R1_SEED = 99999  # Seed fixa pra rotina semana anterior
+
+
+def _gerar_r1_variante_b(banco: list[Exercicio]) -> tuple[set[str], set[str]]:
+    """Gera R-1 fixa (Variante B 2x) e devolve (nomes, famílias da R-1).
+
+    Usa exato setup do 6.2 (Decisão 3 Sessão 7b) e seed 99999. Cacheável
+    porque mesma seed sempre dá mesma R-1.
+    """
+    random.seed(_R1_SEED)
+    config_r1 = [
+        {
+            "demandas": [
+                ("subregiao", "peito", 2),
+                ("subregiao", "ombro", 1),
+                ("subregiao", "perna_posterior", 3),
+                ("subregiao", "core_dinamico", 1),
+                ("padrao", "triceps", 1),
+            ],
+            "tamanho_bloco": 2,
+            "evitar_agonistas": True,
+            "max_complexidade": 5,
+        },
+        {
+            "demandas": [
+                ("subregiao", "costas", 3),
+                ("subregiao", "perna_anterior", 3),
+                ("subregiao", "core_isometrico", 1),
+                ("padrao", "biceps", 1),
+            ],
+            "tamanho_bloco": 2,
+            "evitar_agonistas": True,
+            "max_complexidade": 5,
+        },
+    ]
+    sessoes_r1 = gerar_multiplos_treinos(banco, config_r1, relaxar_familia=False)
+    nomes_r1: set[str] = set()
+    fams_r1: set[str] = set()
+    for s in sessoes_r1:
+        for b in s.blocos:
+            for ex in (b.ex1, b.ex2, b.ex3):
+                if ex is None:
+                    continue
+                nomes_r1.add(ex.nome)
+                if ex.variacao_de:
+                    fams_r1.add(ex.variacao_de)
+    return nomes_r1, fams_r1
+
+
+def _cfg_4_x(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
+    """Setup atual = R-2 (rotina nova). Mesma estrutura Variante B 2x."""
+    return [
+        {
+            "demandas": [
+                ("subregiao", "peito", 2),
+                ("subregiao", "ombro", 1),
+                ("subregiao", "perna_posterior", 3),
+                ("subregiao", "core_dinamico", 1),
+                ("padrao", "triceps", 1),
+            ],
+            "tamanho_bloco": 2,
+            "evitar_agonistas": True,
+            "max_complexidade": 5,
+        },
+        {
+            "demandas": [
+                ("subregiao", "costas", 3),
+                ("subregiao", "perna_anterior", 3),
+                ("subregiao", "core_isometrico", 1),
+                ("padrao", "biceps", 1),
+            ],
+            "tamanho_bloco": 2,
+            "evitar_agonistas": True,
+            "max_complexidade": 5,
+        },
+    ]
+
+
+# Cache lazy da R-1 — calculada na primeira chamada da métrica.
+_R1_CACHE: dict[str, tuple[set[str], set[str]]] = {}
+
+
+def _metrica_4_x_factory(banco_ref: list[Exercicio]):
+    """Factory que captura banco pra métrica 4.x (precisa pra gerar R-1)."""
+    def _m(sessoes: list[Sessao],
+           dims: dict[str, MockDimensoes]) -> tuple[bool, str]:  # noqa: ARG001
+        if "r1" not in _R1_CACHE:
+            _R1_CACHE["r1"] = _gerar_r1_variante_b(banco_ref)
+        nomes_r1, fams_r1 = _R1_CACHE["r1"]
+        nomes_atuais: set[str] = set()
+        fams_atuais: set[str] = set()
+        for s in sessoes:
+            for bloco in s.blocos:
+                for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                    if ex is None:
+                        continue
+                    nomes_atuais.add(ex.nome)
+                    if ex.variacao_de:
+                        fams_atuais.add(ex.variacao_de)
+        nomes_overlap = nomes_atuais & nomes_r1
+        fams_overlap = fams_atuais & fams_r1
+        if nomes_overlap or fams_overlap:
+            detalhes = []
+            if nomes_overlap:
+                detalhes.append(f"nomes={sorted(nomes_overlap)[:3]}")
+            if fams_overlap:
+                detalhes.append(f"fams={sorted(fams_overlap)[:3]}")
+            return True, "; ".join(detalhes)
+        return False, ""
+    return _m
+
+
+# Cenários instanciados em main() depois de `banco` estar disponível.
+# Usa-se factory pattern pra capturar referência. Cenário 4.1 e 4.2 dividem
+# mesma métrica (medem mesma coisa); diferença é só predicate + descrição.
+
+def _make_cenario_4_x(cenario_id: str, nome: str, expectativa: str,
+                       predicate: Callable[[float], bool],
+                       banco: list[Exercicio]) -> Cenario:
+    return Cenario(
+        id=cenario_id,
+        nome=nome,
+        setup_descricao="Variante B 2x, R-1 fixa Variante B (seed 99999), 1000 rotinas",
+        expectativa_descricao=expectativa,
+        expectativa_predicate=predicate,
+        config_factory=_cfg_4_x,
+        n_treinos=2,
+        metrica_fn=_metrica_4_x_factory(banco),
+    )
+
+
+# Cenários 4.1 e 4.2 são instanciados dinâmicamente em main() — placeholders
+# aqui pra registrá-los no dict CENARIOS antes da inicialização.
+# Substituídos por instâncias reais via _patch_cenarios_4_x(banco) abaixo.
+
+CENARIO_4_1: Cenario = None  # type: ignore  # set em _patch_cenarios_4_x
+CENARIO_4_2: Cenario = None  # type: ignore
+
+
+def _patch_cenarios_4_x(banco: list[Exercicio]) -> None:
+    """Inicializa CENARIO_4_1 e CENARIO_4_2 com banco real. Chamar em main()."""
+    global CENARIO_4_1, CENARIO_4_2
+    CENARIO_4_1 = _make_cenario_4_x(
+        cenario_id="4.1",
+        nome="HISTÓRICO toggle ON evita R-1",
+        expectativa="<5% (pos-Etapa 7; pre = baseline alto FAIL)",
+        predicate=lambda pct: pct < 5.0,
+        banco=banco,
+    )
+    CENARIO_4_2 = _make_cenario_4_x(
+        cenario_id="4.2",
+        nome="HISTÓRICO toggle OFF aceita repetição",
+        expectativa="alto (informativo — toggle OFF aceita)",
+        # Predicate informativo — sempre passa (cenário só registra
+        # baseline; comparação significativa vem pos-Etapa 7 quando
+        # toggle ON for implementado e divergir do OFF).
+        predicate=lambda pct: pct >= 0.0,
+        banco=banco,
+    )
+    # Registra nas posições do dict.
+    CENARIOS["4.1"] = CENARIO_4_1
+    CENARIOS["4.2"] = CENARIO_4_2
+
+
 CENARIOS: dict[str, Cenario] = {
     "1.1": CENARIO_1_1,
     "1.2": CENARIO_1_2,
     "1.3": CENARIO_1_3,
+    "2.1": CENARIO_2_1,
     "2.2A": CENARIO_2_2_A,
+    "2.2B": CENARIO_2_2_B,
+    "2.3": CENARIO_2_3,
+    "2.4": CENARIO_2_4,
+    "3.1": CENARIO_3_1,
+    "3.2": CENARIO_3_2,
+    "3.3": CENARIO_3_3,
+    # 4.1 e 4.2 são adicionados por _patch_cenarios_4_x(banco) em main()
+    # (precisam de banco real pra factory da métrica)
     "5.2": CENARIO_5_2,
     "6.1": CENARIO_6_1,
     "6.2": CENARIO_6_2,
-    # TODO E.1.b2 (pós-D2/D3): 2.1, 2.2B (perna_anterior(3)),
-    #                          2.3 (timebox costas(3) — depende mocks G2),
-    #                          3.1 (Variante B 3x A1/A2), 3.2, 3.3, 4.1, 4.2
     # TODO E.2: 5.1
 }
 
@@ -864,6 +1560,7 @@ def main() -> None:
     banco = carregar_banco(str(XLSX))
     dims, futuros = _carregar_mocks()
     banco = _aplicar_overlay(banco, dims, futuros)
+    _patch_cenarios_4_x(banco)  # 4.1/4.2 dependem de banco real (R-1 fixa)
     print(f"Banco: {len(banco)} exercícios "
           f"({len(dims)} mockados, {len(futuros)} mock_futuro)")
     print(f"Iterações por cenário: {args.n_iter}")

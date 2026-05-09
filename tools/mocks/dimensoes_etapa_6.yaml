@@ -155,23 +155,807 @@ exercicios:
       eq_primario: "Barra"
       musculo_primario: "Peitoral"
 
-  # =========================================================================
-  # G2 — REMADAS (cobertura futura: cenário 2.2 Setup A)
-  # TODO E.1.b — preencher antes de ativar 2.2
-  # =========================================================================
+  # Supino Inclinado Halteres — mock_futuro G1 adicionado Sessão 7c
+  # (2026-05-08). Cadastro pra completar ranking 3-faixas do cenário 2.1
+  # (sem ele, banco só tem 1 Supino Inclinado — Smith — e a faixa "2
+  # Inclinados" não é mensurável). Vai pro XLSX real na Fase 4 junto com
+  # os outros mock_futuros.
+
+  - nome: "Supino Inclinado Halteres"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "Supino Inclinado"
+      plano_corporal: "inclinado"
+      pegada: "pronada"  # alinha Supino Com Halteres + Supino Smith Inclinado
+      equipamento_grupo: "halter"
+      variante_pontual: false
+    extras:
+      regiao: "upper"
+      subregiao: "peito"
+      padrao: "empurrar_compostos"
+      purpose: "compound"
+      unilateral: "bilateral"
+      complexidade: 3   # alinha Supino Com Halteres (livre, halteres = +1 vs Smith)
+      fadiga: 3
+      eq_primario: "Halteres + Banco inclinado"
+      musculo_primario: "peitoral, tríceps, deltóide ant."
 
   # =========================================================================
-  # G4 — AGACHAMENTOS (cobertura futura: cenários 3.2, 3.3)
-  # TODO E.1.b — preencher Step Up, Step Up Alt, Passada, Passada Dos Steps
-  # com família refinada subida_elevada (Anexo item 15-quinquies);
-  # Recuo do Estepe como mock_futuro (Anexo item 26).
+  # G2 — REMADAS (cobertura cenários 2.2A baseline, 2.3 timebox)
   # =========================================================================
+  # Famílias refinadas conforme Seção 2 G2 + Anexo:
+  #   - Curvadas (Barra/Halteres/Smith) + Landmine → "curvada"
+  #   - Baixa Aberta + Baixa Neutra unificadas em "baixa"
+  #   - Apoiado, Seal, TRX (Aberta+Neutra) cada um sua própria família
+  #   - Uni Polia + Serrote unificadas em "unilateral"
+  # Decisões clínicas Sessão 7a (2026-05-08):
+  #   A. Pegada Curvada Halteres = pronada (preferência do user); Apoiado +
+  #      Seal Halteres = neutra.
+  #   B. Plano Seal = apoiada (par Seal+Apoiado vira "Ruim"); Landmine =
+  #      curvada (proximidade clínica forte com curvadas); Uni Polia =
+  #      unilateral_apoiada (half-kneeling — apoio do joelho contralateral).
+
+  - nome: "Remada Curvada Barra"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "curvada"
+      plano_corporal: "curvada"
+      pegada: "pronada"
+      equipamento_grupo: "barra"
+      variante_pontual: false
+
+  - nome: "Remada Curvada Halteres"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "curvada"
+      plano_corporal: "curvada"
+      pegada: "pronada"  # decisão Sessão 7a — user prescreve halteres pronados
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Remada Curvada Smith"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "curvada"
+      plano_corporal: "curvada"
+      pegada: "pronada"
+      equipamento_grupo: "barra_guiada"
+      variante_pontual: false
+
+  - nome: "Remada Baixa Aberta"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "baixa"  # unificação pós-conserto Anexo
+      plano_corporal: "baixa_sentada"
+      pegada: "aberta"
+      equipamento_grupo: "polia"
+      variante_pontual: false
+
+  - nome: "Remada Baixa Neutra"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "baixa"  # unificação pós-conserto Anexo
+      plano_corporal: "baixa_sentada"
+      pegada: "neutra"
+      equipamento_grupo: "polia"
+      variante_pontual: false
+
+  - nome: "Remada Apoiado"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "apoiado"
+      plano_corporal: "apoiada"
+      pegada: "neutra"
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Remada Seal Halteres"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "seal"
+      plano_corporal: "apoiada"  # decisão Sessão 7a — par Seal+Apoiado = Ruim
+      pegada: "neutra"
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Remada Landmine"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "curvada"  # Anexo conserto Landmine→curvada
+      plano_corporal: "curvada"   # decisão Sessão 7a — proximidade clínica
+      pegada: "neutra"            # T-bar handle padrão
+      equipamento_grupo: "barra"  # barra com pivot
+      variante_pontual: false
+
+  - nome: "Remada Uni Polia"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "unilateral"
+      plano_corporal: "unilateral_apoiada"  # half-kneeling — apoio do joelho
+      pegada: "neutra"
+      equipamento_grupo: "polia"
+      variante_pontual: false
+
+  - nome: "Serrote"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "unilateral"
+      plano_corporal: "unilateral_apoiada"
+      pegada: "neutra"
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Remada Aberta Trx"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "trx"
+      plano_corporal: "suspensao"
+      pegada: "aberta"
+      equipamento_grupo: null  # vazio — Seção 2 G2 ("(vazio TRX)")
+      variante_pontual: false
+
+  - nome: "Remada Neutra Trx"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "trx"
+      plano_corporal: "suspensao"
+      pegada: "neutra"
+      equipamento_grupo: null
+      variante_pontual: false
 
   # =========================================================================
-  # G8 — CORE (cobertura futura: cenário 6.1)
-  # TODO E.1.b — preencher Pranchas (frontal vs lateral), Crunch, V-Up,
-  # INFRA Suspenso (mock_futuro), Russian Twist (mock_futuro), com refator
-  # estrutural CORE (Anexo item 15-quater): subregiões core_isometrico/
-  # core_dinamico já existentes; padrões refinados em flexao_tronco/
-  # flexao_lateral/rotacao_tronco/flexao_quadril ainda não migrados.
+  # G3 — PUXADAS (cobertura cenário 6.1, 6.2 costas T2)
   # =========================================================================
+  # Famílias atuais: Barra (Fixa+Iso), Pullover (Halteres+Polia), Puxada
+  # (3 pegadas). Decisão Sessão 7a (2026-05-08):
+  #   C. Barra Fixa + Iso = pegada "aberta" (default brasileiro = pronada
+  #      larga; Seção 2 G3 nota "sem pronada-fechada em puxadas") +
+  #      equipamento "corporal" (peso corporal — proximidade com Apoio peito).
+  # Cadastros futuros (Seção 2 G3): Barra Aberta + Barra Supinada como
+  # mock_futuro pra antecipar refinamento da Etapa 7 (split da Barra
+  # genérica). Outros futuros (Barra c/ borracha, Puxada Uni Polia,
+  # Pulldown Braço Estendido) pendentes — adicionar quando relevantes.
+
+  - nome: "Barra Fixa"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Barra"
+      plano_corporal: null
+      pegada: "aberta"
+      equipamento_grupo: "corporal"
+      variante_pontual: false
+
+  - nome: "Barra Isométrica"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Barra"
+      plano_corporal: null
+      pegada: "aberta"
+      equipamento_grupo: "corporal"
+      variante_pontual: false
+
+  - nome: "Pullover Halteres"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Pullover"
+      plano_corporal: "pullover"
+      pegada: "neutra"
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Pullover Polia"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Pullover"
+      plano_corporal: "pullover"
+      pegada: "neutra"
+      equipamento_grupo: "polia"
+      variante_pontual: false
+
+  - nome: "Puxada Aberta"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Puxada"
+      plano_corporal: null
+      pegada: "aberta"
+      equipamento_grupo: "polia"
+      variante_pontual: false
+
+  - nome: "Puxada Neutra"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Puxada"
+      plano_corporal: null
+      pegada: "neutra"
+      equipamento_grupo: "polia"
+      variante_pontual: false
+
+  - nome: "Puxada Supinada"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Puxada"
+      plano_corporal: null
+      pegada: "supinada"
+      equipamento_grupo: "polia"
+      variante_pontual: false
+
+  # Cadastros futuros G3 — Anexo Seção 2 G3 (split Barra genérica)
+
+  - nome: "Barra Aberta"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "Barra"
+      plano_corporal: null
+      pegada: "aberta"
+      equipamento_grupo: "corporal"
+      variante_pontual: false
+    extras:
+      regiao: "upper"
+      subregiao: "costas"
+      padrao: "puxadas"
+      purpose: "compound"
+      unilateral: "bilateral"
+      complexidade: 4
+      fadiga: 4
+      eq_primario: "Barra fixa (crossover)"
+      musculo_primario: "dorsal, bíceps"
+
+  - nome: "Barra Supinada"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "Barra"
+      plano_corporal: null
+      pegada: "supinada"
+      equipamento_grupo: "corporal"
+      variante_pontual: false
+    extras:
+      regiao: "upper"
+      subregiao: "costas"
+      padrao: "puxadas"
+      purpose: "compound"
+      unilateral: "bilateral"
+      complexidade: 4
+      fadiga: 4
+      eq_primario: "Barra fixa (crossover)"
+      musculo_primario: "dorsal, bíceps"
+
+  # =========================================================================
+  # G4 — AGACHAMENTOS (cobertura cenários 3.2, 3.3, 2.4)
+  # =========================================================================
+  # Refinamento de família "subida_elevada" aplicado conforme Sessão 2 /
+  # Caminho 5 / Anexo item 15-quinquies. Membros: Step Up + Step Up Alt. +
+  # Passada Dos Steps + Recuo do Estepe (mock_futuro). Outros uni de
+  # perna_anterior em solo (Passada / Recuo / Walking Lunges / Búlgaro /
+  # Agach. Lateral / Slide Board) NÃO são subida_elevada.
+  #
+  # Decisões clínicas Sessão 7b (2026-05-08):
+  #   A. Reclassificação família `subida_elevada` confirmada (Step Up +
+  #      Step Up Alt. + Passada Dos Steps + Recuo do Estepe).
+  #   B. Recuo C/ Barra mantém família `Recuo` (junto com Recuo + Recuo
+  #      Alternado) — solo, sem apoio elevado posterior.
+  #   C. Equipamento dos 4 da subida_elevada = `caixa` (Seção 7.2 diretriz 7
+  #      — apoio elevado precede halter como vetor primário de proximidade).
+  #   D. Recuo do Estepe extras: comp=3, fad=3 (alinhado com Step Up).
+  #   E. variante_pontual=false em todos os 18.
+  # Pegada/plano: null em todos (G4 não usa essas dims — Seção 7.3+7.4 +
+  # Decisão 3 da Sessão 7a registrada como anti-padrão "default neutra").
+
+  # ── Família "Agachamento" (3 bilaterais) ────────────────────────────
+
+  - nome: "Agachamento Livre"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Agachamento"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "barra"
+      variante_pontual: false
+
+  - nome: "Agachamento Goblet"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Agachamento"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Agachamento Smith"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Agachamento"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "barra_guiada"
+      variante_pontual: false
+
+  # ── Sem família (4 — Box Jump, Cadeira Extensora, Búlgaro, Leg Press) ──
+  # familia_estrita: null preserva ausência de família no banco
+  # (overlay não sobrescreve quando null).
+
+  - nome: "Box Jump"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: null
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # Seção 7.2 nota 8 — Box Jump = vazio
+      variante_pontual: false
+
+  - nome: "Cadeira Extensora"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: null
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "maquina"
+      variante_pontual: false
+
+  - nome: "Leg Press"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: null
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "maquina"
+      variante_pontual: false
+
+  - nome: "Agachamento Búlgaro"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: null
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  # ── Família "Recuo" (3 — Recuo + Recuo Alternado + Recuo C/ Barra) ──
+  # Recuo C/ Barra fica em `Recuo`, NÃO em `subida_elevada` (Decisão B
+  # Sessão 7b — solo, sem apoio elevado posterior).
+
+  - nome: "Recuo"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Recuo"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Recuo Alternado"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Recuo"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Recuo C/ Barra"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Recuo"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "barra"
+      variante_pontual: false
+
+  # ── Família "subida_elevada" (3 cadastrados + 1 mock_futuro) ────────
+  # Reclassificação Sessão 2 / Caminho 5 / Anexo 15-quinquies.
+  # Equipamento `caixa` precede `halter` (Seção 7.2 diretriz 7 + Decisão
+  # C Sessão 7b).
+
+  - nome: "Step Up"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "subida_elevada"  # reclassif Sessão 2
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "caixa"  # apoio elevado precede halter
+      variante_pontual: false
+
+  - nome: "Step Up Alt."
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "subida_elevada"  # reclassif Sessão 2
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "caixa"
+      variante_pontual: false
+
+  - nome: "Passada Dos Steps"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "subida_elevada"  # reclassif Sessão 2
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "caixa"  # apoio elevado precede halter
+      variante_pontual: false
+
+  # ── Família "passada" (1 — só Passada regular) ──────────────────────
+  # Passada Dos Steps movida pra subida_elevada; Passada regular sozinha.
+
+  - nome: "Passada"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "passada"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  # ── Família "walking lunges" (1) ────────────────────────────────────
+
+  - nome: "Walking Lunges"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "walking lunges"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  # ── Família "agach. lateral" (2 — regular + Slide Board) ────────────
+
+  - nome: "Agach. Lateral"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "agach. lateral"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "halter"
+      variante_pontual: false
+
+  - nome: "Slide Board Lateral"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "agach. lateral"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # Seção 7.2 nota 8 — Slide Board = vazio
+      variante_pontual: false
+
+  # ── Cadastro futuro G4 — Recuo do Estepe (Anexo 4.2 item 26) ────────
+
+  - nome: "Recuo do Estepe"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "subida_elevada"  # desde já — Sessão 2 / Caminho 5
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: "caixa"
+      variante_pontual: false
+    extras:
+      regiao: "lower"
+      subregiao: "perna_anterior"
+      padrao: "squat_unilateral"
+      purpose: "compound"
+      unilateral: "unilateral"
+      complexidade: 3   # alinha Step Up — apoio elevado padrão (decisão D Sessão 7b)
+      fadiga: 3
+      eq_primario: "Halteres + Caixa"
+      musculo_primario: "Glúteos, Quadríceps"
+
+
+  # =========================================================================
+  # G8 — CORE (20 atuais + 5 cadastros novos = 25 — cobertura cenários 6.1,
+  #            4.1, 4.2 e 2.1)
+  # =========================================================================
+  # Refator estrutural CORE da Sessão 2 da Fase 2 (Anexo 15-quater):
+  #   - Subregiões `core_dinamico` + `core_isometrico` (já no banco)
+  #   - Padrões refinados (`flexao_tronco`/`flexao_lateral`/`rotacao_tronco`/
+  #     `flexao_quadril`) — IMPLEMENTAÇÃO REAL fica pra Etapa 7. Pra mock
+  #     atual, mock_futuros usam padrão antigo (`core_dinamico`/
+  #     `core_isometrico`) pra retrocompat com gerador atual (Decisão 4
+  #     da Sessão 7b — Seção 8.14.4).
+  # Reclassificação família crítica Caso 1: `prancha` → `prancha frontal` +
+  # `prancha lateral` (Sessão 2 / refator estrutural CORE).
+  # Decisões clínicas Sessão 7c (2026-05-09):
+  #   A. Reclassificação 7 pranchas confirmada (6 frontais + 1 lateral).
+  #   B. Equipamento em superfícies não-padrão (Bola, Feijão, Slide, Ab
+  #      Wheel, Banco, Anilha) = null (nenhum dos 8 níveis aproxima
+  #      clinicamente). Anilha ajustada de halter pra null (uso clínico
+  #      específico — anilha solo nas mãos, similar a supino fechado mas
+  #      mais fácil pra iniciantes).
+  #   C. Prancha Renegade equipamento = corporal (proposta 1 — variante
+  #      leve sem halter).
+  #   D. INFRAs novos (4 mock_futuros): Alternado uni+corporal+comp2/fad2;
+  #      Suspenso bi+barra+comp4/fad3; Chão bi+corporal+comp2/fad2;
+  #      Roll-Up bi+corporal+comp3/fad3.
+  #   E. Russian Twist = bi+halter+comp3/fad3 (user prescreve com halteres).
+  #   F. variante_pontual=false em todos 25.
+
+  # ── core_isometrico — atuais (13) ──────────────────────────────────
+
+  # Diretriz Sessão 7c (correção retroativa): equipamento_grupo = null em
+  # TODO G8 (core). equipamento_grupo é tiebreaker Baixo (-5) com semântica
+  # "desempata pares iguais em outras dims biomecânicas". Em core,
+  # equipamento é só fonte de carga arbitrária (halter, polia, barra de
+  # suspensão = não têm distinção biomecânica que justifique o tiebreaker).
+  # Logisticamente também não há fricção real (vários halteres na sala vs
+  # crossover único). Diferente de peito/costas onde equipamento carrega
+  # info biomecânica real (halter livre vs Smith = estabilização indep).
+  # Diretriz registrada na Seção 7.2 do spec.
+
+  - nome: "Prancha"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "prancha frontal"  # reclassif Caso 1
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "Prancha Alternada"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "prancha frontal"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "Prancha Bola"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "prancha frontal"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # Bola fora dos 8 níveis (Decisão B Sessão 7c)
+      variante_pontual: false
+
+  - nome: "Prancha Feijao"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "prancha frontal"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # Feijão fora dos 8 níveis
+      variante_pontual: false
+
+  - nome: "Prancha Slideboard"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "prancha frontal"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # Slide Board explicitado Seção 7.2 nota 8
+      variante_pontual: false
+
+  - nome: "Prancha Renegade"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "prancha frontal"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "Prancha Lateral"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "prancha lateral"  # reclassif Caso 1
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "Hollow Hold"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: null
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "Roda Abdominal"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: null
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # Ab Wheel fora dos 8 níveis
+      variante_pontual: false
+
+  - nome: "Pallof Press"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: null
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "Dead Bug"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Dead bug"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "Dead Bug C/ Anilha"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Dead bug"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # Decisão B Sessão 7c — anilha solo nas mãos
+                               # (similar supino fechado mas mais fácil setup)
+      variante_pontual: false
+
+  - nome: "Dead Bug C/ Bola"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "Dead bug"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # Bola fora dos 8 níveis
+      variante_pontual: false
+
+  # ── core_dinamico — atuais (7) ─────────────────────────────────────
+
+  - nome: "Crunch Chão"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "crunch"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "Crunch Na Bola"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "crunch"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # Bola fora dos 8 níveis
+      variante_pontual: false
+
+  - nome: "Crunch No Cabo"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "crunch"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "V-Up"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "v-up"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "V-Up Unilateral"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "v-up"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "Abd Bicicleta"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: "crunch"  # Sessão 2 G8 — foco visual crunch
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+
+  - nome: "Canoinha"
+    origem: cadastrado
+    dimensoes:
+      familia_estrita: null
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # Banco passivo, não diferencia
+      variante_pontual: false
+
+  # ── Cadastros futuros G8 (5 mock_futuros — Decisões D + E Sessão 7c) ──
+  # Padrão real (`flexao_tronco`/`flexao_quadril`/`rotacao_tronco`) fica
+  # pra Etapa 7. Aqui usamos padrão antigo (`core_dinamico`) pra retrocompat
+  # com gerador atual.
+
+  - nome: "Russian Twist"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "russian twist"  # família solo nova
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # diretriz G8 — equipamento é só fonte de carga
+      variante_pontual: false
+    extras:
+      regiao: "core"
+      subregiao: "core_dinamico"
+      padrao: "core_dinamico"  # retrocompat — Etapa 7 → rotacao_tronco dyn
+      purpose: "isolation"
+      unilateral: "bilateral"
+      complexidade: 3
+      fadiga: 3
+      eq_primario: "Halteres"
+      musculo_primario: "obliquos, reto abdominal"
+
+  - nome: "INFRA Alternado"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "INFRA"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+    extras:
+      regiao: "core"
+      subregiao: "core_dinamico"
+      padrao: "core_dinamico"  # retrocompat — Etapa 7 → flexao_quadril dyn
+      purpose: "isolation"
+      unilateral: "unilateral"
+      complexidade: 2
+      fadiga: 2
+      eq_primario: "Colchonete"
+      musculo_primario: "iliopsoas, reto abdominal"
+
+  - nome: "INFRA Suspenso"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "INFRA"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null  # diretriz G8 — barra fixa é estrutura passiva
+      variante_pontual: false
+    extras:
+      regiao: "core"
+      subregiao: "core_dinamico"
+      padrao: "core_dinamico"  # retrocompat — Etapa 7 → flexao_quadril dyn
+      purpose: "isolation"
+      unilateral: "bilateral"
+      complexidade: 4
+      fadiga: 3
+      eq_primario: "Barra fixa (crossover)"
+      musculo_primario: "iliopsoas, reto abdominal"
+
+  - nome: "INFRA Chão"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "INFRA"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+    extras:
+      regiao: "core"
+      subregiao: "core_dinamico"
+      padrao: "core_dinamico"
+      purpose: "isolation"
+      unilateral: "bilateral"
+      complexidade: 2
+      fadiga: 2
+      eq_primario: "Colchonete"
+      musculo_primario: "iliopsoas, reto abdominal"
+
+  - nome: "INFRA Roll-Up"
+    origem: mock_futuro
+    dimensoes:
+      familia_estrita: "INFRA"
+      plano_corporal: null
+      pegada: null
+      equipamento_grupo: null
+      variante_pontual: false
+    extras:
+      regiao: "core"
+      subregiao: "core_dinamico"
+      padrao: "core_dinamico"
+      purpose: "isolation"
+      unilateral: "bilateral"
+      complexidade: 3
+      fadiga: 3
+      eq_primario: "Colchonete"
+      musculo_primario: "iliopsoas, reto abdominal"
