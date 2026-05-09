@@ -81,7 +81,14 @@ def test_upper_3x2treinos_tem_composto_de_cada_ancora(banco):
 def test_perna_anterior_3x3_respeita_quota_3_2(banco):
     """Em 100 rotinas perna_anterior(3) × 3, distribuição
     bilateral:unilateral deve aproximar 3:2 (proporção dos pesos),
-    não 1:2 (proporção do banco)."""
+    não 1:2 (proporção do banco).
+
+    Etapa 7 Fase 7.2: razão observada caiu de ~1.5 pra ~1.2 quando o
+    predicado D1 fixou família INTRA hard mesmo no relax. Antes, o
+    relax permitia 2 "Agachamento" no mesmo treino (over-permissivo),
+    inflando bilaterals via repetição da mesma família. Agora a
+    Hamilton em 9 vagas (3 treinos × 3) com peso 3:2 entrega 5 bi + 4
+    uni = ratio 1.25, mais próximo da quota verdadeira."""
     bi_total = 0
     uni_total = 0
     for seed in range(3000, 3100):
@@ -95,10 +102,11 @@ def test_perna_anterior_3x3_respeita_quota_3_2(banco):
             elif ex.padrao == "squat_unilateral":
                 uni_total += 1
     razao = bi_total / max(uni_total, 1)
-    # Esperado pós-Etapa 3: ~ 3/2 = 1.5
-    assert 1.2 <= razao <= 1.8, (
+    # Esperado pós-Etapa 7 Fase 7.2: ~ 5/4 = 1.25 (Hamilton em 9 vagas).
+    # Range tolera flutuação de seed; antes era ~1.5 com over-permissivo relax.
+    assert 1.0 <= razao <= 1.8, (
         f"bi:uni = {bi_total}:{uni_total} (razao={razao:.2f}), "
-        "esperado ~1.5"
+        "esperado ~1.25 (Hamilton 9 vagas peso 3:2)"
     )
 
 

@@ -12,6 +12,8 @@ import random
 from dataclasses import dataclass, field
 from typing import Optional
 
+from pesos_proximidade import SUBREGIOES_LATERALIDADE_HARD
+
 # ---------------------------------------------------------------------------
 # Constantes
 # ---------------------------------------------------------------------------
@@ -668,6 +670,11 @@ class Exercicio:
     carga_grip: int = 0
     carga_lombar: int = 0
     demanda_core: int = 0
+    # Tag narrow-scope da Etapa 6 (Seção 7.7). True em exercícios "uso
+    # pontual cross-family same-subregião" (Supino Fechado, Apoio Fechado
+    # etc.). Hard INTRA via predicado `_compativel_intra` (D1.c). Default
+    # False; banco real (XLSX) ainda não tem coluna — Fase 4 cadastra.
+    variante_pontual: bool = False
 
 
 @dataclass
@@ -1512,6 +1519,49 @@ def _normalizar_config(cfg: dict) -> dict:
     return out
 
 
+def _compativel_intra(
+    cand: "Exercicio",
+    alocados_intra: list["Exercicio"],
+) -> bool:
+    """Predicado central de proximidade hard INTRA (Etapa 6, D1 — Sessão 4).
+
+    Retorna True sse `cand` é compatível com TODOS os exercícios já
+    alocados no MESMO treino segundo as 3 regras hard:
+
+    1. **Família refinada same-treino** — `cand.variacao_de == outro.variacao_de`
+       (ambas não-vazias). Mesma família refinada = redundante (Seção 1.4).
+    2. **`variante_pontual` cross-family same-subregião** — Supino Fechado +
+       Apoio Fechado dentro de peito = max 1 por rotina por subregião (D1.c).
+    3. **Lateralidade contextual costas** — 2 unilaterais dentro de costas =
+       hard. Outras subregiões usam soft `anti_uni_mesmo_grupo` Etapa 5
+       (D1.d). Subregiões "hard" listadas em `SUBREGIOES_LATERALIDADE_HARD`.
+
+    Soft INTRA (pegada, plano_corporal, equipamento_grupo) NÃO entra aqui —
+    vive em `_score_pareamento` aditivamente (D2, Fase 7.3).
+    """
+    for outro in alocados_intra:
+        # 1. Família refinada same-treino
+        if cand.variacao_de and cand.variacao_de == outro.variacao_de:
+            return False
+        # 2. variante_pontual cross-family same-subregião
+        if (
+            cand.variante_pontual
+            and outro.variante_pontual
+            and cand.subregiao == outro.subregiao
+            and cand.variacao_de != outro.variacao_de
+        ):
+            return False
+        # 3. Lateralidade contextual (costas)
+        if (
+            cand.unilateral == "unilateral"
+            and outro.unilateral == "unilateral"
+            and cand.subregiao == outro.subregiao
+            and cand.subregiao in SUBREGIOES_LATERALIDADE_HARD
+        ):
+            return False
+    return True
+
+
 def _candidatos_estritos(
     banco: list[Exercicio],
     nivel: str,
@@ -1520,11 +1570,21 @@ def _candidatos_estritos(
     nomes_bloqueados: set[str],
     familias_bloqueadas: set[str],
     filtro_purpose: Optional[str] = None,  # None | "composto" | "isolado"
+    alocados_intra: Optional[list[Exercicio]] = None,
 ) -> list[Exercicio]:
     """Retorna candidatos viáveis pra um slot no MODO ESTRITO.
 
     Aplica filtros user (eq, complexidade), filtros de hierarquia (padrões do
     escopo), e bloqueia nomes + famílias já alocados. Não considera relax.
+
+    `alocados_intra` (opcional) é a lista de exercícios já alocados no MESMO
+    treino do slot — usada pelo predicado `_compativel_intra` pra aplicar
+    regras hard INTRA 2 (variante_pontual) e 3 (lateralidade contextual
+    costas). Regra 1 (família refinada same-treino) já é coberta pelo
+    filtro `familias_bloqueadas` existente; será migrada pro predicado
+    quando 7.4 separar família INTRA de INTER. Quando `None`, predicado
+    é skip (compatibilidade retroativa com call-sites legados que não
+    rastreiam alocados intra).
     """
     eq_bloq = cfg_treino.get("equipamentos_bloqueados") or []
     max_cx = cfg_treino.get("max_complexidade", 5)
@@ -1544,6 +1604,12 @@ def _candidatos_estritos(
         if e.nome in familias_bloqueadas:
             continue
         if e.variacao_de and e.variacao_de in familias_bloqueadas:
+            continue
+        # Predicado central de proximidade hard INTRA (Etapa 6 D1) —
+        # cobre variante_pontual cross-family same-subregião + lateralidade
+        # contextual costas. Família refinada já está coberta acima
+        # via familias_bloqueadas (migração pro predicado fica pra 7.4).
+        if alocados_intra and not _compativel_intra(e, alocados_intra):
             continue
         # Lateralidade: se a demanda original (escopo) tem filtro explícito
         # via lateralidade_por_padrao (template legado), aplicar.
@@ -1566,6 +1632,7 @@ def _calcular_escassez(
     cfg_treino: dict,
     nomes_bloqueados: set[str],
     familias_bloqueadas: set[str],
+    alocados_intra: Optional[list[Exercicio]] = None,
 ) -> int:
     """Número de candidatos viáveis (modo estrito) pra esse slot.
 
@@ -1573,10 +1640,14 @@ def _calcular_escassez(
     Etapa 3: filtro composto aposentado. A quota composta agora emerge
     dos pesos das âncoras subregião (Hamilton sobre ANCORAS_POR_SUBREGIAO),
     não de uma flag separada no slot.
+
+    `alocados_intra` propagado pra `_candidatos_estritos` aciona o
+    predicado D1 (variante_pontual + lateralidade contextual costas).
     """
     cands = _candidatos_estritos(
         banco, slot.nivel, slot.escopo_alocacao, cfg_treino,
         nomes_bloqueados, familias_bloqueadas, filtro_purpose=None,
+        alocados_intra=alocados_intra,
     )
     return len(cands)
 
@@ -2061,6 +2132,15 @@ def pre_alocar_rotina(
                 )
                 slots_pendentes.append(slot)
 
+    # Helper interno — exercícios já alocados no MESMO treino do slot
+    # (input pro predicado D1 `_compativel_intra`). Inclui travados (-1)
+    # e demandas regulares.
+    def _alocados_intra(t_idx: int) -> list[Exercicio]:
+        out: list[Exercicio] = []
+        for exs in alocacao[t_idx].values():
+            out.extend(exs)
+        return out
+
     # ─── Etapa D: passe 1 (estrito) ──────────────────────────────────────
     # Etapa 3: quota composta aposentada. Pesos das âncoras subregião
     # decidem distribuição composto/isolado (empurrar_compostos:3 vs
@@ -2070,7 +2150,10 @@ def pre_alocar_rotina(
         # Calcular escassez de cada slot pendente
         def _escassez_slot(s: _Slot) -> int:
             cfg_t = configs_norm[s.treino_idx]
-            return _calcular_escassez(s, banco, cfg_t, nomes_globais, familias_globais)
+            return _calcular_escassez(
+                s, banco, cfg_t, nomes_globais, familias_globais,
+                alocados_intra=_alocados_intra(s.treino_idx),
+            )
 
         # Ordenação: (escassez_estrita, peso_nivel, jitter_seeded)
         slots_pendentes.sort(
@@ -2084,6 +2167,7 @@ def pre_alocar_rotina(
             banco, slot.nivel, slot.escopo_alocacao, cfg_t,
             nomes_globais, familias_globais,
             filtro_purpose=None,
+            alocados_intra=_alocados_intra(slot.treino_idx),
         )
 
         if cands:
@@ -2105,7 +2189,10 @@ def pre_alocar_rotina(
         def _escassez_relax(s: _Slot) -> int:
             cfg_t = configs_norm[s.treino_idx]
             # No relax, familias_bloqueadas = vazio, mas nomes_globais ainda bloqueia.
-            return _calcular_escassez(s, banco, cfg_t, nomes_globais, set())
+            return _calcular_escassez(
+                s, banco, cfg_t, nomes_globais, set(),
+                alocados_intra=_alocados_intra(s.treino_idx),
+            )
 
         while slots_para_relax:
             slots_para_relax.sort(
@@ -2117,6 +2204,7 @@ def pre_alocar_rotina(
                 banco, slot.nivel, slot.escopo_alocacao, cfg_t,
                 nomes_globais, set(),  # família relaxada
                 filtro_purpose=None,
+                alocados_intra=_alocados_intra(slot.treino_idx),
             )
             if cands:
                 escolhido = random.choice(cands)

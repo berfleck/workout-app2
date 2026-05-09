@@ -95,9 +95,9 @@ fecharam E.1.b2: 78 mocks YAML em 8 grupos + 16 cenários no harness +
 
 ## Etapa 7 — plano e decisões fechadas (não reabrir sem motivo forte)
 
-Plano consolidado na Sessão 7c (2026-05-09). **Fase 7.1 ✅ concluída
-Sessão 8 (2026-05-09).** Sessão 9 arranca Fase 7.2. Decisões já
-fechadas:
+Plano consolidado na Sessão 7c (2026-05-09). **Fases 7.1 ✅ Sessão 8
++ 7.2 ✅ Sessão 9 (ambas 2026-05-09).** Sessão 10 arranca Fase 7.3.
+Decisões já fechadas:
 
 **Branch:** `etapa-7` (criado Sessão 8 a partir de `refator-gerador`).
 Sem sub-branches por fase (1 PR por fase no mesmo branch).
@@ -113,10 +113,14 @@ de INTER+HIST):**
    N/A); limitação `costas` aceita; **família INTRA = soft_alto (-50)
    ancorado em A.3** (Nota de correção 8.15.2.bis registra
    contradição com 8.15.2 shorthand).
-2. **7.2 ⏳ próxima** — predicado `_compativel_intra` (3 regras hard:
-   família + variante_pontual + lateralidade contextual costas).
-   **Resolve 1.3 + 2.2A FAIL → 0%.** `SUBREGIOES_LATERALIDADE_HARD`
-   já mora em `pesos_proximidade.py`.
+2. **7.2 ✅ Sessão 9** — predicado `_compativel_intra` em
+   `gerador_treino.py` (3 regras hard: família + variante_pontual +
+   lateralidade contextual costas) + wire em `pre_alocar_rotina` via
+   3 call-sites de `_candidatos_estritos`. Campo novo
+   `Exercicio.variante_pontual`. **1.3: 3.80% → 0.00% ✓** /
+   **2.2A: 4.30% → 0.00% ✓**. Efeito secundário corretional: relax
+   antes era over-permissivo (permitia família INTRA same-treino) —
+   3 snapshots e 1 teste de razão atualizados.
 3. **7.3** — score soft INTRA (D2): plano + pegada matriz 4×4 +
    equipamento + variante_pontual INTER. Anti_uni Etapa 5 mantido
    ortogonal.
@@ -141,17 +145,20 @@ independente da migração família INTER; vitória rápida em
 iterativa); Caminho C da D3.2 não obriga acoplamento entre
 predicado e migração.
 
-**Documentos fonte de verdade pra Sessão 9 (Fase 7.2):**
+**Documentos fonte de verdade pra Sessão 10 (Fase 7.3):**
 
-- `pesos_proximidade.py` (entregue Fase 7.1) — importar
-  `SUBREGIOES_LATERALIDADE_HARD` de lá no predicado
-- `docs/refatoracao/dimensoes_proximidade.md` Seção 1.7 (predicado D1
-  com 3 regras hard) + Seção 8.4 (D1 fechado Sessão 4) + Seção
-  8.15.2.bis (Nota de correção família INTRA = soft_alto)
-- `gerador_treino.py` — predicado entra em `pre_alocar_rotina`
-  substituindo check `variacao_pais_intra` atual
-- `tools/calibrar_pesos_dimensoes.py` — re-rodar 16 cenários após
-  7.2; esperado 1.3 e 2.2A → 0%
+- `pesos_proximidade.py` (Fase 7.1) — `PESOS_DEFAULT.peso_intra(subregiao)`
+  já faz lookup com cascata override→default; usar em
+  `_score_pareamento` na Fase 7.3
+- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.7 (D2 — soft
+  INTRA fechado: par-a-par cumulativa, constante por dim, escala
+  -100/-50/-20/-5) + Seção 3.1 (matriz pegada 4×4) + Seção 8.15.4
+  (fechamento Fase 7.2)
+- `gerador_treino.py` `_score_pareamento` (~linha 488) — adicionar
+  penalty soft INTRA aditivo aos componentes existentes; anti_uni
+  Etapa 5 mantido ortogonal
+- `tools/calibrar_pesos_dimensoes.py` `_penalty_proximidade` stub —
+  spec de referência da composição par-a-par
 
 **Pendências em aberto pra Etapa 7** (registradas Seção 8.15.4):
 

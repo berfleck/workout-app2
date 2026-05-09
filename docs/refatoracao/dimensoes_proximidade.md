@@ -2934,7 +2934,88 @@ ambiguidades antecipadas, fechadas pelo user no fechamento da 7c):
 **3 FAIL baseline pré-Etapa 7 esperados:** 1.3 + 2.2A + 4.1 — todos
 viram OK quando 7.2 + 7.4 implementarem predicado e HISTÓRICO toggle.
 
-#### 8.15.4 Pendências em aberto pra Etapa 7
+> **Status pós-Fase 7.2 (Sessão 9 — 2026-05-09):** harness re-rodado,
+> 1.3 e 2.2A → 0.00% conforme planejado. **15/16 OK + 1 FAIL** (apenas
+> 4.1, que vira OK pós-Fase 7.4). Demais 12 cenários OK pré-Etapa 7
+> permanecem OK (3.3 = 41.80%, 5.2 = 17.20%, 2.3 = 5.50%, 2.4 = 100%
+> com sub-pareamento 94.90% — todos dentro da expectativa pré-7.3).
+> Detalhes na Seção 8.15.4.
+
+#### 8.15.4 Fechamento Fase 7.2 (Sessão 9 — 2026-05-09)
+
+**Entregue:** predicado `_compativel_intra(cand, alocados_intra)` em
+`gerador_treino.py` com as 3 regras hard INTRA da decisão D1
+(Seção 1.7). Wire pelos 3 call-sites de `_candidatos_estritos` em
+`pre_alocar_rotina` (passe estrito + passe relax + cálculo de
+escassez). `SUBREGIOES_LATERALIDADE_HARD` importado do
+`pesos_proximidade.py`.
+
+**Mudanças estruturais:**
+
+1. Campo novo `Exercicio.variante_pontual: bool = False` — banco real
+   (XLSX) ainda não tem coluna; harness `_aplicar_overlay` agora
+   propaga a tag do mock pra Exercicio em-memória. Cadastro real entra
+   na Fase 4.
+2. `_candidatos_estritos` ganhou parâmetro `alocados_intra: list |
+   None = None` (default `None` mantém retrocompat com call-sites
+   legados — `gerar_sessao_por_demandas` standalone via /regerar não
+   rastreia alocados intra explicitamente; predicado é skip nesse
+   caminho).
+3. Regra 1 do predicado (família same-treino) hoje é redundante com o
+   filtro existente `familias_bloqueadas` em `_candidatos_estritos`.
+   Mantida no predicado como SPEC; migração estrutural (predicado
+   vira fonte única, set legado removido) acontece na Fase 7.4 quando
+   família INTER vai de hard pra soft.
+
+**Efeito secundário corretional do fix do relax:** o passe relax
+(`familias_bloqueadas = set()`) era **over-permissivo** — permitia
+mesma família INTRA dentro do mesmo treino, contradizendo Seção 1.4
+("INTRA: hard filter. Mesmo treino com 2 membros da mesma família
+refinada continua redundante"). Predicado regra 1 fixa: família INTRA
+é hard sempre, mesmo no relax. Relax continua só pra INTER família
+(propósito original).
+
+**Impacto observado em testes existentes:**
+
+- 3 testes de regressão (`test_peito_3x2treinos_seed13`,
+  `test_upper_3_lower_2_core_2_3treinos_seed42`,
+  `test_template_empurrar_puxar_seed7`) tinham snapshots calibrados
+  com o comportamento over-permissivo. Atualizados via
+  `--snapshot-update`.
+- `test_perna_anterior_3x3_respeita_quota_3_2`: razão bi:uni caiu de
+  ~1.5 pra ~1.20 (consistente em 3 ranges de seed). Hamilton em 9
+  vagas (3 treinos × 3) com peso 3:2 entrega 5 bi + 4 uni = ratio
+  1.25 — mais próxima da quota verdadeira. Antes do fix, o relax
+  inflava bilaterals via 2 "Agachamento" no mesmo treino. Range do
+  teste ajustado pra `1.0 ≤ razão ≤ 1.8` com docstring explicando.
+- Suíte completa: 174 passados + 13 snapshots, 1 skip pré-existente.
+
+**Harness pós-7.2 — 15/16 OK:**
+
+| ID | Pré-7.2 | Pós-7.2 | Status |
+|---|---|---|---|
+| 1.1, 1.2 | 0.00% | 0.00% | OK |
+| **1.3** | **3.80% FAIL** | **0.00%** | **OK ✓ (regra 2)** |
+| 2.1 | 0.00% | 0.00% | OK |
+| **2.2A** | **4.30% FAIL** | **0.00%** | **OK ✓ (regra 3)** |
+| 2.2B | 0.00% | 0.00% | OK |
+| 2.3 | 5.20% | 5.50% | OK (calibrar 7.3+7.6) |
+| 2.4 | 100% (sub 94.9%) | 100% (sub 94.9%) | OK (alvo ~70% pós-7.3) |
+| 3.1 | 0.00% | 0.00% | OK (move pra 10-15% pós-7.4) |
+| 3.2 | 0.00% | 0.00% | OK (move pra <10% pós-7.4) |
+| 3.3 | 41.80% | 41.80% | OK (mantido) |
+| **4.1** | **100% FAIL** | **100% FAIL** | aguarda 7.4 |
+| 4.2 | 100% | 100% | OK informativo |
+| 5.2 | 17.20% | 17.20% | OK (não regrediu) |
+| 6.1 | 0.00% (sec 100%) | 0.00% (sec 100%) | OK (não regrediu) |
+| 6.2 | 0.00% (sub-a 0.20% / sub-b 2.80%) | 0.00% (sub-a 0.20% / sub-b 0.00%) | OK (sub-b melhorou — predicado lateralidade hard captura) |
+
+Sub-b do 6.2 foi de 3.30% pra 0.00% — efeito do predicado regra 3 em
+costas. Realista também respeita o gate hard agora (era 3.30% no
+patológico antes, 0% agora). Sub-a (0.20%) inalterado — já era
+ínfimo, regra 3 só aplica em costas e sub-a mede outras subregiões.
+
+#### 8.15.5 Pendências em aberto pra Etapa 7
 
 1. **Bug retrocompat `("subregiao", "core", N)`** falha alocação
    (`qtd_obtida=0`). Workaround atual: usar `core_dinamico`/

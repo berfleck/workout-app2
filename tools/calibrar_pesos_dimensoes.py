@@ -104,19 +104,24 @@ def _carregar_mocks() -> tuple[dict[str, MockDimensoes], list[dict]]:
 
 def _aplicar_overlay(banco: list[Exercicio], dims: dict[str, MockDimensoes],
                      futuros: list[dict]) -> list[Exercicio]:
-    """Sobrescreve `variacao_de` em Exercicios cadastrados conforme mock e
-    adiciona Exercicios mock_futuro ao banco.
+    """Sobrescreve `variacao_de` + `variante_pontual` em Exercicios
+    cadastrados conforme mock e adiciona Exercicios mock_futuro ao banco.
 
-    Apenas `familia_estrita` afeta o gerador atual (via `variacao_de`); demais
-    dims ficam disponíveis no dict `dims` pra uso futuro do stub
-    `_penalty_proximidade`.
+    Etapa 7 Fase 7.2: `variante_pontual` agora é campo do `Exercicio`
+    (default False) e o predicado `_compativel_intra` lê dele direto.
+    Overlay propaga a tag do mock pra Exercicio em-memória — banco real
+    (XLSX) ainda não tem coluna; Fase 4 cadastra.
+
+    Demais dims (plano_corporal, pegada, equipamento_grupo) continuam só
+    no dict `dims` — entram no gerador via score soft INTRA na Fase 7.3.
     """
     nomes_cadastrados = {e.nome for e in banco}
     for ex in banco:
         if ex.nome in dims:
-            fam = dims[ex.nome].familia_estrita
-            if fam is not None:
-                ex.variacao_de = fam
+            mock = dims[ex.nome]
+            if mock.familia_estrita is not None:
+                ex.variacao_de = mock.familia_estrita
+            ex.variante_pontual = mock.variante_pontual
 
     # Cria Exercicios pra mock_futuros não cadastrados.
     for item in futuros:
@@ -141,6 +146,7 @@ def _aplicar_overlay(banco: list[Exercicio], dims: dict[str, MockDimensoes],
             similaridade="",
             musculo_primario=extras.get("musculo_primario", ""),
             obs=None,
+            variante_pontual=ex_dims.variante_pontual,
         )
         banco.append(novo)
     return banco
