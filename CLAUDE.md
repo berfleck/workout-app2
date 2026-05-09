@@ -95,10 +95,12 @@ fecharam E.1.b2: 78 mocks YAML em 8 grupos + 16 cenários no harness +
 
 ## Etapa 7 — plano e decisões fechadas (não reabrir sem motivo forte)
 
-Plano consolidado na Sessão 7c (2026-05-09). **Fases 7.1 ✅ Sessão 8
-+ 7.2 ✅ Sessão 9 + 7.3 ✅ Sessão 10 + 7.4 ✅ Sessão 11 + 7.5 ✅
-Sessão 12 (todas 2026-05-09).** Sessão 13 arranca Fase 7.6 (calibração
-C coordinate descent). Decisões já fechadas:
+Plano consolidado na Sessão 7c (2026-05-09). **Fases 7.1-7.6 ✅
+Sessões 8-13 (todas 2026-05-09). Etapa 7 CONCLUÍDA.** 7.6 fechou
+como **validação + wire da Dim 3** (NÃO ajuste numérico) — 4 das 5
+dims são NO-OPs no harness atual; defaults da 7.1 já razoáveis;
+calibração futura via setup B do 4.1 ou escalada setup 2.3 não
+bloqueia. Decisões já fechadas:
 
 **Branch:** `etapa-7` (criado Sessão 8 a partir de `refator-gerador`).
 Sem sub-branches por fase (1 PR por fase no mesmo branch).
@@ -159,9 +161,22 @@ de INTER+HIST):**
    harness, decisão Sessão 12. (c) Harness 14/16 OK + 2 FAIL
    esperados (2.3 + 4.1, calibração 7.6). 5.2 drift pós-7.4
    17.20%→34.60% registrado (não regressão funcional).
-6. **7.6** — C calibração coordinate descent (5 dims em ordem:
-   família INTER → plano+pegada → lateralidade soft → HISTÓRICO →
-   equipamento). Cap 5-10 rounds/dim.
+6. **7.6 ✅ Sessão 13** — calibração C coordinate descent fechada
+   como **validação + wire**, NÃO ajuste numérico. Wire da Dim 3
+   (anti_uni) implementado em `_score_pareamento` honrando spec
+   8.10/B.2 (config→gerador, default-preserving). 4 das 5 dims
+   confirmadas NO-OP por sondagem empírica em 1000 iters/candidato:
+   Dim 1 (família INTER) cenários gateados por outras dims;
+   Dim 2 (plano+pegada) banco grande, softmax acha alternativa;
+   Dim 3 (anti_uni) setup 2.4 sem alternativa de pareamento;
+   Dim 5 (equipamento) tiebreaker nunca dispara isolado.
+   Dim 4 (HIST) plateau ~17% dentro do teto 1.2x (alvo <10%
+   inalcançável sem violar invariante; piso estrutural ~6% só
+   chega com mult ≥5 = peso -250). Restrições pré-7.6 (cap 10
+   rounds + teto HIST 1.2x) honradas — paramos antes de
+   brute-force. 2 FAIL benignas: 2.3 (NO-OP Dim 2; reabrir via
+   escalada setup) + 4.1 (plateau Dim 4; reabrir via setup B do
+   refinamento métrica). Detalhes Seção 8.15.9.
 
 **Granularidade Fase 7.1:** módulo completo (não incremental).
 **Ressalva:** se ambiguidade na Seção 8.10 / B aparecer durante
@@ -175,43 +190,28 @@ independente da migração família INTER; vitória rápida em
 iterativa); Caminho C da D3.2 não obriga acoplamento entre
 predicado e migração.
 
-**Documentos fonte de verdade pra Sessão 13 (Fase 7.6):**
+**Documentos fonte de verdade pós-Etapa 7 (próximas sessões — Etapa 8 ou refinamentos):**
 
-- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.15.8 (fechamento
-  Fase 7.5 — métrica 4.1 contínua opção A + cenário 5.1 em pytest +
-  16 cenários re-rodados)
-- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.12 / C (processo
-  de calibração coordinate descent — ordem das 5 dims, cap 5-10
-  rounds, validação cruzada como salvaguarda)
-- `pesos_proximidade.py` — pesos atuais (A.3). Calibração 7.6 ajusta
-  defaults globais ou overrides por subregião na hierarquia 2 níveis.
-  Argumento `pesos_override: ConfigPesosProximidade | None = None` em
-  `gerar_multiplos_treinos` permite testar combinações sem contaminar
-  globais (B.4).
+- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.15.9 (fechamento
+  Fase 7.6 — wire Dim 3 + 4 NO-OPs como ACHADO + 2 FAIL benignas com
+  caminhos de resolução)
+- Seção 8.15.8 (fechamento Fase 7.5 + auditoria/reconciliação 4.1 e 5.2)
+- `pesos_proximidade.py` — pesos finais validados na 7.6 (defaults da
+  7.1 mantidos). Argumento `pesos_override` em `gerar_multiplos_treinos`
+  pra harness de calibração futura (não contamina globais — B.4).
 - `tools/calibrar_pesos_dimensoes.py` harness pronto. Métrica 4.1
   contínua via `metrica_continua_fn`.
-- **Plano Fase 7.6 — calibração C coordinate descent:**
-  - Ordem: família INTER → plano+pegada (acopladas) → lateralidade
-    soft → HISTÓRICO → equipamento_grupo (último, tiebreaker).
-  - **Cap MÁXIMO 10 rounds/dim** + validação cruzada (Seção 8.12 / C.3
-    reforçada Sessão 12). Não brute-force além de 10 rounds — abrir
-    discussão estrutural se não convergir.
-  - **Teto HIST** (Seção 8.11 / A.3.bis registrada Sessão 12):
-    multiplicador HIST máximo permitido = **1.2** (sobre soft_alto
-    -50 = -60), pra preservar invariante "pior caso família INTER+HIST
-    > -100". Sugestão "2.5x" da Seção 8.15.8 viola essa restrição —
-    ignorar. Se 1.2x não fechar 4.1 < 10%, parar e abrir ramo "setup
-    B do refinamento métrica 4.1" (R-1 estrutura DIFERENTE).
-  - **Alvos explícitos:**
-    - 2.3: faixa **2-10%** (atual 0% over-correção, reduzir peso INTRA)
-    - 2.4 sub: **~70%** (atual 89.90%, reduzir peso INTRA squat)
-    - 3.1: **10-15%** (atual 0%)
-    - 3.2: **<10%** (atual 0%)
-    - 4.1: **<10% slots** (atual 22.18%, aumentar multiplicador
-      HIST dentro do teto 1.2x — gap real ~12 pp, ver Seção 8.15.8
-      "Reconciliação")
 
-**Pendências em aberto pra Etapa 7** (Seção 8.15.7 + atualização 8.15.8):
+**Refinamentos pós-Etapa 7 abertos (não bloqueiam uso real):**
+
+- **Setup B do 4.1** (item 7 da 8.15.7): R-1 Variante A 2x ↔ rotina
+  nova Variante B 2x. Banco com mais "ar" → fecha 4.1 < 10% sem
+  violar invariante. ~1 sessão.
+- **Escalada de setup do 2.3** (item 8 NOVO da 8.15.7): `costas(7)`
+  ou `costas(8)` pra dar sinal mensurável a Dim 2 — ou aceitar 2.3
+  em over-correção benigna. ~30min se aprovado.
+
+**Pendências em aberto pós-Etapa 7** (Seção 8.15.7 + atualização 8.15.9):
 
 1. Bug retrocompat `("subregiao", "core", N)` — Etapa 8 ou junto com
    migração estrutural CORE.

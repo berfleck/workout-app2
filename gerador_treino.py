@@ -495,7 +495,8 @@ def _score_pareamento(
     candidato: "Exercicio",
     bloco_atual: list["Exercicio"],
     evitar_agonistas: bool,
-) -> int:
+    pesos_config: Optional["ConfigPesosProximidade"] = None,
+) -> float:
     """Score linear de quão bom é parear `candidato` com o bloco já montado.
 
     Maior = melhor. Componentes aditivos definidos em
@@ -511,9 +512,17 @@ def _score_pareamento(
     - `anti_uni_mesmo_grupo` / `anti_uni_diff_grupo`: penalidade quando
       candidato é unilateral E há outro unilateral no bloco; o peso
       depende de mesmo/diferente grupo musculo-funcional
+
+    `pesos_config` (opcional, Etapa 7 Fase 7.6): quando passado, lê
+    `anti_uni_mesmo_grupo_pesos[grupo]` do config (peso por grupo musculo-
+    funcional) em vez da constante `PESOS_SCORE_PAREAMENTO["anti_uni_mesmo_grupo"]`.
+    Wire da Seção 8.10 / B.2 (estrutura paralela ortogonal). `None` =
+    comportamento legado (constante -75 da Etapa 5). Demais componentes
+    seguem `PESOS_SCORE_PAREAMENTO` — calibração 7.6 só toca anti_uni
+    nesta dim.
     """
     pesos = PESOS_SCORE_PAREAMENTO
-    score = 0
+    score: float = 0.0
 
     regioes_no_bloco = {e.regiao for e in bloco_atual}
     padroes_no_bloco = {e.padrao for e in bloco_atual}
@@ -534,13 +543,25 @@ def _score_pareamento(
     # Aplica uma penalidade por cada unilateral já presente no bloco.
     # Em blocos de 3 com 2 unilaterais já presentes, somam duas penalidades
     # (efeito acumulativo desejado: desincentiva trio com 3 unilaterais).
+    anti_uni_pesos = (
+        pesos_config.anti_uni_mesmo_grupo_pesos
+        if pesos_config is not None else None
+    )
     if candidato.unilateral == "unilateral":
         grupo_cand = GRUPO_MUSCULAR_PADRAO.get(candidato.padrao)
         for ex in bloco_atual:
             if ex.unilateral != "unilateral":
                 continue
-            mesmo_grupo = grupo_cand == GRUPO_MUSCULAR_PADRAO.get(ex.padrao)
-            score += pesos["anti_uni_mesmo_grupo"] if mesmo_grupo else pesos["anti_uni_diff_grupo"]
+            grupo_outro = GRUPO_MUSCULAR_PADRAO.get(ex.padrao)
+            mesmo_grupo = grupo_cand == grupo_outro
+            if mesmo_grupo:
+                # Lookup config (Fase 7.6 Dim 3) → fallback constante legado
+                if anti_uni_pesos is not None and grupo_cand in anti_uni_pesos:
+                    score += anti_uni_pesos[grupo_cand]
+                else:
+                    score += pesos["anti_uni_mesmo_grupo"]
+            else:
+                score += pesos["anti_uni_diff_grupo"]
 
     return score
 
@@ -996,6 +1017,7 @@ def _buscar_candidato(
     evitar_agonistas: bool = False,
     cargas_config: dict | None = None,
     exercicios_travados: list | set | None = None,
+    pesos_config: Optional["ConfigPesosProximidade"] = None,
 ) -> int | None:
     """Retorna o índice do candidato escolhido via softmax top-K, ou None.
 
@@ -1026,7 +1048,8 @@ def _buscar_candidato(
             exercicios_travados=exercicios_travados,
         ):
             continue
-        s = _score_pareamento(exercicios[j], bloco_atual, evitar_agonistas)
+        s = _score_pareamento(exercicios[j], bloco_atual, evitar_agonistas,
+                                pesos_config=pesos_config)
         candidatos.append((j, s))
 
     if not candidatos:
@@ -1049,6 +1072,7 @@ def montar_blocos(
     cargas_config: dict | None = None,
     exercicios_travados: list | set | None = None,
     avisos_carga: list | None = None,
+    pesos_config: Optional["ConfigPesosProximidade"] = None,
 ) -> list[tuple]:
     """
     Monta blocos de tamanho configurável (1, 2 ou 3).
@@ -1084,6 +1108,7 @@ def montar_blocos(
                 evitar_agonistas=evitar_agonistas,
                 cargas_config=cargas_config,
                 exercicios_travados=exercicios_travados,
+                pesos_config=pesos_config,
             )
 
             if melhor is None:
@@ -1096,6 +1121,7 @@ def montar_blocos(
                         evitar_agonistas=evitar_agonistas,
                         cargas_config=None,  # filtro desligado
                         exercicios_travados=exercicios_travados,
+                        pesos_config=pesos_config,
                     )
                     if melhor_off is not None:
                         cand_off = exercicios[melhor_off]
@@ -1233,6 +1259,7 @@ def gerar_sessao(
     evitar_agonistas: bool = False,
     relaxar_familia: bool = False,
     cargas_config: dict | None = None,
+    pesos_config: Optional[ConfigPesosProximidade] = None,
 ) -> Sessao:
     epp      = exercicios_por_padrao or EXERCICIOS_POR_PADRAO
     eq_bloq  = equipamentos_bloqueados or []
@@ -1356,6 +1383,7 @@ def gerar_sessao(
         cargas_config=cargas_config,
         exercicios_travados=travados,
         avisos_carga=avisos_carga_local,
+        pesos_config=pesos_config,
     ))
     avisos_da_sessao.extend(avisos_carga_local)
 
@@ -2543,6 +2571,7 @@ def gerar_sessao_por_demandas(
     relaxar_familia: bool = False,
     exercicios_pre_alocados: Optional[dict[int, list[Exercicio]]] = None,
     cargas_config: dict | None = None,
+    pesos_config: Optional[ConfigPesosProximidade] = None,
 ) -> Sessao:
     """
     Gera uma sessão a partir de uma lista de DEMANDAS hierárquicas.
@@ -2894,6 +2923,7 @@ def gerar_sessao_por_demandas(
         cargas_config=cargas_config,
         exercicios_travados=travados,
         avisos_carga=avisos_carga_local,
+        pesos_config=pesos_config,
     ))
     avisos_da_sessao.extend(avisos_carga_local)
 
@@ -3024,6 +3054,7 @@ def gerar_multiplos_treinos(
             relaxar_familia=relaxar_familia,
             exercicios_pre_alocados=exs_pre,
             cargas_config=cargas_cfg,
+            pesos_config=pesos_override,
         )
 
         # Propaga relaxados da Fase 0 pra Sessao.relaxados (badge ↻ na UI)

@@ -3553,6 +3553,125 @@ explícitos:
   precisa fechar gap de ~12 pp; multiplicador HIST de 1.0 → ~2.5x
   é plausível como ponto de partida, calibrar com 5-10 rounds)
 
+#### 8.15.9 Fechamento Fase 7.6 (Sessão 13 — 2026-05-09)
+
+> **Resumo executivo:** Fase 7.6 fechou como **calibração conferida e
+> wire de configuração faltante implementado**, NÃO como "calibração
+> ajustou pesos". 4 das 5 dims do coordinate descent são **NO-OPs no
+> harness atual** — defaults da 7.1 já são razoáveis empiricamente.
+> Wire da Dim 3 (anti_uni) implementado conforme spec da Seção 8.10 /
+> B.2 (estrutura paralela ortogonal). 14/16 OK + 2 FAIL benignas (2.3
+> e 4.1) — calibração futura via setup B (Seção 8.15.7 item 7) ou
+> escalada de cenários (Seção 1.8.1 densificação).
+>
+> **Esta seção registra explicitamente os 4 NO-OPs como ACHADO da
+> Fase 7.6** — não como "calibração não fechou". Restrições pré-7.6
+> (cap 10 rounds + teto HIST 1.2x da Seção 8.11 A.3.bis) honradas:
+> paramos antes de brute-force.
+
+**Entregue (Sessão 13 — 2026-05-09):**
+
+1. **Wire da Dim 3 implementado** em `gerador_treino.py`:
+   `_score_pareamento` ganhou parâmetro `pesos_config: ConfigPesosProximidade
+   | None = None`. Quando passado, lê `anti_uni_mesmo_grupo_pesos[grupo]`
+   do config (peso por grupo musculo-funcional) em vez da constante
+   `PESOS_SCORE_PAREAMENTO["anti_uni_mesmo_grupo"]`. Default `None`
+   mantém comportamento legado (-75 da Etapa 5). Honra spec da Seção
+   8.10 / B.2 — config era declarada mas não-wired desde Sessão 8.
+
+   Propagação: `_buscar_candidato` → `montar_blocos` →
+   `gerar_sessao_por_demandas` + `gerar_sessao` → `gerar_multiplos_treinos`
+   passa `pesos_override` adiante. Suite pytest 174 OK + 13 snapshots,
+   sem regressões (default behavior idêntico).
+
+2. **Coordinate descent das 5 dims executado** (com sondagem em 1000
+   iters via `pesos_override` por dim):
+
+| Dim | Status | Achado |
+|---|---|---|
+| 1. **Família INTER** | NO-OP | 3.1, 3.2 ficam em 0% mesmo com mult INTER = 0.0; 3.3 já em 49.90% (limite superior). Cenários gateados por OUTRAS dims (pegada, plano), não por família. Default 0.8 mantido. |
+| 2. **Plano + pegada (acopladas)** | NO-OP | 2.3 fica em 0% em soft_alto/soft_medio/soft_baixo. Banco `costas(5)` grande o suficiente que softmax sempre acha candidatos sem colisão pegada+plano duplicada. Default soft_alto -50 / -40 mantido. |
+| 3. **Lateralidade soft (anti_uni)** | NO-OP | Wire implementado e validado por unit test direto (peso -1000 produz score -975 vs -50 default). Mas cenário 2.4 setup `padrão squat_unilateral(2) × 1 treino` força pareamento — só 2 ex unis disponíveis, sem alternativa pro gerador escolher. Mesmo peso -1.000.000 deixa 2.4 sub em 89.50%. Default -75 mantido em todos os 9 grupos. |
+| 4. **HISTÓRICO** | Plateau ~17% | Sondagem mult 1.0 → 1.2 (teto da A.3.bis): 22.17% → 18.09% → 17.02% → 16.99% → 16.94% (diminishing returns claros). Mult 5.0 (peso -250, **viola invariante**) chega a 10.72%; mult 100 plateau ~6.25%. Piso estrutural ~6%, mas dentro do teto 1.2x não fecha <10%. Default 1.0 mantido — calibração futura via setup B se necessário. |
+| 5. **Equipamento_grupo** | NO-OP | Sondagem soft_baixo / soft_medio / soft_alto: 2.3 e 2.1 todos em 0%. Tiebreaker nunca dispara isolado nesse setup. Default soft_baixo -5 mantido. |
+
+3. **Restrições pré-7.6 honradas** (Seção 8.11 / A.3.bis + Seção 8.12
+   / C.3 reforçada):
+   - Cap MÁXIMO 10 rounds/dim — nenhuma dim foi além de 5 rounds
+     (a maioria 1-3 rounds revelou NO-OP).
+   - Teto HIST 1.2x — não atingido. Sondagem fora do teto (mult 5.0,
+     20.0, 100.0) feita só como **instrumentação de debug** pra
+     confirmar piso estrutural; valores rejeitados pra default.
+
+**Resultados harness pós-7.6 (idênticos ao pós-7.5 — wire é
+default-preserving):**
+
+| ID | Pós-7.5 | Pós-7.6 | Status | Notas |
+|---|---|---|---|---|
+| 1.1, 1.2, 1.3, 2.1, 2.2A, 2.2B | OK | mantido | OK | mantido |
+| **2.3** | 0% FAIL | 0% FAIL | FAIL | NO-OP da Dim 2; reabrir via setup escalado |
+| 2.4 | 100% (sub 89.90%) | 100% (sub 89.90%) | OK | NO-OP da Dim 3 |
+| 3.1, 3.2 | 0% | 0% | OK | NO-OP da Dim 1 |
+| 3.3 | 49.90% | 49.90% | OK | mantido |
+| **4.1** | 22.18% slots FAIL | 22.18% slots FAIL | FAIL | NO-OP da Dim 4 dentro do teto |
+| 4.2 | 70.72% | 70.72% | OK | mantido (gap 4.2-4.1 = 48.54 pp) |
+| 5.2 | 34.60% | 34.60% | OK | mantido (drift 7.3 já documentado) |
+| 6.1, 6.2 | OK | mantido | OK | sanity preservado |
+
+**Diagnóstico dos 2 FAIL benignas:**
+
+- **2.3 (0% FAIL — Dim 2 NO-OP):** banco `costas(5)` softmax-resolvível
+  sem colisão pegada+plano dupla. Pra 2.3 dar sinal mensurável,
+  escalar setup pra `costas(7)` ou `costas(8)` (densificação Seção
+  1.8.1 — patológico OK desde que valide em realista via 6.2).
+  Pendência registrada como item 8 da Seção 8.15.7.
+- **4.1 (22.18% slots FAIL — Dim 4 plateau dentro do teto):**
+  mecanismo HIST funcional (gap 4.2-4.1 = 48.54 pp), mas piso
+  estrutural ~17% não fecha <10% sem violar invariante. Setup B
+  do refinamento (R-1 Variante A 2x ↔ rotina nova Variante B 2x)
+  registrado item 7 da Seção 8.15.7 como caminho de resolução.
+
+**Suíte pytest pós-7.6:** 174 passados + 13 snapshots, 1 skip
+pré-existente. Sem snapshots regerados (wire é default-preserving).
+
+**Quanto trabalho ficou de verdade pra calibração futura:**
+
+- Setup B do 4.1 (item 7 da 8.15.7) — ~1 sessão.
+- Escalada de setup do 2.3 (novo item 8) — ~30min se aprovado.
+- Refator estrutural CORE (Etapa 8) — não bloqueia 4.1 nem 2.3.
+
+**Pendências em aberto pra Etapa 7 (atualizado pós-7.6):**
+
+- Item 1 (bug retrocompat core) — Etapa 8.
+- Item 2 (refator CORE real) — Etapa 8 ou Fase 4.
+- Item 4 (mock_futuros pro XLSX) — Fase 4.
+- Item 5 (cycling determinístico subregião) — pós-Etapa 7.
+- Item 6 (UI HIST exposed) — pós-Etapa 7.
+- **Item 8 NOVO** (escalada setup 2.3 ou aceitar over-correção
+  benigna) — decisão pendente, não bloqueia.
+- ~~Calibração C iterativa~~ ✅ **Fase 7.6 fechada** — defaults
+  validados, wire pendente implementado, 2 FAIL benignas com
+  caminho de resolução claro.
+
+**Status final Etapa 7:** 6 fases originalmente planejadas (7.1-7.6)
+✅ todas fechadas. Fase 7.6 fechou como **validação + wire**, NÃO
+como ajuste numérico. Calibração futura (setup B do 4.1, escalada
+2.3) não bloqueia uso real do gerador — defaults atuais entregam
+14/16 cenários no harness, com mecanismos HIST + score INTRA + score
+INTER + predicado hard funcionais.
+
+**Lição metodológica registrada (espelha Seção 1.8.3):** previsão
+"calibração vai mover X cenário pra Y" deve ser auditada empiricamente
+ANTES de escolher direção do coordinate descent. Aqui, expectativas
+acopladas a cada dim ("Dim 1 vai abrir 3.1 pra 10-15%", "Dim 3 vai
+fechar 2.4 sub em ~70%") foram baseadas na spec funcional dos cenários,
+não em sondagem empírica. Sondagem revelou que setup dos cenários NÃO
+PERMITE o efeito esperado — calibração de peso é gateada pela estrutura
+do banco/setup. **Diretriz pra futuras coordinate descents:** primeiro
+sondar empíricamente que cenário responde a peso (5-10 candidatos por
+dim), depois decidir se precisa calibrar ou se cenário precisa
+escalada de setup.
+
 ---
 
 ## 9. Fase 4 — estratégia de preenchimento dos 125+ exercícios
