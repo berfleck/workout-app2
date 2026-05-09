@@ -268,6 +268,11 @@ class Cenario:
     iteracoes: list[CenarioResultado] = field(default_factory=list)
     metricas_secundarias: list[tuple[str, SecundariaFn]] = field(
         default_factory=list)
+    # Etapa 7 Fase 7.4: factory que devolve a R-1 (rotina anterior) pra
+    # passar em `gerar_multiplos_treinos(historico_r1=...)`. None = toggle
+    # OFF (default). Cenário 4.1 usa pra ativar HISTÓRICO; 4.2 deixa None.
+    historico_r1_factory: Optional[Callable[[list[Exercicio]],
+                                              list[Sessao]]] = None
 
 
 def _seed_hash(cenario_id: str, seed: int) -> str:
@@ -1267,20 +1272,24 @@ CENARIO_3_1 = Cenario(
 # R-1 é gerada UMA vez com seed dedicada (99999) e fixada entre todas as iters.
 #
 # 4.1 (toggle ON, esperado <5% pos-Etapa 7): % rotinas onde >=1 nome OU
-#   família da R-1 reaparece. Pre-Etapa 7 (HISTÓRICO não implementado no
-#   gerador): FAIL baseline esperado — frequência igual a 4.2.
-# 4.2 (toggle OFF, esperado alto): aceita repetição. Pre-Etapa 7 = pos-Etapa 7
-#   (toggle OFF ≈ comportamento atual sem HISTÓRICO). Predicate informativo.
+#   família da R-1 reaparece. Pos-Fase 7.4: harness PASSA list[Sessao] da
+#   R-1 pra `gerar_multiplos_treinos(historico_r1=...)` — score HIST aplica
+#   penalty quando candidato match nome ou família com R-1.
+# 4.2 (toggle OFF, esperado alto): aceita repetição. `historico_r1=None`
+#   (default) = comportamento sem score HIST. Predicate informativo.
 # ---------------------------------------------------------------------------
 
 _R1_SEED = 99999  # Seed fixa pra rotina semana anterior
 
 
-def _gerar_r1_variante_b(banco: list[Exercicio]) -> tuple[set[str], set[str]]:
-    """Gera R-1 fixa (Variante B 2x) e devolve (nomes, famílias da R-1).
+def _gerar_sessoes_r1_variante_b(banco: list[Exercicio]) -> list[Sessao]:
+    """Gera sessões da R-1 fixa (Variante B 2x). Cacheável por banco
+    porque mesma seed 99999 + mesmo banco sempre dá mesma R-1.
 
-    Usa exato setup do 6.2 (Decisão 3 Sessão 7b) e seed 99999. Cacheável
-    porque mesma seed sempre dá mesma R-1.
+    Usado em 2 contextos:
+    - **Métrica** 4.1/4.2 (extrai nomes+famílias pra detectar overlap).
+    - **Score HIST** Fase 7.4: cenário 4.1 passa essa lista pra
+      `gerar_multiplos_treinos(historico_r1=...)` via `historico_r1_factory`.
     """
     random.seed(_R1_SEED)
     config_r1 = [
@@ -1308,7 +1317,12 @@ def _gerar_r1_variante_b(banco: list[Exercicio]) -> tuple[set[str], set[str]]:
             "max_complexidade": 5,
         },
     ]
-    sessoes_r1 = gerar_multiplos_treinos(banco, config_r1, relaxar_familia=False)
+    return gerar_multiplos_treinos(banco, config_r1, relaxar_familia=False)
+
+
+def _gerar_r1_variante_b(banco: list[Exercicio]) -> tuple[set[str], set[str]]:
+    """Devolve (nomes, famílias) da R-1 fixa pra métricas 4.1/4.2."""
+    sessoes_r1 = _gerar_sessoes_r1_variante_b(banco)
     nomes_r1: set[str] = set()
     fams_r1: set[str] = set()
     for s in sessoes_r1:
@@ -1391,7 +1405,26 @@ def _metrica_4_x_factory(banco_ref: list[Exercicio]):
 
 def _make_cenario_4_x(cenario_id: str, nome: str, expectativa: str,
                        predicate: Callable[[float], bool],
-                       banco: list[Exercicio]) -> Cenario:
+                       banco: list[Exercicio],
+                       toggle_on: bool) -> Cenario:
+    """Constrói cenário 4.1 ou 4.2.
+
+    `toggle_on=True` → 4.1: passa `historico_r1=` pra ativar score HIST
+    no gerador. Score HIST aplica penalty quando candidato match nome ou
+    família com R-1.
+    `toggle_on=False` → 4.2: `historico_r1_factory=None` mantém toggle
+    OFF (default sem score HIST).
+
+    R-1 cacheada em `_R1_SESSOES_CACHE` pra evitar regerar a cada iter.
+    """
+    hist_factory: Optional[Callable[[list[Exercicio]], list[Sessao]]] = None
+    if toggle_on:
+        def _hist_r1(_banco: list[Exercicio]) -> list[Sessao]:
+            if "r1_sessoes" not in _R1_SESSOES_CACHE:
+                _R1_SESSOES_CACHE["r1_sessoes"] = _gerar_sessoes_r1_variante_b(banco)
+            return _R1_SESSOES_CACHE["r1_sessoes"]
+        hist_factory = _hist_r1
+
     return Cenario(
         id=cenario_id,
         nome=nome,
@@ -1401,7 +1434,12 @@ def _make_cenario_4_x(cenario_id: str, nome: str, expectativa: str,
         config_factory=_cfg_4_x,
         n_treinos=2,
         metrica_fn=_metrica_4_x_factory(banco),
+        historico_r1_factory=hist_factory,
     )
+
+
+# Cache lazy das sessões R-1 (lista, não só nomes/famílias).
+_R1_SESSOES_CACHE: dict[str, list[Sessao]] = {}
 
 
 # Cenários 4.1 e 4.2 são instanciados dinâmicamente em main() — placeholders
@@ -1421,6 +1459,7 @@ def _patch_cenarios_4_x(banco: list[Exercicio]) -> None:
         expectativa="<5% (pos-Etapa 7; pre = baseline alto FAIL)",
         predicate=lambda pct: pct < 5.0,
         banco=banco,
+        toggle_on=True,
     )
     CENARIO_4_2 = _make_cenario_4_x(
         cenario_id="4.2",
@@ -1431,6 +1470,7 @@ def _patch_cenarios_4_x(banco: list[Exercicio]) -> None:
         # toggle ON for implementado e divergir do OFF).
         predicate=lambda pct: pct >= 0.0,
         banco=banco,
+        toggle_on=False,
     )
     # Registra nas posições do dict.
     CENARIOS["4.1"] = CENARIO_4_1
@@ -1489,9 +1529,15 @@ def rodar_cenario(banco: list[Exercicio], dims: dict[str, MockDimensoes],
             raise ValueError(
                 f"Cenário {cenario.id}: config_factory retornou "
                 f"{len(configs)} configs, esperado 1 ou {cenario.n_treinos}")
+        hist_r1 = (
+            cenario.historico_r1_factory(banco)
+            if cenario.historico_r1_factory is not None
+            else None
+        )
         sessoes = gerar_multiplos_treinos(
             banco, configs_treinos,
             relaxar_familia=cenario.relaxar_familia,
+            historico_r1=hist_r1,
         )
         violacao, detalhe = cenario.metrica_fn(sessoes, dims)
         # Primeira secundária persiste no CSV (back-compat); extras só na tela.

@@ -3099,14 +3099,102 @@ do par v_up_uni + tríceps_uni dentro do treino. Continua dentro do range
 de grupos diferentes coexistam. Score-aware não muda esse pareamento
 intencional (anti_uni Etapa 5 segue ortogonal em `_score_pareamento`).
 
-#### 8.15.6 Pendências em aberto pra Etapa 7
+#### 8.15.6 Fechamento Fase 7.4 (Sessão 11 — 2026-05-09)
+
+**Entregue:**
+
+1. **Score INTER + HISTÓRICO** em `_score_proximidade` (gerador_treino.py).
+   Branch `"inter"`: par-a-par cumulativa cross-treino. Família estrita
+   universal (cross-subregião). Pegada/plano/equipamento_grupo
+   same-subregião. variante_pontual cross-family same-subregião
+   (multiplicador 0.95 — Soft Crítico). Branch `"historico"`: penalty
+   única por candidato quando match nome OU família com R-1 (peso
+   `familia_estrita.peso_historico` × 1.0).
+2. **Migração família INTER hard→soft via Caminho A (clean break)** —
+   `pre_alocar_rotina` deixou de passar `familias_globais` como filtro
+   hard pra `_candidatos_estritos` (passa `set()` vazio). Família INTER
+   fica score-only via branch INTER. **`nomes_globais` mantido hard**
+   (regra forte de unicidade de nomes).
+3. **Args novos em `gerar_multiplos_treinos`:**
+   - `historico_r1: list[Sessao] | None = None` (D3.3 toggle ON/OFF)
+   - `pesos_override: ConfigPesosProximidade | None = None` (B.4)
+   Achatamento `Sessao → list[Exercicio]` interno; propaga pra
+   `pre_alocar_rotina`.
+4. **Harness 4.1/4.2 atualizado** — `Cenario` ganhou
+   `historico_r1_factory: Callable[[list[Exercicio]], list[Sessao]] | None`.
+   4.1 passa R-1 fixa (cache `_R1_SESSOES_CACHE`); 4.2 deixa `None`.
+
+**3 ambiguidades resolvidas pelo user antes de implementar (Sessão 11):**
+
+1. **D3.2 Caminho A (clean break)** — remove hard INTER família
+   completamente; toggle `relaxar_familia` perde efeito real (no-op
+   sob Caminho A — passe relax fica idêntico ao estrito porque ambos
+   já não bloqueiam por família). Mantido na assinatura por retrocompat.
+2. **Toggle HISTÓRICO UI: NÃO expor agora** — só contrato programatic.
+   `gerar_multiplos_treinos(historico_r1=None)` default. Calibração C
+   7.6 e harness usam diretamente. UI exposed registrada como pendência
+   pós-Etapa 7 (item 6 da pendência abaixo).
+3. **Granularidade HIST**: nome OR família, penalty única por candidato
+   (D3.3). Não cumulativa entre pares. Peso = `familia_estrita.peso_historico`.
+
+**Mudanças adicionais nos testes:**
+
+- `test_estrito_crossover_e_crossover_sentado_nao_coexistem_entre_treinos`
+  validava o contrato hard INTER família (que o Caminho A relaxou).
+  Substituído por `test_crossover_sentado_coexistencia_INTER_e_rara_pos_caminho_A`
+  — exige coexistência ≤40% das seeds, capturando "soft alto desencoraja
+  mas permite quando banco aperta" da Seção 1.4.
+- `test_filtro_carga_realmente_dissolve_par_conhecido` ajustado pela 3ª
+  vez (par/seed): seed=22 produz `Hiperextensão 45° + Remada Baixa Aberta`
+  (lombar 3+2=5 viola HIB2). Score INTER mudou consumo de `random`.
+- 8 snapshots de regressão atualizados (shifts benignos do score INTER
+  + Caminho A — algumas famílias agora podem coexistir cross-treino,
+  esperado pré-calibração 7.6).
+
+**Harness pós-Fase 7.4 — 14/16 OK + 2 FAIL ainda esperados:**
+
+| ID | Pré-7.4 | Pós-7.4 | Status | Notas |
+|---|---|---|---|---|
+| 1.1, 1.2, 1.3, 2.2A, 2.2B | 0% | 0% | OK | Predicado 7.2 mantido |
+| 2.1 | 0% | 0% | OK | Soft INTER família ainda não força coexistência forçada |
+| **2.3** | **0%** | **0%** | **FAIL (2-10%)** | Over-correção persiste; calibração 7.6 reduz peso INTRA |
+| 2.4 | 100% | 100% | OK | Sub-pareamento 89.90% — alvo ~70% pós-7.6 |
+| 3.1 | 0% | 0% | OK | Espera ~10-15% pós-calibração; default ainda conservador |
+| 3.2 | 0% | 0% | OK | Espera <10% pós-calibração |
+| 3.3 | 48.20% | 49.90% | OK | Dentro 20-50% (famílias dif) |
+| **4.1** | **100%** | **100%** | **FAIL** | **Achado Fase 7.4** ↓ |
+| 4.2 | 100% | 100% | OK | Toggle OFF informativo |
+| 5.2, 6.1, 6.2 | inalterados | inalterados | OK | Não regrediu |
+
+**Achado importante 4.1 (registrar pra 7.5/7.6):** mesmo com peso HIST
+brutal (×50 = -2500), 4.1 permanece 100% violação. Rotina nova e R-1
+**compartilham mesma estrutura** (Variante B 2x), e o banco não tem
+famílias suficientes pra cobrir o set sem sobreposição. Conclusão:
+**a métrica 4.1 atual é estruturalmente impossível ficar <5% nesse
+setup** — não é bug do mecanismo HIST.
+
+Validação empírica (debug Sessão 11):
+- Sem HIST: ~5 nomes + ~8 famílias overlap por rotina.
+- Com HIST default (-50): ~1 nome + ~1 família overlap.
+- Com HIST × 50 (-2500): ~1 overlap mínimo (banco esgotado).
+
+**Mecanismo HIST está funcionando** — score reduz overlap de ~13 pra ~1.34
+por rotina. Mas a métrica binária "≥1 dispara violação" não captura essa
+melhoria. **Refinamento da métrica 4.1 fica pra Fase 7.5 ou 7.6:**
+- Opção A: métrica contínua "% slots com overlap" (alvo <10% pós-calibração).
+- Opção B: setup com R-1 estrutura DIFERENTE da rotina nova (Variante A
+  R-1 ↔ Variante B nova).
+
+**Suíte pytest pós-7.4:** 161 passados + 13 snapshots, 1 skip pré-existente.
+
+#### 8.15.7 Pendências em aberto pra Etapa 7
 
 1. **Bug retrocompat `("subregiao", "core", N)`** falha alocação
    (`qtd_obtida=0`). Workaround atual: usar `core_dinamico`/
-   `core_isometrico` direto. **Resolução:** Fase 7.4 ou junto com
-   migração estrutural CORE (refator real dos padrões
-   `flexao_tronco`/etc — pode ficar pra Etapa 8 ou ser incorporado
-   em alguma fase 7.x). Não afeta diretamente as 6 fases planejadas.
+   `core_isometrico` direto. **Resolução:** junto com migração
+   estrutural CORE (refator real dos padrões `flexao_tronco`/etc —
+   pode ficar pra Etapa 8 ou ser incorporado em alguma fase 7.x).
+   Não afeta diretamente as 6 fases planejadas.
 2. **Refator estrutural CORE real (Sessão 2 / Anexo 15-quater):**
    migração padrão `core_dinamico`/`core_isometrico` →
    `flexao_tronco`/`flexao_lateral`/`rotacao_tronco`/`flexao_quadril`
@@ -3124,6 +3212,23 @@ intencional (anti_uni Etapa 5 segue ortogonal em `_score_pareamento`).
    `_selecionar_ciclando` em modo subregião com `preferir_composto=True`
    produz 100% mesmo padrão sequence — investigar se relevante
    pós-Etapa 7 (pode afetar calibração C se houver).
+6. **UI Histórico exposed** (Sessão 11 / Fase 7.4 — D3.3): o contrato
+   programatic está pronto (`gerar_multiplos_treinos(historico_r1=...)`),
+   mas não há UI/integração com banco SQLite ainda. Pra app real expor
+   toggle HIST: precisa (i) UI checkbox no gerador, (ii) leitura da
+   rotina anterior do aluno via `database.py`, (iii) propagação pro
+   gerador. Decisão Sessão 11 foi adiar — só contrato programatic em
+   7.4. Implementar quando: usuário pedir ou Fase 7.6 calibração C
+   precisar testar HIST em produção. **Não bloqueia 7.5 nem 7.6.**
+7. **Refinamento métrica 4.1** (Sessão 11 / Fase 7.4 — achado): métrica
+   binária "≥1 overlap dispara violação" é estruturalmente impossível
+   ficar <5% no setup atual (R-1 = rotina nova = Variante B 2x; banco
+   sem famílias suficientes pra cobrir set sem sobreposição). Mecanismo
+   HIST funciona (overlap cai de ~13 pra ~1.34 por rotina), métrica é
+   que está mal-calibrada. **Resoluções pra 7.5 ou 7.6:**
+   - **A:** métrica contínua "% slots com overlap" (alvo <10%).
+   - **B:** setup com R-1 estrutura DIFERENTE da rotina nova
+     (Variante A R-1 ↔ Variante B nova).
 
 ---
 

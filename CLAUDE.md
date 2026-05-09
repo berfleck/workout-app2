@@ -96,8 +96,8 @@ fecharam E.1.b2: 78 mocks YAML em 8 grupos + 16 cenários no harness +
 ## Etapa 7 — plano e decisões fechadas (não reabrir sem motivo forte)
 
 Plano consolidado na Sessão 7c (2026-05-09). **Fases 7.1 ✅ Sessão 8
-+ 7.2 ✅ Sessão 9 + 7.3 ✅ Sessão 10 (todas 2026-05-09).** Sessão 11
-arranca Fase 7.4. Decisões já fechadas:
++ 7.2 ✅ Sessão 9 + 7.3 ✅ Sessão 10 + 7.4 ✅ Sessão 11 (todas
+2026-05-09).** Sessão 12 arranca Fase 7.5. Decisões já fechadas:
 
 **Branch:** `etapa-7` (criado Sessão 8 a partir de `refator-gerador`).
 Sem sub-branches por fase (1 PR por fase no mesmo branch).
@@ -134,9 +134,18 @@ de INTER+HIST):**
    = 0% (predicado 7.2 mantido). 13 snapshots atualizados (shifts
    benignos do score-aware) + 1 fixture hardcoded ajustada
    (Lev. Terra+Barra Isométrica seed=9).
-4. **7.4** — score INTER + HISTÓRICO toggle ON/OFF + migração
-   família INTER hard→soft (Caminho C). **Resolve 4.1 FAIL <5% +
-   move 2.1+3.1 pra ~10-15%.**
+4. **7.4 ✅ Sessão 11** — branches INTER + HISTÓRICO em
+   `_score_proximidade` + Caminho A (clean break) migração família
+   INTER hard→soft em `pre_alocar_rotina`. Args novos em
+   `gerar_multiplos_treinos`: `historico_r1: list[Sessao] | None` (D3.3
+   toggle) + `pesos_override: ConfigPesosProximidade | None` (B.4).
+   Harness 4.1/4.2 com `historico_r1_factory` em `Cenario`. **Achado
+   Sessão 11:** mecanismo HIST funciona (overlap cai ~13→~1.34/rotina)
+   mas **métrica 4.1 binária estruturalmente impossível ficar <5% no
+   setup atual** (R-1 e rotina nova mesma estrutura Variante B 2x).
+   Refinamento métrica fica pra 7.5 (registrado Seção 8.15.7 item 7).
+   8 snapshots + 1 fixture hardcoded ajustadas; 1 teste reformulado
+   (`test_crossover_sentado_coexistencia_INTER_e_rara_pos_caminho_A`).
 5. **7.5** — E.2 validação (re-rodar 16 cenários + cenário 5.1
    implementado).
 6. **7.6** — C calibração coordinate descent (5 dims em ordem:
@@ -155,29 +164,24 @@ independente da migração família INTER; vitória rápida em
 iterativa); Caminho C da D3.2 não obriga acoplamento entre
 predicado e migração.
 
-**Documentos fonte de verdade pra Sessão 11 (Fase 7.4):**
+**Documentos fonte de verdade pra Sessão 12 (Fase 7.5):**
 
-- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.9 (D3 — INTER
-  soft + HISTÓRICO toggle: D3.1 multiplicador 0.8 com overrides; D3.2
-  Caminho C migração família INTER hard→soft; D3.3 granularidade
-  nome+família soma livre; D3.4 Fase 0 `pre_alocar_rotina`) + Seção
-  8.11 A.3 (escala derivados INTER/HIST) + Seção 8.15.5 (fechamento
-  Fase 7.3 — 2 ambiguidades de implementação resolvidas Sessão 10)
-- `pesos_proximidade.py` — `PESOS_DEFAULT.peso_inter(subregiao)` e
-  `peso_historico(subregiao)` já fazem lookup com multiplicadores
-  (D3.1 0.8 default + override 0.95 variante_pontual; HIST 1.0
-  integral). Usar diretamente em `_score_proximidade` branches
-  INTER/HIST
-- `gerador_treino.py` `_score_proximidade` (~linha 1577) — branch
-  `"intra"` populado (Fase 7.3); plug em `pre_alocar_rotina`
-  precisa expandir helpers pra coletar `alocados_inter` (todos exs em
-  outros treinos) e `historico_r1` (R-1 quando toggle ON)
-- **Migração família INTER hard→soft (D3.2 Caminho C):** decisão
-  pendente A vs B — (A) clean break (remove `familias_globais` set
-  hard, score só) ou (B) coexistência (set + score). Ponto de
-  discussão pra Sessão 11.
+- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.15.6 (fechamento
+  Fase 7.4 — Caminho A clean break, achado métrica 4.1) + Seção 8.15.7
+  itens 6-7 (UI HIST exposed pendência + métrica 4.1 refinamento)
+- `gerador_treino.py` `_score_proximidade` (~linha 1577) — branches
+  `"intra"` + `"inter"` + `"historico"` populados. `pre_alocar_rotina`
+  chama via `_selecionar_cand_score_aware(cands, intra, inter, hist,
+  pesos)`. Caminho A removeu `familias_globais` como filtro hard
+  (passa `set()` em vez)
+- **Plano Fase 7.5 — E.2 validação:**
+  - Implementar cenário **5.1** (sanity escopo cross-region, pendente)
+  - **Refinar métrica 4.1** (achado 7.4): (A) métrica contínua "% slots
+    com overlap" OU (B) setup R-1 estrutura DIFERENTE da rotina nova.
+    Decisão pendente — consultar user.
+  - Re-rodar 16 cenários completo + diff vs baseline pré-Etapa 7
 
-**Pendências em aberto pra Etapa 7** (registradas Seção 8.15.6):
+**Pendências em aberto pra Etapa 7** (registradas Seção 8.15.7):
 
 1. Bug retrocompat `("subregiao", "core", N)` (resolução em 7.4 ou
    junto com migração estrutural CORE).
@@ -187,6 +191,13 @@ predicado e migração.
 4. Mock_futuros (11 exercícios) vão pro XLSX na Fase 4.
 5. Cycling determinístico de subregião (achado paralelo Sessão 7a)
    — investigar se relevante pós-Etapa 7.
+6. **UI Histórico exposed** (Sessão 11 / Fase 7.4): contrato
+   programatic `gerar_multiplos_treinos(historico_r1=...)` pronto, mas
+   sem UI/integração SQLite. Toggle UI + leitura R-1 do banco fica
+   pra fase posterior — não bloqueia 7.5/7.6.
+7. **Refinamento métrica 4.1** (Sessão 11 / Fase 7.4): métrica binária
+   "≥1 overlap dispara violação" estruturalmente impossível ficar <5%
+   no setup atual (R-1 = rotina nova). Refinar em Fase 7.5.
 
 ## Stack
 

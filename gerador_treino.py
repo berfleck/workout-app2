@@ -1583,45 +1583,66 @@ def _score_proximidade(
     contexto: str,
     pesos_config: ConfigPesosProximidade = PESOS_DEFAULT,
 ) -> float:
-    """Penalty soft de proximidade (D2 — Etapa 6, Seção 8.7).
+    """Penalty soft de proximidade (D2 + D3 — Etapa 6, Seções 8.7 + 8.9).
 
     Composição **par-a-par cumulativa**: cada par (cand, outro) soma uma
     penalty constante por dim que colide. Penalty é negativa — quanto maior
     o módulo, mais o gerador desencoraja a escolha.
 
     `contexto`:
-    - `"intra"` — pares dentro do MESMO treino (Fase 7.3, dims pegada,
-      plano_corporal, equipamento_grupo). Família estrita, variante_pontual
-      e lateralidade contextual costas são HARD via `_compativel_intra`
-      (Seção 1.7) — não entram aqui.
-    - `"inter"` / `"historico"` — Fase 7.4. Por enquanto retornam 0.0.
+    - `"intra"` — pares dentro do MESMO treino (Fase 7.3). Dims:
+      pegada, plano_corporal, equipamento_grupo. Família estrita,
+      variante_pontual e lateralidade contextual costas são HARD via
+      `_compativel_intra` (Seção 1.7) — não entram aqui.
+    - `"inter"` — pares cross-treino dentro da mesma rotina (Fase 7.4,
+      D3.1). Dims: família estrita (universal cross-subregião — Seção
+      1.5; multiplicador 0.8 default), pegada/plano/equipamento_grupo
+      same-subregião (multiplicador 0.8), variante_pontual cross-family
+      same-subregião (multiplicador 0.95 — Soft Crítico, D1.c).
+    - `"historico"` — match com R-1 (Fase 7.4, D3.3). Granularidade
+      **nome OU família** (set match), penalty única por candidato
+      (não cumulativa pares). Peso = `familia_estrita.peso_historico`
+      (multiplicador 1.0 quando toggle ON).
 
-    **Escopo de aplicação (Seção 1.5):** soft INTRA dispara só quando
-    `cand.subregiao == outro.subregiao`. Pares cross-subregião não somam
-    penalty soft.
+    **Escopo de aplicação (Seção 1.5):**
+    - INTRA + INTER soft (pegada/plano/equipamento): same-subregião only.
+    - Família estrita INTER: **universal** (qualquer cross-treino, mesma
+      família = penalty), independente de subregião.
+    - variante_pontual INTER: cross-family + same-subregião only.
 
-    **Tag ausente:** quando uma dim do cand ou do outro é `None`/`""`,
-    a dim é ignorada silenciosamente nesse par (banco real ainda não
-    tem cadastro completo — Fase 4 fecha; harness propaga via overlay).
+    **Tag ausente:** dim do cand ou outro `None`/`""` → ignorada
+    silenciosamente. Banco real ainda não cadastra (Fase 4 fecha).
 
-    **Pegada:** D2.1 fechou em **constante por dim** (igual/diferente),
-    não matriz 4×4 (Seção 8.7). Calibração final em 7.6.
+    **Pegada:** D2.1 fechou em **constante por dim**, não matriz 4×4.
+    Calibração numérica final em 7.6.
 
-    Pesos vêm de `pesos_config.<dim>.peso_intra(subregiao)` com cascata
-    override→default (B.2). Subregiões marcadas N/A no override retornam
-    0 e a dim é silenciosamente ignorada.
+    Pesos vêm de `pesos_config.<dim>.peso_intra/inter/historico(subregiao)`
+    com cascata override→default (B.2). Subregiões marcadas N/A no override
+    retornam 0 e a dim é silenciosamente ignorada.
     """
-    if contexto != "intra":
-        return 0.0  # INTER + HIST ficam pra Fase 7.4
-
     if not alocados:
         return 0.0
 
+    if contexto == "intra":
+        return _score_intra(cand, alocados, pesos_config)
+    if contexto == "inter":
+        return _score_inter(cand, alocados, pesos_config)
+    if contexto == "historico":
+        return _score_historico(cand, alocados, pesos_config)
+    return 0.0
+
+
+def _score_intra(
+    cand: "Exercicio",
+    alocados: list["Exercicio"],
+    pesos_config: ConfigPesosProximidade,
+) -> float:
+    """Branch INTRA — par-a-par cumulativa, same-subregião, 3 dims soft."""
     total = 0.0
     sub_cand = cand.subregiao
     for outro in alocados:
         if sub_cand != outro.subregiao:
-            continue  # soft INTRA = same-subregião only (Seção 1.5)
+            continue
         if cand.pegada and outro.pegada and cand.pegada == outro.pegada:
             total += pesos_config.pegada.peso_intra(sub_cand)
         if (
@@ -1639,16 +1660,86 @@ def _score_proximidade(
     return total
 
 
+def _score_inter(
+    cand: "Exercicio",
+    alocados: list["Exercicio"],
+    pesos_config: ConfigPesosProximidade,
+) -> float:
+    """Branch INTER — par-a-par cumulativa cross-treino (D3.1).
+
+    Família estrita: universal (qualquer subregião). Pegada/plano/
+    equipamento_grupo: same-subregião only. variante_pontual: cross-family
+    same-subregião (multiplicador 0.95 — Soft Crítico).
+    """
+    total = 0.0
+    sub_cand = cand.subregiao
+    for outro in alocados:
+        # Família estrita — escopo universal cross-treino (Seção 1.5)
+        if cand.variacao_de and cand.variacao_de == outro.variacao_de:
+            total += pesos_config.familia_estrita.peso_inter(sub_cand)
+        # Demais dims same-subregião only
+        if sub_cand != outro.subregiao:
+            continue
+        if cand.pegada and outro.pegada and cand.pegada == outro.pegada:
+            total += pesos_config.pegada.peso_inter(sub_cand)
+        if (
+            cand.plano_corporal
+            and outro.plano_corporal
+            and cand.plano_corporal == outro.plano_corporal
+        ):
+            total += pesos_config.plano_corporal.peso_inter(sub_cand)
+        if (
+            cand.equipamento_grupo
+            and outro.equipamento_grupo
+            and cand.equipamento_grupo == outro.equipamento_grupo
+        ):
+            total += pesos_config.equipamento_grupo.peso_inter(sub_cand)
+        # variante_pontual cross-family same-subregião (D1.c — Soft Crítico)
+        if (
+            cand.variante_pontual
+            and outro.variante_pontual
+            and cand.variacao_de != outro.variacao_de
+        ):
+            total += pesos_config.variante_pontual.peso_inter(sub_cand)
+    return total
+
+
+def _score_historico(
+    cand: "Exercicio",
+    historico_r1: list["Exercicio"],
+    pesos_config: ConfigPesosProximidade,
+) -> float:
+    """Branch HISTÓRICO — D3.3: granularidade nome OR família, penalty única.
+
+    Peso = `familia_estrita.peso_historico(subregiao)` (multiplicador 1.0
+    quando toggle ON). Match qualquer ex na R-1 com nome igual OU família
+    igual = penalty. Não cumulativa entre pares (candidato está ou não na
+    R-1; o "quanto" é fixo).
+    """
+    nomes_r1 = {e.nome for e in historico_r1}
+    fams_r1 = {e.variacao_de for e in historico_r1 if e.variacao_de}
+    if cand.nome in nomes_r1 or (
+        cand.variacao_de and cand.variacao_de in fams_r1
+    ):
+        return pesos_config.familia_estrita.peso_historico(cand.subregiao)
+    return 0.0
+
+
 def _selecionar_cand_score_aware(
     cands: list["Exercicio"],
     alocados_intra: list["Exercicio"],
+    alocados_inter: Optional[list["Exercicio"]] = None,
+    historico_r1: Optional[list["Exercicio"]] = None,
     pesos_config: ConfigPesosProximidade = PESOS_DEFAULT,
 ) -> "Exercicio":
-    """Escolhe um candidato em `cands` ponderando pelo penalty soft INTRA.
+    """Escolhe um candidato em `cands` ponderando pelo score soft total.
 
     Substitui `random.choice(cands)` em `pre_alocar_rotina` (Etapa 7,
-    Fase 7.3). Quando todos os candidatos pontuam 0 (cross-subregião,
-    tags ausentes ou nenhum par redundante), a softmax cai em distribuição
+    Fases 7.3 + 7.4). Score = INTRA (alocados mesmo treino) + INTER
+    (alocados outros treinos) + HISTÓRICO (R-1, quando toggle ON).
+
+    Quando todos os candidatos pontuam 0 (cross-subregião, tags ausentes,
+    nenhum par redundante, R-1 vazio), a softmax cai em distribuição
     uniforme — equivalente a `random.choice` antigo.
 
     Reusa `SOFTMAX_TOP_K` / `SOFTMAX_TEMPERATURA` da Etapa 5 (mesma escala
@@ -1656,13 +1747,22 @@ def _selecionar_cand_score_aware(
     """
     if not cands:
         raise ValueError("cands vazio")
-    if len(cands) == 1 or not alocados_intra:
+    if (
+        len(cands) == 1
+        or (not alocados_intra and not alocados_inter and not historico_r1)
+    ):
         return random.choice(cands)
 
-    scored = [
-        (e, _score_proximidade(e, alocados_intra, "intra", pesos_config))
-        for e in cands
-    ]
+    inter_list = alocados_inter or []
+    hist_list = historico_r1 or []
+
+    def _total_score(e: "Exercicio") -> float:
+        s = _score_proximidade(e, alocados_intra, "intra", pesos_config)
+        s += _score_proximidade(e, inter_list, "inter", pesos_config)
+        s += _score_proximidade(e, hist_list, "historico", pesos_config)
+        return s
+
+    scored = [(e, _total_score(e)) for e in cands]
     scored.sort(key=lambda t: t[1], reverse=True)
     top = scored[:SOFTMAX_TOP_K]
     max_s = top[0][1]
@@ -1945,6 +2045,8 @@ def pre_alocar_rotina(
     banco: list[Exercicio],
     configs: list[dict],
     relaxar_familia: bool = False,
+    historico_r1: Optional[list[Exercicio]] = None,
+    pesos_override: Optional[ConfigPesosProximidade] = None,
 ) -> tuple[
     dict[int, dict[int, list[Exercicio]]],
     list[dict],
@@ -1957,9 +2059,18 @@ def pre_alocar_rotina(
         configs: lista de cfg dict, idealmente já normalizadas via
                  _normalizar_config (configs sem `demandas` são normalizadas
                  internamente).
-        relaxar_familia: aceito por simetria de assinatura, mas a Fase 0
-                 sempre opera no modo estrito (D3.2). Relax é responsabilidade
-                 da Fase 1 em gerar_sessao_por_demandas.
+        relaxar_familia: sob Caminho A (Etapa 7 Fase 7.4 — D3.2), família
+                 INTER deixou de ser hard. Toggle agora é no-op efetivo:
+                 passe relax tem o mesmo conjunto de candidatos que estrito
+                 (família INTER vira soft via `_score_proximidade` branch
+                 INTER). Mantido na assinatura por retrocompat com app.
+        historico_r1: lista de Exercicios da rotina anterior (R-1) quando
+                 toggle HISTÓRICO ON (D3.3). `None` = toggle OFF (default).
+                 Score HIST aplica penalty quando candidato match nome ou
+                 família com algum ex da R-1.
+        pesos_override: override opcional dos pesos de proximidade
+                 (B.4 — `ConfigPesosProximidade`). `None` usa
+                 `PESOS_DEFAULT`. Útil pra harness de calibração C 7.6.
 
     Returns:
         (alocacao, avisos_rotina, relaxados_por_treino) onde:
@@ -2242,26 +2353,48 @@ def pre_alocar_rotina(
                 )
                 slots_pendentes.append(slot)
 
+    pesos = pesos_override or PESOS_DEFAULT
+    hist_list: list[Exercicio] = historico_r1 or []
+
     # Helper interno — exercícios já alocados no MESMO treino do slot
-    # (input pro predicado D1 `_compativel_intra`). Inclui travados (-1)
-    # e demandas regulares.
+    # (input pro predicado D1 `_compativel_intra` e branch INTRA do score).
+    # Inclui travados (-1) e demandas regulares.
     def _alocados_intra(t_idx: int) -> list[Exercicio]:
         out: list[Exercicio] = []
         for exs in alocacao[t_idx].values():
             out.extend(exs)
         return out
 
+    # Helper — exercícios já alocados em OUTROS treinos da rotina (input
+    # pro branch INTER do score, D3.1 — Fase 7.4).
+    def _alocados_inter(t_idx_atual: int) -> list[Exercicio]:
+        out: list[Exercicio] = []
+        for t_idx, by_d in alocacao.items():
+            if t_idx == t_idx_atual:
+                continue
+            for exs in by_d.values():
+                out.extend(exs)
+        return out
+
     # ─── Etapa D: passe 1 (estrito) ──────────────────────────────────────
     # Etapa 3: quota composta aposentada. Pesos das âncoras subregião
     # decidem distribuição composto/isolado (empurrar_compostos:3 vs
     # empurrar_isolados:2 já dá ~60% composto em peito).
+    #
+    # **Caminho A (Fase 7.4 — D3.2):** família INTER deixou de ser hard.
+    # `_candidatos_estritos` recebe `set()` no lugar de `familias_globais`
+    # — o filtro de família INTER não bloqueia mais; vira soft via score
+    # INTER (`_score_proximidade` branch "inter"). `nomes_globais` continua
+    # hard (regra forte de unicidade de nomes). `familias_globais` segue
+    # rastreado pra propagar a Fase 1 via `variacao_pais_globais` (info
+    # em avisos `incompleta`), sem bloquear seleção.
     slots_para_relax: list[_Slot] = []
     while slots_pendentes:
-        # Calcular escassez de cada slot pendente
+        # Calcular escassez de cada slot pendente (usando filtro INTER soft)
         def _escassez_slot(s: _Slot) -> int:
             cfg_t = configs_norm[s.treino_idx]
             return _calcular_escassez(
-                s, banco, cfg_t, nomes_globais, familias_globais,
+                s, banco, cfg_t, nomes_globais, set(),
                 alocados_intra=_alocados_intra(s.treino_idx),
             )
 
@@ -2274,15 +2407,18 @@ def pre_alocar_rotina(
         cfg_t = configs_norm[slot.treino_idx]
 
         alocados_t = _alocados_intra(slot.treino_idx)
+        alocados_inter_t = _alocados_inter(slot.treino_idx)
         cands = _candidatos_estritos(
             banco, slot.nivel, slot.escopo_alocacao, cfg_t,
-            nomes_globais, familias_globais,
+            nomes_globais, set(),  # família INTER soft (Caminho A)
             filtro_purpose=None,
             alocados_intra=alocados_t,
         )
 
         if cands:
-            escolhido = _selecionar_cand_score_aware(cands, alocados_t)
+            escolhido = _selecionar_cand_score_aware(
+                cands, alocados_t, alocados_inter_t, hist_list, pesos,
+            )
             alocacao[slot.treino_idx][slot.d_idx_original].append(escolhido)
             nomes_globais.add(escolhido.nome)
             familias_globais.add(escolhido.nome)
@@ -2293,8 +2429,14 @@ def pre_alocar_rotina(
             slots_para_relax.append(slot)
 
     # ─── Etapa E: passe 2 (relax família entre treinos) ──────────────────
-    # Só rodado se relaxar_familia=True. Permite candidato cuja família já
-    # foi usada em outros treinos da mesma rotina (mas nome único global).
+    # **Caminho A (Fase 7.4):** sob D3.2 clean break, família INTER deixou
+    # de ser hard no passe estrito (Etapa D). O passe relax fica como
+    # safety net pra casos onde o estrito ainda falha por outras razões
+    # (banco saturado, fadiga, equipamento bloqueado, lateralidade
+    # contextual costas). Sob esses casos, comportamento idêntico ao
+    # estrito — `_candidatos_estritos` já recebe `set()` por família. Mantido
+    # por retrocompat de sinalização de relaxados (`Sessao.relaxados`),
+    # apesar de ser efetivamente no-op no caso comum.
     if relaxar_familia and slots_para_relax:
         # Re-ordenar slots remanescentes por escassez (relaxada — só nomes bloqueiam)
         def _escassez_relax(s: _Slot) -> int:
@@ -2312,6 +2454,7 @@ def pre_alocar_rotina(
             slot = slots_para_relax.pop(0)
             cfg_t = configs_norm[slot.treino_idx]
             alocados_t = _alocados_intra(slot.treino_idx)
+            alocados_inter_t = _alocados_inter(slot.treino_idx)
             cands = _candidatos_estritos(
                 banco, slot.nivel, slot.escopo_alocacao, cfg_t,
                 nomes_globais, set(),  # família relaxada
@@ -2319,7 +2462,9 @@ def pre_alocar_rotina(
                 alocados_intra=alocados_t,
             )
             if cands:
-                escolhido = _selecionar_cand_score_aware(cands, alocados_t)
+                escolhido = _selecionar_cand_score_aware(
+                    cands, alocados_t, alocados_inter_t, hist_list, pesos,
+                )
                 alocacao[slot.treino_idx][slot.d_idx_original].append(escolhido)
                 nomes_globais.add(escolhido.nome)
                 # Família AINDA é tracked pra slots subsequentes do mesmo passe relax
@@ -2776,6 +2921,8 @@ def gerar_multiplos_treinos(
     banco: list[Exercicio],
     configs: list[dict],
     relaxar_familia: bool = False,
+    historico_r1: Optional[list[Sessao]] = None,
+    pesos_override: Optional[ConfigPesosProximidade] = None,
 ) -> list[Sessao]:
     """
     Gera N sessões de treino com pré-alocação global (Etapa 2 da refatoração v4).
@@ -2804,6 +2951,13 @@ def gerar_multiplos_treinos(
         relaxar_familia: se True, permite Fase 1 relaxar família entre treinos.
             Fase 0 (pré-alocação) sempre opera no modo estrito, independente
             desta flag (D3.2).
+        historico_r1: rotina anterior do aluno (R-1) quando toggle HISTÓRICO
+            ON (Etapa 7 Fase 7.4 — D3.3). `None` = toggle OFF (default).
+            Score HIST aplica penalty quando candidato match nome ou família
+            com algum ex da R-1.
+        pesos_override: override opcional dos pesos de proximidade
+            (`ConfigPesosProximidade`). `None` usa `PESOS_DEFAULT`. Útil
+            pra harness de calibração C 7.6 (B.4).
 
     Returns:
         Lista de Sessao na mesma ordem de configs. Avisos `incompleta`
@@ -2812,9 +2966,23 @@ def gerar_multiplos_treinos(
     # Normaliza configs (templates → demandas, D4 opção C)
     configs_norm = [_normalizar_config(c) for c in configs]
 
+    # Achata historico_r1 (list[Sessao] → list[Exercicio]) pra propagar
+    # à Fase 0. None preserva-se como None (toggle OFF).
+    hist_r1_exs: Optional[list[Exercicio]] = None
+    if historico_r1 is not None:
+        hist_r1_exs = []
+        for s in historico_r1:
+            for b in s.blocos:
+                for ex in (b.ex1, b.ex2, b.ex3):
+                    if ex is not None:
+                        hist_r1_exs.append(ex)
+
     # Fase 0: pré-alocação global (com 2º passe de relax se relaxar_familia)
     alocacao, avisos_rotina, relaxados_por_treino = pre_alocar_rotina(
-        banco, configs_norm, relaxar_familia=relaxar_familia,
+        banco, configs_norm,
+        relaxar_familia=relaxar_familia,
+        historico_r1=hist_r1_exs,
+        pesos_override=pesos_override,
     )
 
     # Reconstrói variacao_pais_globais a partir da alocação (R5).
