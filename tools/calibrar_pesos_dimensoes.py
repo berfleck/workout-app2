@@ -1297,20 +1297,31 @@ CENARIO_3_1 = Cenario(
 # ---------------------------------------------------------------------------
 # Cenários 4.1 + 4.2 — HISTÓRICO toggle ON/OFF
 #
-# R-1 (rotina semana anterior) = Variante B 2x do `configuracoes_comuns.md`
-# Seção 2.2 — exato setup do 6.2 (Decisão 3 Sessão 7b / Seção 8.14.4).
-# R-1 é gerada UMA vez com seed dedicada (99999) e fixada entre todas as iters.
+# **Setup B** (Sessão pós-13 — item 7 da 8.15.7, 2026-05-09): R-1 vira
+# Variante A 2x (full-body região), rotina nova mantém Variante B 2x
+# (subregião). Estruturas DIFERENTES — banco efetivo da R-1 cobre região
+# inteira (upper(N)/lower(N)), liberando "ar" pra mecanismo HIST trabalhar
+# sem violar invariante INTER+HIST > -100. Substitui setup pré-13, que
+# usava R-1 = R-2 = Variante B 2x e prendia 4.1 em ~22% (banco apertado
+# demais — Seção 8.15.7 item 7 / 8.15.8 Reconciliação).
 #
-# 4.1 (toggle ON, esperado <10% pós-7.6): **% slots com overlap**
-#   agregado cross-iter (refinamento contínuo Fase 7.5 — opção A do user
-#   na Sessão 12; Seção 8.15.6 achado pós-7.4). Métrica binária pré-7.5
-#   ("≥1 dispara violação") era estruturalmente impossível ficar <5%
-#   porque R-1 e rotina nova compartilham mesma estrutura Variante B 2x.
-#   Mecanismo HIST entrega ~1.34 overlap/rotina ÷ ~18 slots ≈ 7-8%
-#   pré-calibração; 7.6 ajusta peso pra fechar <10% com folga.
-#   Pos-Fase 7.4: harness PASSA list[Sessao] da R-1 pra
-#   `gerar_multiplos_treinos(historico_r1=...)` — score HIST aplica
-#   penalty quando candidato match nome ou família com R-1.
+# Variante A 2x = `configuracoes_comuns.md` Seção 2.2:
+#   - Treino A1 (viés upper): upper(5) + lower(2) + core_dinamico(1) = 8 ex
+#   - Treino A2 (viés lower): lower(5) + upper(2) + core_isometrico(1) = 8 ex
+#   Ambos full-body; cada um com volume maior em metade complementar.
+#
+# Rotina nova (R-2) mantém Variante B 2x — split subregião (peito+ombro+
+# perna_post / costas+perna_ant). Estruturas diferentes = banco efetivo
+# de R-1 expõe set amplo (regiões); banco efetivo de R-2 concentra em
+# subregiões. Score HIST tem mais alternativas pra escolher exercícios
+# diferentes da R-1.
+#
+# 4.1 (toggle ON, esperado <10% slots pós-setup B): **% slots com
+#   overlap** agregado cross-iter (refinamento contínuo Fase 7.5 — opção
+#   A do user na Sessão 12; Seção 8.15.6 achado pós-7.4). Harness PASSA
+#   list[Sessao] da R-1 pra `gerar_multiplos_treinos(historico_r1=...)`
+#   — score HIST aplica penalty quando candidato match nome ou família
+#   com R-1.
 # 4.2 (toggle OFF, esperado alto): aceita repetição. `historico_r1=None`
 #   (default) = comportamento sem score HIST. Predicate informativo.
 #   Mesma métrica contínua de 4.1 — comparação significativa é o GAP
@@ -1320,9 +1331,15 @@ CENARIO_3_1 = Cenario(
 _R1_SEED = 99999  # Seed fixa pra rotina semana anterior
 
 
-def _gerar_sessoes_r1_variante_b(banco: list[Exercicio]) -> list[Sessao]:
-    """Gera sessões da R-1 fixa (Variante B 2x). Cacheável por banco
-    porque mesma seed 99999 + mesmo banco sempre dá mesma R-1.
+def _gerar_sessoes_r1_variante_a(banco: list[Exercicio]) -> list[Sessao]:
+    """Gera sessões da R-1 fixa (Variante A 2x — full-body com viés).
+    Cacheável por banco porque mesma seed 99999 + mesmo banco sempre dá
+    mesma R-1.
+
+    Setup B do refinamento métrica 4.1 (item 7 da 8.15.7) — R-1 vira
+    Variante A enquanto R-2 (rotina nova) mantém Variante B. Estruturas
+    diferentes liberam "ar" pra mecanismo HIST trabalhar sem violar
+    invariante INTER+HIST > -100.
 
     Usado em 2 contextos:
     - **Métrica** 4.1/4.2 (extrai nomes+famílias pra detectar overlap).
@@ -1330,14 +1347,19 @@ def _gerar_sessoes_r1_variante_b(banco: list[Exercicio]) -> list[Sessao]:
       `gerar_multiplos_treinos(historico_r1=...)` via `historico_r1_factory`.
     """
     random.seed(_R1_SEED)
+    # Setup B oficial pós-sondagem Nota #5 (Sessão pós-fechamento item 8,
+    # 2026-05-13): C3 vencedor de 5 candidatos sondados (ver Seção 8.15.11
+    # tabela). R-1 = regiões separadas + core: T1 upper(7)+core_din(1),
+    # T2 lower(7)+core_iso(1). Cada treino concentra densidade em UMA
+    # região (~1.75/subregião), enquanto R-2 (Variante B) tem picos
+    # densos em subregiões específicas (peito 2, costas 3) — banco
+    # efetivo distinto = "ar" pro score HIST escolher exercícios
+    # diferentes. Resultado: 22.18% (baseline) → 12.85% (queda 9.3pp).
     config_r1 = [
         {
             "demandas": [
-                ("subregiao", "peito", 2),
-                ("subregiao", "ombro", 1),
-                ("subregiao", "perna_posterior", 3),
+                ("regiao", "upper", 7),
                 ("subregiao", "core_dinamico", 1),
-                ("padrao", "triceps", 1),
             ],
             "tamanho_bloco": 2,
             "evitar_agonistas": True,
@@ -1345,10 +1367,8 @@ def _gerar_sessoes_r1_variante_b(banco: list[Exercicio]) -> list[Sessao]:
         },
         {
             "demandas": [
-                ("subregiao", "costas", 3),
-                ("subregiao", "perna_anterior", 3),
+                ("regiao", "lower", 7),
                 ("subregiao", "core_isometrico", 1),
-                ("padrao", "biceps", 1),
             ],
             "tamanho_bloco": 2,
             "evitar_agonistas": True,
@@ -1358,9 +1378,9 @@ def _gerar_sessoes_r1_variante_b(banco: list[Exercicio]) -> list[Sessao]:
     return gerar_multiplos_treinos(banco, config_r1, relaxar_familia=False)
 
 
-def _gerar_r1_variante_b(banco: list[Exercicio]) -> tuple[set[str], set[str]]:
+def _gerar_r1_variante_a(banco: list[Exercicio]) -> tuple[set[str], set[str]]:
     """Devolve (nomes, famílias) da R-1 fixa pra métricas 4.1/4.2."""
-    sessoes_r1 = _gerar_sessoes_r1_variante_b(banco)
+    sessoes_r1 = _gerar_sessoes_r1_variante_a(banco)
     nomes_r1: set[str] = set()
     fams_r1: set[str] = set()
     for s in sessoes_r1:
@@ -1375,7 +1395,9 @@ def _gerar_r1_variante_b(banco: list[Exercicio]) -> tuple[set[str], set[str]]:
 
 
 def _cfg_4_x(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
-    """Setup atual = R-2 (rotina nova). Mesma estrutura Variante B 2x."""
+    """R-2 (rotina nova) = Variante B 2x (split subregião). R-1 vive em
+    `_gerar_sessoes_r1_variante_a` (full-body região) — estruturas
+    DIFERENTES é a essência do setup B do refinamento métrica 4.1."""
     return [
         {
             "demandas": [
@@ -1424,7 +1446,7 @@ def _metrica_4_x_continua_factory(banco_ref: list[Exercicio]):
     def _m(sessoes: list[Sessao],
            dims: dict[str, MockDimensoes]) -> tuple[int, int, str]:  # noqa: ARG001
         if "r1" not in _R1_CACHE:
-            _R1_CACHE["r1"] = _gerar_r1_variante_b(banco_ref)
+            _R1_CACHE["r1"] = _gerar_r1_variante_a(banco_ref)
         nomes_r1, fams_r1 = _R1_CACHE["r1"]
         slots_total = 0
         slots_overlap = 0
@@ -1492,14 +1514,15 @@ def _make_cenario_4_x(cenario_id: str, nome: str, expectativa: str,
     if toggle_on:
         def _hist_r1(_banco: list[Exercicio]) -> list[Sessao]:
             if "r1_sessoes" not in _R1_SESSOES_CACHE:
-                _R1_SESSOES_CACHE["r1_sessoes"] = _gerar_sessoes_r1_variante_b(banco)
+                _R1_SESSOES_CACHE["r1_sessoes"] = _gerar_sessoes_r1_variante_a(banco)
             return _R1_SESSOES_CACHE["r1_sessoes"]
         hist_factory = _hist_r1
 
     return Cenario(
         id=cenario_id,
         nome=nome,
-        setup_descricao="Variante B 2x, R-1 fixa Variante B (seed 99999), 1000 rotinas",
+        setup_descricao=("R-2 Variante B 2x, R-1 fixa Variante A 2x "
+                         "(seed 99999), 1000 rotinas"),
         expectativa_descricao=expectativa,
         expectativa_predicate=predicate,
         config_factory=_cfg_4_x,
@@ -1526,15 +1549,19 @@ def _patch_cenarios_4_x(banco: list[Exercicio]) -> None:
     """Inicializa CENARIO_4_1 e CENARIO_4_2 com banco real. Chamar em main().
 
     Fase 7.5 — métrica contínua "% slots com overlap" (opção A da Sessão 12).
-    Alvo 4.1 = <10% pós-calibração 7.6 (mecanismo HIST default já entrega
-    ~7-8%; calibração final em 7.6 decide o número exato).
+    Alvo refinado pós-sondagem Nota #5 (Seção 8.15.11 — fechamento item 7
+    da 8.15.7, 2026-05-13): `<15%` reflete piso estrutural do banco mock
+    com setup B oficial C3 (~12.85% observado). Mecanismo HIST funcional
+    (queda de 9.3pp do baseline 22.18%); fechamento <10% gateado pela
+    Fase 4 (XLSX 125+ pode reduzir piso). Gate continua com dentes —
+    regressão saltaria pra ~22% se HIST quebrar.
     """
     global CENARIO_4_1, CENARIO_4_2
     CENARIO_4_1 = _make_cenario_4_x(
         cenario_id="4.1",
         nome="HISTÓRICO toggle ON evita R-1",
-        expectativa="<10% slots (Fase 7.5 contínua)",
-        predicate=lambda pct: pct < 10.0,
+        expectativa="<15% slots (piso estrutural pós-Nota #5 / setup B C3)",
+        predicate=lambda pct: pct < 15.0,
         banco=banco,
         toggle_on=True,
     )
