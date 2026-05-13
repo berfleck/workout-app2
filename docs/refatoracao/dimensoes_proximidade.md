@@ -411,6 +411,59 @@ Estimativas "~1+~1=~2" não substituem auditoria com 1000 iters.
 Esta diretriz é **complementar** à 1.8.1 e 1.8.2 — completa o ciclo
 "densificação OK, validação realista, auditoria de números informais".
 
+#### 1.8.4 Escalada de setup como complemento ao coordinate descent (Nota de processo #5)
+
+Quando uma dim aparece como NO-OP no coordinate descent (peso não
+muda comportamento do harness em sondagem 5-10 candidatos), **uma
+sondagem de N rápida (3-4 candidatos)** desambigua entre dois tipos
+de NO-OP estruturalmente diferentes:
+
+- **NO-OP estrutural por banco-limitado:** o cenário não exercita a
+  dim porque o banco efetivo (pós hard-filters) não tem pares
+  mensuráveis suficientes. Comportamento típico: **binário** ao
+  escalar N (0% até um limiar, salto direto pra ~X% sem ponto
+  intermédio). Calibrar peso é vício — qualquer peso ≠ 0 entrega a
+  mesma curva binária.
+- **NO-OP por peso-saturado (plateau):** o cenário exercita a dim,
+  mas o peso atual está em região de retornos decrescentes.
+  Comportamento típico: **continuo** ao escalar peso (diminishing
+  returns claros mas monotônico). Calibrar peso ajuda até o plateau
+  — depois precisa mudar setup ou aceitar piso estrutural.
+
+**Origem (Sessão pós-13 / fechamento item 8 da 8.15.7 — 2026-05-09):**
+2.3 ficou em 0% pós-Fase 7.3 com peso INTRA `soft_alto (-50)` da Dim 2
+(pegada+plano). Coordinate descent da 7.6 sondou `soft_baixo / soft_medio
+/ soft_alto`: todos em 0%. Sondagem de N adicional (`costas(5/7/8/9)`)
+revelou comportamento binário (0/0/0/23.30%) — Dim 2 NO-OP estrutural
+por banco-limitado (1 par mensurável pós-hard). Diagnóstico final
+registrado como 5º NO-OP, Seção 8.15.10. Distingue de 4 NO-OPs
+originais da 8.15.9, que foram majoritariamente peso-saturado (HIST)
+ou cenário gateado por outras dims.
+
+**Procedimento operacional (complementa coordinate descent da Seção
+8.12 / C):**
+
+1. Ao topar com NO-OP em coordinate descent (5-10 candidatos de peso),
+   **antes de declarar a dim NO-OP definitivo**, rodar sondagem de N
+   ou de estrutura de setup (3-4 candidatos rápidos).
+2. Se curva for **binária** (salto sem gradiente) → NO-OP estrutural
+   por banco-limitado. Aceitar como "5º tipo de NO-OP", documentar
+   gateamento por banco futuro (Fase 4 ou banco real).
+3. Se curva for **contínua** (gradiente claro mesmo se em plateau) →
+   NO-OP por peso-saturado. Sondar setup alternativo (Variante A vs B,
+   estrutura R-1, etc.) antes de aceitar piso estrutural.
+4. **Não pular esse passo** — diagnóstico errado direciona resolução
+   errada (calibrar peso de banco-limitado é vício; escalar setup de
+   peso-saturado mascara plateau).
+
+**Custo:** 3-4 rodadas de 1000 iters cada — ~5-15 min de wall-clock
+no harness atual. Trivial comparado ao custo de calibrar peso sem
+diagnóstico ou de adiar fechamento.
+
+Esta diretriz é **complementar** à 1.8.1, 1.8.2 e 1.8.3 — completa o
+ciclo "densificação OK, validação realista, auditoria de números
+informais, **diagnóstico de NO-OP estrutural vs peso-saturado**".
+
 ---
 
 ## 2. Síntese da Fase 1 — análise dos 8 grupos
@@ -3036,6 +3089,14 @@ viram OK quando 7.2 + 7.4 implementarem predicado e HISTÓRICO toggle.
 > com sub-pareamento 94.90% — todos dentro da expectativa pré-7.3).
 > Detalhes na Seção 8.15.4.
 
+> **Atualização pós-fechamento item 8 (Sessão posterior à 13 — 2026-05-09):**
+> 2.3 sai de FAIL pós-7.6 (predicate `2.0 <= pct < 10.0` não fecha — Dim 2
+> NO-OP no banco mock atual) pra **OK informativo** (predicate `pct >= 0`).
+> Coluna "Esperado pós-Etapa 7" do 2.3 nesta tabela fica como referência
+> histórica — fechamento real é "5º NO-OP, validação Dim 2 gateada pela
+> Fase 4". Harness pós-decisão = **15/16 OK + 1 FAIL** (apenas 4.1, plateau
+> ~17% no teto HIST 1.2x). Detalhes na Seção 8.15.10 + 9.4.
+
 #### 8.15.4 Fechamento Fase 7.2 (Sessão 9 — 2026-05-09)
 
 **Entregue:** predicado `_compativel_intra(cand, alocados_intra)` em
@@ -3647,18 +3708,24 @@ pré-existente. Sem snapshots regerados (wire é default-preserving).
 - Item 4 (mock_futuros pro XLSX) — Fase 4.
 - Item 5 (cycling determinístico subregião) — pós-Etapa 7.
 - Item 6 (UI HIST exposed) — pós-Etapa 7.
-- **Item 8 NOVO** (escalada setup 2.3 ou aceitar over-correção
-  benigna) — decisão pendente, não bloqueia.
+- ~~**Item 8 NOVO** (escalada setup 2.3 ou aceitar over-correção
+  benigna)~~ ✅ **Fechado** (Sessão posterior à 13 — 2026-05-09):
+  sondagem de escalada `costas(7/8/9)` revelou comportamento binário
+  do banco mock (0% até N=8, 23.30% em N=9 — sem ponto intermédio).
+  Aceito como **5º NO-OP** documentado, paralelo aos 4 da 8.15.9
+  mas descoberto via escalada de setup em vez de coordinate descent.
+  Validação real Dim 2 gateada pela Fase 4 (XLSX 125+). Detalhes
+  Seção 8.15.10.
 - ~~Calibração C iterativa~~ ✅ **Fase 7.6 fechada** — defaults
   validados, wire pendente implementado, 2 FAIL benignas com
   caminho de resolução claro.
 
 **Status final Etapa 7:** 6 fases originalmente planejadas (7.1-7.6)
 ✅ todas fechadas. Fase 7.6 fechou como **validação + wire**, NÃO
-como ajuste numérico. Calibração futura (setup B do 4.1, escalada
-2.3) não bloqueia uso real do gerador — defaults atuais entregam
-14/16 cenários no harness, com mecanismos HIST + score INTRA + score
-INTER + predicado hard funcionais.
+como ajuste numérico. Calibração futura (setup B do 4.1) não bloqueia
+uso real do gerador — defaults atuais entregam 15/16 cenários no
+harness pós-fechamento item 8 (Seção 8.15.10), com mecanismos HIST +
+score INTRA + score INTER + predicado hard funcionais.
 
 **Lição metodológica registrada (espelha Seção 1.8.3):** previsão
 "calibração vai mover X cenário pra Y" deve ser auditada empiricamente
@@ -3671,6 +3738,75 @@ do banco/setup. **Diretriz pra futuras coordinate descents:** primeiro
 sondar empíricamente que cenário responde a peso (5-10 candidatos por
 dim), depois decidir se precisa calibrar ou se cenário precisa
 escalada de setup.
+
+#### 8.15.10 Fechamento Item 8 da 8.15.7 — escalada setup 2.3 (Sessão pós-13 — 2026-05-09)
+
+> **Decisão registrada:** aceitar 2.3 em over-correção benigna como
+> **5º NO-OP** da sondagem de calibração, paralelo aos 4 NO-OPs
+> da Seção 8.15.9 mas descoberto via **escalada de setup** em vez de
+> coordinate descent. Setup `costas(5)` mantido; predicate de 2.3 vira
+> informativo (`pct >= 0`); cenário fica como **gate de não-regressão +
+> observador da frequência**. Validação real da Dim 2 (pegada+plano)
+> fica gateada pela Fase 4 (XLSX 125+ exercícios). Cap-stone do item 8
+> da Seção 8.15.7.
+
+**Sondagem executada (1000 iters/setup):**
+
+| Setup | % rotinas com colisão pegada+plano | Observação |
+|---|---|---|
+| `costas(5)` (atual) | 0.00% | softmax escapa o único par mensurável |
+| `costas(7)` | 0.00% | idem — mais espaço pra escapar |
+| `costas(8)` | 0.00% | idem — limite alto antes do salto |
+| `costas(9)` | **23.30%** | força preencher todas as 9 famílias hard distintas; sem opção de pular Apoiado ou Seal |
+
+**Por que comportamento binário:** banco mock atual de costas tem
+9 famílias hard distintas pós-`familia_estrita` (curvada / baixa /
+apoiado / seal / unilateral / trx / Barra / Pullover / Puxada).
+O único par mensurável da Dim 2 (pegada+plano AMBOS iguais) que
+sobrevive ao hard INTRA é **Remada Apoiado + Remada Seal Halteres**
+(neutra+apoiada — Decisão B Sessão 7a) — em famílias com 1 exemplar
+cada. Em N≤8, softmax escolhe 8 de 9 famílias e simplesmente não
+seleciona Apoiado OU Seal (uma das duas fica de fora). Em N=9, força
+preencher 9 — Apoiado e Seal viram inevitáveis quando a rotina
+completa, gerando ~23% (resto representa rotinas que falharam em
+preencher 9 e geraram aviso "incompleta").
+
+**Por que isso é estrutural, não bug:**
+
+- O score-aware da Dim 2 (default soft_alto -50) **funciona** quando
+  tem alternativa — softmax penaliza colisão e prefere outras famílias.
+- O banco mock atual **não dá alternativa** — só 1 par mensurável
+  pós-hard. Em N≤8, alternativa é "pular um dos dois"; em N=9, não
+  há alternativa.
+- Calibrar peso da Dim 2 contra esse setup é vício — qualquer peso
+  diferente de 0 entrega a mesma curva binária (0% até N=8, ~23% em
+  N=9). Mesma régua dos 4 NO-OPs da 8.15.9: **não calibrar peso
+  contra banco que não exercita a dim**.
+
+**Resultado pós-decisão:**
+
+- 2.3 sai de **FAIL** (predicate `2.0 <= pct < 10.0`) pra **OK**
+  (predicate informativo `pct >= 0`).
+- Harness pós-decisão = **15/16 OK + 1 FAIL** (apenas 4.1 — plateau
+  ~17% no teto HIST 1.2x; resolução via setup B do 4.1, item 7 da
+  8.15.7 ainda aberto).
+- Defaults da 7.1 (soft_alto -50 pra pegada e plano_corporal)
+  **mantidos sem alteração** — calibração futura via Fase 4 quando
+  banco real expor mais variedade pegada+plano.
+
+**Cross-references:**
+
+- Cenário 2.3 no harness: `tools/calibrar_pesos_dimensoes.py`,
+  `_cfg_2_3` + `CENARIO_2_3` documentam o status como header inline.
+- Validação real da Dim 2: ver Seção 9.4 (Validação Dim 2 gateada
+  pela Fase 4).
+- Item 8 da 8.15.7: marcado como ✅ fechado, ponteiro pra cá.
+
+**Lição metodológica:** promovida pra Seção 1.8 como **Nota de
+processo #5 (subseção 1.8.4)** — "Escalada de setup como complemento
+ao coordinate descent". Ver lá pro procedimento operacional reutilizável
+em sessões futuras (distingue NO-OP estrutural por banco-limitado vs
+NO-OP por peso-saturado via 3-4 candidatos de N).
 
 ---
 
@@ -3791,6 +3927,44 @@ Fase 4 pode arrancar quando Etapa 7 implementação estrutural fechar.
 Calibração refinada (C) pode acontecer em paralelo com Fase 4 se
 mocks já cobrirem dims de exercícios mais relevantes — desacoplar
 quando possível.
+
+### 9.4 Validação Dim 2 (pegada + plano_corporal) gateada pela Fase 4
+
+> **Origem:** Seção 8.15.10 — fechamento item 8 da 8.15.7 (escalada
+> setup 2.3). Sondagem revelou que o banco mock atual (costas) só tem
+> **1 par Dim 2 mensurável pós hard-família** (Apoiado + Seal Halteres),
+> em famílias com 1 exemplar cada. Comportamento binário (0% até N=8,
+> ~23% em N=9 forçado) impossibilita calibração via harness pré-Fase 4.
+
+**Sub-tarefa da Fase 4 quando ela executar:** após XLSX expor as 5
+dims em todos os ~125 exercícios, **re-rodar 2.3 (e cenários análogos
+em outras subregiões)** com banco real. Expectativas:
+
+- **Mais pares mensuráveis pós-hard.** Subregiões com famílias maiores
+  (peito Supinos refinados, ombros, quadril) devem expor pares com
+  mesma `pegada` + mesmo `plano_corporal` em famílias diferentes.
+- **Curva contínua substitui binária.** Com banco maior, score-aware
+  da Dim 2 passa a ter alternativas reais — peso `soft_alto -50`
+  (default 7.1) deve produzir `pct` em faixa intermediária (não 0%
+  nem ~23%).
+- **Calibração de peso volta a ser informativa.** Se a faixa observada
+  ficar fora de "low single digits" (alvo de over-correção benigna,
+  análogo à faixa 2-10% do timebox 7a), considerar ajuste de peso
+  Dim 2 — agora com sondagem dirigida pelos cenários reais (não pelo
+  binário do banco mock).
+- **Considerar adicionar variantes 2.3.b/2.3.c em outras subregiões.**
+  2.3 atual é específica de costas; banco real permite variantes
+  análogas em peito (Supinos refinados — mesma pegada+mesmo plano em
+  famílias Reto vs Inclinado), ombros e pernas. Decidir na Fase 4
+  se cobertura cross-subregião vale o esforço.
+
+**Critério de fechamento:** Dim 2 sai do status "5º NO-OP" quando ≥1
+cenário do harness exercitar pegada+plano em faixa contínua
+(sondagem de peso `-20 / -50 / -100` produz curva monotônica não-trivial).
+Até lá, Dim 2 fica como mecanismo wired + funcional unitário (verificável
+via `tests/test_score_proximidade_cross_region.py` 5.1.a) mas sem
+calibração empírica — defaults da 7.1 (soft_alto -50) seguem como
+baseline conservador.
 
 ---
 

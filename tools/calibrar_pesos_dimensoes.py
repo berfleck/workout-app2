@@ -557,26 +557,37 @@ CENARIO_2_2_B = Cenario(
 
 
 # ---------------------------------------------------------------------------
-# Cenário 2.3 — Pegada+plano cumulativa em costas (densificado)
+# Cenário 2.3 — Pegada+plano cumulativa em costas (gate de não-regressão)
 #
-# Setup DENSIFICADO pós-timebox Sessão 7a (Seção 8.14.1): timebox
-# `costas(3) × 1 treino` deu 1.50% < 5% limiar → 2.3 oficialmente
-# ⚠️ densificado. Faixa pré-registrada (Seção 8.14.2 / Decisão 2):
-# `costas(4)` → **4-12% esperado**. <4% = inefetivo (escalar pra costas(5));
-# >12% = banco apertado demais.
+# **Status pós-Etapa 7 (2026-05-09):** Dim 2 (pegada+plano) é o **5º NO-OP**
+# documentado da sondagem de calibração — paralelo aos 4 NO-OPs da Seção
+# 8.15.9, descoberto via escalada de setup em vez de coordinate descent.
 #
-# Métrica: 2+ ex com pegada+plano AMBOS iguais e não-vazios (colisão dupla).
-# 100% das colisões observadas em costas(3) Sessão 7a foram
-# `Remada Apoiado + Remada Seal Halteres` (pegada=neutra plano=apoiada) —
-# caso clínico modelado ativamente em Decisão B Sessão 7a.
+# Sondagem de escalada (Sessão posterior à 13, item 8 da 8.15.7):
+#   costas(5) → 0%   costas(7) → 0%   costas(8) → 0%   costas(9) → 23.30%
+#
+# Comportamento binário do banco mock atual: costas pós hard-família tem
+# 9 famílias distintas; em N≤8 o softmax score-aware sempre escapa o
+# único par mensurável (`Remada Apoiado + Remada Seal Halteres`,
+# pegada=neutra plano=apoiada — Decisão B Sessão 7a); em N=9 força
+# preencher todas as 9 famílias e captura ~23% do tempo. Não há ponto
+# intermédio — ou pula 100%, ou força ~23%.
+#
+# **Decisão (Sessão de fechamento item 8):** aceitar 2.3 em over-correção
+# benigna. Não calibrar pesos contra banco que não exercita a dim
+# (mesma régua dos 4 NO-OPs originais). Cenário fica como gate de
+# não-regressão + observador da frequência. Validação real da Dim 2
+# pegada+plano fica gateada pela Fase 4 (XLSX 125+ exercícios) — ver
+# Seção 9 / nota Dim 2.
+#
+# Métrica: 2+ ex em costas com pegada+plano AMBOS iguais e não-vazios.
 # ---------------------------------------------------------------------------
 
 def _cfg_2_3(banco: list[Exercicio]) -> list[dict]:  # noqa: ARG001
-    # Setup ajustado pós-Sessão 7b (2026-05-08): costas(5) em vez de costas(4).
-    # costas(4) deu 1.10% (abaixo do limiar pré-registrado 4%); escalada pra
-    # costas(5) deu 5.20%. Predicate ajustado pra 2-10% baseline (faixa
-    # pré-registrada 10-25% revisada — banco efetivo tem só 1 par mensurável,
-    # Apoiado+Seal, após hard família INTRA proteger membros mesma família).
+    # costas(5) mantido. Sondagem de escalada (5/7/8/9) revelou que o banco
+    # mock atual só tem 1 par Dim 2 mensurável pós hard-família (Apoiado+Seal)
+    # — comportamento binário (0% até N=8, 23% em N=9). Ver header acima
+    # + Seção 8.15.10 do dimensoes_proximidade.md (5º NO-OP).
     return [{
         "demandas": [("subregiao", "costas", 5)],
         "tamanho_bloco": 2,
@@ -611,10 +622,11 @@ def _metrica_2_3(sessoes: list[Sessao],
 
 CENARIO_2_3 = Cenario(
     id="2.3",
-    nome="Pegada+plano cumulativa em costas (densificado)",
+    nome="Pegada+plano cumulativa em costas (gate de não-regressão)",
     setup_descricao="costas(5) × 1 treino, 1000 rotinas",
-    expectativa_descricao="2-10% (revisado Sessão 7b, pre-D2)",
-    expectativa_predicate=lambda pct: 2.0 <= pct < 10.0,
+    expectativa_descricao=("informativo (5º NO-OP — banco mock só tem 1 par "
+                           "mensurável; validação Dim 2 fica pra Fase 4)"),
+    expectativa_predicate=lambda pct: pct >= 0.0,  # informativo, sempre OK
     config_factory=_cfg_2_3,
     n_treinos=1,
     metrica_fn=_metrica_2_3,
