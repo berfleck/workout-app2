@@ -140,6 +140,13 @@ PADRAO_PARA_CHIP = {
     "flexao_plantar":     ("panturrilha", "panturrilha"),
     "core_isometrico":    ("core", "core"),
     "core_dinamico":      ("core", "core"),
+    # Padrões refinados Etapa 8 (Anexo 15-quater) — ainda sem exercícios
+    # mapeados em 8.1 (XLSX migra em 8.2). Chips entram aqui pra label estar
+    # pronto quando XLSX migrar.
+    "flexao_tronco":      ("core", "core"),
+    "flexao_lateral":     ("core", "core"),
+    "rotacao_tronco":     ("core", "core"),
+    "flexao_quadril":     ("core", "core"),
     "cardio":             ("cardio", "cardio"),
 }
 
@@ -215,6 +222,11 @@ PADROES_LABELS = {
     "posterior_ombro": "Posterior de ombro",
     "biceps": "Bíceps", "triceps": "Tríceps",
     "core_isometrico": "Core isométrico", "core_dinamico": "Core dinâmico",
+    # Padrões refinados Etapa 8 (Anexo 15-quater)
+    "flexao_tronco": "Flexão de tronco",
+    "flexao_lateral": "Flexão lateral",
+    "rotacao_tronco": "Rotação de tronco",
+    "flexao_quadril": "Flexão de quadril",
     "cardio": "Cardio",
 }
 

@@ -28,30 +28,44 @@ XLSX_PATH = "banco_exercicios.xlsx"
 # Hierarquia: Região → Subregião → Padrão
 # ---------------------------------------------------------------------------
 
-# Mapeamento PADRÃO → SUBREGIÃO (todo padrão pertence a uma e só uma subregião)
-PADRAO_PARA_SUBREGIAO = {
+# Mapeamento PADRÃO → SUBREGIÕES. Valor é set[str] desde Etapa 8 (refator
+# CORE) — padrões refinados de core atravessam as 2 subregiões (ex:
+# `flexao_tronco` aparece em Prancha iso E Crunch dyn). Padrões não-core
+# continuam 1:1 (set de 1 elemento) por consistência. `core_isometrico` e
+# `core_dinamico` continuam como padrões válidos pra retrocompat até XLSX
+# migrar em Fase 8.2; aliasing pros 4 refinados ativado lá via
+# `_PADROES_LEGADOS`.
+PADRAO_PARA_SUBREGIAO: dict[str, set[str]] = {
     # Membros inferiores
-    "squat_bilateral":  "perna_anterior",
-    "squat_unilateral": "perna_anterior",
-    "hinge":          "perna_posterior",
-    "knee_flexion":   "perna_posterior",
-    "abduction":      "perna_posterior",
-    "adduction":      "adutores",
-    "flexao_plantar": "panturrilha",
+    "squat_bilateral":  {"perna_anterior"},
+    "squat_unilateral": {"perna_anterior"},
+    "hinge":          {"perna_posterior"},
+    "knee_flexion":   {"perna_posterior"},
+    "abduction":      {"perna_posterior"},
+    "adduction":      {"adutores"},
+    "flexao_plantar": {"panturrilha"},
     # Membros superiores
-    "empurrar_compostos": "peito",
-    "empurrar_isolados":  "peito",
-    "remadas":            "costas",
-    "puxadas":            "costas",
-    "ombro_composto":     "ombro",
-    "ombro_isolado":      "ombro",
-    "posterior_ombro":    "ombro",
-    "biceps":             "bracos",
-    "triceps":            "bracos",
-    # Outros
-    "core_isometrico": "core_isometrico",
-    "core_dinamico":   "core_dinamico",
-    "cardio":          "cardio",
+    "empurrar_compostos": {"peito"},
+    "empurrar_isolados":  {"peito"},
+    "remadas":            {"costas"},
+    "puxadas":            {"costas"},
+    "ombro_composto":     {"ombro"},
+    "ombro_isolado":      {"ombro"},
+    "posterior_ombro":    {"ombro"},
+    "biceps":             {"bracos"},
+    "triceps":            {"bracos"},
+    # Core legados (mantidos 1:1; XLSX ainda usa esses padrões na Fase 8.1)
+    "core_isometrico": {"core_isometrico"},
+    "core_dinamico":   {"core_dinamico"},
+    # Core refinados (Anexo 15-quater) — 1:N atravessando iso/dyn.
+    # `flexao_lateral` só tem variante iso por enquanto (dyn vazio — futuro).
+    # Sem exercícios mapeados em 8.1; XLSX migra em 8.2.
+    "flexao_tronco":   {"core_isometrico", "core_dinamico"},
+    "flexao_lateral":  {"core_isometrico"},
+    "rotacao_tronco":  {"core_isometrico", "core_dinamico"},
+    "flexao_quadril":  {"core_isometrico", "core_dinamico"},
+    # Cardio
+    "cardio":          {"cardio"},
 }
 
 # Mapeamento SUBREGIÃO → REGIÃO
@@ -75,9 +89,21 @@ REGIAO_PARA_SUBREGIOES: dict[str, list[str]] = {}
 for sub, reg in SUBREGIAO_PARA_REGIAO.items():
     REGIAO_PARA_SUBREGIOES.setdefault(reg, []).append(sub)
 
+# Padrões refinados Etapa 8 que ainda não têm exercícios no banco real
+# (XLSX migra em Fase 8.2). Filtrados de SUBREGIAO_PARA_PADROES pra evitar
+# decomposição espúria de demanda região("core", N) — sem este filtro, o
+# decompositor distribui vagas pros padrões refinados e gera avisos
+# "incompleta" porque banco retorna 0 candidatos. Set fica vazio na Fase 8.2.
+_PADROES_RESERVADOS: set[str] = {
+    "flexao_tronco", "flexao_lateral", "rotacao_tronco", "flexao_quadril",
+}
+
 SUBREGIAO_PARA_PADROES: dict[str, list[str]] = {}
-for pad, sub in PADRAO_PARA_SUBREGIAO.items():
-    SUBREGIAO_PARA_PADROES.setdefault(sub, []).append(pad)
+for pad, subs in PADRAO_PARA_SUBREGIAO.items():
+    if pad in _PADROES_RESERVADOS:
+        continue
+    for sub in subs:
+        SUBREGIAO_PARA_PADROES.setdefault(sub, []).append(pad)
 
 
 # Estrutura essencial/acessório usada na pré-alocação global (Etapa 2).
@@ -184,9 +210,10 @@ def _validar_ancoras() -> None:
             assert pad in PADRAO_PARA_SUBREGIAO, (
                 f"ANCORAS_POR_SUBREGIAO[{sub!r}]: padrão '{pad}' não existe"
             )
-            assert PADRAO_PARA_SUBREGIAO[pad] == sub, (
-                f"ANCORAS_POR_SUBREGIAO[{sub!r}]: '{pad}' aponta pra "
-                f"'{PADRAO_PARA_SUBREGIAO[pad]}' em PADRAO_PARA_SUBREGIAO"
+            assert sub in PADRAO_PARA_SUBREGIAO[pad], (
+                f"ANCORAS_POR_SUBREGIAO[{sub!r}]: '{pad}' não pertence a "
+                f"esta subregião — PADRAO_PARA_SUBREGIAO[{pad!r}]="
+                f"{sorted(PADRAO_PARA_SUBREGIAO[pad])}"
             )
 
 
@@ -771,14 +798,26 @@ def carregar_banco(path: str) -> list[Exercicio]:
             continue
         eq_pri = _str(row.get("eq_primario")) or _EQ_FIXES.get(nome, "")
         padrao = _str(row.get("padrao"))
-        subregiao_canonica = PADRAO_PARA_SUBREGIAO.get(padrao, "")
+        # Etapa 8: PADRAO_PARA_SUBREGIAO retorna set[str] (1:N pra core).
+        # Pra 1:1, usa a única subregião do set. Pra 1:N (core refinados),
+        # se XLSX já informa subregião válida do set, respeita; senão pega
+        # a primeira ordenada e warn.
+        subs_canonicas = PADRAO_PARA_SUBREGIAO.get(padrao, set())
         subregiao_xlsx = _str(row.get("subregiao"))
-        if subregiao_xlsx and subregiao_canonica and subregiao_xlsx != subregiao_canonica:
-            print(
-                f"[carregar_banco] WARN: '{nome}' tem subregiao='{subregiao_xlsx}' "
-                f"no XLSX, mas padrao='{padrao}' deriva '{subregiao_canonica}' "
-                f"do mapa canônico. Usando o mapa."
-            )
+        if subs_canonicas:
+            if subregiao_xlsx and subregiao_xlsx in subs_canonicas:
+                subregiao_canonica = subregiao_xlsx
+            else:
+                subregiao_canonica = sorted(subs_canonicas)[0]
+                if subregiao_xlsx and subregiao_xlsx not in subs_canonicas:
+                    print(
+                        f"[carregar_banco] WARN: '{nome}' tem subregiao='{subregiao_xlsx}' "
+                        f"no XLSX, mas padrao='{padrao}' deriva subregiões "
+                        f"{sorted(subs_canonicas)} do mapa canônico. "
+                        f"Usando '{subregiao_canonica}'."
+                    )
+        else:
+            subregiao_canonica = ""
         exercicios.append(Exercicio(
             nome=nome,
             variacao_de=_str(row.get("variacao_de")) or None,
@@ -2275,10 +2314,12 @@ def pre_alocar_rotina(
 
             travados_d = travados_por_demanda.get((t_idx, d_idx), [])
             padroes_obrig = [ex.padrao for ex in travados_d]
-            subs_obrig = list({
-                PADRAO_PARA_SUBREGIAO[p] for p in padroes_obrig
-                if p in PADRAO_PARA_SUBREGIAO
-            })
+            # Etapa 8: PADRAO_PARA_SUBREGIAO[p] é set[str] (1:N pra core).
+            # Une todas as subregiões possíveis dos padrões obrigatórios.
+            subs_obrig_set: set[str] = set()
+            for p in padroes_obrig:
+                subs_obrig_set |= PADRAO_PARA_SUBREGIAO.get(p, set())
+            subs_obrig = list(subs_obrig_set)
 
             # Caminho hierarquia treino > rotina: usa quotas pré-calculadas
             # no nível rotina (Etapa A.0) se essa demanda foi agregada.
@@ -2299,9 +2340,11 @@ def pre_alocar_rotina(
                     avisos_rotina.append(av)
                 sub_dems_padrao: list[tuple[str, str, int]] = []
                 for (_n, sub_esc, sub_qt) in sub_dems_subregiao:
+                    # Etapa 8: padrão pertence à subregião sse o nome está
+                    # no set do mapa (1:N pra core).
                     pads_obrig_sub = [
                         p for p in padroes_obrig
-                        if PADRAO_PARA_SUBREGIAO.get(p) == sub_esc
+                        if sub_esc in PADRAO_PARA_SUBREGIAO.get(p, set())
                     ]
                     sub_dems_p, avs_sub = _decompor_demanda_subregiao(
                         sub_esc, sub_qt, padroes_obrigatorios=pads_obrig_sub,
@@ -2529,10 +2572,20 @@ def _aviso_slot_sem_candidato(
     família esgotada.
     """
     nivel_dem = quota_total[(slot.treino_idx, slot.d_idx_original)][0]
-    sub_da_padrao = PADRAO_PARA_SUBREGIAO.get(slot.escopo_alocacao, "")
+    # Etapa 8: padrão pode mapear pra múltiplas subregiões (1:N pra core).
+    # Considera padrão obrigatório se for âncora obrigatória em QUALQUER
+    # subregião que ele atravessa. Pra padrões não-core (1:1), comportamento
+    # idêntico ao pré-Etapa 8.
+    subs_do_padrao = PADRAO_PARA_SUBREGIAO.get(slot.escopo_alocacao, set())
+    # Pra interface do aviso, preserva 1 subregião escolhida deterministicamente.
+    # 1:1 (não-core): primeira do set é a única. 1:N (core): primeira por ordem
+    # alfabética — interface legada espera string única. Padrão sem mapeamento
+    # vira "".
+    subregiao_aviso = sorted(subs_do_padrao)[0] if subs_do_padrao else ""
     eh_obrigatoria = any(
         a["padrao"] == slot.escopo_alocacao and a["obrigatoria"]
-        for a in ANCORAS_POR_SUBREGIAO.get(sub_da_padrao, [])
+        for sub in subs_do_padrao
+        for a in ANCORAS_POR_SUBREGIAO.get(sub, [])
     )
     if eh_obrigatoria:
         return {
@@ -2542,7 +2595,7 @@ def _aviso_slot_sem_candidato(
             "nivel": nivel_dem,
             "escopo_demanda": slot.escopo_demanda_original,
             "padrao": slot.escopo_alocacao,
-            "subregiao": sub_da_padrao,
+            "subregiao": subregiao_aviso,
             "motivo": motivo,
             "faltam": 1,
         }
