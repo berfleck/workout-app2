@@ -213,23 +213,115 @@ predicado e migração.
 
 **Pendências em aberto pós-Etapa 7** (Seção 8.15.7 + atualização 8.15.9):
 
-1. Bug retrocompat `("subregiao", "core", N)` — Etapa 8 ou junto com
-   migração estrutural CORE.
-2. Refator estrutural CORE real (padrões `flexao_tronco`/etc) —
-   pode ficar pra Etapa 8 ou Fase 4.
+1. ~~Bug retrocompat `("subregiao", "core", N)`~~ ✅ **Fechado em Fase
+   8.3** (2026-05-13) via `_SUBREGIOES_LEGADAS` paralelo a
+   `_PADROES_LEGADOS` + branch retrocompat em `_decompor_demanda_subregiao`.
+   Teste de regressão `test_subregiao_core_legada_aloca_qtd_pedida`.
+2. ~~Refator estrutural CORE real (padrões `flexao_tronco`/etc)~~
+   ✅ **Fechado em Fase 8.2** (2026-05-13). XLSX migrado, aliases
+   legados via `_PADROES_LEGADOS`. 4.1 declarado 6º NO-OP estrutural
+   (Seção 8.15.12).
 3. ~~Cenário 5.1 — implementar em Fase 7.5.~~ ✅ **Fechado em pytest
    determinístico** (`tests/test_score_proximidade_cross_region.py`,
    13 testes parametrizados — Fase 7.5 / Sessão 12).
-4. Mock_futuros (11 exercícios) vão pro XLSX na Fase 4.
+4. Mock_futuros (5 restantes) vão pro XLSX na Fase 4 — Russian Twist +
+   4 INFRAs. Etapa 8 reduziu de 11 pra 5 (refator CORE absorveu o
+   resto). Pode reduzir piso 4.1.
 5. Cycling determinístico de subregião (achado paralelo Sessão 7a)
-   — investigar se relevante pós-Etapa 7.
+   — investigar se relevante pós-Etapa 7. Pode interagir com viés
+   mono-ex do 6º NO-OP.
 6. **UI Histórico exposed** (Sessão 11 / Fase 7.4): contrato
    programatic `gerar_multiplos_treinos(historico_r1=...)` pronto, mas
    sem UI/integração SQLite. Toggle UI + leitura R-1 do banco fica
    pra fase posterior — não bloqueia 7.6.
 7. ~~**Refinamento métrica 4.1**.~~ ✅ **Fechado opção A** (Fase 7.5 /
    Sessão 12) — métrica contínua "% slots com overlap" agregada
-   cross-iter. Alvo <10% pós-7.6.
+   cross-iter. Alvo <15% via setup B C3 (Fase 7.6 / Frente A).
+   Pós-Etapa 8: predicate vira informativo (6º NO-OP).
+
+## Etapa 8 — plano e decisões fechadas (não reabrir sem motivo forte)
+
+**Etapa 8 CONCLUÍDA em 2026-05-13** (sessão única, branch `etapa-8`,
+fases 8.1-8.4). Resolve itens 1+2 da 8.15.7: refator estrutural CORE
+(item 15-quater do Anexo) + bug retrocompat `("subregiao", "core", N)`.
+
+**Decisões fechadas** (4 perguntas iniciais via AskUserQuestion):
+
+1. **`PADRAO_PARA_SUBREGIAO` 1:N** — vira `dict[str, set[str]]`.
+   Padrões pré-Etapa 8 mantêm set de 1 elemento. 4 refinados core
+   (`flexao_tronco`, `flexao_lateral`, `rotacao_tronco`, `flexao_quadril`)
+   atravessam iso/dyn conforme spec; `flexao_lateral` só iso;
+   `rotacao_tronco` só iso até Fase 4 cadastrar Russian Twist.
+2. **Cadastros novos adiados pra Fase 4** — Russian Twist + 4 INFRAs
+   continuam só em mocks YAML, não no XLSX.
+3. **Aceitar spec do Anexo 15-quater nos 3 🟡** — Roda Abdominal,
+   Prancha Renegade, Abd Bicicleta → `flexao_tronco`.
+4. **Aliases legados via `_PADROES_LEGADOS`** — templates antigos e
+   cenários do harness não migram. `core_isometrico` expande pros 4
+   refinados iso; `core_dinamico` pra 2 (sem flexao_lateral nem
+   rotacao_tronco até Fase 4).
+
+**Ordem das 4 fases:**
+
+| Fase | Escopo | Commit |
+|---|---|---|
+| 8.1 | Scaffolding (1:N + 4 padrões + call-sites + `_PADROES_RESERVADOS`) | `4a1b8ca` |
+| 8.2 | XLSX migration + aliases + YAML cleanup + snapshots + **6º NO-OP** | `204ca49` |
+| 8.3 | Bug item 1 + `_SUBREGIOES_LEGADAS` + teste de regressão | `da53a5a` |
+| 8.4 | Docs + log + memory + PR pra main | (este) |
+
+**Achado central da Fase 8.2 — 6º NO-OP estrutural pós-CORE**
+(Seção 8.15.12 nova):
+
+Refator CORE introduz **viés de distribuição por padrões mono-exercício**:
+Pallof Press em `rotacao_tronco` e Prancha Lateral em `flexao_lateral`
+concentram ~25% de probabilidade em R-1 (vs 7.7% pré-refator, 3.2× mais
+provável). 4.1 sobe de 12.85% pra 21.54%. Sondagem Nota #5 v2 com 8
+candidatos de R-1 — nenhum fecha alvo original <15%. Setup B C3 mantido
+(continuidade com Frente A); predicate vira informativo.
+
+**Taxonomia consolidada dos 3 sub-tipos de NO-OP** (Nota #5 / 1.8.4
+ganha 3ª validação empírica):
+
+1. NO-OP banco-limitado (2.3 / 8.15.10)
+2. NO-OP gated por piso (4.1 pré-Etapa 8 / 8.15.11 — resolvido)
+3. NO-OP por viés de distribuição (4.1 pós-Etapa 8 / 8.15.12 NOVO)
+
+**Achado metodológico — sondagem v1 vs v2**: instrumentação de sondagem
+DEVE replicar overlay do harness; raw XLSX subestima 4.1.
+
+**Gate de fechamento Etapa 8 (todas as fases verdes):**
+
+- pytest 175 passed (=174 + 1 novo de regressão da 8.3) + 13 snapshots
+  regenerados consistentes + 1 skip pré-existente
+- harness 16/16 OK (4.1 = 21.54% informativo, gate de regressão
+  preservado via observação de magnitude)
+- defaults da Fase 7.1 (pesos da proximidade) intocados
+
+**Reabertura possível (não bloqueia uso real):**
+
+- Fase 4 (XLSX 125+) — Russian Twist cadastrado de fato → expandir
+  `PADRAO_PARA_SUBREGIAO[rotacao_tronco]` pra `{iso, dyn}`; pode reduzir
+  piso estrutural do 4.1.
+- Refator estrutural do cycling — distribuição uniforme por exercício
+  em vez de por padrão eliminaria viés mono-ex. Mudança de algoritmo
+  do gerador, fora do escopo Etapa 8.
+
+**Documentos fonte de verdade pós-Etapa 8:**
+
+- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.15.12 (nova)
+  — fechamento Fase 8.2 + 6º NO-OP + taxonomia + sondagem v1/v2
+- `docs/refatoracao/dimensoes_proximidade.md` Seção 8.15.7 itens 1+2
+  marcados ✅ fechados
+- `docs/refatoracao/logs/etapa_8.md` — log da etapa
+- `gerador_treino.py`:
+  - `PADRAO_PARA_SUBREGIAO` final 1:N (linhas 32-66)
+  - `_PADROES_LEGADOS` com aliases CORE (~linha 426)
+  - `_SUBREGIOES_LEGADAS` paralelo (~linha 443)
+  - `_decompor_demanda_subregiao` com branch retrocompat
+- `tools/calibrar_pesos_dimensoes.py`:
+  - Setup B C3 mantido em `_gerar_sessoes_r1_variante_a`
+  - Predicate 4.1 informativo em `_patch_cenarios_4_x`
 
 ## Stack
 
