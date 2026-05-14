@@ -298,3 +298,40 @@ def test_v_up_uni_pareia_com_triceps_uni_nao_com_hollow(banco):
         f"{aciertos}/50 rotinas pareiam V-Up Uni + Tríceps Uni "
         f"({fracao:.0%}); esperado ≥ 50%"
     )
+
+
+# ----- 11: ('subregiao', 'core', N) retrocompat — Frente 3 + Etapa 8.3 ----
+
+
+def test_subregiao_core_legada_aloca_qtd_pedida(banco):
+    """Demanda legada `("subregiao", "core", N)` aloca N exercícios entre
+    core_isometrico + core_dinamico — sem aviso `qtd_obtida=0`.
+
+    Bug item 1 da 8.15.7: pré-Etapa 8.3 a demanda falhava com qtd_obtida=0
+    porque `_decompor_demanda_subregiao("core", N)` consultava
+    `SUBREGIAO_PARA_PADROES["core"]` que não existe (só core_iso/core_din
+    separadas). Etapa 8.3 introduziu `_SUBREGIOES_LEGADAS = {"core":
+    ("core_isometrico", "core_dinamico")}` + tratamento no decompositor
+    que divide N entre as filhas via Hamilton ceil/floor + cycling.
+
+    Workaround inline em `_padroes_de_escopo` consolidado via mesma
+    estrutura `_SUBREGIOES_LEGADAS`. Configs antigas salvas em SQLite ou
+    cenários do harness com `("subregiao", "core", N)` continuam funcionando.
+    """
+    for N in (1, 2, 3, 4):
+        for seed in (7, 42, 123):
+            random.seed(seed)
+            cfg = {"demandas": [("subregiao", "core", N)]}
+            sessoes = gerar_multiplos_treinos(banco, [cfg], relaxar_familia=True)
+            s = sessoes[0]
+            n_obtido = sum(1 for _ in _exercicios(s))
+            assert n_obtido == N, (
+                f"N={N} seed={seed}: alocou {n_obtido} ex (esperado {N}). "
+                f"Avisos: {s.avisos}"
+            )
+            # Nenhum aviso de incompleta pra demanda core legada
+            avisos_incompleta = [a for a in s.avisos if a.get("tipo") == "incompleta"]
+            assert avisos_incompleta == [], (
+                f"N={N} seed={seed}: avisos incompleta inesperados: "
+                f"{avisos_incompleta}"
+            )

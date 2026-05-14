@@ -3374,12 +3374,14 @@ melhoria. **Refinamento da métrica 4.1 fica pra Fase 7.5 ou 7.6:**
 
 #### 8.15.7 Pendências em aberto pra Etapa 7
 
-1. **Bug retrocompat `("subregiao", "core", N)`** falha alocação
-   (`qtd_obtida=0`). Workaround atual: usar `core_dinamico`/
-   `core_isometrico` direto. **Resolução:** junto com migração
-   estrutural CORE (refator real dos padrões `flexao_tronco`/etc —
-   pode ficar pra Etapa 8 ou ser incorporado em alguma fase 7.x).
-   Não afeta diretamente as 6 fases planejadas.
+1. ~~**Bug retrocompat `("subregiao", "core", N)`** falha alocação
+   (`qtd_obtida=0`).~~ ✅ **Fechado em Fase 8.3 (2026-05-13).**
+   `_SUBREGIOES_LEGADAS = {"core": ("core_isometrico", "core_dinamico")}`
+   adicionado paralelo a `_PADROES_LEGADOS`; `_decompor_demanda_subregiao`
+   divide N entre filhas via Hamilton ceil/floor + cycling; workaround
+   inline em `_padroes_de_escopo` consolidado via mesma estrutura.
+   Teste de regressão `test_subregiao_core_legada_aloca_qtd_pedida`
+   em `tests/test_problemas_etapa.py` (cobre N=1,2,3,4 × 3 seeds).
 2. **Refator estrutural CORE real (Sessão 2 / Anexo 15-quater):**
    migração padrão `core_dinamico`/`core_isometrico` →
    `flexao_tronco`/`flexao_lateral`/`rotacao_tronco`/`flexao_quadril`

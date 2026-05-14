@@ -445,6 +445,18 @@ _PADROES_LEGADOS = {
     ),
 }
 
+# Tabela de tradução de SUBREGIÕES legadas — paralela a _PADROES_LEGADOS,
+# mas no nível de subregião. Aplicada em `_padroes_de_escopo` e em
+# `_decompor_demanda_subregiao` (caminho de pré-alocação).
+# - `core`: subregião antiga (pré-Frente 3 da Etapa 1) que foi quebrada em
+#   `core_isometrico` + `core_dinamico`. Configs antigas salvas em SQLite
+#   ou cenários do harness podem ainda pedir `("subregiao", "core", N)`;
+#   o decompositor divide N entre as 2 filhas (Hamilton ceil/floor) e cada
+#   filha decompõe normalmente nos seus padrões refinados Etapa 8.
+_SUBREGIOES_LEGADAS = {
+    "core": ("core_isometrico", "core_dinamico"),
+}
+
 # DEPRECATED na Etapa 3: a regra 60% compostos foi aposentada da
 # pré-alocação porque emerge naturalmente dos pesos das âncoras subregião
 # (empurrar_compostos:3 vs empurrar_isolados:2 dá ~60% composto em peito).
@@ -1469,14 +1481,14 @@ def _padroes_de_escopo(
             return list(_PADROES_LEGADOS[escopo])
         return [escopo]
     if nivel == "subregiao":
-        # Retrocompat: a subregião antiga "core" foi quebrada em
-        # core_dinamico + core_isometrico (Frente 3 da refatoração).
-        # Configs salvos em SQLite ou testes antigos podem ainda pedir
-        # ("subregiao", "core", N) — expandimos para os padrões das duas
-        # subregiões novas pra preservar comportamento.
-        if escopo == "core":
-            return list(SUBREGIAO_PARA_PADROES.get("core_dinamico", [])) + \
-                   list(SUBREGIAO_PARA_PADROES.get("core_isometrico", []))
+        # Retrocompat de subregiões legadas (`_SUBREGIOES_LEGADAS`): expande
+        # nos padrões das subregiões filhas. Atual: "core" → padrões de
+        # core_isometrico + core_dinamico.
+        if escopo in _SUBREGIOES_LEGADAS:
+            pads: list[str] = []
+            for filha in _SUBREGIOES_LEGADAS[escopo]:
+                pads.extend(SUBREGIAO_PARA_PADROES.get(filha, []))
+            return pads
         return list(SUBREGIAO_PARA_PADROES.get(escopo, []))
     if nivel == "regiao":
         pads: list[str] = []
@@ -1959,6 +1971,28 @@ def _decompor_demanda_subregiao(
           avisos = lista de avisos `ancora_nao_cumprida` propagados de
             calcular_quotas (chave/escopo/nivel populados).
     """
+    # Retrocompat de subregiões legadas (`_SUBREGIOES_LEGADAS`): expande
+    # divisão de vagas entre as subregiões filhas (Hamilton ceil/floor com
+    # cycling), cada filha decompõe recursivamente. Atual: "core" →
+    # core_isometrico + core_dinamico.
+    if subregiao in _SUBREGIOES_LEGADAS:
+        filhas = _SUBREGIOES_LEGADAS[subregiao]
+        if qtd <= 0:
+            return [], []
+        cada = qtd // len(filhas)
+        sobra = qtd % len(filhas)
+        filhas_shuf = random.sample(list(filhas), len(filhas))
+        sub_dems_out: list[tuple[str, str, int]] = []
+        avisos_out: list[dict] = []
+        for i, filha in enumerate(filhas_shuf):
+            q_filha = cada + (1 if i < sobra else 0)
+            if q_filha <= 0:
+                continue
+            sd, av = _decompor_demanda_subregiao(filha, q_filha, padroes_obrigatorios)
+            sub_dems_out.extend(sd)
+            avisos_out.extend(av)
+        return sub_dems_out, avisos_out
+
     padroes = list(SUBREGIAO_PARA_PADROES.get(subregiao, []))
     if not padroes or qtd <= 0:
         return [], []
