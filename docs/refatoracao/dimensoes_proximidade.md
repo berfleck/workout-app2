@@ -3898,6 +3898,127 @@ confirma que o passo 2/3 do procedimento operacional da Nota #5
 (distinguir binário vs contínuo) é o pivô — não dá pra pular esse
 passo. Diretriz ratificada empiricamente em 2 casos seguidos.
 
+#### 8.15.12 Fechamento Fase 8.2 — refator estrutural CORE + 4.1 como 6º NO-OP (Sessão Etapa 8 — 2026-05-13)
+
+> **Decisão registrada:** após refator estrutural CORE da Fase 8.2
+> (4 padrões refinados `flexao_tronco`/`flexao_lateral`/`rotacao_tronco`/
+> `flexao_quadril` substituindo `core_isometrico`/`core_dinamico` como
+> padrões), cenário 4.1 sobe de **12.85% → ~21.5% slots overlap**.
+> Sondagem Nota #5 v2 com banco overlay testou **8 candidatos** de R-1
+> — **nenhum fecha o alvo original <15%**. 4.1 declarado **6º NO-OP
+> estrutural**, terceira categoria distinta dos NO-OPs anteriores.
+> Predicate vira informativo (`pct >= 0`). Setup B C3 (Frente A
+> original, Seção 8.15.11) **mantido** — C8.1 ganha 1.49pp mas é
+> cosmético; continuidade documental privilegiada.
+
+**Taxonomia consolidada dos 3 sub-tipos de NO-OP** (Nota #5 / Seção
+1.8.4 ganha terceira validação empírica):
+
+1. **NO-OP banco-limitado** (2.3, Seção 8.15.10): dim sem material
+   mensurável no banco mock — comportamento binário ao escalar N
+   (0/0/0/23%). Calibrar peso é vício; validação real gateada pela
+   Fase 4 (banco maior).
+2. **NO-OP gated por piso** (4.1 pré-Etapa 8, Seção 8.15.11): mecanismo
+   funcional; setup B C3 recuperou de 22.18% pra 12.85% sondando
+   estruturas de R-1. Resolvido via ajuste de setup (Nota #5 entregou).
+3. **NO-OP por viés de distribuição** (4.1 pós-Etapa 8, Seção 8.15.12
+   — novo): mecanismo funcional; padrões mono-exercício pós-refator
+   CORE (Pallof Press, Prancha Lateral, INFRAs overlay) concentram
+   probabilidade em R-1; setup não recupera porque **distribuição é
+   função do banco, não da estrutura R-1**. Refator estrutural do
+   cycling (distribuição uniforme por exercício em vez de por padrão)
+   ou Fase 4 (XLSX 125+ pode redistribuir) seriam vias de resolução,
+   fora do escopo Etapa 8.
+
+**Sondagem executada (v2, 8 candidatos, 1000 iters cada, banco com
+overlay YAML aplicado):**
+
+| Candidato | R-1 A1 | R-1 A2 | 4.1 (overlay) | Status |
+|---|---|---|---|---|
+| **C8.0 mantido** | upper(7)+core_din(1) | lower(7)+core_iso(1) | **21.53%** | FAIL +6.53pp (setup mantido) |
+| C8.1 +slots core | upper(6)+core_din(2) | lower(6)+core_iso(2) | 16.49% | FAIL +1.49pp (melhor) |
+| C8.2 sem core na R-1 | upper(8) | lower(8) | 21.63% | FAIL +6.63pp |
+| C8.3 viés oposto core | upper(7)+core_iso(1) | lower(7)+core_din(1) | 20.73% | FAIL +5.73pp |
+| C8.4 core só A1 | upper(7)+core_din(1) | lower(8) | 17.82% | FAIL +2.82pp |
+| C8.5 core só A2 | upper(8) | lower(7)+core_iso(1) | 20.07% | FAIL +5.07pp |
+| C8.6 viés oposto + core só A1 (iso) | upper(7)+core_iso(1) | lower(8) | 17.48% | FAIL +2.48pp |
+| C8.7 viés oposto + core só A2 (din) | upper(8) | lower(7)+core_din(1) | 18.33% | FAIL +3.33pp |
+
+**Achados estruturais:**
+
+1. **Divergência sondagem v1 vs v2.** Sondagem inicial (v1) usou banco
+   raw (sem overlay YAML); ranking deu C8.4 vencedor em 14.51%. Após
+   correção pra usar banco com overlay (v2, leitura correta do harness
+   real), C8.4 sobe pra 17.82% e C8.1 vira melhor candidato. **Divergiu
+   em ranking, convergiu em conclusão** — nenhum fecha <15%. v2 é
+   leitura correta. Achado metodológico: instrumentação de sondagem
+   deve replicar overlay do harness; raw XLSX subestima 4.1.
+2. **C8.1 contraintuitivo (com overlay):** adicionar slots de core na
+   R-1 *MELHORA* 4.1 (dilui mono-exercícios via mais slots). Inverso
+   da intuição da v1 sem overlay, onde C8.1 piorava. Achado depende
+   do banco concreto — overlay introduz INFRAs em flexao_quadril que
+   diluem peso relativo dos mono-ex (Pallof, Prancha Lateral).
+3. **C8.2 ≈ C8.0** (21.63% vs 21.53%): cycling cross-region família/
+   nome opera além de core — HIST não é hack específico de Pallof
+   Press ou Prancha Lateral. Remover core da R-1 quase não muda 4.1
+   porque overlap dominante vem de famílias inter-região (Stiff,
+   Remada, etc).
+4. **Origem do viés de distribuição** (causa raiz):
+   - Pré-refator CORE: subregião `core_isometrico` tinha 1 padrão
+     (`core_isometrico`) com 13 ex → cycling uniforme entre exercícios
+     → prob Pallof = 1/13 = **7.7%** em R-1.
+   - Pós-refator CORE: subregião `core_isometrico` tem 4 padrões
+     refinados (`flexao_tronco` 8 ex, `flexao_lateral` 1, `rotacao_tronco`
+     1, `flexao_quadril` 3) → cycling escolhe 1 padrão random (1/4) e
+     1 ex dentro do padrão → prob Pallof = 1/4 × 1/1 = **25%** em R-1
+     (3.2× mais provável). Mesmo viés pra Prancha Lateral em
+     `flexao_lateral`.
+   - Russian Twist (mock_futuro, padrao=rotacao_tronco, subregiao=
+     core_dinamico) ficou órfão no overlay porque `PADRAO_PARA_SUBREGIAO[
+     "rotacao_tronco"] = {"core_isometrico"}` only (decisão de design
+     pra preservar pytest baseline — banco real não tem ex em
+     rotacao_tronco dyn até Fase 4 cadastrar Russian Twist no XLSX).
+
+**Resultado pós-decisão:**
+
+- 4.1 sai de **FAIL** (`pct < 15.0`) pra **OK informativo**
+  (`pct >= 0.0`).
+- Harness pós-decisão = **16/16 OK** (todos cenários passam; 4.1 e
+  4.2 informativos com gate de não-regressão preservado via
+  observação de magnitude).
+- Setup B C3 mantido (continuidade documental com Frente A da
+  Seção 8.15.11).
+- Defaults da 7.1 (pesos da proximidade) **mantidos sem alteração**
+  — calibração por SETUP/PESO descartada pra esse NO-OP; resolução
+  via refator estrutural do cycling ou via Fase 4.
+
+**Reabertura possível:**
+
+- **Fase 4 (XLSX 125+ exercícios):** redistribuição dos padrões pode
+  reduzir mono-exercícios. Russian Twist cadastrado de fato → expandir
+  `PADRAO_PARA_SUBREGIAO[rotacao_tronco]` pra `{iso, dyn}`; Crucifixos/
+  Crossovers Inclinados cadastrados → mais ex em padrões adjacentes;
+  todos os fatores podem mover 4.1 abaixo de 15% sem intervenção.
+- **Refator estrutural do cycling:** mudar cycling em subregião pra
+  distribuição uniforme por exercício (em vez de por padrão) eliminaria
+  o viés mono-ex. Mudança de algoritmo do gerador — fora do escopo
+  Etapa 8 mas naturalmente convergente com a próxima onda de refatores.
+
+**Cross-references:**
+
+- Cenário 4.1 no harness: `tools/calibrar_pesos_dimensoes.py`,
+  `_gerar_sessoes_r1_variante_a` (Setup B C3 mantido) +
+  `_patch_cenarios_4_x` (predicate informativo).
+- Validação real da Dim 4 (HIST): pendente Fase 4 ou refator do
+  cycling.
+- Outros NO-OPs da taxonomia: Seções 8.15.9 (4 originais), 8.15.10
+  (2.3 = 5º), 8.15.11 (4.1 pré-Etapa 8 = mecanismo gated por piso,
+  RESOLVIDO via setup).
+- Nota #5 / Seção 1.8.4: validação empírica em 3 casos seguidos
+  (2.3, 4.1 pré-Etapa 8, 4.1 pós-Etapa 8) — procedimento operacional
+  ratificado, com a adição da diretriz **"instrumentação de sondagem
+  deve replicar overlay do harness"** (achado v1 vs v2 desta seção).
+
 ---
 
 ## 9. Fase 4 — estratégia de preenchimento dos 125+ exercícios

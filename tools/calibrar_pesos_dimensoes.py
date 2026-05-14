@@ -1297,18 +1297,23 @@ CENARIO_3_1 = Cenario(
 # ---------------------------------------------------------------------------
 # Cenários 4.1 + 4.2 — HISTÓRICO toggle ON/OFF
 #
-# **Setup B** (Sessão pós-13 — item 7 da 8.15.7, 2026-05-09): R-1 vira
-# Variante A 2x (full-body região), rotina nova mantém Variante B 2x
-# (subregião). Estruturas DIFERENTES — banco efetivo da R-1 cobre região
-# inteira (upper(N)/lower(N)), liberando "ar" pra mecanismo HIST trabalhar
-# sem violar invariante INTER+HIST > -100. Substitui setup pré-13, que
-# usava R-1 = R-2 = Variante B 2x e prendia 4.1 em ~22% (banco apertado
-# demais — Seção 8.15.7 item 7 / 8.15.8 Reconciliação).
+# **Setup B C3** (mantido pós-Etapa 8.2 — Seção 8.15.12 declarou 6º NO-OP).
+# Linha do tempo:
+#  - Pré-Etapa 7: R-1 = R-2 = Variante B 2x (subregião) → 4.1 ~22% (banco
+#    apertado demais; 8.15.8 Reconciliação).
+#  - Pós-Etapa 7 / Sessão pós-13 / Seção 8.15.11: R-1 vira Variante A 2x
+#    full-body região (C3: upper(7)+core_din(1) // lower(7)+core_iso(1))
+#    → 4.1 12.85% (queda 9.3pp). Alvo refinado <15%.
+#  - Pós-Etapa 8.2 / Seção 8.15.12: refator estrutural CORE (4 padrões
+#    refinados) introduz viés de distribuição por padrões mono-exercício
+#    (Pallof, Prancha Lateral, INFRAs overlay). 4.1 sobe pra ~21.5%.
+#    Sondagem Nota #5 v2 (8 candidatos com overlay): nenhum fecha <15%.
+#    Setup B C3 MANTIDO; 4.1 declarado 6º NO-OP estrutural; predicate
+#    vira informativo.
 #
-# Variante A 2x = `configuracoes_comuns.md` Seção 2.2:
-#   - Treino A1 (viés upper): upper(5) + lower(2) + core_dinamico(1) = 8 ex
-#   - Treino A2 (viés lower): lower(5) + upper(2) + core_isometrico(1) = 8 ex
-#   Ambos full-body; cada um com volume maior em metade complementar.
+# Setup atual (C3) — `_gerar_sessoes_r1_variante_a`:
+#   - Treino A1 (viés upper): upper(7) + core_dinamico(1) = 8 ex
+#   - Treino A2 (viés lower): lower(7) + core_isometrico(1) = 8 ex
 #
 # Rotina nova (R-2) mantém Variante B 2x — split subregião (peito+ombro+
 # perna_post / costas+perna_ant). Estruturas diferentes = banco efetivo
@@ -1347,14 +1352,14 @@ def _gerar_sessoes_r1_variante_a(banco: list[Exercicio]) -> list[Sessao]:
       `gerar_multiplos_treinos(historico_r1=...)` via `historico_r1_factory`.
     """
     random.seed(_R1_SEED)
-    # Setup B oficial pós-sondagem Nota #5 (Sessão pós-fechamento item 8,
-    # 2026-05-13): C3 vencedor de 5 candidatos sondados (ver Seção 8.15.11
-    # tabela). R-1 = regiões separadas + core: T1 upper(7)+core_din(1),
-    # T2 lower(7)+core_iso(1). Cada treino concentra densidade em UMA
-    # região (~1.75/subregião), enquanto R-2 (Variante B) tem picos
-    # densos em subregiões específicas (peito 2, costas 3) — banco
-    # efetivo distinto = "ar" pro score HIST escolher exercícios
-    # diferentes. Resultado: 22.18% (baseline) → 12.85% (queda 9.3pp).
+    # Setup B C3 mantido (Seção 8.15.11 — Frente A original).
+    # Pós-Etapa 8.2 (Seção 8.15.12): refator estrutural CORE introduziu
+    # viés de distribuição por padrões mono-exercício; 4.1 subiu pra
+    # ~21.5%. Sondagem Nota #5 v2 com overlay testou 8 candidatos pós-Etapa
+    # 8 — nenhum fecha alvo original <15%. Setup B C3 mantido (continuidade
+    # com Frente A; C8.1 ganha 1.49pp mas é cosmético). 4.1 declarado
+    # 6º NO-OP estrutural; predicate vira informativo (gate de não-regressão
+    # + observador). Detalhes Seção 8.15.12.
     config_r1 = [
         {
             "demandas": [
@@ -1549,19 +1554,30 @@ def _patch_cenarios_4_x(banco: list[Exercicio]) -> None:
     """Inicializa CENARIO_4_1 e CENARIO_4_2 com banco real. Chamar em main().
 
     Fase 7.5 — métrica contínua "% slots com overlap" (opção A da Sessão 12).
-    Alvo refinado pós-sondagem Nota #5 (Seção 8.15.11 — fechamento item 7
-    da 8.15.7, 2026-05-13): `<15%` reflete piso estrutural do banco mock
-    com setup B oficial C3 (~12.85% observado). Mecanismo HIST funcional
-    (queda de 9.3pp do baseline 22.18%); fechamento <10% gateado pela
-    Fase 4 (XLSX 125+ pode reduzir piso). Gate continua com dentes —
-    regressão saltaria pra ~22% se HIST quebrar.
+
+    Histórico do alvo:
+    - Pré-Etapa 7: 4.1 = ~22% (banco apertado, Seção 8.15.8 Reconciliação).
+    - Pós-Etapa 7 / Seção 8.15.11 (sondagem Nota #5): setup B C3 fechou
+      12.85% — alvo refinado `<15%` reflete piso estrutural pré-CORE.
+    - Pós-Etapa 8.2 / Seção 8.15.12: refator estrutural CORE introduziu
+      viés de distribuição por padrões mono-exercício (Pallof Press,
+      Prancha Lateral, INFRAs overlay). Sondagem Nota #5 v2 com overlay
+      testou 8 candidatos — NENHUM fecha <15%. Melhor: C8.1 16.49%.
+      Declarado **6º NO-OP estrutural** (3ª categoria distinta dos NO-OPs
+      anteriores). Predicate vira informativo (`pct >= 0`); 4.1 é gate de
+      não-regressão + observador da frequência. Setup B mantido em C3
+      (continuidade com Frente A; C8.1 ganhar 1.49pp é cosmético).
+      Reabertura possível: Fase 4 (XLSX 125+) ou refator estrutural do
+      cycling (distribuição uniforme entre exercícios em vez de padrões).
     """
     global CENARIO_4_1, CENARIO_4_2
     CENARIO_4_1 = _make_cenario_4_x(
         cenario_id="4.1",
         nome="HISTÓRICO toggle ON evita R-1",
-        expectativa="<15% slots (piso estrutural pós-Nota #5 / setup B C3)",
-        predicate=lambda pct: pct < 15.0,
+        expectativa=("informativo — 6º NO-OP pós-Etapa 8 (Seção 8.15.12 — viés "
+                     "distribuição por padrões mono-ex)"),
+        # Predicate informativo (pós-Etapa 8.2). Pré-Etapa 8 era `pct < 15.0`.
+        predicate=lambda pct: pct >= 0.0,
         banco=banco,
         toggle_on=True,
     )

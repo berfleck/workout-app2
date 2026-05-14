@@ -31,10 +31,10 @@ XLSX_PATH = "banco_exercicios.xlsx"
 # Mapeamento PADRÃO → SUBREGIÕES. Valor é set[str] desde Etapa 8 (refator
 # CORE) — padrões refinados de core atravessam as 2 subregiões (ex:
 # `flexao_tronco` aparece em Prancha iso E Crunch dyn). Padrões não-core
-# continuam 1:1 (set de 1 elemento) por consistência. `core_isometrico` e
-# `core_dinamico` continuam como padrões válidos pra retrocompat até XLSX
-# migrar em Fase 8.2; aliasing pros 4 refinados ativado lá via
-# `_PADROES_LEGADOS`.
+# continuam 1:1 (set de 1 elemento) por consistência. Padrões `core_isometrico`
+# e `core_dinamico` legados saíram do mapa em Fase 8.2 — XLSX migrou pros
+# 4 refinados; demandas legadas que ainda peçam o nome antigo passam por
+# `_PADROES_LEGADOS` aliasing.
 PADRAO_PARA_SUBREGIAO: dict[str, set[str]] = {
     # Membros inferiores
     "squat_bilateral":  {"perna_anterior"},
@@ -54,15 +54,16 @@ PADRAO_PARA_SUBREGIAO: dict[str, set[str]] = {
     "posterior_ombro":    {"ombro"},
     "biceps":             {"bracos"},
     "triceps":            {"bracos"},
-    # Core legados (mantidos 1:1; XLSX ainda usa esses padrões na Fase 8.1)
-    "core_isometrico": {"core_isometrico"},
-    "core_dinamico":   {"core_dinamico"},
-    # Core refinados (Anexo 15-quater) — 1:N atravessando iso/dyn.
-    # `flexao_lateral` só tem variante iso por enquanto (dyn vazio — futuro).
-    # Sem exercícios mapeados em 8.1; XLSX migra em 8.2.
+    # Core refinados (Etapa 8 / Anexo 15-quater) — 1:N atravessando iso/dyn
+    # quando o banco real tem exercícios na variante. Padrões refinados sem
+    # variante cadastrada no XLSX ficam restritos à subregião com exercícios
+    # — evita cycling pegar padrão vazio (= aviso "incompleta" espúrio):
+    # - flexao_lateral: só iso (Prancha Lateral). Sem variante dyn prevista.
+    # - rotacao_tronco: só iso (Pallof Press) até Fase 4 cadastrar Russian
+    #   Twist no XLSX — aí adicionar core_dinamico ao set.
     "flexao_tronco":   {"core_isometrico", "core_dinamico"},
     "flexao_lateral":  {"core_isometrico"},
-    "rotacao_tronco":  {"core_isometrico", "core_dinamico"},
+    "rotacao_tronco":  {"core_isometrico"},
     "flexao_quadril":  {"core_isometrico", "core_dinamico"},
     # Cardio
     "cardio":          {"cardio"},
@@ -89,19 +90,8 @@ REGIAO_PARA_SUBREGIOES: dict[str, list[str]] = {}
 for sub, reg in SUBREGIAO_PARA_REGIAO.items():
     REGIAO_PARA_SUBREGIOES.setdefault(reg, []).append(sub)
 
-# Padrões refinados Etapa 8 que ainda não têm exercícios no banco real
-# (XLSX migra em Fase 8.2). Filtrados de SUBREGIAO_PARA_PADROES pra evitar
-# decomposição espúria de demanda região("core", N) — sem este filtro, o
-# decompositor distribui vagas pros padrões refinados e gera avisos
-# "incompleta" porque banco retorna 0 candidatos. Set fica vazio na Fase 8.2.
-_PADROES_RESERVADOS: set[str] = {
-    "flexao_tronco", "flexao_lateral", "rotacao_tronco", "flexao_quadril",
-}
-
 SUBREGIAO_PARA_PADROES: dict[str, list[str]] = {}
 for pad, subs in PADRAO_PARA_SUBREGIAO.items():
-    if pad in _PADROES_RESERVADOS:
-        continue
     for sub in subs:
         SUBREGIAO_PARA_PADROES.setdefault(sub, []).append(pad)
 
@@ -142,7 +132,9 @@ SUBREGIOES_POR_REGIAO: dict[str, dict[str, list[str]]] = {
 # uniforme via _decompor_demanda_*). Casos atuais sem âncora:
 #   - bracos (sub) e biceps/triceps (padrões): user pede explicitamente
 #   - adutores (sub) e adduction (padrão): user pede explicitamente
-#   - core_dinamico/core_isometrico: padrões internos a definir no futuro
+#   - core_dinamico/core_isometrico (subregiões) e seus 4 padrões refinados
+#     da Etapa 8 (flexao_tronco/lateral/rotacao_tronco/flexao_quadril):
+#     cycling natural pelos padrões da subregião
 
 ANCORAS_POR_REGIAO: dict[str, list[dict]] = {
     "upper": [
@@ -433,12 +425,24 @@ PADROES_COMPOSTOS = {
     "empurrar_compostos", "remadas", "puxadas", "ombro_composto",
 }
 
-# Tabela de tradução de padrões legados (configs salvas em SQLite ou
-# templates antigos podem referenciar `squat`). Frente 4 da Etapa 1
-# refinou squat em squat_bilateral + squat_unilateral. Aplicada em
-# `expandir_para_padroes`, `_padroes_de_escopo` e `gerar_sessao` legacy.
+# Tabela de tradução de padrões legados (configs salvas em SQLite,
+# templates antigos, ou cenários do harness podem referenciar os nomes
+# antigos). Aplicada em `expandir_para_padroes`, `_padroes_de_escopo` e
+# `gerar_sessao` legacy.
+# - `squat`: refinado em squat_bilateral/unilateral na Frente 4 da Etapa 1
+# - `core_isometrico`/`core_dinamico`: refinados nos 4 padrões biomecânicos
+#   na Etapa 8 (Anexo 15-quater). Expandem nos padrões correspondentes da
+#   subregião: iso ganha flexao_lateral também (Prancha Lateral); dyn não
+#   tem variante de flexao_lateral cadastrada por enquanto.
 _PADROES_LEGADOS = {
     "squat": ("squat_bilateral", "squat_unilateral"),
+    "core_isometrico": (
+        "flexao_tronco", "flexao_lateral", "rotacao_tronco", "flexao_quadril",
+    ),
+    "core_dinamico": (
+        # rotacao_tronco fora até Fase 4 cadastrar Russian Twist no XLSX.
+        "flexao_tronco", "flexao_quadril",
+    ),
 }
 
 # DEPRECATED na Etapa 3: a regra 60% compostos foi aposentada da
@@ -481,9 +485,13 @@ GRUPO_MUSCULAR_PADRAO: dict[str, str] = {
     # Lower — outros
     "adduction":      "addutor",
     "flexao_plantar": "calf",
-    # Core / cardio
-    "core_isometrico": "core",
-    "core_dinamico":   "core",
+    # Core / cardio (Etapa 8 / Anexo 15-quater — 4 padrões refinados
+    # substituíram core_isometrico/core_dinamico; todos compartilham grupo
+    # "core" pra mesma semântica anti-agonista que antes)
+    "flexao_tronco":  "core",
+    "flexao_lateral": "core",
+    "rotacao_tronco": "core",
+    "flexao_quadril": "core",
     "cardio":          "cardio",
 }
 

@@ -265,16 +265,17 @@ def test_gerar_multiplos_treinos_respeita_cargas_config(banco):
 def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     """Evidência forte: par documentado pelo harness some quando filtro liga.
 
-    Sem filtro, seed=22 com cfg lower(4)+upper(3)+core(1)×2 produz par
-    'Hiperextensão 45°' + 'Remada Baixa Aberta' (lombar 3+2=5 viola HIB2).
+    Sem filtro, seed=3 com cfg lower(4)+upper(3)+core(1)×2 produz par
+    'Lev. Terra' + 'Remada Baixa Aberta' (lombar somando 5, viola HIB2).
     Com filtro HIB2 ligado, esse par precisa desaparecer.
 
-    Atualizado na Etapa 7 Fase 7.4: score INTER + HISTÓRICO + Caminho A
-    (família INTER hard→soft) em `pre_alocar_rotina` mudou de novo a
-    sequência de `random` por seed. Histórico: seed=1 Lev.Terra Sumô +
-    Remada Baixa Aberta (Etapa 5) → seed=9 Lev.Terra + Barra Isométrica
-    (Fase 7.3) → seed=22 Hiperextensão 45° + Remada Baixa Aberta (Fase
-    7.4). Sempre o mesmo contrato clínico: par viola HIB2 sem filtro,
+    Atualizado na Etapa 8.2: refator estrutural CORE (4 padrões refinados
+    substituem core_iso/din) muda cycling determinístico de
+    `("regiao", "core", 1)`, deslocando a sequência de `random` por seed.
+    Histórico: seed=1 Lev.Terra Sumô + Remada Baixa Aberta (Etapa 5) →
+    seed=9 Lev.Terra + Barra Isométrica (Fase 7.3) → seed=22 Hiperextensão
+    45° + Remada Baixa Aberta (Fase 7.4) → seed=3 Lev.Terra + Remada Baixa
+    Aberta (Etapa 8.2). Mesmo contrato clínico: par viola HIB2 sem filtro,
     some com filtro.
     """
     import random
@@ -286,8 +287,8 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
         "equipamentos_bloqueados": [],
         "evitar_agonistas": True,
     }
-    PAR = {"Hiperextensão 45°", "Remada Baixa Aberta"}
-    SEED = 22
+    PAR = {"Lev. Terra", "Remada Baixa Aberta"}
+    SEED = 3
 
     def par_aparece(sessoes):
         for s in sessoes:

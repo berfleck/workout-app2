@@ -251,7 +251,12 @@ ORDEM_PADROES = {
     "bracos": ["biceps", "triceps"],
     "perna_anterior": ["squat"], "perna_posterior": ["hinge", "knee_flexion", "abduction"],
     "adutores": ["adduction"], "panturrilha": ["flexao_plantar"],
-    "core_isometrico": ["core_isometrico"], "core_dinamico": ["core_dinamico"],
+    # Etapa 8 (Anexo 15-quater): 4 padrões refinados substituem core_iso/din.
+    # `flexao_lateral` só tem variante iso (Prancha Lateral) — dyn vazio.
+    # `rotacao_tronco` só tem variante iso (Pallof Press) até Fase 4 cadastrar
+    # Russian Twist no XLSX.
+    "core_isometrico": ["flexao_tronco", "flexao_lateral", "rotacao_tronco", "flexao_quadril"],
+    "core_dinamico": ["flexao_tronco", "flexao_quadril"],
     "cardio": ["cardio"],
 }
 

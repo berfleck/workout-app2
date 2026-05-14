@@ -641,13 +641,13 @@ exercicios:
   # G8 — CORE (20 atuais + 5 cadastros novos = 25 — cobertura cenários 6.1,
   #            4.1, 4.2 e 2.1)
   # =========================================================================
-  # Refator estrutural CORE da Sessão 2 da Fase 2 (Anexo 15-quater):
-  #   - Subregiões `core_dinamico` + `core_isometrico` (já no banco)
+  # Refator estrutural CORE aplicado em Etapa 8.2 (Anexo 15-quater):
+  #   - Subregiões `core_dinamico` + `core_isometrico` (inalteradas)
   #   - Padrões refinados (`flexao_tronco`/`flexao_lateral`/`rotacao_tronco`/
-  #     `flexao_quadril`) — IMPLEMENTAÇÃO REAL fica pra Etapa 7. Pra mock
-  #     atual, mock_futuros usam padrão antigo (`core_dinamico`/
-  #     `core_isometrico`) pra retrocompat com gerador atual (Decisão 4
-  #     da Sessão 7b — Seção 8.14.4).
+  #     `flexao_quadril`) agora no XLSX banco real. Mocks dos 20 cadastrados
+  #     pegam o padrão do banco direto (overlay não sobrescreve `padrao`).
+  #     Mock_futuros (5 novos) usam o padrão refinado correto desde Etapa 8.2
+  #     pra ficar consistente com o pós-Fase 4 (cadastro no XLSX).
   # Reclassificação família crítica Caso 1: `prancha` → `prancha frontal` +
   # `prancha lateral` (Sessão 2 / refator estrutural CORE).
   # Decisões clínicas Sessão 7c (2026-05-09):
@@ -861,9 +861,9 @@ exercicios:
       variante_pontual: false
 
   # ── Cadastros futuros G8 (5 mock_futuros — Decisões D + E Sessão 7c) ──
-  # Padrão real (`flexao_tronco`/`flexao_quadril`/`rotacao_tronco`) fica
-  # pra Etapa 7. Aqui usamos padrão antigo (`core_dinamico`) pra retrocompat
-  # com gerador atual.
+  # Padrão refinado (`flexao_quadril`/`rotacao_tronco`) cadastrado direto
+  # em Etapa 8.2 conforme Anexo 15-quater. Cadastro no XLSX real fica pra
+  # Fase 4 (5 cadastros novos adiados da Etapa 8 — P2 Sessão atual).
 
   - nome: "Russian Twist"
     origem: mock_futuro
@@ -876,7 +876,7 @@ exercicios:
     extras:
       regiao: "core"
       subregiao: "core_dinamico"
-      padrao: "core_dinamico"  # retrocompat — Etapa 7 → rotacao_tronco dyn
+      padrao: "rotacao_tronco"  # Etapa 8.2: padrão refinado aplicado (Anexo 15-quater)
       purpose: "isolation"
       unilateral: "bilateral"
       complexidade: 3
@@ -895,7 +895,7 @@ exercicios:
     extras:
       regiao: "core"
       subregiao: "core_dinamico"
-      padrao: "core_dinamico"  # retrocompat — Etapa 7 → flexao_quadril dyn
+      padrao: "flexao_quadril"  # Etapa 8.2: padrão refinado aplicado (Anexo 15-quater)
       purpose: "isolation"
       unilateral: "unilateral"
       complexidade: 2
@@ -914,7 +914,7 @@ exercicios:
     extras:
       regiao: "core"
       subregiao: "core_dinamico"
-      padrao: "core_dinamico"  # retrocompat — Etapa 7 → flexao_quadril dyn
+      padrao: "flexao_quadril"  # Etapa 8.2: padrão refinado aplicado (Anexo 15-quater)
       purpose: "isolation"
       unilateral: "bilateral"
       complexidade: 4
@@ -933,7 +933,7 @@ exercicios:
     extras:
       regiao: "core"
       subregiao: "core_dinamico"
-      padrao: "core_dinamico"
+      padrao: "flexao_quadril"  # Etapa 8.2: padrão refinado aplicado (Anexo 15-quater)
       purpose: "isolation"
       unilateral: "bilateral"
       complexidade: 2
@@ -952,7 +952,7 @@ exercicios:
     extras:
       regiao: "core"
       subregiao: "core_dinamico"
-      padrao: "core_dinamico"
+      padrao: "flexao_quadril"  # Etapa 8.2: padrão refinado aplicado (Anexo 15-quater)
       purpose: "isolation"
       unilateral: "bilateral"
       complexidade: 3
