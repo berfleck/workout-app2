@@ -878,7 +878,7 @@
           'faltam': 1,
           'familias_usadas': list([
             'Prancha Lateral',
-            'prancha',
+            'prancha lateral',
           ]),
           'nivel': 'padrao',
           'qtd_obtida': 0,
@@ -964,28 +964,28 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Barra Fixa',
-            'Leg Press',
+            'Good Morning',
+            'Remada Baixa Aberta',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Good Morning',
-            'Abd Bicicleta',
+            'Remada Aberta Trx',
+            'Pallof Press',
           ]),
         }),
         dict({
           'label': 'C',
           'nomes': list([
-            'Remada Baixa Aberta',
-            'Pallof Press',
+            'Roda Abdominal',
+            'Cadeira Extensora',
           ]),
         }),
         dict({
           'label': 'D',
           'nomes': list([
-            'Remada Aberta Trx',
+            'Pullover Halteres',
           ]),
         }),
       ]),
@@ -1001,14 +1001,14 @@
           'label': 'A',
           'nomes': list([
             'Lev. Terra',
-            'Supino Com Anilha',
+            'Apoio Ajoelhado',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Apoio',
-            'Roda Abdominal',
+            'Supino Com Anilha',
+            'Abd Bicicleta',
           ]),
         }),
         dict({
@@ -1036,15 +1036,15 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Hip Thrust',
-            'Elevação Lateral',
+            'Apoio',
+            'Leg Press',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Supino Com Barra',
-            'Cadeira Extensora',
+            'Hip Thrust',
+            'Elevação Lateral',
           ]),
         }),
         dict({
