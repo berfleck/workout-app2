@@ -62,13 +62,13 @@ def test_carga_fields_exist_with_default_zero():
 
 
 def test_carregar_banco_le_cargas(banco):
-    """Banco real tem 82/102/109 ex com grip/lombar/core >= 1."""
+    """Banco real tem 89/111/118 ex com grip/lombar/core >= 1 (pós Fase 4 Sub-D: +11 mock_futuros)."""
     grip_nz = sum(1 for e in banco if e.carga_grip >= 1)
     lombar_nz = sum(1 for e in banco if e.carga_lombar >= 1)
     core_nz = sum(1 for e in banco if e.demanda_core >= 1)
-    assert grip_nz == 82
-    assert lombar_nz == 102
-    assert core_nz == 109
+    assert grip_nz == 89
+    assert lombar_nz == 111
+    assert core_nz == 118
 
 
 def test_carregar_banco_cargas_em_faixa_0_3(banco):
@@ -265,18 +265,18 @@ def test_gerar_multiplos_treinos_respeita_cargas_config(banco):
 def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     """Evidência forte: par documentado pelo harness some quando filtro liga.
 
-    Sem filtro, seed=3 com cfg lower(4)+upper(3)+core(1)×2 produz par
+    Sem filtro, seed=1 com cfg lower(4)+upper(3)+core(1)×2 produz par
     'Lev. Terra' + 'Remada Baixa Aberta' (lombar somando 5, viola HIB2).
     Com filtro HIB2 ligado, esse par precisa desaparecer.
 
-    Atualizado na Etapa 8.2: refator estrutural CORE (4 padrões refinados
-    substituem core_iso/din) muda cycling determinístico de
-    `("regiao", "core", 1)`, deslocando a sequência de `random` por seed.
+    Atualizado na Fase 4 Sub-D: +11 mock_futuros no banco (136 ex) muda
+    cycling determinístico, deslocando a sequência de `random` por seed.
     Histórico: seed=1 Lev.Terra Sumô + Remada Baixa Aberta (Etapa 5) →
     seed=9 Lev.Terra + Barra Isométrica (Fase 7.3) → seed=22 Hiperextensão
     45° + Remada Baixa Aberta (Fase 7.4) → seed=3 Lev.Terra + Remada Baixa
-    Aberta (Etapa 8.2). Mesmo contrato clínico: par viola HIB2 sem filtro,
-    some com filtro.
+    Aberta (Etapa 8.2) → seed=1 Lev.Terra + Remada Baixa Aberta (Fase 4
+    Sub-D, 136 ex). Mesmo contrato clínico: par viola HIB2 sem filtro, some
+    com filtro.
     """
     import random
     from gerador_treino import gerar_multiplos_treinos
@@ -288,7 +288,7 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
         "evitar_agonistas": True,
     }
     PAR = {"Lev. Terra", "Remada Baixa Aberta"}
-    SEED = 3
+    SEED = 1
 
     def par_aparece(sessoes):
         for s in sessoes:

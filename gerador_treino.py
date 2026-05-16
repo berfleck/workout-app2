@@ -59,11 +59,10 @@ PADRAO_PARA_SUBREGIAO: dict[str, set[str]] = {
     # variante cadastrada no XLSX ficam restritos à subregião com exercícios
     # — evita cycling pegar padrão vazio (= aviso "incompleta" espúrio):
     # - flexao_lateral: só iso (Prancha Lateral). Sem variante dyn prevista.
-    # - rotacao_tronco: só iso (Pallof Press) até Fase 4 cadastrar Russian
-    #   Twist no XLSX — aí adicionar core_dinamico ao set.
+    # - rotacao_tronco: iso (Pallof Press) + dyn (Russian Twist — Fase 4)
     "flexao_tronco":   {"core_isometrico", "core_dinamico"},
     "flexao_lateral":  {"core_isometrico"},
-    "rotacao_tronco":  {"core_isometrico"},
+    "rotacao_tronco":  {"core_isometrico", "core_dinamico"},
     "flexao_quadril":  {"core_isometrico", "core_dinamico"},
     # Cardio
     "cardio":          {"cardio"},
@@ -440,8 +439,7 @@ _PADROES_LEGADOS = {
         "flexao_tronco", "flexao_lateral", "rotacao_tronco", "flexao_quadril",
     ),
     "core_dinamico": (
-        # rotacao_tronco fora até Fase 4 cadastrar Russian Twist no XLSX.
-        "flexao_tronco", "flexao_quadril",
+        "flexao_tronco", "rotacao_tronco", "flexao_quadril",
     ),
 }
 
