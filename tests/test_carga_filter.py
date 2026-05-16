@@ -62,13 +62,13 @@ def test_carga_fields_exist_with_default_zero():
 
 
 def test_carregar_banco_le_cargas(banco):
-    """Banco real tem 89/111/118 ex com grip/lombar/core >= 1 (pós Fase 4 Sub-D: +11 mock_futuros)."""
+    """Banco real tem 90/112/119 ex com grip/lombar/core >= 1 (pós Fase 4 Sub-H: +Remada LM Aberta)."""
     grip_nz = sum(1 for e in banco if e.carga_grip >= 1)
     lombar_nz = sum(1 for e in banco if e.carga_lombar >= 1)
     core_nz = sum(1 for e in banco if e.demanda_core >= 1)
-    assert grip_nz == 89
-    assert lombar_nz == 111
-    assert core_nz == 118
+    assert grip_nz == 90
+    assert lombar_nz == 112
+    assert core_nz == 119
 
 
 def test_carregar_banco_cargas_em_faixa_0_3(banco):
