@@ -265,17 +265,18 @@ def test_gerar_multiplos_treinos_respeita_cargas_config(banco):
 def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     """Evidência forte: par documentado pelo harness some quando filtro liga.
 
-    Sem filtro, seed=1 com cfg lower(4)+upper(3)+core(1)×2 produz par
-    'Lev. Terra' + 'Remada Baixa Aberta' (lombar somando 5, viola HIB2).
+    Sem filtro, seed=4 com cfg lower(4)+upper(3)+core(1)×2 produz par
+    'Lev. Terra' + 'Barra Isométrica' (grip somando 6, viola HIB2).
     Com filtro HIB2 ligado, esse par precisa desaparecer.
 
-    Atualizado na Fase 4 Sub-D: +11 mock_futuros no banco (136 ex) muda
-    cycling determinístico, deslocando a sequência de `random` por seed.
+    Atualizado na Fase 4 Sub-F: dims preenchidas (59 ex) muda score-aware,
+    deslocando sequência de random por seed.
     Histórico: seed=1 Lev.Terra Sumô + Remada Baixa Aberta (Etapa 5) →
     seed=9 Lev.Terra + Barra Isométrica (Fase 7.3) → seed=22 Hiperextensão
     45° + Remada Baixa Aberta (Fase 7.4) → seed=3 Lev.Terra + Remada Baixa
     Aberta (Etapa 8.2) → seed=1 Lev.Terra + Remada Baixa Aberta (Fase 4
-    Sub-D, 136 ex). Mesmo contrato clínico: par viola HIB2 sem filtro, some
+    Sub-D, 136 ex) → seed=4 Lev.Terra + Barra Isométrica (Fase 4 Sub-F,
+    dims completas). Mesmo contrato clínico: par viola HIB2 sem filtro, some
     com filtro.
     """
     import random
@@ -287,8 +288,8 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
         "equipamentos_bloqueados": [],
         "evitar_agonistas": True,
     }
-    PAR = {"Lev. Terra", "Remada Baixa Aberta"}
-    SEED = 1
+    PAR = {"Lev. Terra", "Barra Isométrica"}
+    SEED = 4
 
     def par_aparece(sessoes):
         for s in sessoes:
@@ -309,7 +310,7 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     cfg_on = {**cfg, "cargas_config": HIB2}
     s_on = gerar_multiplos_treinos(banco, [cfg_on, cfg_on], relaxar_familia=True)
     assert not par_aparece(s_on), (
-        "Filtro falhou: par 'Lev. Terra' + 'Barra Isométrica' apareceu "
+        "Filtro falhou: par 'Lev. Terra' + 'Barra Isometrica' apareceu "
         "mesmo com cargas_config HIB2 ativo."
     )
 
