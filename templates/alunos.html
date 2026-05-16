@@ -50,7 +50,11 @@
 <p class="meta-count">{{ alunos|length }} aluno(s)</p>
 
 {% for aluno in alunos %}
-<div class="aluno-card" id="aluno-{{ aluno.id }}">
+<div class="aluno-card" id="aluno-{{ aluno.id }}"
+     data-aluno-select="{{ aluno.id }}" data-aluno-nome="{{ aluno.nome }}">
+    <span class="aluno-select-check" aria-hidden="true">
+        <svg class="icon"><use href="#i-check"/></svg>
+    </span>
     <div class="aluno-card-info">
         <div class="aluno-card-nome">{{ aluno.nome }}</div>
         <div class="aluno-card-meta">
@@ -62,7 +66,7 @@
         <div class="aluno-card-obs"><b>Obs:</b> {{ aluno.obs }}</div>
         {% endif %}
     </div>
-    <div class="flex gap-1 shrink-0">
+    <div class="flex gap-1 shrink-0 aluno-card-actions">
         <button class="btn-ghost" title="Editar"
                 onclick='editarAluno({{ aluno.id }}, {{ aluno | tojson }})'><svg class="icon"><use href="#i-pencil"/></svg></button>
         <button class="btn-ghost" title="Remover"

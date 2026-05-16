@@ -292,6 +292,103 @@
         .aluno-card-meta { @apply text-xs text-gray-500 mt-0.5; }
         .aluno-card-obs { @apply text-xs text-gray-400 mt-0.5; }
 
+        /* ── Aluno select mode (long-press → multi-select → bulk delete) ── */
+        /* Suprime preview/context menu nativo do navegador no long-press de cards */
+        [data-aluno-select] {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .aluno-select-check {
+            display: none;
+            flex-shrink: 0;
+            width: 22px; height: 22px;
+            border-radius: 999px;
+            border: 2px solid var(--brand-500);
+            background: white;
+            place-items: center;
+        }
+        .aluno-select-check .icon { width: 14px; height: 14px; color: white; opacity: 0; }
+        body.aluno-select-mode { user-select: none; -webkit-user-select: none; }
+        body.aluno-select-mode .aluno-card { cursor: pointer; }
+        body.aluno-select-mode .aluno-card-actions { display: none; }
+        body.aluno-select-mode .aluno-select-check { display: grid; }
+        body.aluno-select-mode .aluno-card.aluno-selected {
+            background: var(--brand-50);
+            border-color: var(--brand-500);
+        }
+        body.aluno-select-mode .aluno-card.aluno-selected .aluno-select-check {
+            background: var(--brand-500);
+        }
+        body.aluno-select-mode .aluno-card.aluno-selected .aluno-select-check .icon { opacity: 1; }
+        body.aluno-select-mode .aluno-card:not(.aluno-selected):active {
+            background: rgba(232, 93, 4, 0.06);
+        }
+        .aluno-select-bar {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: calc(var(--bb-height, 64px) + 12px + env(safe-area-inset-bottom, 0px));
+            z-index: 100;
+            background: white;
+            border-radius: 999px;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 32px rgba(15,23,42,0.22), 0 2px 8px rgba(15,23,42,0.08);
+            border: 1px solid rgba(15,23,42,0.06);
+        }
+        .aluno-select-bar-count {
+            color: #111827; white-space: nowrap;
+            padding: 0 10px; min-width: 22px; text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .aluno-select-bar > button {
+            border: 0; border-radius: 999px;
+            width: 36px; height: 36px;
+            display: grid; place-items: center;
+            cursor: pointer; flex-shrink: 0;
+            transition: background 120ms;
+        }
+        .aluno-select-bar > button .icon { width: 16px; height: 16px; }
+        .aluno-select-bar-cancel { background: rgba(15,23,42,0.06); color: #374151; }
+        .aluno-select-bar-cancel:hover { background: rgba(15,23,42,0.12); }
+        .aluno-select-bar-edit { background: rgba(15,23,42,0.06); color: #374151; }
+        .aluno-select-bar-edit:hover { background: rgba(15,23,42,0.12); }
+        .aluno-select-bar-delete { background: #fee2e2; color: #dc2626; }
+        .aluno-select-bar-delete:hover { background: #fecaca; }
+        @media (min-width: 769px) {
+            .aluno-select-bar { bottom: 16px; }
+        }
+
+        /* Mobile aluno card (anchor) — select mode hooks */
+        .aluno-mob-check {
+            display: none;
+            flex-shrink: 0;
+            width: 22px; height: 22px;
+            border-radius: 999px;
+            border: 2px solid var(--brand-500);
+            background: white;
+            place-items: center;
+            margin-right: 4px;
+        }
+        .aluno-mob-check .icon { width: 14px; height: 14px; color: white; opacity: 0; }
+        body.aluno-select-mode .aluno-mob-card { cursor: pointer; }
+        body.aluno-select-mode .aluno-mob-check { display: grid; }
+        body.aluno-select-mode .aluno-mob-arrow { display: none; }
+        body.aluno-select-mode .aluno-mob-card.aluno-selected {
+            background: var(--brand-50);
+            border-color: var(--brand-500);
+        }
+        body.aluno-select-mode .aluno-mob-card.aluno-selected .aluno-mob-check {
+            background: var(--brand-500);
+        }
+        body.aluno-select-mode .aluno-mob-card.aluno-selected .aluno-mob-check .icon { opacity: 1; }
+        .aluno-select-bar-edit[hidden] { display: none !important; }
+
         .ref-badge { @apply inline-block text-[9px] font-bold text-indigo-600 bg-indigo-100 rounded px-1 align-middle ml-1; }
 
         .comparacao-panel { @apply bg-white border border-gray-200 rounded-xl p-5 mb-4; }
@@ -3306,6 +3403,210 @@ document.addEventListener('click', async function(e) {
         if (popupState && popupState.anchorEl && !document.body.contains(popupState.anchorEl)) {
             closeExerciseActionPopup();
         }
+    });
+})();
+
+// ── Aluno multi-select (long-press → seleciona → bottom bar → bulk delete) ──
+(function() {
+    const LONG_PRESS_MS = 500;
+    const MOVE_TOLERANCE = 10;
+    let pressTimer = null;
+    let pressStart = null;
+    let pressTargetEl = null;
+    let selectMode = false;
+    let modeEnteredAt = 0;
+    const selected = new Set();
+
+    function interactiveInsideCard(target, card) {
+        // True quando há um elemento interativo ENTRE target e card (ex: button aninhado).
+        // False quando o próprio card É o elemento interativo (mobile = <a>).
+        const inter = target.closest('button, a, input, textarea, select, label, summary, details');
+        return inter && inter !== card && card.contains(inter);
+    }
+
+    function enterSelectMode(firstCard) {
+        if (selectMode) return;
+        selectMode = true;
+        document.body.classList.add('aluno-select-mode');
+        modeEnteredAt = Date.now();
+        if (firstCard) toggleCard(firstCard);
+        renderBar();
+        if (navigator.vibrate) try { navigator.vibrate(40); } catch (e) {}
+    }
+
+    function exitSelectMode() {
+        selectMode = false;
+        selected.clear();
+        document.body.classList.remove('aluno-select-mode');
+        document.querySelectorAll('.aluno-card.aluno-selected').forEach(el => el.classList.remove('aluno-selected'));
+        const bar = document.getElementById('aluno-select-bar');
+        if (bar) bar.remove();
+    }
+    window.cancelAlunoSelectMode = exitSelectMode;
+
+    function toggleCard(card) {
+        const id = card.dataset.alunoSelect;
+        if (!id) return;
+        if (selected.has(id)) {
+            selected.delete(id);
+            card.classList.remove('aluno-selected');
+        } else {
+            selected.add(id);
+            card.classList.add('aluno-selected');
+        }
+        if (selectMode && selected.size === 0) {
+            exitSelectMode();
+            return;
+        }
+        renderBar();
+    }
+
+    function renderBar() {
+        let bar = document.getElementById('aluno-select-bar');
+        const count = selected.size;
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'aluno-select-bar';
+            bar.className = 'aluno-select-bar';
+            bar.innerHTML =
+                '<button type="button" class="aluno-select-bar-cancel" aria-label="Cancelar">' +
+                  '<svg class="icon"><use href="#i-x"/></svg>' +
+                '</button>' +
+                '<span class="aluno-select-bar-count"></span>' +
+                '<button type="button" class="aluno-select-bar-edit" aria-label="Editar" title="Editar" hidden>' +
+                  '<svg class="icon"><use href="#i-pencil"/></svg>' +
+                '</button>' +
+                '<button type="button" class="aluno-select-bar-delete" aria-label="Excluir" title="Excluir">' +
+                  '<svg class="icon"><use href="#i-trash"/></svg>' +
+                '</button>';
+            bar.querySelector('.aluno-select-bar-cancel').addEventListener('click', exitSelectMode);
+            bar.querySelector('.aluno-select-bar-edit').addEventListener('click', openEditSelected);
+            bar.querySelector('.aluno-select-bar-delete').addEventListener('click', confirmBulkDelete);
+            document.body.appendChild(bar);
+        }
+        bar.querySelector('.aluno-select-bar-count').textContent = String(count);
+        bar.querySelector('.aluno-select-bar-edit').hidden = (count !== 1);
+    }
+
+    function openEditSelected() {
+        if (selected.size !== 1) return;
+        const id = Array.from(selected)[0];
+        const card = document.querySelector('[data-aluno-select="' + id + '"]');
+        if (!card) return;
+        const data = {
+            id: id,
+            nome: card.dataset.alunoNome || '',
+            nivel: card.dataset.nivel || 'intermediario',
+            objetivo: card.dataset.objetivo || 'hipertrofia',
+            restricoes: card.dataset.alunoRestricoes || '',
+            obs: card.dataset.alunoObs || '',
+        };
+        exitSelectMode();
+        if (typeof window.openEditAlunoSheet === 'function') {
+            window.openEditAlunoSheet(data);
+        }
+    }
+
+    function confirmBulkDelete() {
+        if (selected.size === 0) return;
+        const ids = Array.from(selected);
+        const nomes = ids.map(id => {
+            const el = document.querySelector('[data-aluno-select="' + id + '"]');
+            return el ? el.dataset.alunoNome : id;
+        });
+        const preview = nomes.length <= 3
+            ? nomes.join(', ')
+            : nomes.slice(0, 3).join(', ') + ' e mais ' + (nomes.length - 3);
+        const msg = ids.length === 1
+            ? 'Remover ' + nomes[0] + '?'
+            : 'Remover ' + ids.length + ' alunos?\n\n' + preview;
+        if (!confirm(msg)) return;
+        const idsParam = ids.join(',');
+        exitSelectMode();
+        const form = new FormData();
+        form.append('ids', idsParam);
+        fetch('/alunos/deletar-multiplos', { method: 'POST', body: form })
+            .then(() => window.location.reload())
+            .catch(err => console.error('Bulk delete falhou:', err));
+    }
+
+    function clearTimer() {
+        if (pressTimer) clearTimeout(pressTimer);
+        pressTimer = null;
+        pressStart = null;
+        pressTargetEl = null;
+    }
+
+    function pointerDown(x, y, target) {
+        clearTimer();
+        const card = target.closest('[data-aluno-select]');
+        if (!card) return;
+        if (interactiveInsideCard(target, card)) return;
+        pressStart = { x: x, y: y };
+        pressTargetEl = card;
+        pressTimer = setTimeout(function() {
+            if (pressTargetEl) enterSelectMode(pressTargetEl);
+            clearTimer();
+        }, LONG_PRESS_MS);
+    }
+
+    function pointerMove(x, y) {
+        if (!pressStart) return;
+        if (Math.hypot(x - pressStart.x, y - pressStart.y) > MOVE_TOLERANCE) clearTimer();
+    }
+
+    document.addEventListener('touchstart', function(e) {
+        if (e.touches.length !== 1) { clearTimer(); return; }
+        pointerDown(e.touches[0].clientX, e.touches[0].clientY, e.target);
+    }, { passive: true });
+    document.addEventListener('touchmove', function(e) {
+        pointerMove(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    document.addEventListener('touchend', clearTimer, { passive: true });
+    document.addEventListener('touchcancel', clearTimer, { passive: true });
+
+    document.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        pointerDown(e.clientX, e.clientY, e.target);
+    });
+    document.addEventListener('mousemove', function(e) { pointerMove(e.clientX, e.clientY); });
+    document.addEventListener('mouseup', clearTimer);
+
+    // Tap em card durante select mode → toggle
+    document.addEventListener('click', function(e) {
+        if (!selectMode) return;
+        if (e.target.closest('.aluno-select-bar')) return;
+        // Ignora click sintético gerado pelo touchend que ativou o modo,
+        // mas previne navegação caso seja um <a> (mobile card é anchor).
+        if (Date.now() - modeEnteredAt < 400) {
+            if (e.target.closest('[data-aluno-select]')) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            return;
+        }
+        const card = e.target.closest('[data-aluno-select]');
+        if (!card) return;
+        e.preventDefault();
+        e.stopPropagation();
+        toggleCard(card);
+    }, true);
+
+    // ESC cancela
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && selectMode) exitSelectMode();
+    });
+
+    // Suprime menu nativo do navegador (long-press mobile / right-click desktop) em cards de aluno —
+    // o long-press do app concorre com o preview de link nativo do <a>.
+    document.addEventListener('contextmenu', function(e) {
+        if (e.target.closest('[data-aluno-select]')) e.preventDefault();
+    });
+
+    // Se conteúdo dos alunos é re-renderizado via HTMX, sai do modo
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        if (!selectMode) return;
+        if (e.target && e.target.id === 'alunos-content') exitSelectMode();
     });
 })();
 

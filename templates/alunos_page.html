@@ -86,10 +86,18 @@
         {% endif %}
         <a href="/?aluno_id={{ aluno.id }}"
            class="aluno-mob-card{% if eh_atual %} is-atual{% endif %}"
+           draggable="false"
            data-nome="{{ aluno.nome | lower }}"
            data-nivel="{{ aluno.get('nivel', '') }}"
            data-objetivo="{{ aluno.get('objetivo', '') }}"
-           data-tem-rotina="{{ '1' if aluno.get('rotina_ativa_id') else '0' }}">
+           data-tem-rotina="{{ '1' if aluno.get('rotina_ativa_id') else '0' }}"
+           data-aluno-select="{{ aluno.id }}"
+           data-aluno-nome="{{ aluno.nome }}"
+           data-aluno-restricoes="{{ aluno.get('restricoes', []) | join(', ') }}"
+           data-aluno-obs="{{ aluno.get('obs', '') }}">
+            <span class="aluno-mob-check" aria-hidden="true">
+                <svg class="icon"><use href="#i-check"/></svg>
+            </span>
             <div class="aluno-mob-avatar avatar-{{ _avatar_classes[_avatar_color] }}">{{ _ini }}</div>
             <div class="aluno-mob-info">
                 <div class="aluno-mob-name-row">
@@ -189,6 +197,50 @@
     </div>
 </div>
 
+{# ─── Bottom sheet: editar aluno (mobile) ─── #}
+<div id="edit-aluno-overlay" class="sheet-overlay md:hidden" onclick="closeEditAlunoSheet(event)" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Editar aluno" onclick="event.stopPropagation()">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Editando</div>
+                <div class="sheet-title" id="edit-aluno-title">Aluno</div>
+            </div>
+            <button type="button" class="sheet-close" onclick="closeEditAlunoSheet()" aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <form id="edit-aluno-mob-form" class="novo-aluno-form" method="post"
+              hx-on::after-request="if(event.detail.successful){closeEditAlunoSheet();window.location.reload();}">
+            <label class="field-label">Nome *</label>
+            <input type="text" name="nome" id="edit-aluno-mob-nome" required class="field-input">
+
+            <label class="field-label">Nível</label>
+            <select name="nivel" id="edit-aluno-mob-nivel" class="field-select">
+                <option value="iniciante">Iniciante</option>
+                <option value="intermediario">Intermediário</option>
+                <option value="avancado">Avançado</option>
+            </select>
+
+            <label class="field-label">Objetivo</label>
+            <select name="objetivo" id="edit-aluno-mob-objetivo" class="field-select">
+                <option>hipertrofia</option><option>forca</option><option>resistencia</option>
+                <option>emagrecimento</option><option>condicionamento</option><option>reabilitacao</option>
+            </select>
+
+            <label class="field-label">Restrições (vírgula)</label>
+            <input type="text" name="restricoes" id="edit-aluno-mob-restricoes" class="field-input">
+
+            <label class="field-label">Observações</label>
+            <textarea name="obs" id="edit-aluno-mob-obs" rows="2" class="field-input" style="resize:vertical;"></textarea>
+
+            <button type="submit" class="bb-action primary" style="margin-top:14px;width:100%;">
+                <svg class="icon icon-sm"><use href="#i-check"/></svg> Salvar alterações
+            </button>
+        </form>
+    </div>
+</div>
+
 <script>
 // ── Mobile: filtros chip + busca ──
 function setAlunoFilter(btn) {
@@ -246,6 +298,36 @@ function openNovoAlunoSheet() {
 function closeNovoAlunoSheet(e) {
     if (e && e.target && e.target.id !== 'novo-aluno-overlay') return;
     const overlay = document.getElementById('novo-aluno-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('sheet-open');
+}
+
+// ── Sheet de editar aluno (chamado pela select-bar quando N=1) ──
+window.openEditAlunoSheet = function(data) {
+    const overlay = document.getElementById('edit-aluno-overlay');
+    if (!overlay) return;
+    document.getElementById('edit-aluno-title').textContent = data.nome || 'Aluno';
+    document.getElementById('edit-aluno-mob-nome').value = data.nome || '';
+    document.getElementById('edit-aluno-mob-nivel').value = data.nivel || 'intermediario';
+    document.getElementById('edit-aluno-mob-objetivo').value = data.objetivo || 'hipertrofia';
+    document.getElementById('edit-aluno-mob-restricoes').value = data.restricoes || '';
+    document.getElementById('edit-aluno-mob-obs').value = data.obs || '';
+    const form = document.getElementById('edit-aluno-mob-form');
+    form.setAttribute('hx-post', '/alunos/' + data.id + '/editar');
+    form.setAttribute('hx-target', '#alunos-content');
+    form.setAttribute('hx-swap', 'innerHTML');
+    if (window.htmx) htmx.process(form);
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sheet-open');
+    setTimeout(() => document.getElementById('edit-aluno-mob-nome')?.focus(), 200);
+};
+
+function closeEditAlunoSheet(e) {
+    if (e && e.target && e.target.id !== 'edit-aluno-overlay') return;
+    const overlay = document.getElementById('edit-aluno-overlay');
     if (!overlay) return;
     overlay.classList.remove('is-open');
     overlay.setAttribute('aria-hidden', 'true');

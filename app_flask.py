@@ -2632,6 +2632,14 @@ def aluno_deletar(i):
     deletar_aluno(i)
     return _render_alunos_com_dropdown(carregar_alunos())
 
+@app.route("/alunos/deletar-multiplos", methods=["POST"])
+def alunos_deletar_multiplos():
+    raw = request.form.get("ids", "")
+    ids = [int(x) for x in raw.split(",") if x.strip().isdigit()]
+    for aluno_id in ids:
+        deletar_aluno(aluno_id)
+    return _render_alunos_com_dropdown(carregar_alunos())
+
 # ══════════════════════════════════════════════════════════════
 
 init_db()
