@@ -59,11 +59,10 @@ PADRAO_PARA_SUBREGIAO: dict[str, set[str]] = {
     # variante cadastrada no XLSX ficam restritos à subregião com exercícios
     # — evita cycling pegar padrão vazio (= aviso "incompleta" espúrio):
     # - flexao_lateral: só iso (Prancha Lateral). Sem variante dyn prevista.
-    # - rotacao_tronco: só iso (Pallof Press) até Fase 4 cadastrar Russian
-    #   Twist no XLSX — aí adicionar core_dinamico ao set.
+    # - rotacao_tronco: iso (Pallof Press) + dyn (Russian Twist — Fase 4)
     "flexao_tronco":   {"core_isometrico", "core_dinamico"},
     "flexao_lateral":  {"core_isometrico"},
-    "rotacao_tronco":  {"core_isometrico"},
+    "rotacao_tronco":  {"core_isometrico", "core_dinamico"},
     "flexao_quadril":  {"core_isometrico", "core_dinamico"},
     # Cardio
     "cardio":          {"cardio"},
@@ -440,8 +439,7 @@ _PADROES_LEGADOS = {
         "flexao_tronco", "flexao_lateral", "rotacao_tronco", "flexao_quadril",
     ),
     "core_dinamico": (
-        # rotacao_tronco fora até Fase 4 cadastrar Russian Twist no XLSX.
-        "flexao_tronco", "flexao_quadril",
+        "flexao_tronco", "rotacao_tronco", "flexao_quadril",
     ),
 }
 
@@ -754,6 +752,9 @@ class Exercicio:
     pegada: Optional[str] = None
     plano_corporal: Optional[str] = None
     equipamento_grupo: Optional[str] = None
+    # Flag operacional — False exclui o exercício de todas as gerações.
+    # Default True; XLSX vazio = ativo. Fase 4 cadastra.
+    ativo: bool = True
 
 
 @dataclass
@@ -800,6 +801,17 @@ def _int_or_zero(val) -> int:
         return 0
 
 
+def _bool_xlsx(val, default: bool) -> bool:
+    """Converte célula do XLSX em bool, usando default para None/NaN."""
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, float) and math.isnan(val):
+        return default
+    return bool(val)
+
+
 _EQ_FIXES = {
     "Apoio":           "Sem equipamento",
     "Apoio ajoelhado": "Sem equipamento",
@@ -815,6 +827,8 @@ def carregar_banco(path: str) -> list[Exercicio]:
     for _, row in df.iterrows():
         nome = _str(row.get("nome"))
         if not nome:
+            continue
+        if not _bool_xlsx(row.get("ativo"), True):
             continue
         eq_pri = _str(row.get("eq_primario")) or _EQ_FIXES.get(nome, "")
         padrao = _str(row.get("padrao"))
@@ -860,6 +874,8 @@ def carregar_banco(path: str) -> list[Exercicio]:
             pegada=_str(row.get("pegada")) or None,
             plano_corporal=_str(row.get("plano_corporal")) or None,
             equipamento_grupo=_str(row.get("equipamento_grupo")) or None,
+            variante_pontual=_bool_xlsx(row.get("variante_pontual"), False),
+            ativo=_bool_xlsx(row.get("ativo"), True),
         ))
     return exercicios
 
