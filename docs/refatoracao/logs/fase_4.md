@@ -29,7 +29,11 @@ exercícios do XLSX (`banco_exercicios.xlsx`) + Annexo 4.1 itens pendentes.
 **Banco:** 137 exercícios (125 originais + 11 mock_futuros + 1 Remada LM Aberta)
 
 **5 colunas dims preenchidas em 100% dos exercícios:**
-- `variacao_de` (familia_estrita): 125/137 preenchidas + 12 null por decisão clínica
+- `variacao_de` (familia_estrita): 121/137 preenchidas + 16 null (exercícios "raiz"
+  sem variação — Box Jump, Leg Press, Cadeira Extensora/Flexora, Nordic Curl,
+  Pallof Press, Roda Abdominal, Hollow Hold, Side Clams, Canoinha, Crucifíxo
+  Invertido, Posterior Ombro Polia, Face Pull, Hiperextensão 45°, Desloc.
+  Lateral c/ Band, Agachamento Búlgaro)
 - `pegada`: null por default; exceções: neutra (Landmine press/row, crossovers,
   pulldowns supinados, barras abertas/supinadas, etc.), pronada (supinos, empurrar,
   curvadas), aberta (puxadas abertas, remada LM Aberta), supinada (puxadas supinadas)
