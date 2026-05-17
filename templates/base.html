@@ -223,6 +223,104 @@
         .ex-pill-substituido{ background: #f3e8ff; color: #7e22ce; }   /* roxo */
         .ex-pill-novo       { background: #dcfce7; color: #15803d; }   /* verde */
 
+        /* Etapa 8 — botão e painel de Explicabilidade (rationale) */
+        .btn-rationale {
+            background: transparent; border: 0; padding: 4px;
+            display: inline-flex; align-items: center; justify-content: center;
+            color: #9ca3af; cursor: pointer; border-radius: 6px;
+        }
+        .btn-rationale .icon { width: 16px; height: 16px; }
+        .btn-rationale:hover { color: #e85d04; background: #fff7ed; }
+        .btn-rationale.is-open { color: #e85d04; background: #ffedd5; }
+        .rationale-container { display: block; }
+        .rationale-container:empty { display: none; }
+        .rationale-panel {
+            margin: 8px 0 4px;
+            background: #fff7ed; border: 1px solid #fdba74; border-radius: 10px;
+            padding: 12px 14px; font-size: 13px; color: #1f2937;
+            position: relative;
+        }
+        .rationale-panel--vazio { background: #f9fafb; border-color: #e5e7eb; color: #6b7280; }
+        .rationale-empty { display: flex; align-items: flex-start; gap: 8px; padding-right: 32px; }
+        .rationale-empty .icon { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; }
+        .rationale-head {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 8px; margin-bottom: 8px;
+        }
+        .rationale-title { font-size: 13px; color: #7c2d12; }
+        .rationale-title b { font-weight: 600; }
+        .rationale-close {
+            background: transparent; border: 0; padding: 2px; cursor: pointer;
+            color: #9a3412; display: inline-flex; align-items: center;
+            flex-shrink: 0;
+        }
+        .rationale-close .icon { width: 14px; height: 14px; }
+        .rationale-meta {
+            display: flex; flex-wrap: wrap; gap: 4px 12px;
+            margin-bottom: 8px; font-size: 12px; color: #4b5563;
+        }
+        .rationale-meta-item b { color: #1f2937; font-weight: 600; }
+        .rationale-score b { color: #7c2d12; }
+        .rationale-section { margin-top: 10px; }
+        .rationale-section--neutro {
+            font-size: 12px; color: #6b7280; font-style: italic;
+            padding: 6px 0;
+        }
+        .rationale-section-title {
+            font-size: 11px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.04em; color: #9a3412; margin-bottom: 4px;
+        }
+        .rationale-list, .rationale-alts {
+            list-style: none; padding: 0; margin: 0;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .rationale-item {
+            display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px;
+            font-size: 12px; padding: 4px 0;
+            border-top: 1px dashed #fed7aa;
+        }
+        .rationale-item:first-child { border-top: 0; }
+        .rationale-tag {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            background: #fff; border: 1px solid #fdba74; color: #9a3412;
+            padding: 1px 6px; border-radius: 4px;
+        }
+        .rationale-item--intra .rationale-tag { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+        .rationale-item--inter .rationale-tag { background: #ffedd5; border-color: #fdba74; color: #9a3412; }
+        .rationale-item--historico .rationale-tag { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+        .rationale-dim { font-weight: 600; color: #1f2937; }
+        .rationale-peso {
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-weight: 700; color: #b91c1c;
+            min-width: 38px; text-align: right;
+        }
+        .rationale-com { color: #4b5563; }
+        .rationale-com b { color: #1f2937; font-weight: 600; }
+        .rationale-alt {
+            display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
+            font-size: 12px; padding: 4px 0;
+            border-top: 1px dashed #fed7aa;
+        }
+        .rationale-alt:first-child { border-top: 0; }
+        .rationale-alt-nome { color: #1f2937; flex: 1; min-width: 0; }
+        .rationale-alt-score {
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 11px; color: #6b7280;
+        }
+        .rationale-alt-delta {
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 11px; font-weight: 700;
+            padding: 1px 6px; border-radius: 4px;
+        }
+        .rationale-alt-delta--pior { background: #dcfce7; color: #166534; }
+        .rationale-alt-delta--melhor { background: #fee2e2; color: #991b1b; }
+        .rationale-alt-delta--empate { background: #f3f4f6; color: #4b5563; }
+        .rationale-foot {
+            margin-top: 10px; font-size: 11px; color: #9a3412;
+            font-style: italic; line-height: 1.4;
+        }
+
         .config-panel { @apply bg-white border border-gray-200 rounded-xl p-6 mb-5; }
         .config-title { @apply text-xs font-semibold text-gray-700 mb-4; }
 
@@ -2878,6 +2976,7 @@
     <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
     <symbol id="i-circle-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
     <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
     <symbol id="i-equal" viewBox="0 0 24 24"><line x1="5" x2="19" y1="9" y2="9"/><line x1="5" x2="19" y1="15" y2="15"/></symbol>
     <symbol id="i-columns" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></symbol>
@@ -3617,6 +3716,42 @@ function _atualizarBodyEmEdicao() {
 }
 document.addEventListener('DOMContentLoaded', _atualizarBodyEmEdicao);
 document.body.addEventListener('htmx:afterSwap', _atualizarBodyEmEdicao);
+
+// ── Etapa 8: Explicabilidade — só 1 painel de rationale aberto por vez ──
+(function() {
+    // Antes de abrir um painel via htmx, fecha todos os outros.
+    document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        const trigger = evt.detail && evt.detail.elt;
+        if (!trigger || !trigger.classList.contains('btn-rationale')) return;
+        // Fecha containers de outros exs
+        const meuContainer = trigger.closest('.exercicio-wrapper, .exercicio')
+            ?.querySelector('.rationale-container');
+        document.querySelectorAll('.rationale-container').forEach(c => {
+            if (c !== meuContainer) c.innerHTML = '';
+        });
+        document.querySelectorAll('.btn-rationale.is-open').forEach(b => {
+            if (b !== trigger) b.classList.remove('is-open');
+        });
+    });
+    // Marca o botão como "aberto" quando o painel chega
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        const tgt = evt.detail && evt.detail.target;
+        if (!tgt || !tgt.classList || !tgt.classList.contains('rationale-container')) return;
+        const trigger = tgt.parentElement?.querySelector('.btn-rationale');
+        if (trigger) trigger.classList.add('is-open');
+    });
+    // Click no X do painel fecha (limpa o container)
+    document.body.addEventListener('click', function(evt) {
+        const closeBtn = evt.target.closest('[data-rationale-close]');
+        if (!closeBtn) return;
+        const container = closeBtn.closest('.rationale-container');
+        if (container) {
+            container.innerHTML = '';
+            const trigger = container.parentElement?.querySelector('.btn-rationale');
+            if (trigger) trigger.classList.remove('is-open');
+        }
+    });
+})();
 
 // ── Reatividade da bb_actions: refetch quando rotina-display ou draft-banner mudam ──
 (function() {

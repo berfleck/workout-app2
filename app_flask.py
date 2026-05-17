@@ -297,7 +297,7 @@ def filtrar_banco(texto="", padrao=None, purpose=None, unilateral=None,
     return resultado
 
 def _exercicio_to_dict(ex):
-    return {"nome": ex.nome, "variacao_de": ex.variacao_de,
+    d = {"nome": ex.nome, "variacao_de": ex.variacao_de,
             "eq_primario": ex.eq_primario, "eq_secundario": ex.eq_secundario,
             "regiao": ex.regiao, "subregiao": ex.subregiao, "padrao": ex.padrao,
             "purpose": ex.purpose,
@@ -305,6 +305,11 @@ def _exercicio_to_dict(ex):
             "fadiga": ex.fadiga, "circuito": ex.circuito,
             "similaridade": ex.similaridade, "musculo_primario": ex.musculo_primario,
             "obs": ex.obs, "series": ex.series, "reps": ex.reps, "rir": ex.rir}
+    # Etapa 8 — rationale da decisão (Explicabilidade). Só serializa quando
+    # populado, pra não inflar payloads de exs do banco / sessões legadas.
+    if getattr(ex, "rationale", None) is not None:
+        d["rationale"] = ex.rationale
+    return d
 
 def _dict_to_exercicio(d):
     padrao = d.get("padrao", "")
@@ -322,7 +327,8 @@ def _dict_to_exercicio(d):
         unilateral=d.get("unilateral",""), complexidade=d.get("complexidade",1),
         fadiga=d.get("fadiga",1), circuito=d.get("circuito","não"),
         similaridade=d.get("similaridade",""), musculo_primario=d.get("musculo_primario",""),
-        obs=d.get("obs"), series=d.get("series"), reps=d.get("reps"), rir=d.get("rir"))
+        obs=d.get("obs"), series=d.get("series"), reps=d.get("reps"), rir=d.get("rir"),
+        rationale=d.get("rationale"))
 
 def _sessao_to_dict(s):
     blocos = []
@@ -1672,6 +1678,51 @@ def treino_visualizar(t):
     return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
                            modo="visualizar", padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
                            nomes_ref=_nomes_ref_set())
+
+
+def _ex_do_slot(sessao, bi, ei):
+    """Retorna o Exercicio na posição (bi, ei) da sessão, ou None se inválido."""
+    if not sessao or bi < 0 or bi >= len(sessao.blocos):
+        return None
+    bloco = sessao.blocos[bi]
+    slots = [bloco.ex1, bloco.ex2, bloco.ex3]
+    if ei < 0 or ei >= len(slots):
+        return None
+    return slots[ei]
+
+
+@app.route("/treino/<int:t>/rationale/<int:bi>/<int:ei>")
+def treino_rationale(t, bi, ei):
+    """Etapa 8 — Explicabilidade. Renderiza o painel inline com o rationale
+    do exercício no slot (t, bi, ei) das sessoes_ativas (modo gerador)."""
+    if t >= len(sessoes_ativas):
+        return "Treino não encontrado", 404
+    ex = _ex_do_slot(sessoes_ativas[t], bi, ei)
+    if ex is None:
+        return "Exercício não encontrado", 404
+    return render_template("_rationale_inline.html", ex=ex, bi=bi, ei=ei)
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/rationale/<int:bi>/<int:ei>")
+def hub_treino_rationale(aluno_id, t, bi, ei):
+    """Etapa 8 — Explicabilidade no contexto HUB. Lê do rascunho ou da
+    rotina ativa (mesmo padrão de `_hub_treino_card.html`)."""
+    aluno = next((a for a in carregar_alunos() if a["id"] == aluno_id), None)
+    if not aluno:
+        return "Aluno não encontrado", 404
+    # Rascunho tem prioridade quando existe; senão rotina ativa.
+    sessoes_dicts = carregar_rascunho(aluno_id)
+    if not sessoes_dicts and aluno.get("rotina_ativa_id"):
+        rotina = carregar_registro(aluno["rotina_ativa_id"])
+        if rotina:
+            sessoes_dicts = rotina["sessoes"]
+    if not sessoes_dicts or t >= len(sessoes_dicts):
+        return "Treino não encontrado", 404
+    sessao = _dict_to_sessao(sessoes_dicts[t])
+    ex = _ex_do_slot(sessao, bi, ei)
+    if ex is None:
+        return "Exercício não encontrado", 404
+    return render_template("_rationale_inline.html", ex=ex, bi=bi, ei=ei)
 
 @app.route("/treino/<int:t>/editar")
 def treino_editar(t):

@@ -1,0 +1,93 @@
+{# Partial — explicabilidade da decisão (Etapa 8).
+   Recebe `ex` (Exercicio com .rationale populado) e `bi`/`ei` (pra fechar).
+   Mobile-first: largura inteira do card; padding generoso; copy enxuto.
+#}
+{% if not ex or not ex.rationale %}
+<div class="rationale-panel rationale-panel--vazio">
+    <div class="rationale-empty">
+        <svg class="icon"><use href="#i-info"/></svg>
+        <span>Esse exercício não tem rationale disponível — provavelmente foi adicionado manualmente ou vem de uma rotina antiga.</span>
+    </div>
+    <button type="button" class="rationale-close" data-rationale-close
+            aria-label="Fechar"><svg class="icon"><use href="#i-x"/></svg></button>
+</div>
+{% else %}
+{% set r = ex.rationale %}
+{% set slot = r.slot %}
+{% set comps = r.componentes %}
+{% set alts = r.alternativas %}
+{% set NIVEL_LABEL = {"regiao":"região","subregiao":"subregião","padrao":"padrão"} %}
+{% set CTX_LABEL = {"intra":"mesmo treino","inter":"outro treino","historico":"última rotina"} %}
+{% set DIM_LABEL = {
+    "pegada":"pegada",
+    "plano_corporal":"plano corporal",
+    "equipamento_grupo":"equipamento",
+    "familia_estrita":"família",
+    "variante_pontual":"variante pontual"
+} %}
+<div class="rationale-panel">
+    <div class="rationale-head">
+        <span class="rationale-title">Por que <b>{{ ex.nome }}</b>?</span>
+        <button type="button" class="rationale-close" data-rationale-close
+                aria-label="Fechar"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+
+    <div class="rationale-meta">
+        <span class="rationale-meta-item"><b>Slot:</b> {{ slot.escopo }} ({{ NIVEL_LABEL.get(slot.nivel, slot.nivel) }})</span>
+        <span class="rationale-meta-item"><b>Passe:</b> {{ slot.passe }}</span>
+        <span class="rationale-meta-item"><b>Pool:</b> {{ r.tamanho_pool }} candidato{{ '' if r.tamanho_pool == 1 else 's' }}</span>
+        <span class="rationale-meta-item rationale-score"><b>Score:</b> {{ '%.0f'|format(r.score_total) }}</span>
+    </div>
+
+    {% if comps %}
+    <div class="rationale-section">
+        <div class="rationale-section-title">Penalizações que pesaram</div>
+        <ul class="rationale-list">
+            {% for c in comps %}
+            <li class="rationale-item rationale-item--{{ c.contexto }}">
+                <span class="rationale-tag">{{ CTX_LABEL.get(c.contexto, c.contexto) }}</span>
+                <span class="rationale-dim">{{ DIM_LABEL.get(c.dim, c.dim) }}</span>
+                <span class="rationale-peso">{{ '%+.0f'|format(c.peso) }}</span>
+                {% if c.contexto == 'historico' %}
+                <span class="rationale-com">match por {{ c.com }}</span>
+                {% else %}
+                <span class="rationale-com">com <b>{{ c.com }}</b></span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% else %}
+    <div class="rationale-section rationale-section--neutro">
+        Sem conflitos com outros exercícios da rotina ou da última semana —
+        candidato neutro no pool.
+    </div>
+    {% endif %}
+
+    {% if alts %}
+    <div class="rationale-section">
+        <div class="rationale-section-title">Alternativas consideradas (top {{ alts|length }})</div>
+        <ul class="rationale-alts">
+            {% for a in alts %}
+            <li class="rationale-alt">
+                <span class="rationale-alt-nome">{{ a.nome }}</span>
+                <span class="rationale-alt-score">score {{ '%.0f'|format(a.score_total) }}</span>
+                {% if a.delta > 0 %}
+                <span class="rationale-alt-delta rationale-alt-delta--pior" title="Alternativa era pior em {{ '%.0f'|format(a.delta) }} pontos">Δ {{ '%+.0f'|format(a.delta) }}</span>
+                {% elif a.delta < 0 %}
+                <span class="rationale-alt-delta rationale-alt-delta--melhor" title="Alternativa era melhor — softmax sorteou o escolhido">Δ {{ '%+.0f'|format(a.delta) }}</span>
+                {% else %}
+                <span class="rationale-alt-delta rationale-alt-delta--empate" title="Empate técnico — softmax escolheu uniformemente">Δ 0</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="rationale-foot">
+        Δ = score do escolhido − score da alternativa. Δ &lt; 0 indica que o softmax
+        sorteou um candidato dentro do top-K, não necessariamente o de maior score.
+    </div>
+</div>
+{% endif %}

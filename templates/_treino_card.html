@@ -128,6 +128,14 @@
                         <span class="badge-novo">novo</span>
                         {% endif %}
                     {% endif %}
+                    {% if ex.rationale %}
+                    <button type="button" class="btn-rationale"
+                            title="Por que este exercício?"
+                            aria-label="Por que este exercício"
+                            hx-get="/treino/{{ idx }}/rationale/{{ bloco_idx }}/{{ ei }}"
+                            hx-target="#rationale-{{ idx }}-{{ bloco_idx }}-{{ ei }}"
+                            hx-swap="innerHTML"><svg class="icon"><use href="#i-info"/></svg></button>
+                    {% endif %}
                 </span>
                 {% set equip = ex.eq_primario if ex.eq_primario else '' %}
                 {% if ex.eq_secundario %}{% set equip = (equip ~ ' + ' ~ ex.eq_secundario) if equip else ex.eq_secundario %}{% endif %}
@@ -181,6 +189,7 @@
             </div>
             {% endif %}
         </div>
+        <div class="rationale-container" id="rationale-{{ idx }}-{{ bloco_idx }}-{{ ei }}"></div>
     </div>
     {% endfor %}
     </div>
