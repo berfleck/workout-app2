@@ -1360,6 +1360,7 @@ def gerar():
     tam_bloco = int(request.form.get("tamanho_bloco", 2))
     evitar_agon = request.form.get("evitar_agonistas") == "on"
     relaxar_familia = request.form.get("relaxar_familia") == "on"
+    usar_historico_r1 = request.form.get("usar_historico_r1") == "on"
 
     # Filtro de cargas (Etapa 4 / HIB2). Apenas aplica se os 3 thresholds vierem
     # preenchidos no form. Defaults da UI: grip=6, lombar=5, core=6 (HIB2).
@@ -1498,52 +1499,27 @@ def gerar():
                            and e.nome not in pais_irmaos
                            and (e.variacao_de is None or e.variacao_de not in nomes_irmaos)]
 
-    # Bloqueio por referências manuais
-    ref_sessoes = _ref_sessoes()
-    if ref_sessoes:
-        nomes_ref = set()
-        pais_ref = set()
-        for s in ref_sessoes:
-            for bloco in s.blocos:
-                for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
-                    if ex:
-                        nomes_ref.add(ex.nome)
-                        if ex.variacao_de:
-                            pais_ref.add(ex.variacao_de)
-        banco_gerar = [e for e in banco_gerar
-                       if e.nome not in nomes_ref
-                       and e.nome not in pais_ref
-                       and (e.variacao_de is None or e.variacao_de not in nomes_ref)]
-
-    # Bloqueio por histórico do aluno
+    # Rotina ativa do aluno — lookup único; alimenta tanto o score HIST quanto o
+    # auto-fixar refs visuais (decisão UX: refs sempre aparecem quando há rotina
+    # ativa; toggle só controla o score HIST D3.3).
     aluno_nome = request.form.get("aluno", "").strip()
-    evitar_ultimos = int(request.form.get("evitar_ultimos", 0))
-    n_bloqueados_hist = 0
-    if aluno_nome and evitar_ultimos > 0:
-        registros_aluno = buscar_historico_por_aluno(aluno_nome)[:evitar_ultimos]
-        nomes_hist = set()
-        pais_hist = set()
-        for reg_resumo in registros_aluno:
-            reg_full = carregar_registro(reg_resumo["id"])
-            if not reg_full:
-                continue
-            for sess_dict in reg_full["sessoes"]:
-                for bloco in sess_dict["blocos"]:
-                    for key in ("ex1", "ex2", "ex3"):
-                        ex = bloco.get(key)
-                        if ex:
-                            nomes_hist.add(ex["nome"])
-                            if ex.get("variacao_de"):
-                                pais_hist.add(ex["variacao_de"])
-        banco_antes = len(banco_gerar)
-        banco_gerar = [e for e in banco_gerar
-                       if e.nome not in nomes_hist
-                       and e.nome not in pais_hist
-                       and (e.variacao_de is None or e.variacao_de not in nomes_hist)]
-        n_bloqueados_hist = banco_antes - len(banco_gerar)
+    rotina_ativa_aluno = None
+    if aluno_nome:
+        aluno_obj_db = buscar_aluno_por_nome(aluno_nome)
+        if aluno_obj_db and aluno_obj_db.get("rotina_ativa_id"):
+            rotina_ativa_aluno = carregar_rotina_ativa(aluno_obj_db["id"])
+
+    # Score HIST D3.3 (Etapa 7 Fase 7.4) — toggle "Evitar exercícios da rotina
+    # anterior". Quando ON e há rotina ativa, propaga R-1 pro _score_proximidade
+    # (penalty soft -50 família, peso integral). Não bloqueia banco, desencoraja
+    # via softmax; permite repetir quando inevitável.
+    historico_r1_sessoes: list[Sessao] | None = None
+    if usar_historico_r1 and rotina_ativa_aluno:
+        historico_r1_sessoes = [_dict_to_sessao(s) for s in rotina_ativa_aluno["sessoes"]]
 
     sessoes_ativas = gerar_multiplos_treinos(banco_gerar, all_configs,
-                                             relaxar_familia=relaxar_familia)
+                                             relaxar_familia=relaxar_familia,
+                                             historico_r1=historico_r1_sessoes)
 
     # Calcula avisos cedo (antes de qualquer redirect contextual) para podermos
     # stashar em session quando a rota redireciona pro HUB (substituir/adicionar/nova_rotina).
@@ -1601,6 +1577,7 @@ def gerar():
         "tamanho_bloco": tam_bloco,
         "evitar_agonistas": evitar_agon,
         "relaxar_familia": relaxar_familia,
+        "usar_historico_r1": usar_historico_r1,
         "cargas_config": cargas_config,
     }
     salvar_sessoes_disco()
@@ -1633,28 +1610,27 @@ def gerar():
                 salvar_rascunho(ctx_aluno_id, sessoes_rotina)
                 return f'<div class="sucesso">Treino adicionado à rotina de {aluno_obj["nome"]}!</div><script>setTimeout(()=>window.location.href="/?aluno_id={ctx_aluno_id}",1500)</script>'
 
-    # Auto-fixar referências do último período do aluno (Etapa 4)
+    # Auto-fixar referências da rotina ativa do aluno (independente do toggle HIST).
+    # UX: refs visuais aparecem sempre que aluno tem rotina ativa, pro personal
+    # trainer comparar a rotina nova com a anterior. Reutiliza rotina_ativa_aluno
+    # já carregado acima.
     auto_ref_etiqueta = None
-    if aluno_nome and evitar_ultimos > 0:
-        registros_aluno = buscar_historico_por_aluno(aluno_nome)
-        if registros_aluno:
-            ultimo_reg = carregar_registro(registros_aluno[0]["id"])
-            if ultimo_reg:
-                referencias.clear()
-                for ti, sess_dict in enumerate(ultimo_reg["sessoes"]):
-                    sessao_ref = _dict_to_sessao(sess_dict)
-                    referencias.append({
-                        "sessao": sessao_ref,
-                        "origem": {
-                            "etiqueta": ultimo_reg.get("etiqueta", ""),
-                            "aluno": ultimo_reg.get("aluno", "—"),
-                            "data": ultimo_reg.get("data_salvo", "—"),
-                            "reg_id": ultimo_reg["id"],
-                            "treino_idx": ti,
-                        },
-                        "id_ref": _novo_id_ref(),
-                    })
-                auto_ref_etiqueta = ultimo_reg.get("etiqueta") or ultimo_reg.get("data_salvo", "")
+    if rotina_ativa_aluno:
+        referencias.clear()
+        for ti, sess_dict in enumerate(rotina_ativa_aluno["sessoes"]):
+            sessao_ref = _dict_to_sessao(sess_dict)
+            referencias.append({
+                "sessao": sessao_ref,
+                "origem": {
+                    "etiqueta": rotina_ativa_aluno.get("etiqueta", ""),
+                    "aluno": rotina_ativa_aluno.get("aluno", "—"),
+                    "data": rotina_ativa_aluno.get("data_salvo", "—"),
+                    "reg_id": rotina_ativa_aluno["id"],
+                    "treino_idx": ti,
+                },
+                "id_ref": _novo_id_ref(),
+            })
+        auto_ref_etiqueta = rotina_ativa_aluno.get("etiqueta") or rotina_ativa_aluno.get("data_salvo", "")
 
     # No fluxo padrão de /gerador (sem ctx_acao), exibimos o modal direto em
     # _resultado.html e limpamos a stash pra não duplicar no próximo HUB.
@@ -1752,22 +1728,6 @@ def treino_regerar(t):
     banco_regen = [e for e in banco if e.nome not in nomes_outros
                    and e.nome not in pais_dos_outros
                    and (e.variacao_de is None or e.variacao_de not in nomes_outros)]
-    # Block exercises from reference (same logic as /gerar)
-    ref_sessoes = _ref_sessoes()
-    if ref_sessoes:
-        nomes_ref = set()
-        pais_ref = set()
-        for s in ref_sessoes:
-            for bloco in s.blocos:
-                for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
-                    if ex:
-                        nomes_ref.add(ex.nome)
-                        if ex.variacao_de:
-                            pais_ref.add(ex.variacao_de)
-        banco_regen = [e for e in banco_regen
-                       if e.nome not in nomes_ref
-                       and e.nome not in pais_ref
-                       and (e.variacao_de is None or e.variacao_de not in nomes_ref)]
 
     if cfg_r.get("demandas"):
         nova = gerar_sessao_por_demandas(banco_regen, demandas=cfg_r["demandas"],
@@ -1814,12 +1774,6 @@ def treino_substituir(t, nome_ex):
                             for b in s.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
     banco_sem_irmaos = [e for e in banco if e.nome not in nomes_outros_treinos]
     banco_subst = banco_sem_irmaos if banco_sem_irmaos else banco
-    ref_sessoes = _ref_sessoes()
-    if ref_sessoes:
-        nomes_ref = {ex.nome for s in ref_sessoes for b in s.blocos
-                     for ex in [b.ex1, b.ex2, b.ex3] if ex}
-        banco_sem_ref = [e for e in banco_subst if e.nome not in nomes_ref]
-        banco_subst = banco_sem_ref if banco_sem_ref else banco_subst
 
     # Filtrar nomes já sugeridos para esta posição; se esgotou o ciclo, reseta (preservando inicial)
     if pos_key:
@@ -1927,13 +1881,6 @@ def bloco_regerar(t, bi):
     for i, s in enumerate(sessoes_ativas):
         for j, b in enumerate(s.blocos):
             if i == t and j == bi: continue
-            for ex in [b.ex1, b.ex2, b.ex3]:
-                if ex:
-                    nomes_bloqueados.add(ex.nome)
-                    if ex.variacao_de: pais_bloqueados.add(ex.variacao_de)
-    # Bloquear por referências manuais
-    for s in _ref_sessoes():
-        for b in s.blocos:
             for ex in [b.ex1, b.ex2, b.ex3]:
                 if ex:
                     nomes_bloqueados.add(ex.nome)

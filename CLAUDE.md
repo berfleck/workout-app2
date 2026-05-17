@@ -230,10 +230,16 @@ predicado e migração.
 5. Cycling determinístico de subregião (achado paralelo Sessão 7a)
    — investigar se relevante pós-Etapa 7. Pode interagir com viés
    mono-ex do 6º NO-OP.
-6. **UI Histórico exposed** (Sessão 11 / Fase 7.4): contrato
-   programatic `gerar_multiplos_treinos(historico_r1=...)` pronto, mas
-   sem UI/integração SQLite. Toggle UI + leitura R-1 do banco fica
-   pra fase posterior — não bloqueia 7.6.
+6. ~~**UI Histórico exposed**~~ ✅ **Fechado 2026-05-17** (branch
+   `feat/ui-historico-r1`). Clean break do hard block legado
+   `evitar_ultimos` (dropdown 0/1/2/3 períodos) → toggle checkbox
+   "Evitar exercícios da rotina anterior" (`usar_historico_r1`, default
+   OFF) wirando `historico_r1=` em `gerar_multiplos_treinos`. R-1 =
+   `carregar_rotina_ativa(aluno_id)`. Refs viraram puramente UX
+   (decisão de produto): bloqueio via refs removido de 4 rotas (/gerar,
+   /regerar, /substituir, /bloco/regerar); marcas visuais "REF" em
+   `_substituicao.html` preservadas. Auto-fixar refs roda sempre que
+   aluno tem rotina ativa, independente do toggle.
 7. ~~**Refinamento métrica 4.1**.~~ ✅ **Fechado opção A** (Fase 7.5 /
    Sessão 12) — métrica contínua "% slots com overlap" agregada
    cross-iter. Alvo <15% via setup B C3 (Fase 7.6 / Frente A).
@@ -526,7 +532,7 @@ Fluxo: selecionar exercícios (família + nome) → ordenar compostos primeiro �
 - UI de exercícios fixos (backend suporta `exercicios_travados`, falta UI)
 - Botão download ZIP na UI (rota existe)
 - Lista de exercícios pausados por aluno
-- Sistema de referências manuais legado (`_referencia.html`, `_comparacao.html`) — remover quando confirmado que toggle de período + lado a lado cobrem todos os casos
+- Sistema de referências manuais legado (`_referencia.html`, `_comparacao.html`) — agora puramente UX (bloqueio via refs removido em 2026-05-17 quando UI Histórico foi exposta). Remover painel e auto-fixar quando confirmado que toggle Atual/Anterior do HUB cobre todos os casos.
 
 ## Redesign mobile (em progresso · branch `mobile-redesign-02`)
 
