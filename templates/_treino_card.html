@@ -123,11 +123,6 @@
                     {% if sessao.relaxados and ex.nome in sessao.relaxados %}
                     <span class="badge-relaxado" title="Família repetida — colocado via flexibilização porque o banco não tinha mais variações disponíveis">↻</span>
                     {% endif %}
-                    {% if modo != 'editar' and nomes_ref is defined and nomes_ref %}
-                        {% if ex.nome not in nomes_ref %}
-                        <span class="badge-novo">novo</span>
-                        {% endif %}
-                    {% endif %}
                     {% if ex.rationale %}
                     <button type="button" class="btn-rationale"
                             title="Por que este exercício?"

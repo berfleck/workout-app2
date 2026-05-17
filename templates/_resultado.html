@@ -6,13 +6,6 @@
 
 {% include "_avisos_modal.html" %}
 
-{% if auto_ref_etiqueta %}
-<div class="auto-ref-badge">
-    <svg class="icon align-[-2px]"><use href="#i-pin"/></svg> Comparando com período anterior: <strong>{{ auto_ref_etiqueta }}</strong>
-    <span class="text-[11px] text-gray-500">({{ referencias|length }} treino{{ 's' if referencias|length > 1 else '' }} como referência)</span>
-</div>
-{% endif %}
-
 <!-- Salvar no histórico -->
 <details class="mb-4">
     <summary class="text-sm font-semibold py-2 cursor-pointer text-gray-700"><span class="chevron text-gray-400 text-xs">▶</span> 💾 Salvar no histórico</summary>
