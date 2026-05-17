@@ -323,6 +323,69 @@ DEVE replicar overlay do harness; raw XLSX subestima 4.1.
   - Setup B C3 mantido em `_gerar_sessoes_r1_variante_a`
   - Predicate 4.1 informativo em `_patch_cenarios_4_x`
 
+## Etapa 8 Explicabilidade — concluída (não confundir com Etapa 8 refator CORE)
+
+**Etapa 8 numerada do `guia_refatoracao_v4.md` linha 1045** — última etapa
+do guia, distinta do refator estrutural CORE (`etapa_8.md`). Concluída em
+2026-05-17 (branch `etapa-8-explicabilidade`, incluindo validação browser).
+
+**Decisões fechadas (AskUserQuestion inicial):**
+
+- **Escopo motor MVP** — captura só na seleção de exercício
+  (`_selecionar_cand_score_aware`). Pareamento de blocos + pré-alocação
+  global ficam fora do MVP. Estrutura `dict` genérica do rationale permite
+  estender sem mudar o shape exposto na UI.
+- **Armazenamento** — campo `rationale: Optional[dict] = None` no dataclass
+  `Exercicio`. Cópia via `dataclasses.replace` na hora da escolha pra não
+  contaminar referências do banco compartilhadas.
+- **UI** — expand inline (não drawer, não modal). Mobile-first. Botão ⓘ
+  ao lado do nome do ex; click expande painel logo abaixo dentro do card.
+  Apenas 1 painel aberto por vez (JS centralizado em `base.html`).
+
+**5 fases (todas mergeadas no mesmo branch, sem sub-PRs):**
+
+- 8.E.1 — campo `rationale` + funções `_componentes_*` + `_montar_rationale`
+- 8.E.2 — captura no `_selecionar_cand_score_aware` com `slot_info` opcional
+- 8.E.3 — serialização condicional em `_exercicio_to_dict` /
+  `_dict_to_exercicio` + 9 testes em `tests/test_rationale.py`
+- 8.E.4 — UI: endpoints `/treino/<t>/rationale/<bi>/<ei>` (gerador) e
+  `/hub/rotina/<aluno_id>/treino/<t>/rationale/<bi>/<ei>` (HUB), partial
+  `_rationale_inline.html`, botão ⓘ + container nos 2 templates de card,
+  CSS amber + symbol `i-info` + JS "só 1 aberto" em `base.html`
+- 8.E.5 — validação clínica (caso Crossover Sentado solo virou teste 8)
+  + harness 16/16 OK + log da etapa
+
+**Estrutura do rationale (shape do dict):**
+
+```python
+{
+    "slot": {"treino_idx": int, "nivel": str, "escopo": str,
+             "escopo_demanda_original": str, "passe": "estrito"|"relax"},
+    "score_total": float,
+    "componentes": [{"contexto": "intra"|"inter"|"historico",
+                     "dim": str, "peso": float, "com": str}, ...],
+    "alternativas": [{"nome": str, "score_total": float,
+                      "componentes": [...], "delta": float}, ...],
+    "tamanho_pool": int,
+}
+```
+
+`delta = score_escolhido - score_alternativa`. Δ<0 = alternativa era melhor
+em score (softmax sorteou dentro do top-K), Δ>0 = escolhido era favorito,
+Δ=0 = empate.
+
+**Gate de fechamento:** pytest 184 passed (175 base + 9 novos), 1 skip;
+13 snapshots verdes; harness 16/16 OK (2 FAIL benignas pré-existentes
+preservadas).
+
+**Pendências pós-Etapa 8 Explicabilidade (não bloqueiam uso real):**
+
+- Captura de rationale no pareamento (`_buscar_candidato`) e pré-alocação
+  global — estrutura `dict` permite estensão sem breaking change
+- Outros itens da 8.15.7 da `dimensoes_proximidade.md` continuam abertos
+  (UI Histórico item 6, setup B 4.1 item 7, escalada 2.3 item 8, cycling
+  determinístico item 5, cleanup YAML)
+
 ## Stack
 
 Flask + Jinja2 + HTMX 2.0.4 + Tailwind CDN (`cdn.tailwindcss.com` com `@apply` em `<style type="text/tailwindcss">`) + SortableJS 1.15.3. Fonte: DM Sans. Cores: laranja `#e85d04`, fundo `#f9fafb`.

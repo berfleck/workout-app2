@@ -9,7 +9,7 @@ Uso:
 import math
 import pandas as pd
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from pesos_proximidade import (
@@ -755,6 +755,10 @@ class Exercicio:
     # Flag operacional — False exclui o exercício de todas as gerações.
     # Default True; XLSX vazio = ativo. Fase 4 cadastra.
     ativo: bool = True
+    # Rationale da decisão (Etapa 8 — Explicabilidade). Default None;
+    # populado em `_selecionar_cand_score_aware` para o exercício escolhido.
+    # Estrutura em `_montar_rationale`.
+    rationale: Optional[dict] = None
 
 
 @dataclass
@@ -1828,12 +1832,209 @@ def _score_historico(
     return 0.0
 
 
+# ---------------------------------------------------------------------------
+# Etapa 8 — Explicabilidade: decomposição por dim
+# ---------------------------------------------------------------------------
+#
+# Reproduzem `_score_intra`/`_score_inter`/`_score_historico` retornando uma
+# lista de eventos `{"contexto", "dim", "peso", "com"}` em vez do total. O
+# total ainda é calculado pelas funções originais (autoridade); estas servem
+# apenas pra explicar o "por que" do candidato escolhido + top alternativas.
+# Custo: dupla avaliação só nos K=top alternativas (não em todo o pool).
+
+
+def _componentes_intra(
+    cand: "Exercicio",
+    alocados: list["Exercicio"],
+    pesos_config: ConfigPesosProximidade,
+) -> list[dict]:
+    eventos: list[dict] = []
+    sub_cand = cand.subregiao
+    for outro in alocados:
+        if sub_cand != outro.subregiao:
+            continue
+        if cand.pegada and outro.pegada and cand.pegada == outro.pegada:
+            eventos.append({
+                "contexto": "intra", "dim": "pegada",
+                "peso": pesos_config.pegada.peso_intra(sub_cand),
+                "com": outro.nome,
+            })
+        if (
+            cand.plano_corporal
+            and outro.plano_corporal
+            and cand.plano_corporal == outro.plano_corporal
+        ):
+            eventos.append({
+                "contexto": "intra", "dim": "plano_corporal",
+                "peso": pesos_config.plano_corporal.peso_intra(sub_cand),
+                "com": outro.nome,
+            })
+        if (
+            cand.equipamento_grupo
+            and outro.equipamento_grupo
+            and cand.equipamento_grupo == outro.equipamento_grupo
+        ):
+            eventos.append({
+                "contexto": "intra", "dim": "equipamento_grupo",
+                "peso": pesos_config.equipamento_grupo.peso_intra(sub_cand),
+                "com": outro.nome,
+            })
+    return eventos
+
+
+def _componentes_inter(
+    cand: "Exercicio",
+    alocados: list["Exercicio"],
+    pesos_config: ConfigPesosProximidade,
+) -> list[dict]:
+    eventos: list[dict] = []
+    sub_cand = cand.subregiao
+    for outro in alocados:
+        if cand.variacao_de and cand.variacao_de == outro.variacao_de:
+            eventos.append({
+                "contexto": "inter", "dim": "familia_estrita",
+                "peso": pesos_config.familia_estrita.peso_inter(sub_cand),
+                "com": outro.nome,
+            })
+        if sub_cand != outro.subregiao:
+            continue
+        if cand.pegada and outro.pegada and cand.pegada == outro.pegada:
+            eventos.append({
+                "contexto": "inter", "dim": "pegada",
+                "peso": pesos_config.pegada.peso_inter(sub_cand),
+                "com": outro.nome,
+            })
+        if (
+            cand.plano_corporal
+            and outro.plano_corporal
+            and cand.plano_corporal == outro.plano_corporal
+        ):
+            eventos.append({
+                "contexto": "inter", "dim": "plano_corporal",
+                "peso": pesos_config.plano_corporal.peso_inter(sub_cand),
+                "com": outro.nome,
+            })
+        if (
+            cand.equipamento_grupo
+            and outro.equipamento_grupo
+            and cand.equipamento_grupo == outro.equipamento_grupo
+        ):
+            eventos.append({
+                "contexto": "inter", "dim": "equipamento_grupo",
+                "peso": pesos_config.equipamento_grupo.peso_inter(sub_cand),
+                "com": outro.nome,
+            })
+        if (
+            cand.variante_pontual
+            and outro.variante_pontual
+            and cand.variacao_de != outro.variacao_de
+        ):
+            eventos.append({
+                "contexto": "inter", "dim": "variante_pontual",
+                "peso": pesos_config.variante_pontual.peso_inter(sub_cand),
+                "com": outro.nome,
+            })
+    return eventos
+
+
+def _componentes_historico(
+    cand: "Exercicio",
+    historico_r1: list["Exercicio"],
+    pesos_config: ConfigPesosProximidade,
+) -> list[dict]:
+    if not historico_r1:
+        return []
+    nomes_r1 = {e.nome for e in historico_r1}
+    fams_r1 = {e.variacao_de for e in historico_r1 if e.variacao_de}
+    hit_nome = cand.nome in nomes_r1
+    hit_familia = bool(cand.variacao_de and cand.variacao_de in fams_r1)
+    if not (hit_nome or hit_familia):
+        return []
+    motivo = "nome" if hit_nome else "familia"
+    return [{
+        "contexto": "historico", "dim": "familia_estrita",
+        "peso": pesos_config.familia_estrita.peso_historico(cand.subregiao),
+        "com": motivo,  # "nome" ou "familia" (granularidade D3.3)
+    }]
+
+
+def _componentes_totais(
+    cand: "Exercicio",
+    alocados_intra: list["Exercicio"],
+    alocados_inter: list["Exercicio"],
+    historico_r1: list["Exercicio"],
+    pesos_config: ConfigPesosProximidade,
+) -> tuple[list[dict], float]:
+    """Concatena componentes dos 3 contextos e retorna (eventos, total)."""
+    eventos: list[dict] = []
+    eventos.extend(_componentes_intra(cand, alocados_intra, pesos_config))
+    eventos.extend(_componentes_inter(cand, alocados_inter, pesos_config))
+    eventos.extend(_componentes_historico(cand, historico_r1, pesos_config))
+    total = sum(ev["peso"] for ev in eventos)
+    return eventos, total
+
+
+def _montar_rationale(
+    escolhido: "Exercicio",
+    cands_scored: list[tuple["Exercicio", float]],
+    slot_info: dict,
+    alocados_intra: list["Exercicio"],
+    alocados_inter: list["Exercicio"],
+    historico_r1: list["Exercicio"],
+    pesos_config: ConfigPesosProximidade,
+    max_alternativas: int = 3,
+) -> dict:
+    """Monta o dict de rationale pro exercício escolhido.
+
+    `cands_scored` é a lista completa `(exercicio, score)` (mesma que o
+    softmax usa). Inclui o escolhido. As alternativas exibidas são as `K`
+    de maior score depois do escolhido (não passaram no sorteio softmax).
+    """
+    componentes_escolhido = _componentes_intra(
+        escolhido, alocados_intra, pesos_config
+    )
+    componentes_escolhido.extend(
+        _componentes_inter(escolhido, alocados_inter, pesos_config)
+    )
+    componentes_escolhido.extend(
+        _componentes_historico(escolhido, historico_r1, pesos_config)
+    )
+    score_escolhido = sum(ev["peso"] for ev in componentes_escolhido)
+
+    # Top K alternativas (excluindo o escolhido), por score desc
+    outros = [
+        (e, s) for e, s in cands_scored
+        if e.nome != escolhido.nome
+    ]
+    outros.sort(key=lambda t: t[1], reverse=True)
+    alternativas: list[dict] = []
+    for alt, _s_alt in outros[:max_alternativas]:
+        eventos_alt, total_alt = _componentes_totais(
+            alt, alocados_intra, alocados_inter, historico_r1, pesos_config,
+        )
+        alternativas.append({
+            "nome": alt.nome,
+            "score_total": total_alt,
+            "componentes": eventos_alt,
+            "delta": score_escolhido - total_alt,
+        })
+
+    return {
+        "slot": slot_info,
+        "score_total": score_escolhido,
+        "componentes": componentes_escolhido,
+        "alternativas": alternativas,
+        "tamanho_pool": len(cands_scored),
+    }
+
+
 def _selecionar_cand_score_aware(
     cands: list["Exercicio"],
     alocados_intra: list["Exercicio"],
     alocados_inter: Optional[list["Exercicio"]] = None,
     historico_r1: Optional[list["Exercicio"]] = None,
     pesos_config: ConfigPesosProximidade = PESOS_DEFAULT,
+    slot_info: Optional[dict] = None,
 ) -> "Exercicio":
     """Escolhe um candidato em `cands` ponderando pelo score soft total.
 
@@ -1847,17 +2048,36 @@ def _selecionar_cand_score_aware(
 
     Reusa `SOFTMAX_TOP_K` / `SOFTMAX_TEMPERATURA` da Etapa 5 (mesma escala
     do `_score_pareamento`).
+
+    **Etapa 8 — Explicabilidade.** Se `slot_info` for fornecido, o exercício
+    retornado é uma cópia (`dataclasses.replace`) com `rationale` populado
+    (slot + score + componentes + top 3 alternativas). A referência do banco
+    permanece intocada. Quando `slot_info=None`, mantém compatibilidade
+    retroativa (call-sites que ainda não passam slot_info recebem a
+    referência do banco como antes).
     """
     if not cands:
         raise ValueError("cands vazio")
+
+    inter_list = alocados_inter or []
+    hist_list = historico_r1 or []
+
+    # Caminho rápido — sem nada pra comparar, escolha uniforme + rationale trivial
     if (
         len(cands) == 1
         or (not alocados_intra and not alocados_inter and not historico_r1)
     ):
-        return random.choice(cands)
-
-    inter_list = alocados_inter or []
-    hist_list = historico_r1 or []
+        escolhido = random.choice(cands)
+        if slot_info is None:
+            return escolhido
+        rationale = _montar_rationale(
+            escolhido,
+            [(e, 0.0) for e in cands],
+            slot_info,
+            alocados_intra, inter_list, hist_list,
+            pesos_config,
+        )
+        return replace(escolhido, rationale=rationale)
 
     def _total_score(e: "Exercicio") -> float:
         s = _score_proximidade(e, alocados_intra, "intra", pesos_config)
@@ -1872,7 +2092,18 @@ def _selecionar_cand_score_aware(
     exps = [math.exp((s - max_s) / SOFTMAX_TEMPERATURA) for _, s in top]
     total = sum(exps)
     pesos = [e / total for e in exps]
-    return random.choices([e for e, _ in top], weights=pesos, k=1)[0]
+    escolhido = random.choices([e for e, _ in top], weights=pesos, k=1)[0]
+
+    if slot_info is None:
+        return escolhido
+    rationale = _montar_rationale(
+        escolhido,
+        scored,
+        slot_info,
+        alocados_intra, inter_list, hist_list,
+        pesos_config,
+    )
+    return replace(escolhido, rationale=rationale)
 
 
 def _candidatos_estritos(
@@ -2545,8 +2776,16 @@ def pre_alocar_rotina(
         )
 
         if cands:
+            slot_info = {
+                "treino_idx": slot.treino_idx,
+                "nivel": slot.nivel,
+                "escopo": slot.escopo_alocacao,
+                "escopo_demanda_original": slot.escopo_demanda_original,
+                "passe": "estrito",
+            }
             escolhido = _selecionar_cand_score_aware(
                 cands, alocados_t, alocados_inter_t, hist_list, pesos,
+                slot_info=slot_info,
             )
             alocacao[slot.treino_idx][slot.d_idx_original].append(escolhido)
             nomes_globais.add(escolhido.nome)
@@ -2591,8 +2830,16 @@ def pre_alocar_rotina(
                 alocados_intra=alocados_t,
             )
             if cands:
+                slot_info = {
+                    "treino_idx": slot.treino_idx,
+                    "nivel": slot.nivel,
+                    "escopo": slot.escopo_alocacao,
+                    "escopo_demanda_original": slot.escopo_demanda_original,
+                    "passe": "relax",
+                }
                 escolhido = _selecionar_cand_score_aware(
                     cands, alocados_t, alocados_inter_t, hist_list, pesos,
+                    slot_info=slot_info,
                 )
                 alocacao[slot.treino_idx][slot.d_idx_original].append(escolhido)
                 nomes_globais.add(escolhido.nome)
