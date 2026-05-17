@@ -3399,14 +3399,19 @@ melhoria. **Refinamento da métrica 4.1 fica pra Fase 7.5 ou 7.6:**
    `_selecionar_ciclando` em modo subregião com `preferir_composto=True`
    produz 100% mesmo padrão sequence — investigar se relevante
    pós-Etapa 7 (pode afetar calibração C se houver).
-6. **UI Histórico exposed** (Sessão 11 / Fase 7.4 — D3.3): o contrato
-   programatic está pronto (`gerar_multiplos_treinos(historico_r1=...)`),
-   mas não há UI/integração com banco SQLite ainda. Pra app real expor
-   toggle HIST: precisa (i) UI checkbox no gerador, (ii) leitura da
-   rotina anterior do aluno via `database.py`, (iii) propagação pro
-   gerador. Decisão Sessão 11 foi adiar — só contrato programatic em
-   7.4. Implementar quando: usuário pedir ou Fase 7.6 calibração C
-   precisar testar HIST em produção. **Não bloqueia 7.5 nem 7.6.**
+6. ~~**UI Histórico exposed**~~ ✅ **Fechado em 2026-05-17** (branch
+   `feat/ui-historico-r1`). Decisão A do user: substituir hard block
+   legado (`evitar_ultimos` dropdown) pelo score HIST D3.3 (clean break).
+   Refs viram puramente UX (decisão pós-contradição auto-fixar refs vs
+   clean break — 4 call-sites de hard block via refs removidos em /gerar,
+   /regerar, /substituir, /bloco/regerar; 2 call-sites visuais mantidos).
+   Toggle "Evitar exercícios da rotina anterior" (name `usar_historico_r1`,
+   default OFF) no gerador (desktop + mobile mirror). R-1 = rotina ativa
+   do aluno (`carregar_rotina_ativa(aluno_id)` via `database.py`).
+   Auto-fixar refs visuais agora roda sempre que aluno tem rotina ativa
+   (independente do toggle). Validação: pytest 184+ OK, harness 16/16 OK
+   (4.1 = 19.76% / 4.2 = 46.91% — gap mantém o sinal do mecanismo HIST
+   funcional). Smoke test browser via POST `/gerar` OK.
 7. ~~**Refinamento métrica 4.1**~~ ✅ **Fechado em 2 passos:**
    - **Passo 1 — Métrica refinada (Fase 7.5, opção A):** métrica
      contínua "% slots com overlap" agregada cross-iter (Seção 8.15.8).
