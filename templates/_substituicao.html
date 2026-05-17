@@ -1,13 +1,12 @@
 {% set purpose_pt = {'compound':'composto','isolation':'isolado','stability':'estabilidade','explosive':'explosivo'} %}
 <div class="drawer-count">{{ cands|length }} candidato{{ '' if cands|length == 1 else 's' }}</div>
 {% for e in cands %}
-{% set na_ref = nomes_ref is defined and e.nome in nomes_ref %}
 {% set equip = e.eq_primario or '' %}
 {% if e.eq_secundario %}{% set equip = (equip ~ ' + ' ~ e.eq_secundario) if equip else e.eq_secundario %}{% endif %}
-<div class="cand-row{% if na_ref %} is-ref{% endif %}" data-nome="{{ e.nome }}" onclick="selectCandRow(this)">
+<div class="cand-row" data-nome="{{ e.nome }}" onclick="selectCandRow(this)">
     <div class="cand-radio"></div>
     <div class="cand-info">
-        <div class="cand-nome">{{ e.nome }}{% if na_ref %} <span class="ref-badge">REF</span>{% endif %}</div>
+        <div class="cand-nome">{{ e.nome }}</div>
         <div class="cand-meta">
             {% if e.purpose %}<span class="meta-chip purpose">{{ purpose_pt.get(e.purpose, e.purpose) }}</span>{% endif %}
             {% if equip %}<span class="meta-chip equip">{{ equip }}</span>{% endif %}

@@ -532,7 +532,6 @@ Fluxo: selecionar exercícios (família + nome) → ordenar compostos primeiro �
 - UI de exercícios fixos (backend suporta `exercicios_travados`, falta UI)
 - Botão download ZIP na UI (rota existe)
 - Lista de exercícios pausados por aluno
-- Sistema de referências manuais legado (`_referencia.html`, `_comparacao.html`) — agora puramente UX (bloqueio via refs removido em 2026-05-17 quando UI Histórico foi exposta). Remover painel e auto-fixar quando confirmado que toggle Atual/Anterior do HUB cobre todos os casos.
 
 ## Redesign mobile (em progresso · branch `mobile-redesign-02`)
 

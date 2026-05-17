@@ -92,8 +92,6 @@ SESSOES_PATH = Path("sessoes_salvas.json")
 sessoes_ativas: list[Sessao] = []
 configs_geradas: list[dict] = []
 opcoes_globais: dict = {}
-# referencias: cada item = {"sessao": Sessao, "origem": {...}, "id_ref": str}
-referencias: list[dict] = []
 # Estado de edição do HUB (quando professor edita um treino da rotina)
 edicao_hub: dict | None = None  # {"aluno_id": int, "rotina_id": str}
 # Estado de criação manual pendente (permite cancelar e restaurar rascunho anterior)
@@ -102,21 +100,6 @@ criacao_manual: dict | None = None  # {"aluno_id": int, "backup": [...sessoes_di
 # (treino_idx, bloco_idx, posicao) -> {"inicial": str, "vistos": set[str]}
 # "inicial" é o nome do exercício no momento do primeiro clique e nunca volta a ser sugerido.
 historico_substituicoes: dict[tuple[int, int, str], dict] = {}
-
-def _ref_sessoes():
-    return [r["sessao"] for r in referencias]
-
-def _nomes_ref_set():
-    nomes = set()
-    for r in referencias:
-        for bloco in r["sessao"].blocos:
-            for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
-                if ex:
-                    nomes.add(ex.nome)
-    return nomes
-
-def _novo_id_ref():
-    return secrets.token_hex(4)
 
 # Mapeamento padrão → (label curto, slug de cor) para chips no card de treino.
 # Derivado dos exercícios da sessão (não da string sessao.tipo, que pode vir em níveis diferentes).
@@ -777,8 +760,6 @@ def gerador_page():
         alunos=alunos,
         nomes_hist=nomes_hist,
         sessoes=sessoes_ativas,
-        referencias=referencias,
-        tem_referencia=bool(referencias),
         ctx_aluno=ctx_aluno,
         ctx_acao=acao,
         ctx_treino_idx=treino_idx,
@@ -1610,38 +1591,12 @@ def gerar():
                 salvar_rascunho(ctx_aluno_id, sessoes_rotina)
                 return f'<div class="sucesso">Treino adicionado à rotina de {aluno_obj["nome"]}!</div><script>setTimeout(()=>window.location.href="/?aluno_id={ctx_aluno_id}",1500)</script>'
 
-    # Auto-fixar referências da rotina ativa do aluno (independente do toggle HIST).
-    # UX: refs visuais aparecem sempre que aluno tem rotina ativa, pro personal
-    # trainer comparar a rotina nova com a anterior. Reutiliza rotina_ativa_aluno
-    # já carregado acima.
-    auto_ref_etiqueta = None
-    if rotina_ativa_aluno:
-        referencias.clear()
-        for ti, sess_dict in enumerate(rotina_ativa_aluno["sessoes"]):
-            sessao_ref = _dict_to_sessao(sess_dict)
-            referencias.append({
-                "sessao": sessao_ref,
-                "origem": {
-                    "etiqueta": rotina_ativa_aluno.get("etiqueta", ""),
-                    "aluno": rotina_ativa_aluno.get("aluno", "—"),
-                    "data": rotina_ativa_aluno.get("data_salvo", "—"),
-                    "reg_id": rotina_ativa_aluno["id"],
-                    "treino_idx": ti,
-                },
-                "id_ref": _novo_id_ref(),
-            })
-        auto_ref_etiqueta = rotina_ativa_aluno.get("etiqueta") or rotina_ativa_aluno.get("data_salvo", "")
-
     # No fluxo padrão de /gerador (sem ctx_acao), exibimos o modal direto em
     # _resultado.html e limpamos a stash pra não duplicar no próximo HUB.
     session.pop("avisos_pendentes", None)
 
     return render_template("_resultado.html", sessoes=sessoes_ativas,
                            padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           tem_referencia=bool(referencias),
-                           referencias=referencias,
-                           auto_ref_etiqueta=auto_ref_etiqueta,
-                           nomes_ref=_nomes_ref_set(),
                            avisos_por_treino=avisos_por_treino)
 
 # ══════════════════════════════════════════════════════════════
@@ -1652,8 +1607,7 @@ def gerar():
 def treino_visualizar(t):
     if t >= len(sessoes_ativas): return "Treino não encontrado", 404
     return render_template("_treino_card.html", sessao=sessoes_ativas[t], idx=t,
-                           modo="visualizar", padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           nomes_ref=_nomes_ref_set())
+                           modo="visualizar", padroes_labels=PADROES_LABELS, alunos=carregar_alunos())
 
 
 def _ex_do_slot(sessao, bi, ei):
@@ -1755,8 +1709,7 @@ def treino_regerar(t):
     sessoes_ativas[t] = nova
     salvar_sessoes_disco()
     return render_template("_treino_card.html", sessao=nova, idx=t,
-                           modo="visualizar", padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           nomes_ref=_nomes_ref_set())
+                           modo="visualizar", padroes_labels=PADROES_LABELS, alunos=carregar_alunos())
 
 @app.route("/treino/<int:t>/substituir/<path:nome_ex>", methods=["POST"])
 def treino_substituir(t, nome_ex):
@@ -1838,16 +1791,11 @@ def buscar_subs(t, nome_ex):
                           musculo=musculo or None, max_cx=5)
     cands = [e for e in cands if e.nome not in nomes_em_uso and e.nome != nome_ex]
 
-    ref_sessoes = _ref_sessoes()
-    nomes_ref = {ex.nome for s in ref_sessoes for b in s.blocos
-                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if ref_sessoes else set()
-
     return render_template("_substituicao.html", cands=cands[:50], nome_ex=nome_ex, idx=t,
                            padroes_labels=PADROES_LABELS,
                            todos_padroes=sorted(PADROES_LABELS.keys()),
                            todos_equipamentos=todos_equipamentos,
-                           todos_musculos=todos_musculos,
-                           nomes_ref=nomes_ref)
+                           todos_musculos=todos_musculos)
 
 # ── Bloco operations ──────────────────────────────────────────
 
@@ -2215,18 +2163,11 @@ def buscar_exercicios():
                           musculo=musculo or None)
     cands = [e for e in cands if e.nome not in excluir]
 
-    ref_sessoes = _ref_sessoes()
-    nomes_ref = {ex.nome for s in ref_sessoes for b in s.blocos
-                 for ex in [b.ex1, b.ex2, b.ex3] if ex} if ref_sessoes else set()
-
     html = f"<p class='meta-count'>{len(cands)} exercício(s)</p>"
     for e in cands:
-        na_ref = e.nome in nomes_ref
-        badge = ' <span class="ref-badge">REF</span>' if na_ref else ''
-        style = ' style="opacity:0.6"' if na_ref else ''
-        html += (f'<label class="ex-option"{style}>'
+        html += (f'<label class="ex-option">'
                  f'<input type="radio" name="exercicio_escolhido" value="{e.nome}">'
-                 f'<span>{e.nome}{badge}</span>'
+                 f'<span>{e.nome}</span>'
                  f'<span class="ex-option-meta">{e.purpose} · {e.eq_primario}</span>'
                  f'</label>')
     if not cands:
@@ -2385,134 +2326,7 @@ def historico_carregar(reg_id):
         opcoes_globais = {}
     salvar_sessoes_disco()
     return render_template("_resultado.html", sessoes=sessoes_ativas,
-                           padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           tem_referencia=bool(referencias),
-                           referencias=referencias)
-
-# ══════════════════════════════════════════════════════════════
-# ROTAS — REFERÊNCIA
-# ══════════════════════════════════════════════════════════════
-
-def _render_referencia():
-    return render_template("_referencia.html",
-                           referencias=referencias,
-                           padroes_labels=PADROES_LABELS,
-                           n_sessoes_ativas=len(sessoes_ativas))
-
-@app.route("/referencia/lista")
-def referencia_lista():
-    """Retorna lista resumida das referências (para atualizar dropdown de comparação)."""
-    return jsonify([{
-        "idx": i,
-        "aluno": r["origem"]["aluno"],
-        "treino_idx": r["origem"].get("treino_idx", 0),
-        "data": (r["origem"].get("data", "") or "").split(" ")[0],
-    } for i, r in enumerate(referencias)])
-
-@app.route("/referencia/render")
-def referencia_render():
-    """Retorna HTML do painel de referência (usado pelo auto-ref após gerar)."""
-    return _render_referencia()
-
-@app.route("/referencia/fixar/<reg_id>/<int:treino_idx>", methods=["POST"])
-def referencia_fixar(reg_id, treino_idx):
-    """Fixa UM treino específico de um registro do histórico como referência."""
-    reg = carregar_registro(reg_id)
-    if not reg:
-        return "Registro não encontrado", 404
-    if treino_idx >= len(reg["sessoes"]):
-        return "Treino não encontrado", 404
-    sessao = _dict_to_sessao(reg["sessoes"][treino_idx])
-    referencias.append({
-        "sessao": sessao,
-        "origem": {
-            "etiqueta": reg.get("etiqueta", ""),
-            "aluno": reg.get("aluno", "—"),
-            "data": reg.get("data", "—"),
-            "reg_id": reg_id,
-            "treino_idx": treino_idx,
-        },
-        "id_ref": _novo_id_ref(),
-    })
-    return _render_referencia()
-
-@app.route("/referencia/fixar-ativo/<int:treino_idx>", methods=["POST"])
-def referencia_fixar_ativo(treino_idx):
-    """Fixa UM treino ativo como referência."""
-    if treino_idx >= len(sessoes_ativas):
-        return "Treino não encontrado", 404
-    referencias.append({
-        "sessao": copy.deepcopy(sessoes_ativas[treino_idx]),
-        "origem": {
-            "etiqueta": "Sessão atual",
-            "aluno": "—",
-            "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "reg_id": None,
-            "treino_idx": treino_idx,
-        },
-        "id_ref": _novo_id_ref(),
-    })
-    return _render_referencia()
-
-@app.route("/referencia/remover/<id_ref>", methods=["POST"])
-def referencia_remover(id_ref):
-    """Remove um item específico da lista de referências."""
-    global referencias
-    referencias = [r for r in referencias if r["id_ref"] != id_ref]
-    return _render_referencia()
-
-@app.route("/referencia/limpar", methods=["POST"])
-def referencia_limpar():
-    """Limpa TODAS as referências."""
-    global referencias
-    referencias = []
-    return ""
-
-@app.route("/referencia/clonar/<id_ref>", methods=["POST"])
-def referencia_clonar(id_ref):
-    """Clona 1 item da referência para sessoes_ativas (substituindo)."""
-    global sessoes_ativas, configs_geradas
-    item = next((r for r in referencias if r["id_ref"] == id_ref), None)
-    if not item:
-        return '<p class="aviso">Referência não encontrada.</p>'
-    sessoes_ativas = [copy.deepcopy(item["sessao"])]
-    configs_geradas = []
-    salvar_sessoes_disco()
-    return render_template("_resultado.html", sessoes=sessoes_ativas,
-                           padroes_labels=PADROES_LABELS, alunos=carregar_alunos(),
-                           tem_referencia=bool(referencias), referencias=referencias)
-
-@app.route("/referencia/copiar-bloco/<int:ref_t>/<int:ref_bi>/para/<int:dest_t>", methods=["POST"])
-def referencia_copiar_bloco(ref_t, ref_bi, dest_t):
-    global sessoes_ativas
-    if ref_t >= len(referencias) or dest_t >= len(sessoes_ativas):
-        return "", 404
-    bloco_ref = referencias[ref_t]["sessao"].blocos[ref_bi]
-    bloco_novo = copy.deepcopy(bloco_ref)
-    labels = "ABCDEFGHIJKLMNOP"
-    n = len(sessoes_ativas[dest_t].blocos)
-    bloco_novo.label = labels[n] if n < len(labels) else str(n + 1)
-    sessoes_ativas[dest_t].blocos.append(bloco_novo)
-    salvar_sessoes_disco()
-    return _responder_card_com_banner(dest_t)
-
-@app.route("/comparar/<int:ref_t>/<int:ativo_t>")
-def comparar_treinos(ref_t, ativo_t):
-    if ref_t >= len(referencias) or ativo_t >= len(sessoes_ativas):
-        return "", 404
-    ref = referencias[ref_t]["sessao"]
-    ativo = sessoes_ativas[ativo_t]
-    nomes_ref = {ex.nome for b in ref.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
-    nomes_ativo = {ex.nome for b in ativo.blocos for ex in [b.ex1, b.ex2, b.ex3] if ex}
-    mantidos = nomes_ref & nomes_ativo
-    removidos = nomes_ref - nomes_ativo
-    adicionados = nomes_ativo - nomes_ref
-    return render_template("_comparacao.html",
-                           ref=ref, ativo=ativo,
-                           ref_idx=ref_t, ativo_idx=ativo_t,
-                           ref_origem=referencias[ref_t]["origem"],
-                           mantidos=mantidos, removidos=removidos, adicionados=adicionados,
-                           padroes_labels=PADROES_LABELS)
+                           padroes_labels=PADROES_LABELS, alunos=carregar_alunos())
 
 @app.route("/historico/<reg_id>/ver")
 def historico_ver(reg_id):

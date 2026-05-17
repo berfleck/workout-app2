@@ -212,7 +212,6 @@
         .exercicio-meta { @apply text-[11px] text-gray-400 mt-0.5; }
         .prescr-badge { @apply inline-flex items-center bg-brand-100 text-brand-500 rounded-md px-2 py-0.5 text-[11px] font-semibold font-mono whitespace-nowrap ml-auto shrink-0; }
         .exercicio-acoes { @apply flex gap-0.5 shrink-0; }
-        .badge-novo { @apply inline-block text-[10px] font-semibold text-green-600 bg-green-100 rounded px-1.5 py-px ml-1 align-middle; }
         .badge-relaxado { @apply inline-block text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 rounded px-1.5 py-px ml-1 align-middle cursor-help; }
         .badge-mantido { @apply inline-block text-[10px] font-semibold text-blue-600 bg-blue-100 rounded px-1.5 py-px ml-1 align-middle; }
         /* Pills de estado do exercício no rascunho — só ícone, sem texto */
@@ -486,11 +485,6 @@
         }
         body.aluno-select-mode .aluno-mob-card.aluno-selected .aluno-mob-check .icon { opacity: 1; }
         .aluno-select-bar-edit[hidden] { display: none !important; }
-
-        .ref-badge { @apply inline-block text-[9px] font-bold text-indigo-600 bg-indigo-100 rounded px-1 align-middle ml-1; }
-
-        .comparacao-panel { @apply bg-white border border-gray-200 rounded-xl p-5 mb-4; }
-        .comparacao-grid { @apply grid grid-cols-1 sm:grid-cols-2 gap-5; }
 
         .auto-ref-badge { @apply bg-blue-50 border border-blue-300 rounded-lg px-3 py-2 text-xs text-blue-800 mb-2; }
 
@@ -2253,35 +2247,6 @@
         /* Scroll containers */
         [id^="add-results-"], [id^="nb-results-"] { max-height: 240px; overflow-y: auto; }
 
-        /* Referência panel */
-        .ref-panel-slim > details { margin-bottom: 0; border: 1px solid #c7d2fe; border-left: 3px solid #6366f1; border-radius: 8px; background: #f8fafc; }
-        .ref-panel-slim > details > summary.ref-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 12px; font-weight: 500; color: #374151; list-style: none; }
-        .ref-panel-slim > details > summary.ref-bar::before { content: '\25B8'; color: #6366f1; font-size: 10px; }
-        .ref-panel-slim > details[open] > summary.ref-bar::before { content: '\25BE'; }
-        .ref-bar-titulo { font-weight: 700; color: #4f46e5; white-space: nowrap; }
-        .ref-bar-resumo { flex: 1; color: #9ca3af; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .ref-bar-limpar { font-size: 11px; color: #9ca3af; background: transparent; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-family: inherit; }
-        .ref-bar-limpar:hover { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
-        .ref-items { padding: 4px 12px 10px; }
-        .ref-item { border-top: 1px solid #e5e7eb; padding: 8px 0; }
-        .ref-item:first-child { border-top: none; }
-        .ref-item-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-        .ref-item-titulo { font-size: 12px; color: #374151; }
-        .ref-item-titulo strong { color: #4f46e5; }
-        .ref-item-tag { display: inline-block; font-size: 10px; color: #6b7280; background: #f1f5f9; border-radius: 3px; padding: 1px 5px; margin-left: 6px; }
-        .ref-item-acoes { display: flex; gap: 4px; }
-        .ref-item-acoes .btn-ghost { font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid #e5e7eb; background: white; cursor: pointer; font-family: inherit; }
-        .ref-item-acoes .btn-ghost:hover { background: #f9fafb; }
-        .ref-item-remover:hover { color: #dc2626 !important; border-color: #fecaca !important; background: #fef2f2 !important; }
-        .ref-item-detalhes { margin-top: 4px; }
-        .ref-item-detalhes > summary.ref-item-summary { font-size: 11px; color: #6b7280; padding: 4px 0; font-weight: 400; }
-        .ref-bloco-head { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
-        .ref-exercicio { border-left-color: #a5b4fc !important; opacity: 0.85; }
-        .ref-exercicio .exercicio-nome { font-size: 12px; }
-        .ref-exercicio .exercicio-meta { font-size: 10px; }
-        .ref-copiar-btn { font-size: 11px; color: #6366f1; padding: 2px 8px; border: 1px solid #c7d2fe; border-radius: 6px; background: #eef2ff; cursor: pointer; font-family: inherit; transition: background 0.15s; }
-        .ref-copiar-btn:hover { background: #e0e7ff; }
-
         /* Spinner */
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #e85d04; border-radius: 50%; animation: spin 0.6s linear infinite; }
@@ -2889,14 +2854,12 @@
         .cand-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; transition: all 0.1s; }
         .cand-row:hover { background: var(--gray-50); }
         .cand-row.selected { background: var(--brand-50); border-color: var(--brand-500); }
-        .cand-row.is-ref { opacity: 0.55; }
         .cand-radio { width: 16px; height: 16px; border: 2px solid var(--gray-300); border-radius: 999px; flex-shrink: 0; position: relative; }
         .cand-row.selected .cand-radio { border-color: var(--brand-500); }
         .cand-row.selected .cand-radio::after { content: ''; position: absolute; inset: 3px; background: var(--brand-500); border-radius: 999px; }
         .cand-info { flex: 1; min-width: 0; }
         .cand-nome { font-size: 13px; font-weight: 500; color: var(--gray-900); display: flex; align-items: center; gap: 6px; }
         .cand-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
-        .ref-badge { background: #e0e7ff; color: #4338ca; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; }
 
         .drawer-footer { padding: 14px 20px; border-top: 1px solid var(--gray-200); background: var(--gray-50); display: flex; gap: 8px; }
         .drawer-footer .btn { flex: 1; justify-content: center; }
