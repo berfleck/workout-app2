@@ -224,9 +224,13 @@ predicado e migração.
 3. ~~Cenário 5.1 — implementar em Fase 7.5.~~ ✅ **Fechado em pytest
    determinístico** (`tests/test_score_proximidade_cross_region.py`,
    13 testes parametrizados — Fase 7.5 / Sessão 12).
-4. Mock_futuros (5 restantes) vão pro XLSX na Fase 4 — Russian Twist +
-   4 INFRAs. Etapa 8 reduziu de 11 pra 5 (refator CORE absorveu o
-   resto). Pode reduzir piso 4.1.
+4. ~~Mock_futuros (5 restantes) vão pro XLSX na Fase 4~~ ✅ **Fechado
+   2026-05-17**. Todos os 11 mock_futuros originais (Russian Twist +
+   4 INFRAs + 6 outros do G1/G3/G4) já estavam no XLSX desde a Fase 4
+   (2026-05-15). Entries `origem: mock_futuro` removidas do YAML
+   overlay (`tools/mocks/dimensoes_etapa_6.yaml`) — overlay era no-op
+   total (dimensões idênticas no XLSX). Cleanup metodológico no mesmo
+   commit do refator cycling fallback.
 5. ~~Cycling determinístico de subregião~~ ✅ **Fechado 2026-05-17**
    (branch `refactor/cycling-fallback`). Refator do `_decompor_demanda_*`
    fallback (subregiões sem âncora: core_iso/din, bracos, adutores) com
@@ -454,7 +458,8 @@ escassez). CSS novo em `base.html` (`.rationale-section--origem`,
 - Outros itens da 8.15.7 da `dimensoes_proximidade.md` continuam abertos
   (UI Histórico item 6 ✅ fechado, setup B 4.1 item 7 ✅ fechado,
   cycling determinístico item 5 ✅ fechado 2026-05-17 — Seção 8.15.13,
-  escalada 2.3 item 8, cleanup YAML)
+  mock_futuros item 4 ✅ fechado 2026-05-17 — Seção 8.15.13,
+  escalada 2.3 item 8 — único restante)
 
 ## Stack
 

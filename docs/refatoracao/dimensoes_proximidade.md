@@ -3390,11 +3390,16 @@ melhoria. **Refinamento da métrica 4.1 fica pra Fase 7.5 ou 7.6:**
 3. **Cenário 5.1** (sanity escopo cross-region — regiões dif não
    disparam soft) — pendente E.2. Implementar em **Fase 7.5** junto
    com validação completa.
-4. **Mock_futuros vão pro XLSX na Fase 4** (11 exercícios:
-   Apoio Fechado, Supino Fechado, Supino Inclinado Halteres,
-   Barra Aberta, Barra Supinada, Recuo do Estepe, Russian Twist,
-   INFRA Alternado/Suspenso/Chão/Roll-Up). Confirmação user
-   Sessão 7c. Fase 4 protocolo já registrado Seção 9.
+4. ~~**Mock_futuros vão pro XLSX na Fase 4**~~ ✅ **Fechado em 2026-05-17**.
+   Todos os 11 mock_futuros (Apoio Fechado, Supino Fechado, Supino
+   Inclinado Halteres, Barra Aberta, Barra Supinada, Recuo do Estepe,
+   Russian Twist, INFRA Alternado/Suspenso/Chão/Roll-Up) já estavam
+   no XLSX desde a Fase 4 (2026-05-15). Cleanup das 11 entries
+   `origem: mock_futuro` em `tools/mocks/dimensoes_etapa_6.yaml` no
+   commit de 2026-05-17 — overlay era no-op completo (dimensões
+   idênticas no XLSX, validado campo-a-campo). Loader do harness
+   (`tools/calibrar_pesos_dimensoes.py` linhas 100-101, 128-156)
+   mantém suporte a `origem: mock_futuro` pra eventual reintrodução.
 5. ~~**Cycling determinístico de subregião**~~ ✅ **Fechado em 2026-05-17**
    (branch `refactor/cycling-fallback`). Refator do `_decompor_demanda_*`
    fallback (subregiões sem âncora) — quota agora ponderada por pool via
@@ -3983,11 +3988,15 @@ overlay YAML aplicado):**
      1 ex dentro do padrão → prob Pallof = 1/4 × 1/1 = **25%** em R-1
      (3.2× mais provável). Mesmo viés pra Prancha Lateral em
      `flexao_lateral`.
-   - Russian Twist (mock_futuro, padrao=rotacao_tronco, subregiao=
-     core_dinamico) ficou órfão no overlay porque `PADRAO_PARA_SUBREGIAO[
-     "rotacao_tronco"] = {"core_isometrico"}` only (decisão de design
-     pra preservar pytest baseline — banco real não tem ex em
-     rotacao_tronco dyn até Fase 4 cadastrar Russian Twist no XLSX).
+   - Russian Twist (na época mock_futuro, padrao=rotacao_tronco,
+     subregiao=core_dinamico) ficou órfão no overlay porque
+     `PADRAO_PARA_SUBREGIAO["rotacao_tronco"] = {"core_isometrico"}`
+     only (decisão de design pra preservar pytest baseline — banco
+     real não tinha ex em rotacao_tronco dyn até Fase 4 cadastrar
+     Russian Twist no XLSX). **Status pós-2026-05-17:** Russian Twist
+     cadastrado no XLSX (Fase 4), `PADRAO_PARA_SUBREGIAO["rotacao_tronco"]
+     = {"core_isometrico", "core_dinamico"}` ativa de fato a variante
+     dyn. Vide item 4 da Seção 8.15.7 fechado.
 
 **Resultado pós-decisão:**
 
