@@ -99,7 +99,9 @@ def test_decompor_lower_5_acessoria_entra():
 
 def test_decompor_lower_6_proporcional():
     """lower(6): pesos 2:2:1 → Hamilton 6×(2/5,2/5,1/5)=(2.4,2.4,1.2)
-    → floor (2,2,1) restante=1; tie-break ordem → perna_ant +1 = (3,2,1).
+    → floor (2,2,1) restante=1; tie-break sorteado entre perna_ant e
+    perna_post (ambas com mesmo resto 0.4 e mesmo peso 2) → uma delas
+    ganha o +1, panturrilha fica em 1.
 
     NOTA: adutores NÃO está em ANCORAS_POR_REGIAO['lower'] (decisão clínica:
     adutores entra só quando user pede explicitamente). Mudança vs Etapa 2
@@ -108,9 +110,10 @@ def test_decompor_lower_6_proporcional():
     random.seed(4)
     sub_dems, _ = _decompor_demanda_regiao("lower", 6)
     qtd_por_sub = {sub: qt for _, sub, qt in sub_dems}
-    assert qtd_por_sub.get("perna_anterior", 0) == 3
-    assert qtd_por_sub.get("perna_posterior", 0) == 2
     assert qtd_por_sub.get("panturrilha", 0) == 1
+    qa = qtd_por_sub.get("perna_anterior", 0)
+    qp = qtd_por_sub.get("perna_posterior", 0)
+    assert {qa, qp} == {2, 3}
     assert "adutores" not in qtd_por_sub
 
 

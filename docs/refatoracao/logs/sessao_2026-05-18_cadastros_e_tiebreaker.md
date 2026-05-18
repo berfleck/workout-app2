@@ -387,6 +387,24 @@ Net effect: **mudanças minimais em algoritmo** (1 linha) +
 4. **Validação clínica em uso real** — usuário gerar rotinas reais
    pós-merge e confirmar que Supino com Barra agora aparece em ~1/3
    das rotinas (vs 1.9% antes) e Pullover deixou de saturar.
+5. ~~**Tie-break determinístico em camada upstream (Hamilton + Bresenham
+   + doadores em `calcular_quotas` / `_decompor_demanda_*`) + viés
+   estrutural do cycling Bresenham**~~
+   ✅ **Fechado** em sessão 2026-05-18 segunda metade
+   (`sessao_2026-05-18_fix_calcular_quotas_tiebreak.md`). 5 fixes
+   `random.random()` / `random.randrange()` em locais distintos
+   resolvem:
+   - **4 tie-breaks deterministas** (Hamilton + Bresenham + 2
+     doadores) — empate de distribuição decidido por ordem de
+     declaração / alfabética.
+   - **1 viés estrutural do cycling** (offset inicial do Bresenham
+     hard-coded em 0) — chave de menor quota sempre caía no mesmo
+     treino mesmo após tie-break aleatorizado.
+
+   Resolveu retroativamente Q4 do `analise_vies_upper.md` (peito 25%
+   T1 / 50% T2, χ²=533). Sondagem N=500/cenário pós-fix confirma
+   distribuição ~50/50 em todos os 4 cenários afetados
+   (`upper(3) x 2-3T`, `perna_posterior(3) x 2T`, `ombro(3) x 2T`).
 
 ---
 

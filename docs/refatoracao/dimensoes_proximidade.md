@@ -4119,6 +4119,170 @@ ainda emerge naturalmente do sorteio ponderado.
 
 ---
 
+#### 8.15.14 Fechamento fix tie-break determinístico em `calcular_quotas` + auditoria upstream (2026-05-18 segunda metade)
+
+> **Decisão registrada:** randomizar tie-break em 4 locais distintos de
+> `gerador_treino.py` que decidiam empates de distribuição por ordem
+> alfabética / ordem de definição da lista — todos da mesma patologia
+> conceitual descoberta 24h antes em `_selecionar_cand_score_aware`
+> (sessão 2026-05-18 primeira metade, fix downstream). Esta sessão
+> resolve a camada **upstream** (distribuição de quotas), distinta da
+> downstream (escolha de exercício dentro de pool).
+
+**Diagnóstico (handoff inicial):**
+
+`calcular_quotas` distribui vagas entre âncoras via Hamilton's Largest
+Remainder. Tie-break original `(-resto, obrig, -peso, idx)` — onde
+`idx` = ordem de definição na lista `ANCORAS_POR_REGIAO` /
+`ANCORAS_POR_SUBREGIAO`. Empate triplo (resto + obrig + peso iguais)
+resolvido determinísticamente. Casos clínicos:
+
+| Cenário agregado | Vencedor sistemático |
+|---|---|
+| upper(4-6) | peito vs costas → peito |
+| lower(4-6) | perna_anterior vs perna_posterior → perna_anterior |
+| core(3) | core_dinamico vs core_isometrico → core_dinamico |
+| costas-sub(3-7) | remadas vs puxadas → remadas |
+
+Explica retroativamente Q4 do `analise_vies_upper.md` (peito 25% T1,
+50% T2, χ²=533, zero variação em 1000 iters) — pré-existente mas sem
+diagnóstico mecânico.
+
+**Fix principal (1 linha) — Hamilton em `calcular_quotas`:**
+
+```python
+def tiebreak_key(p):
+    idx, a, ideal, floor = p
+    resto = ideal - floor
+    return (
+        -resto,
+        0 if a.get("obrigatoria") else 1,
+        -a["peso"],
+        random.random(),  # era idx
+    )
+```
+
+Critérios anteriores preservados — sorteio só dispara em empate triplo.
+
+**Validação test-first (pré-fix):** `tests/test_calcular_quotas_vies.py`
+com 4 casos parametrizados × 2000 seeds cada. Asserção: ratio ~50%
+(entre 45% e 55%) entre as duas âncoras empatadas. Pré-fix: todos
+**ratio = 100%** (vencedor sempre o primeiro da lista). Pós-fix:
+ratios 49-51% nos 4 casos.
+
+**Auditoria upstream — 3 patologias adicionais (mesma classe):**
+
+| Local | Mecanismo | Sondagem pré-fix |
+|---|---|---|
+| `_distribuir_quotas_entre_treinos` ~linha 455 | `sorted(quotas.keys(), key=lambda k: (-q[k], k))` — tie-break alfabético no Bresenham | 3 chaves qtd=1 em 3 treinos: **100% T1/T2/T3 determinístico por ordem alfabética** (2000 seeds) |
+| `_decompor_demanda_subregiao` ~linha 2750 | `max(quotas, key=lambda k: (q[k], k))` no doador raro | 100% determinístico em empate de quotas |
+| `_decompor_demanda_regiao` ~linha 2855 | mesma estrutura | mesma patologia |
+
+Fixes: trocar `k` final por `random.random()` no key da ordenação /
+max. Pós-fix isolado: Bresenham distribui 33/33/33 entre T1/T2/T3 com
+3 chaves de qtd=1.
+
+**Fix adicional — viés estrutural do cycling Bresenham (4ª patologia,
+classe diferente):**
+
+Sondagem real pós-fixes 1-3: `cfg=upper(3) x 2 treinos`, 1000 iters
+→ ombro **100% T2**, peito 60% T1 / 40% T2. Causa: viés ESTRUTURAL do
+cycling, não tie-break. O `acumulador` do Bresenham começa em 0 fixo;
+chave de menor quota (ordenada por último via `-quota`) sempre cycla
+com offset = soma das quotas anteriores % n_treinos, que é
+determinístico.
+
+Sondagem N=500 confirmou extensão da patologia em 4 cenários realistas
+(`upper(3)x2T`, `upper(3)x3T`, `perna_posterior(3)x2T`, `ombro(3)x2T`),
+com chaves variadas caindo 100% num treino fixo (ombro, abduction,
+posterior_ombro) ou 66/33 (hinge, ombro_composto). Cenários com quotas
+balanceadas (`upper(4-5)`, `lower(3-5)`, `costas(3)`) já estavam ok.
+
+Fix (~linha 463):
+
+```python
+acumulador = random.randrange(n_treinos)  # era 0
+```
+
+Pós-fix: todos os 4 cenários afetados caem para ~50/50 (ou 33/33/33
+com 3 treinos). Cenários ok continuam ok. Validação:
+
+| Cenário | Chave | Pré-fix | Pós-fix |
+|---|---|---|---|
+| `upper(3) x 2T` | ombro | T1=0% / T2=100% | T1=53% / T2=46% |
+| `upper(3) x 3T` | ombro | T1=0% / T2=50% / T3=50% | T1=35% / T2=32% / T3=32% |
+| `perna_posterior(3) x 2T` | abduction | T1=0% / T2=100% | T1=49% / T2=50% |
+| `perna_posterior(3) x 2T` | hinge | T1=66% / T2=33% | T1=50% / T2=49% |
+| `ombro(3) x 2T` | posterior_ombro | T1=0% / T2=100% | T1=49% / T2=50% |
+| `ombro(3) x 2T` | ombro_composto | T1=66% / T2=33% | T1=50% / T2=49% |
+
+Justificativa: distribuir o offset acumulado entre rotinas. Preserva
+Bresenham (mantém cycling intra-rotina via `acumulador += qtd`), só
+quebra a fase inicial determinística. Validado: rotinas individuais
+continuam tendo total correto (Bresenham é exato por construção); só
+muda em qual treino cada chave começa.
+
+**Validação completa:**
+
+- `tests/test_calcular_quotas_vies.py` — 4/4 OK (era 4/4 FAIL pré-fix)
+- pytest geral — 206 passed + 1 skipped (era 202 + 1 skipped; ganho
+  vem do novo arquivo de teste do handoff)
+- 15 snapshots regenerados (7 do fix Hamilton + 5 do fix Bresenham
+  tie-break + doadores + 3 do offset inicial). Diff principal:
+  - `core_3x1treino_seed17` pré-fix: 3 dinâmicos consecutivos (V-Up +
+    Russian Twist + Canoinha) — caso clínico do viés. Pós-fix:
+    1 dinâmico + 2 isométricos (mix saudável).
+  - `upper_3x2treinos_seed11` pré-fix: T1 sem cobertura `puxadas`
+    (remadas sempre vencia). Pós-fix: T1 cobre puxadas; avisos
+    `ancora_nao_cumprida` em T2 apenas (não T1).
+  - Avisos `ancora_nao_cumprida` migram `chave: remadas → puxadas` ou
+    `treino_idx: 0 → 1` conforme empate sorteado. Nenhuma obrigatória
+    sumiu indevidamente.
+- 2 testes que codificavam o viés reescritos:
+  - `test_quota_costas_3_tie_break_alfabetico_estavel` →
+    `test_quota_costas_3_tie_break_sorteado_em_empate_total` (asserção
+    nova: `{total=3, ambas ≥1, min=1 max=2}`)
+  - `test_decompor_lower_6_proporcional`: relaxado pra `{qa, qp} == {2, 3}`
+- Fixture HIB2: seed 358 → 672 → 809 → **543** (3 transições pra
+  absorver shifts da sequência random)
+- Harness 16/16 OK preservado; métrica 4.1 contínua: pré 14.95% (pós
+  cycling fix 2026-05-17) → pós 15.81%. Variação dentro do mesmo
+  regime estrutural (piso gateado pelo NO-OP Seção 8.15.12).
+
+**Taxonomia das 4 descobertas em 24h (variações da mesma família):**
+
+1. **Tag faltando no XLSX** (Apoios `plano_corporal=NaN`) — escapava do
+   score INTRA, fix por cadastro (sessão `cadastros_e_tiebreaker`).
+2. **Tie-break downstream** (`_selecionar_cand_score_aware` ~2572) —
+   empate de score resolvido pela ordem do XLSX, fix com
+   `key=(-score, random.random())` (sessão `cadastros_e_tiebreaker`).
+3. **Tie-break upstream** (Hamilton + Bresenham + doadores) — empate
+   de distribuição resolvido por ordem de declaração / alfabética,
+   fix com `random.random()` em 4 locais (esta sessão).
+4. **Cycling determinístico do Bresenham** — `acumulador = 0` fixo
+   fazia chave de menor quota sempre cair no mesmo treino, mesmo após
+   tie-break aleatorizado. Fix: `acumulador = random.randrange(n_treinos)`.
+   **Classe distinta** das três primeiras (não é tie-break, é fase
+   inicial determinística do algoritmo). Esta sessão.
+
+Unidade conceitual: sempre que o algoritmo precisa quebrar empate
+aleatorizável ou escolher fase inicial e fica determinístico por
+acidente da estrutura de dados ou por inicialização hard-coded, viés
+posicional emerge sistemático.
+
+**Cross-references:**
+
+- `docs/refatoracao/logs/handoff_calcular_quotas_tiebreak.md` — handoff
+  desta sessão
+- `docs/refatoracao/logs/sessao_2026-05-18_fix_calcular_quotas_tiebreak.md`
+  — log completo desta sessão
+- `docs/refatoracao/logs/sessao_2026-05-18_cadastros_e_tiebreaker.md` —
+  sessão prévia mesmo dia (fixes downstream + tags)
+- `docs/refatoracao/logs/analise_vies_upper.md` Q4 — caso clínico
+  retroativamente explicado por este fix
+
+---
+
 ## 9. Fase 4 — estratégia de preenchimento dos 125+ exercícios
 
 > **Status:** protocolo registrado (Sessão 6 — 2026-05-08), execução

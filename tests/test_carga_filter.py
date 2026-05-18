@@ -281,8 +281,13 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     (fix distribuição) → seed=57 Agachamento Livre + Remada Baixa Aberta
     (cadastros pullover-mitigation: +10 ex, Apoios c/ plano=reto) →
     seed=358 Stiff Barra Smith + Remada Baixa Aberta (tiebreaker aleatório
-    no softmax). Mesmo contrato clínico: par viola HIB2 sem filtro,
-    some com filtro.
+    no softmax) → seed=672 Stiff Barra Smith + Remada Baixa Aberta
+    (random.random() no tie-break do Hamilton em calcular_quotas) →
+    seed=809 Stiff Barra Smith + Remada Baixa Aberta (random.random() no
+    Bresenham + nos doadores de _decompor_demanda_*, auditoria 2026-05-18) →
+    seed=543 Stiff Barra Smith + Remada Baixa Aberta (offset inicial
+    aleatório do Bresenham, fix do viés estrutural pós-auditoria).
+    Mesmo contrato clínico: par viola HIB2 sem filtro, some com filtro.
     """
     import random
     from gerador_treino import gerar_multiplos_treinos
@@ -294,7 +299,7 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
         "evitar_agonistas": True,
     }
     PAR = {"Stiff Barra Smith", "Remada Baixa Aberta"}
-    SEED = 358
+    SEED = 543
 
     def par_aparece(sessoes):
         for s in sessoes:

@@ -280,7 +280,7 @@ def calcular_quotas(
     restantes = vagas - distribuidas
 
     # Distribuir vagas restantes pelos maiores restos com tie-break:
-    # obrigatória > peso maior > ordem de definição (estável)
+    # obrigatória > peso maior > sorteio aleatório (evita viés da ordem)
     if restantes > 0:
         def tiebreak_key(p):
             idx, a, ideal, floor = p
@@ -289,7 +289,7 @@ def calcular_quotas(
                 -resto,                          # maior resto primeiro
                 0 if a.get("obrigatoria") else 1,  # obrig primeiro
                 -a["peso"],                      # peso maior primeiro
-                idx,                             # ordem definição (estável)
+                random.random(),                 # sorteio (evita viés da ordem de definição)
             )
         pares_ord = sorted(pares, key=tiebreak_key)
         for _, a, _, _ in pares_ord[:restantes]:
@@ -449,15 +449,23 @@ def _distribuir_quotas_entre_treinos(
     if sum(quotas_global.values()) == 0:
         return [{} for _ in range(n_treinos)]
 
-    # Ordenar chaves por quota desc (tie-break alfabético estável)
+    # Ordenar chaves por quota desc (tie-break sorteado — evita que chaves
+    # com quotas iguais caiam sempre nos mesmos treinos. Ver auditoria
+    # 2026-05-18: empate alfabético criava viés posicional residual mesmo
+    # após o fix do Hamilton em calcular_quotas).
     chaves_ord = sorted(
         quotas_global.keys(),
-        key=lambda k: (-quotas_global[k], k),
+        key=lambda k: (-quotas_global[k], random.random()),
     )
 
     por_treino: list[dict[str, int]] = [{} for _ in range(n_treinos)]
     capacidade = list(vagas_por_treino)
-    acumulador = 0
+    # Offset inicial aleatório (em vez de 0 fixo). Sem isso, a soma
+    # determinística das quotas anteriores fazia chaves de qtd menor caírem
+    # sempre no mesmo treino mesmo após o tie-break aleatório acima (ex.
+    # ombro 100% T2 em upper(3)x2T pré-2026-05-18). Distribui o offset
+    # acumulado entre rotinas — preserva Bresenham, quebra viés estrutural.
+    acumulador = random.randrange(n_treinos)
 
     for chave in chaves_ord:
         qtd = quotas_global[chave]
@@ -2747,7 +2755,8 @@ def _decompor_demanda_subregiao(
         for p_trav in obrig:
             if quotas.get(p_trav, 0) == 0:
                 if quotas:
-                    p_doador = max(quotas, key=lambda k: (quotas[k], k))
+                    # Tie-break sorteado entre quotas iguais (auditoria 2026-05-18)
+                    p_doador = max(quotas, key=lambda k: (quotas[k], random.random()))
                     if quotas[p_doador] > 1:
                         quotas[p_doador] -= 1
                         quotas[p_trav] = 1
@@ -2851,7 +2860,8 @@ def _decompor_demanda_regiao(
         for s_trav in obrig:
             if quotas.get(s_trav, 0) == 0:
                 if quotas:
-                    s_doador = max(quotas, key=lambda k: (quotas[k], k))
+                    # Tie-break sorteado entre quotas iguais (auditoria 2026-05-18)
+                    s_doador = max(quotas, key=lambda k: (quotas[k], random.random()))
                     if quotas[s_doador] > 1:
                         quotas[s_doador] -= 1
                         quotas[s_trav] = 1
