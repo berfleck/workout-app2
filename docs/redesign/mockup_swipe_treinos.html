@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Swipe lateral entre treinos (v2 full-bleed)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --brand-50:  #fff7ed;
+    --brand-500: #e85d04;
+    --brand-600: #d4520a;
+    --gray-50:   #f9fafb;
+    --gray-100:  #f3f4f6;
+    --gray-200:  #e5e7eb;
+    --gray-300:  #d1d5db;
+    --gray-400:  #9ca3af;
+    --gray-500:  #6b7280;
+    --gray-700:  #374151;
+    --gray-900:  #111827;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #1a1a1a;
+    min-height: 100vh;
+    color: var(--gray-900);
+  }
+  .phone-frame {
+    max-width: 412px;
+    margin: 0 auto;
+    background: var(--gray-50);
+    min-height: 100vh;
+    position: relative;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  @media (min-width: 768px) {
+    body { padding: 24px 0; }
+    .phone-frame { min-height: 800px; max-height: 90vh; border-radius: 28px; overflow: hidden; }
+  }
+
+  /* ── Topbar ── */
+  .topbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px 8px;
+    background: var(--gray-50);
+    flex-shrink: 0;
+  }
+  .topbar-logo {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--brand-500); color: white;
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 13px;
+  }
+  .topbar-info { flex: 1; }
+  .topbar-aluno {
+    font-size: 14px; font-weight: 600;
+    color: var(--gray-900);
+  }
+  .topbar-aluno-meta {
+    font-size: 11px; color: var(--gray-500);
+    font-weight: 500;
+  }
+  .topbar-counter {
+    font-size: 11px; font-weight: 700;
+    color: var(--gray-400);
+    font-variant-numeric: tabular-nums;
+    background: var(--gray-100);
+    padding: 4px 9px;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+  }
+  .topbar-counter strong { color: var(--brand-500); }
+
+  /* ── Chip tabs (afordância principal) ── */
+  .pager {
+    display: flex; gap: 6px;
+    padding: 6px 16px 10px;
+    overflow-x: auto;
+    background: var(--gray-50);
+    flex-shrink: 0;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .pager::-webkit-scrollbar { display: none; }
+  .pager-chip {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    font-size: 12.5px; font-weight: 600;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all 150ms;
+    display: inline-flex; align-items: center; gap: 7px;
+    line-height: 1;
+    font-family: inherit;
+  }
+  .pager-chip-badge {
+    display: inline-block;
+    font-size: 10px; font-weight: 800;
+    background: var(--gray-100); color: var(--gray-500);
+    padding: 2px 6px; border-radius: 4px;
+    letter-spacing: 0.04em;
+  }
+  .pager-chip.active {
+    background: var(--brand-500);
+    border-color: var(--brand-500);
+    color: white;
+  }
+  .pager-chip.active .pager-chip-badge {
+    background: rgba(255,255,255,0.22); color: white;
+  }
+
+  /* ── Swipe container ── */
+  .swipe-track {
+    flex: 1;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .swipe-track::-webkit-scrollbar { display: none; }
+
+  /* ── Treino-page: full-bleed, sem card, sem peek ── */
+  .treino-page {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    background: var(--gray-50);
+    scrollbar-width: none;
+  }
+  .treino-page::-webkit-scrollbar { display: none; }
+
+  .treino-head {
+    padding: 16px 16px 10px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .treino-head-info { flex: 1; min-width: 0; }
+  .treino-head-badge {
+    display: inline-block;
+    background: var(--brand-50); color: var(--brand-500);
+    font-weight: 800; font-size: 10px;
+    letter-spacing: 0.06em;
+    padding: 3px 7px; border-radius: 5px;
+    margin-bottom: 4px;
+  }
+  .treino-head-nome {
+    font-size: 18px; font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1.2;
+  }
+  .treino-head-tipo {
+    font-size: 11.5px; color: var(--gray-400);
+    font-weight: 500;
+    margin-top: 3px;
+  }
+  .treino-head-kebab {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: transparent; border: 0;
+    color: var(--gray-400);
+    display: grid; place-items: center;
+    cursor: pointer;
+  }
+  .treino-head-kebab:hover { background: var(--gray-100); color: var(--gray-700); }
+
+  /* ── Bloco: edge-to-edge, sem margin lateral ── */
+  .bloco {
+    background: white;
+    padding: 10px 16px 12px;
+    border-top: 1px solid var(--gray-200);
+  }
+  .bloco:last-child { border-bottom: 1px solid var(--gray-200); margin-bottom: 32px; }
+  .bloco-label {
+    font-size: 10px; font-weight: 800;
+    color: var(--gray-400);
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+  .exercicio {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0;
+    border-top: 1px solid rgba(0,0,0,0.04);
+  }
+  .exercicio:first-of-type { border-top: 0; }
+  .ex-label {
+    display: inline-block;
+    background: var(--brand-50);
+    color: var(--gray-700);
+    font-weight: 800; font-size: 10.5px;
+    padding: 2px 7px; border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    flex-shrink: 0;
+  }
+  .ex-nome {
+    flex: 1; min-width: 0;
+    font-size: 14.5px; font-weight: 600;
+    color: var(--gray-900);
+    line-height: 1.25;
+  }
+  .ex-prescr {
+    font-size: 11.5px; color: var(--gray-500);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  /* ── Hint inicial de swipe (anima 1x no load) ── */
+  .swipe-hint {
+    position: absolute;
+    bottom: 22px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.78);
+    color: white;
+    font-size: 12px; font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 999px;
+    z-index: 25;
+    display: inline-flex; align-items: center; gap: 8px;
+    opacity: 0;
+    pointer-events: none;
+    animation: hintFlash 4.5s ease-in-out 0.6s forwards;
+  }
+  @keyframes hintFlash {
+    0%   { opacity: 0; transform: translate(-50%, 10px); }
+    8%   { opacity: 1; transform: translate(-50%, 0); }
+    72%  { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, 4px); }
+  }
+  .swipe-hint .arrow {
+    display: inline-block;
+    animation: arrowSwing 1.4s ease-in-out infinite;
+  }
+  @keyframes arrowSwing {
+    0%, 100% { transform: translateX(0); }
+    50%      { transform: translateX(6px); }
+  }
+
+  /* Nudge inicial do conteúdo: scrollLeft anima brevemente após load pra mostrar swipeability */
+  .swipe-track.nudge { scroll-behavior: auto; }
+
+  /* SVG icons */
+  .icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+
+<svg style="display:none">
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+</svg>
+
+<div class="phone-frame">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-logo">BF</div>
+    <div class="topbar-info">
+      <div class="topbar-aluno">Bernardo</div>
+      <div class="topbar-aluno-meta">intermediário · atualizada há 2d</div>
+    </div>
+    <span class="topbar-counter"><strong id="counter-cur">1</strong> / <span id="counter-tot">4</span></span>
+  </header>
+
+  <!-- Chip tabs (afordância principal — clicáveis) -->
+  <nav class="pager" id="pager">
+    <button class="pager-chip active" data-target="0">
+      <span class="pager-chip-badge">T1</span> Inferior A
+    </button>
+    <button class="pager-chip" data-target="1">
+      <span class="pager-chip-badge">T2</span> Superior A
+    </button>
+    <button class="pager-chip" data-target="2">
+      <span class="pager-chip-badge">T3</span> Inferior B
+    </button>
+    <button class="pager-chip" data-target="3">
+      <span class="pager-chip-badge">T4</span> Superior B
+    </button>
+  </nav>
+
+  <!-- Swipe track full-bleed -->
+  <main class="swipe-track" id="track">
+
+    <!-- T1 -->
+    <article class="treino-page" data-idx="0">
+      <header class="treino-head">
+        <div class="treino-head-info">
+          <span class="treino-head-badge">T1</span>
+          <div class="treino-head-nome">Inferior A</div>
+          <div class="treino-head-tipo">squat · hinge · knee_flexion · core</div>
+        </div>
+        <button class="treino-head-kebab"><svg class="icon"><use href="#i-more"/></svg></button>
+      </header>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO A</div>
+        <div class="exercicio">
+          <span class="ex-label">A1</span>
+          <span class="ex-nome">Agachamento livre</span>
+          <span class="ex-prescr">4 × 6-8 · RIR 2</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">A2</span>
+          <span class="ex-nome">Prancha frontal</span>
+          <span class="ex-prescr">3 × 40s · RIR 1</span>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO B</div>
+        <div class="exercicio">
+          <span class="ex-label">B1</span>
+          <span class="ex-nome">Stiff com barra</span>
+          <span class="ex-prescr">3 × 8-10 · RIR 2</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">B2</span>
+          <span class="ex-nome">Cadeira flexora unilateral</span>
+          <span class="ex-prescr">3 × 12 · RIR 1</span>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO C</div>
+        <div class="exercicio">
+          <span class="ex-label">C1</span>
+          <span class="ex-nome">Búlgaro com halteres</span>
+          <span class="ex-prescr">3 × 10 · RIR 2</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">C2</span>
+          <span class="ex-nome">Panturrilha em pé</span>
+          <span class="ex-prescr">4 × 12-15 · RIR 1</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- T2 -->
+    <article class="treino-page" data-idx="1">
+      <header class="treino-head">
+        <div class="treino-head-info">
+          <span class="treino-head-badge">T2</span>
+          <div class="treino-head-nome">Superior A</div>
+          <div class="treino-head-tipo">empurrar · puxar · ombro · braços</div>
+        </div>
+        <button class="treino-head-kebab"><svg class="icon"><use href="#i-more"/></svg></button>
+      </header>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO A</div>
+        <div class="exercicio">
+          <span class="ex-label">A1</span>
+          <span class="ex-nome">Supino reto com barra</span>
+          <span class="ex-prescr">4 × 6-8 · RIR 2</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">A2</span>
+          <span class="ex-nome">Remada curvada barra</span>
+          <span class="ex-prescr">4 × 8 · RIR 2</span>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO B</div>
+        <div class="exercicio">
+          <span class="ex-label">B1</span>
+          <span class="ex-nome">Desenvolvimento halteres</span>
+          <span class="ex-prescr">3 × 10 · RIR 2</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">B2</span>
+          <span class="ex-nome">Puxada alta neutra</span>
+          <span class="ex-prescr">3 × 10 · RIR 2</span>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO C</div>
+        <div class="exercicio">
+          <span class="ex-label">C1</span>
+          <span class="ex-nome">Tríceps corda</span>
+          <span class="ex-prescr">3 × 12 · RIR 1</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">C2</span>
+          <span class="ex-nome">Rosca direta barra W</span>
+          <span class="ex-prescr">3 × 10-12 · RIR 1</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- T3 -->
+    <article class="treino-page" data-idx="2">
+      <header class="treino-head">
+        <div class="treino-head-info">
+          <span class="treino-head-badge">T3</span>
+          <div class="treino-head-nome">Inferior B</div>
+          <div class="treino-head-tipo">hinge · squat · adução · panturrilha</div>
+        </div>
+        <button class="treino-head-kebab"><svg class="icon"><use href="#i-more"/></svg></button>
+      </header>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO A</div>
+        <div class="exercicio">
+          <span class="ex-label">A1</span>
+          <span class="ex-nome">Levantamento terra</span>
+          <span class="ex-prescr">4 × 4-6 · RIR 2</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">A2</span>
+          <span class="ex-nome">Abdominal infra</span>
+          <span class="ex-prescr">3 × 12 · RIR 1</span>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO B</div>
+        <div class="exercicio">
+          <span class="ex-label">B1</span>
+          <span class="ex-nome">Hack squat</span>
+          <span class="ex-prescr">3 × 10 · RIR 2</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">B2</span>
+          <span class="ex-nome">Adutor máquina</span>
+          <span class="ex-prescr">3 × 15 · RIR 1</span>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO C</div>
+        <div class="exercicio">
+          <span class="ex-label">C1</span>
+          <span class="ex-nome">Avanço com halteres</span>
+          <span class="ex-prescr">3 × 10 · RIR 2</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">C2</span>
+          <span class="ex-nome">Panturrilha sentado</span>
+          <span class="ex-prescr">4 × 15 · RIR 1</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- T4 -->
+    <article class="treino-page" data-idx="3">
+      <header class="treino-head">
+        <div class="treino-head-info">
+          <span class="treino-head-badge">T4</span>
+          <div class="treino-head-nome">Superior B</div>
+          <div class="treino-head-tipo">empurrar · puxar · ombro iso</div>
+        </div>
+        <button class="treino-head-kebab"><svg class="icon"><use href="#i-more"/></svg></button>
+      </header>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO A</div>
+        <div class="exercicio">
+          <span class="ex-label">A1</span>
+          <span class="ex-nome">Supino inclinado halteres</span>
+          <span class="ex-prescr">4 × 8 · RIR 2</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">A2</span>
+          <span class="ex-nome">Remada cabo neutro</span>
+          <span class="ex-prescr">4 × 10 · RIR 2</span>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO B</div>
+        <div class="exercicio">
+          <span class="ex-label">B1</span>
+          <span class="ex-nome">Elevação lateral cabo</span>
+          <span class="ex-prescr">4 × 12-15 · RIR 1</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">B2</span>
+          <span class="ex-nome">Pulldown unilateral</span>
+          <span class="ex-prescr">3 × 12 · RIR 1</span>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <div class="bloco-label">BLOCO C</div>
+        <div class="exercicio">
+          <span class="ex-label">C1</span>
+          <span class="ex-nome">Tríceps testa halteres</span>
+          <span class="ex-prescr">3 × 10 · RIR 1</span>
+        </div>
+        <div class="exercicio">
+          <span class="ex-label">C2</span>
+          <span class="ex-nome">Rosca martelo</span>
+          <span class="ex-prescr">3 × 12 · RIR 1</span>
+        </div>
+      </div>
+    </article>
+
+  </main>
+
+  <!-- Hint inicial: aparece 1x e some -->
+  <div class="swipe-hint" id="swipe-hint">
+    deslize <span class="arrow"><svg class="icon" style="width:14px;height:14px"><use href="#i-chev-r"/></svg></span> ou toque nos chips
+  </div>
+
+</div>
+
+<script>
+  const track = document.getElementById('track');
+  const chips = document.querySelectorAll('.pager-chip');
+  const cards = document.querySelectorAll('.treino-page');
+  const counter = document.getElementById('counter-cur');
+  const total = cards.length;
+  document.getElementById('counter-tot').textContent = total;
+
+  // Sincroniza chip + counter com o card mais centralizado
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.intersectionRatio > 0.6) {
+        const i = parseInt(entry.target.dataset.idx, 10);
+        chips.forEach(c => c.classList.toggle('active', parseInt(c.dataset.target, 10) === i));
+        counter.textContent = i + 1;
+        const activeChip = document.querySelector('.pager-chip.active');
+        if (activeChip) activeChip.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
+    });
+  }, { root: track, threshold: [0.6, 0.9] });
+  cards.forEach(c => io.observe(c));
+
+  // Tap em chip → scroll pro card
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const i = parseInt(chip.dataset.target, 10);
+      cards[i].scrollIntoView({ inline: 'start', behavior: 'smooth' });
+    });
+  });
+
+  // Nudge inicial: mostra um peek breve do treino seguinte na 1ª carga (~30px) e volta —
+  // ensina o gesto sem precisar de texto. Só roda se o usuário não interagiu antes.
+  let userInteracted = false;
+  track.addEventListener('scroll', () => { userInteracted = true; }, { once: true });
+  setTimeout(() => {
+    if (userInteracted) return;
+    const w = track.clientWidth;
+    track.classList.add('nudge');
+    track.scrollTo({ left: 36, behavior: 'auto' });
+    setTimeout(() => {
+      track.scrollTo({ left: 0, behavior: 'smooth' });
+      track.classList.remove('nudge');
+    }, 380);
+  }, 900);
+</script>
+
+</body>
+</html>
