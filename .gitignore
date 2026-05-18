@@ -8,3 +8,5 @@ server.pid
 
 sessoes_salvas.json
 
+# Claude Code agent worktrees (session state, embedded sub-repos)
+.claude/worktrees/
