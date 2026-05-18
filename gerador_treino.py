@@ -2562,7 +2562,14 @@ def _selecionar_cand_score_aware(
         return s
 
     scored = [(e, _total_score(e)) for e in cands]
-    scored.sort(key=lambda t: t[1], reverse=True)
+    # Tiebreaker aleatório em empates (2026-05-18): sort estável + ordem do XLSX
+    # introduzia viés sistemático — quando vários candidatos empatavam em score
+    # 0, os primeiros do XLSX entravam no top-K do softmax de forma
+    # determinística. Caso real: em costas(2)×2 slot puxada do T2, Pullover
+    # Halteres + Pullover Polia ficavam nas 2 primeiras posições do empate por
+    # ordem de cadastro, sendo escolhidos em ~50% das rotinas. Tupla
+    # (-score, random) preserva ranking por score e desempata uniformemente.
+    scored.sort(key=lambda t: (-t[1], random.random()))
     top = scored[:SOFTMAX_TOP_K]
     max_s = top[0][1]
     exps = [math.exp((s - max_s) / SOFTMAX_TEMPERATURA) for _, s in top]

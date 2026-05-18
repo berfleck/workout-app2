@@ -22,6 +22,12 @@ from gerador_treino import carregar_banco, gerar_multiplos_treinos
 
 PEITOS_TESTE = {"Crossover", "Crossover Sentado", "Crucifixo Halteres", "Apoio"}
 SEEDS = [42, 7, 100, 200, 999]
+# SEEDS_ESTATISTICAS: lista maior usada apenas em testes que validam um cap
+# empírico (não comportamento por seed). Com tiebreaker aleatório no softmax
+# (2026-05-18), n=5 ficou frágil — 1-2 coexistências extras saltavam o pct
+# acima do cap por flutuação estatística. n=50 dá granularidade 2% e reflete
+# a distribuição real (~8% no banco atual).
+SEEDS_ESTATISTICAS = list(range(50))
 
 
 # Helpers --------------------------------------------------------------------
@@ -148,10 +154,12 @@ def test_crossover_sentado_coexistencia_INTER_e_rara_pos_caminho_A(
     Antes do Caminho A (até Fase 7.3): hard INTER família bloqueava
     Crossover (T1) + Crossover Sentado (T2) em qualquer seed.
     Pós Caminho A: ≤20% das seeds permitem coexistência (cap empírico).
+    Usa SEEDS_ESTATISTICAS (n=50) — teste estatístico precisa de n maior
+    pra granularidade fina (n=5 ficou frágil após tiebreaker 2026-05-18).
     """
     coexistem = 0
-    n_seeds = len(SEEDS)
-    for seed in SEEDS:
+    n_seeds = len(SEEDS_ESTATISTICAS)
+    for seed in SEEDS_ESTATISTICAS:
         sessoes = _rodar(banco, seed, modo, relaxar=False)
         nomes_t1, nomes_t2 = _coletar_nomes(sessoes[0]), _coletar_nomes(sessoes[1])
         par1 = "Crossover" in nomes_t1 and "Crossover Sentado" in nomes_t2
