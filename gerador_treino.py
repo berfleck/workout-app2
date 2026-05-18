@@ -422,65 +422,65 @@ def _distribuir_quotas_entre_treinos(
     vagas_por_treino: list[int],
     pesos: dict[str, int],
 ) -> list[dict[str, int]]:
-    """Distribui quotas globais entre N treinos via round-robin sobre fila
-    intercalada por peso, minimizando concentração de déficit (R6 da Etapa 3).
+    """Distribui quotas globais entre N treinos via Bresenham por chave.
+
+    Cada chave entra com offset = acumulador mod n_treinos e distribui
+    suas vagas em round-robin a partir desse offset, pulando treinos com
+    capacidade esgotada. O acumulador soma a quota ao final de cada chave,
+    o que evita o phase lock do algoritmo antigo (`A,B,A,B` na mesma ordem
+    em todos os treinos) — chaves diferentes começam em treinos diferentes.
+
+    Resolve diagnóstico de 2026-05-17 (notas_distribuicao.md, Solução 1):
+    `peito` sempre em T2, `perna_anterior` sempre em T1, etc. quando havia
+    > 1 chave com quotas iguais.
 
     Args:
         quotas_global: {chave: qtd_total_na_rotina}.
         n_treinos: número de treinos.
         vagas_por_treino: vagas alocadas pra esta demanda em cada treino.
-        pesos: {chave: peso} (usado pra ordenar a fila — peso maior primeiro).
+        pesos: {chave: peso} — mantido na assinatura por compat de API,
+            **não usado**. Ordenação agora é por quota desc + alfabético.
 
     Returns:
         Lista de N dicts {chave: qtd_no_treino}, soma == quotas_global.
-
-    Algoritmo:
-      1. Ordenar chaves por peso desc (tie-break alfabético).
-      2. Construir fila intercalada via round-robin pelas qtds.
-      3. Distribuir slots pelos N treinos via round-robin, respeitando
-         vagas_por_treino (pula treino lotado).
     """
     if n_treinos <= 0:
         return []
     if sum(quotas_global.values()) == 0:
         return [{} for _ in range(n_treinos)]
 
-    # Ordenar chaves por peso desc (tie-break alfabético estável)
+    # Ordenar chaves por quota desc (tie-break alfabético estável)
     chaves_ord = sorted(
         quotas_global.keys(),
-        key=lambda k: (-pesos.get(k, 0), k),
+        key=lambda k: (-quotas_global[k], k),
     )
 
-    # Construir fila intercalada via round-robin pelas qtds
-    fila: list[str] = []
-    qtds = {k: quotas_global[k] for k in chaves_ord}
-    while sum(qtds.values()) > 0:
-        for k in chaves_ord:
-            if qtds[k] > 0:
-                fila.append(k)
-                qtds[k] -= 1
-
-    # Distribuir slots pelos treinos via round-robin, respeitando capacidade
     por_treino: list[dict[str, int]] = [{} for _ in range(n_treinos)]
     capacidade = list(vagas_por_treino)
-    treino_atual = 0
-    for chave in fila:
-        # Avança até treino com capacidade disponível
-        tentativas = 0
-        while capacidade[treino_atual] <= 0:
-            treino_atual = (treino_atual + 1) % n_treinos
-            tentativas += 1
-            if tentativas > n_treinos:
-                # Sem capacidade em ninguém — consistência interna falha
-                # (não deveria acontecer se sum(vagas_por_treino) == sum(quotas))
-                break
-        else:
-            por_treino[treino_atual][chave] = por_treino[treino_atual].get(chave, 0) + 1
-            capacidade[treino_atual] -= 1
-            treino_atual = (treino_atual + 1) % n_treinos
+    acumulador = 0
+
+    for chave in chaves_ord:
+        qtd = quotas_global[chave]
+        if qtd <= 0:
             continue
-        # Loop saiu por break — parar distribuição
-        break
+        offset = acumulador % n_treinos
+        restantes = qtd
+        t = offset
+        tentativas_sem_progresso = 0
+        while restantes > 0:
+            if capacidade[t] > 0:
+                por_treino[t][chave] = por_treino[t].get(chave, 0) + 1
+                capacidade[t] -= 1
+                restantes -= 1
+                tentativas_sem_progresso = 0
+            else:
+                tentativas_sem_progresso += 1
+                if tentativas_sem_progresso >= n_treinos:
+                    # Sem capacidade em ninguém — consistência interna falha
+                    # (não deveria acontecer se sum(vagas_por_treino) == sum(quotas))
+                    break
+            t = (t + 1) % n_treinos
+        acumulador += qtd
 
     return por_treino
 
@@ -1222,6 +1222,210 @@ def _buscar_candidato(
     return escolhido_idx, candidatos
 
 
+# Penalidade por exercício deixado solo no matching. Maior que qualquer score
+# de par possível (P1 + composto + nao_agonista ≈ 1175), pra garantir que
+# pareamentos válidos sempre venham antes de solos. Solos só sobram quando
+# não há par viável (hard filter cargas/fadiga isola exercício).
+_MATCHING_SOLO_PENALTY: float = 100_000.0
+
+
+def _montar_blocos_matching(
+    exercicios: list["Exercicio"],
+    evitar_agonistas: bool = False,
+    cargas_config: dict | None = None,
+    exercicios_travados: list | set | None = None,
+    avisos_carga: list | None = None,
+    pesos_config: Optional["ConfigPesosProximidade"] = None,
+) -> list[tuple]:
+    """Monta blocos de tamanho 2 via matching enumerativo (Solução 2 do
+    notas_distribuicao.md, 2026-05-17).
+
+    Algoritmo:
+      1. Pré-computa par-a-par viabilidade (hard) e score (`_score_pareamento`).
+      2. Enumera todos emparelhamentos perfeitos + (quando inevitável) solos.
+      3. Escolhe o de maior soma de scores. Solos pagam
+         `_MATCHING_SOLO_PENALTY` cada — força minimização de solos antes
+         da otimização de score por par.
+      4. Constrói blocos com a âncora = exercício de menor índice no par
+         (preserva semântica "mais cedo na lista de input = âncora"), ordenados
+         pelo índice da âncora ascendente.
+      5. Captura rationale de pareamento (papel=ancora + papel=par) reusando
+         `_montar_rationale_pareamento` com `scored` = todos candidatos viáveis
+         pra parear com a âncora (delta < 0 nas alternativas mostra quando
+         o matching escolheu não-greedy por motivo global).
+
+    Determinístico — sem `random.choice` na seleção. Pares iguais em score
+    são desempatados pela ordem da recursão (primeiro encontrado wins, e a
+    recursão explora índices em ordem crescente).
+    """
+    N = len(exercicios)
+
+    # Pré-computa viabilidade hard + score do par (i âncora, j parceiro).
+    # `pode_adicionar_ao_bloco` é simétrica em cargas e fadiga, então basta
+    # checar i<j. O score, porém, NÃO é simétrico em todos os componentes
+    # (composto avalia só o candidato), mas é simétrico nos componentes
+    # estruturais (regiao_diff, padrao_diff, anti_uni). Escolhemos i como
+    # âncora pra preservar "mais cedo = âncora".
+    pair_ok: dict[tuple[int, int], bool] = {}
+    pair_score: dict[tuple[int, int], float] = {}
+    for i in range(N):
+        for j in range(i + 1, N):
+            if not pode_adicionar_ao_bloco(
+                [exercicios[i]], exercicios[j], 2,
+                cargas_config=cargas_config,
+                exercicios_travados=exercicios_travados,
+            ):
+                continue
+            pair_ok[(i, j)] = True
+            pair_score[(i, j)] = _score_pareamento(
+                exercicios[j], [exercicios[i]],
+                evitar_agonistas, pesos_config=pesos_config,
+            )
+
+    # Enumeração recursiva. Estado: frozenset de índices não usados +
+    # listas paralelas de pairs e solos acumuladas. Pega sempre o menor
+    # unused, opções: parear com cada j>first em pair_ok, ou virar solo.
+    best = {"score": float("-inf"), "pairs": [], "solos": []}
+
+    def rec(unused: frozenset[int], pairs: list, solos: list, score: float) -> None:
+        if not unused:
+            adj = score - _MATCHING_SOLO_PENALTY * len(solos)
+            if adj > best["score"]:
+                best["score"] = adj
+                best["pairs"] = list(pairs)
+                best["solos"] = list(solos)
+            return
+        first = min(unused)
+        rest = unused - {first}
+        # Opção: parear first com j (em ordem crescente pra determinismo)
+        for j in sorted(rest):
+            if (first, j) in pair_ok:
+                rec(
+                    rest - {j},
+                    pairs + [(first, j)],
+                    solos,
+                    score + pair_score[(first, j)],
+                )
+        # Opção: deixar first solo (sempre considerada — cobre N ímpar e
+        # caso em que NENHUM par viável existe pra first).
+        rec(rest, pairs, solos + [first], score)
+
+    rec(frozenset(range(N)), [], [], 0.0)
+
+    # Construir layout final: lista de (ancora_idx, [exs_idx]) ordenada
+    # pelo índice da âncora ascendente. Preserva ordem original.
+    bloco_por_ancora: list[tuple[int, list[int]]] = []
+    for (i, j) in best["pairs"]:
+        bloco_por_ancora.append((i, [i, j]))
+    for i in best["solos"]:
+        bloco_por_ancora.append((i, [i]))
+    bloco_por_ancora.sort(key=lambda t: t[0])
+
+    # Emitir avisos relaxado_carga pros solos que existiriam SÓ por causa
+    # de cargas_config. Dedup por par de exercícios (frozenset): quando A e
+    # B são ambos solos e violariam cargas entre si, emitir 1 vez (mirror
+    # do greedy, que ao processar A acha B livre → emite; ao processar B,
+    # A já está usado → não emite).
+    if cargas_config and avisos_carga is not None:
+        ancora_para_bloco_idx = {
+            anc: bi for bi, (anc, _) in enumerate(bloco_por_ancora)
+        }
+        emitted_pairs: set[frozenset[int]] = set()
+        # Iterar solos em ordem crescente (já vêm assim do best["solos"],
+        # mas explicitamos pra segurança).
+        for solo_i in sorted(best["solos"]):
+            ancora_ex = exercicios[solo_i]
+            cand_off_idx = None
+            cand_off = None
+            for other in range(N):
+                if other == solo_i:
+                    continue
+                if pode_adicionar_ao_bloco(
+                    [ancora_ex], exercicios[other], 2,
+                    cargas_config=None,
+                    exercicios_travados=exercicios_travados,
+                ):
+                    cand_off_idx = other
+                    cand_off = exercicios[other]
+                    break
+            if cand_off is None:
+                continue
+            pair_key = frozenset({solo_i, cand_off_idx})
+            if pair_key in emitted_pairs:
+                continue
+            emitted_pairs.add(pair_key)
+            motivo = None
+            for dim, attr in _DIMS_CARGA:
+                t = cargas_config.get(dim)
+                if not t:
+                    continue
+                va = getattr(ancora_ex, attr, 0)
+                vb = getattr(cand_off, attr, 0)
+                if va >= 1 and vb >= 1 and (va + vb) >= t:
+                    motivo = (dim, va + vb, t)
+                    break
+            if motivo:
+                avisos_carga.append({
+                    "tipo": "relaxado_carga",
+                    "bloco_idx": ancora_para_bloco_idx[solo_i],
+                    "exercicio": ancora_ex.nome,
+                    "par_bloqueado": cand_off.nome,
+                    "dimensao": motivo[0],
+                    "soma": motivo[1],
+                    "threshold": motivo[2],
+                })
+
+    # Construir blocos com rationale.
+    blocos: list[tuple] = []
+    for ancora_idx, exs_idx in bloco_por_ancora:
+        if len(exs_idx) == 1:
+            blocos.append((exercicios[exs_idx[0]],))
+            continue
+
+        ancora_ex = exercicios[exs_idx[0]]
+        parceiro_idx = exs_idx[1]
+        parceiro_ex = exercicios[parceiro_idx]
+
+        # `scored` pra rationale do parceiro: todos os candidatos viáveis pra
+        # parear com a âncora, com seus scores LOCAIS (âncora sozinha no bloco).
+        # Inclui o próprio parceiro escolhido. Delta < 0 nas alts mostra quando
+        # o matching escolheu um candidato local-subótimo por ganho global.
+        scored_alts: list[tuple[int, float]] = []
+        for j in range(N):
+            if j == ancora_idx:
+                continue
+            key = (min(ancora_idx, j), max(ancora_idx, j))
+            if key not in pair_ok:
+                continue
+            s_local = _score_pareamento(
+                exercicios[j], [ancora_ex],
+                evitar_agonistas, pesos_config=pesos_config,
+            )
+            scored_alts.append((j, s_local))
+        scored_alts.sort(key=lambda t: t[1], reverse=True)
+
+        pareamento_par = _montar_rationale_pareamento(
+            parceiro_ex, scored_alts, exercicios, [ancora_ex],
+            evitar_agonistas, pesos_config,
+        )
+        parceiro_com_rat = replace(parceiro_ex, rationale={
+            **(parceiro_ex.rationale or {}),
+            "pareamento": pareamento_par,
+        })
+
+        ancora_com_rat = replace(ancora_ex, rationale={
+            **(ancora_ex.rationale or {}),
+            "pareamento": {
+                "papel": "ancora",
+                "parceiros": [parceiro_ex.nome],
+            },
+        })
+
+        blocos.append((ancora_com_rat, parceiro_com_rat))
+
+    return blocos
+
+
 def montar_blocos(
     exercicios: list[Exercicio],
     tamanho: int = 2,
@@ -1246,6 +1450,21 @@ def montar_blocos(
     """
     if not exercicios:
         return []
+
+    # Matching enumerativo pra tamanho=2 (Solução 2 do notas_distribuicao.md):
+    # substitui o greedy `_buscar_candidato`-loop por enumeração de
+    # emparelhamentos perfeitos com maximização da soma de scores. Resolve
+    # caso Jose T1 (3 uni + 3 bi greedy → 2 uni juntos; ótimo é 3×P1).
+    # tamanho=1 e tamanho=3 continuam no greedy original.
+    if tamanho == 2 and len(exercicios) >= 2:
+        return _montar_blocos_matching(
+            exercicios,
+            evitar_agonistas=evitar_agonistas,
+            cargas_config=cargas_config,
+            exercicios_travados=exercicios_travados,
+            avisos_carga=avisos_carga,
+            pesos_config=pesos_config,
+        )
 
     usados = [False] * len(exercicios)
     blocos = []

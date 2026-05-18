@@ -9,13 +9,13 @@
           'label': 'A',
           'nomes': list([
             'Russian Twist',
-            'Canoinha',
+            'Dead Bug',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Dead Bug',
+            'Canoinha',
           ]),
         }),
       ]),
@@ -34,14 +34,14 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Remada Curvada Smith',
+            'Barra Fixa',
             'Remada Neutra Trx',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Barra Fixa',
+            'Remada Curvada Smith',
             'Pullover Polia',
           ]),
         }),
@@ -165,20 +165,20 @@
           'label': 'B',
           'nomes': list([
             'Supino Com Anilha',
-            'Box Jump',
+            'Desloc. Lateral c/ Band',
           ]),
         }),
         dict({
           'label': 'C',
           'nomes': list([
             'Desenv. Halteres Sentado',
-            'Abd Bicicleta',
+            'Box Jump',
           ]),
         }),
         dict({
           'label': 'D',
           'nomes': list([
-            'Desloc. Lateral c/ Band',
+            'Abd Bicicleta',
             'Pullover Halteres',
           ]),
         }),
@@ -194,14 +194,14 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Desenvolvimento Barra',
+            'Remada Seal Halteres',
             'Agach. Lateral',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Remada Seal Halteres',
+            'Desenvolvimento Barra',
             'Ponte Alternada',
           ]),
         }),
@@ -259,21 +259,21 @@
           'label': 'B',
           'nomes': list([
             'Agachamento Livre',
-            'Apoio Fechado',
+            'Desenv. Landmine',
           ]),
         }),
         dict({
           'label': 'C',
           'nomes': list([
             'Remada Baixa Aberta',
-            'Prancha Lateral',
+            'Abdução Polia',
           ]),
         }),
         dict({
           'label': 'D',
           'nomes': list([
-            'Desenv. Landmine',
-            'Abdução Polia',
+            'Apoio Fechado',
+            'Prancha Lateral',
           ]),
         }),
       ]),
@@ -337,15 +337,15 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Barra Fixa',
-            'Lev. Terra Anilha',
+            'Passada Dos Steps',
+            'Supino Smith Inclinado',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Passada Dos Steps',
-            'Supino Smith Inclinado',
+            'Lev. Terra Anilha',
+            'Desenv. Halteres Uni.',
           ]),
         }),
         dict({
@@ -358,7 +358,7 @@
         dict({
           'label': 'D',
           'nomes': list([
-            'Desenv. Halteres Uni.',
+            'Barra Fixa',
             'Copenhagen Adduction',
           ]),
         }),
@@ -396,20 +396,20 @@
           'label': 'B',
           'nomes': list([
             'Supino Com Anilha',
-            'Box Jump',
+            'Desloc. Lateral c/ Band',
           ]),
         }),
         dict({
           'label': 'C',
           'nomes': list([
             'Desenv. Halteres Sentado',
-            'Abd Bicicleta',
+            'Box Jump',
           ]),
         }),
         dict({
           'label': 'D',
           'nomes': list([
-            'Desloc. Lateral c/ Band',
+            'Abd Bicicleta',
             'Pullover Halteres',
           ]),
         }),
@@ -425,14 +425,14 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Desenvolvimento Barra',
+            'Remada Seal Halteres',
             'Agach. Lateral',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Remada Seal Halteres',
+            'Desenvolvimento Barra',
             'Ponte Alternada',
           ]),
         }),
@@ -497,14 +497,14 @@
           'label': 'C',
           'nomes': list([
             'Remada Baixa Aberta',
-            'Prancha Lateral',
+            'Abdução Polia',
           ]),
         }),
         dict({
           'label': 'D',
           'nomes': list([
             'Apoio Fechado',
-            'Abdução Polia',
+            'Prancha Lateral',
           ]),
         }),
       ]),
@@ -524,13 +524,13 @@
           'label': 'A',
           'nomes': list([
             'Lev. Terra',
-            'Hip Thrust C/ Band',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
             'Recuo C/ Barra',
+            'Hip Thrust C/ Band',
           ]),
         }),
         dict({
@@ -565,13 +565,13 @@
           'label': 'A',
           'nomes': list([
             'Remada Apoiado',
-            'Desenv. Landmine',
+            'Supino Smith Inclinado',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Supino Smith Inclinado',
+            'Desenv. Landmine',
             'Crucifixo Halteres',
           ]),
         }),
@@ -592,7 +592,7 @@
           'label': 'A',
           'nomes': list([
             'Supino Com Anilha',
-            'Supino Smith Inclinado',
+            'Crossover Sentado',
           ]),
         }),
         dict({
@@ -613,14 +613,14 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Apoio Fechado',
+            'Supino Inclinado Halteres',
             'Crossover',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Crucifixo Halteres',
+            'Apoio Fechado',
           ]),
         }),
       ]),
@@ -640,13 +640,13 @@
           'label': 'A',
           'nomes': list([
             'Agachamento Búlgaro',
-            'Cadeira Extensora',
+            'Leg Press',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Agachamento Goblet',
+            'Box Jump',
           ]),
         }),
       ]),
@@ -661,14 +661,14 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Step Up',
-            'Box Jump',
+            'Agachamento Goblet',
+            'Slide Board Lateral',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Recuo',
+            'Cadeira Extensora',
           ]),
         }),
       ]),
@@ -684,13 +684,13 @@
           'label': 'A',
           'nomes': list([
             'Agachamento Livre',
-            'Leg Press',
+            'Step Up',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Slide Board Lateral',
+            'Recuo',
           ]),
         }),
       ]),
@@ -775,28 +775,28 @@
           'label': 'C',
           'nomes': list([
             'Desenv. Halteres Sentado',
-            'Cadeira Flexora',
+            'Dead Bug',
           ]),
         }),
         dict({
           'label': 'D',
           'nomes': list([
             'Desenv. Halteres Uni.',
-            'Hip Thrust Uni.',
+            'Cadeira Flexora',
           ]),
         }),
         dict({
           'label': 'E',
           'nomes': list([
             'Crossover Sentado',
-            'Dead Bug',
+            'Prancha Lateral',
           ]),
         }),
         dict({
           'label': 'F',
           'nomes': list([
-            'Prancha Lateral',
             'Tríceps Testa Halteres',
+            'Hip Thrust Uni.',
           ]),
         }),
       ]),
@@ -825,34 +825,34 @@
           'label': 'A',
           'nomes': list([
             'Supino Inclinado Halteres',
-            'Flexão Joelhos Feijão',
+            'Lev. Terra Anilha',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Lev. Terra Anilha',
-            'Crucifixo Halteres',
+            'Desenvolvimento Smith',
+            'Flexão Joelhos Feijão',
           ]),
         }),
         dict({
           'label': 'C',
-          'nomes': list([
-            'Desenvolvimento Smith',
-            'Ponte Na Caixa',
-          ]),
-        }),
-        dict({
-          'label': 'D',
           'nomes': list([
             'Apoio Elevado',
             'Pallof Press',
           ]),
         }),
         dict({
-          'label': 'E',
+          'label': 'D',
           'nomes': list([
             'Desenv. Landmine',
+            'Ponte Na Caixa',
+          ]),
+        }),
+        dict({
+          'label': 'E',
+          'nomes': list([
+            'Crucifixo Halteres',
             'Side Clams',
           ]),
         }),
@@ -893,33 +893,60 @@
   list([
     dict({
       'avisos': list([
+        dict({
+          'chave': 'puxadas',
+          'escopo': 'costas',
+          'escopo_demanda': 'upper',
+          'motivo': 'vagas_insuficientes',
+          'nivel': 'subregiao',
+          'tipo': 'ancora_nao_cumprida',
+          'treino_idx': 0,
+        }),
+        dict({
+          'chave': 'puxadas',
+          'escopo': 'costas',
+          'escopo_demanda': 'upper',
+          'motivo': 'vagas_insuficientes',
+          'nivel': 'subregiao',
+          'tipo': 'ancora_nao_cumprida',
+          'treino_idx': 1,
+        }),
+        dict({
+          'chave': 'remadas',
+          'escopo': 'costas',
+          'escopo_demanda': 'upper',
+          'motivo': 'vagas_insuficientes',
+          'nivel': 'subregiao',
+          'tipo': 'ancora_nao_cumprida',
+          'treino_idx': 2,
+        }),
       ]),
       'blocos': list([
         dict({
           'label': 'A',
           'nomes': list([
-            'Remada Curvada Barra',
-            'Hiperextensão 45°',
+            'Hip Thrust',
+            'Apoio Fechado',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Remada Apoiado',
-            'Agachamento Goblet',
+            'Remada Baixa Neutra',
+            'Abd Bicicleta',
           ]),
         }),
         dict({
           'label': 'C',
           'nomes': list([
-            'Barra Isométrica',
-            'Roda Abdominal',
+            'Crossover',
+            'Cadeira Extensora',
           ]),
         }),
         dict({
           'label': 'D',
           'nomes': list([
-            'INFRA Alternado',
+            'Hollow Hold',
           ]),
         }),
       ]),
@@ -934,22 +961,22 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Agachamento Livre',
-            'Supino Smith Inclinado',
+            'Remada Curvada Barra',
+            'Hiperextensão 45°',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Apoio Ajoelhado',
-            'Hip Thrust C/ Band',
+            'Desenv. Halteres Sentado',
+            'Box Jump',
           ]),
         }),
         dict({
           'label': 'C',
           'nomes': list([
-            'Crossover',
-            'Crunch Na Bola',
+            'Supino Inclinado Halteres',
+            'Dead Bug',
           ]),
         }),
         dict({
@@ -970,28 +997,28 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Lev. Terra',
-            'Desenv. Halteres Uni.',
+            'Stiff Barra Smith',
+            'Apoio',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Supino Com Anilha',
-            'Dead Bug C/ Anilha',
+            'Agachamento Smith',
+            'Desenv. Landmine',
           ]),
         }),
         dict({
           'label': 'C',
           'nomes': list([
-            'Leg Press',
-            'Elevação Frontal Halteres',
+            'Barra Isométrica',
+            'Russian Twist',
           ]),
         }),
         dict({
           'label': 'D',
           'nomes': list([
-            'Canoinha',
+            'Pallof Press',
           ]),
         }),
       ]),
@@ -1035,7 +1062,7 @@
         dict({
           'label': 'B',
           'nomes': list([
-            'Desenv. Halteres Sentado',
+            'Crossover',
           ]),
         }),
       ]),
@@ -1050,14 +1077,14 @@
         dict({
           'label': 'A',
           'nomes': list([
-            'Apoio',
-            'Pullover Halteres',
+            'Desenv. Halteres Sentado',
+            'Supino Com Anilha',
           ]),
         }),
         dict({
           'label': 'B',
           'nomes': list([
-            'Crossover',
+            'Pullover Halteres',
           ]),
         }),
       ]),
