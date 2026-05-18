@@ -227,9 +227,16 @@ predicado e migração.
 4. Mock_futuros (5 restantes) vão pro XLSX na Fase 4 — Russian Twist +
    4 INFRAs. Etapa 8 reduziu de 11 pra 5 (refator CORE absorveu o
    resto). Pode reduzir piso 4.1.
-5. Cycling determinístico de subregião (achado paralelo Sessão 7a)
-   — investigar se relevante pós-Etapa 7. Pode interagir com viés
-   mono-ex do 6º NO-OP.
+5. ~~Cycling determinístico de subregião~~ ✅ **Fechado 2026-05-17**
+   (branch `refactor/cycling-fallback`). Refator do `_decompor_demanda_*`
+   fallback (subregiões sem âncora: core_iso/din, bracos, adutores) com
+   quota ponderada por pool via novo helper `_quotas_por_pool`. Resolve
+   também o 6º NO-OP da Seção 8.15.12: **4.1 cai de 21.54% → 14.95%
+   slots overlap** (abaixo do alvo histórico <15% pela primeira vez).
+   Caminho com âncora intocado — paridade `costas(4)=2+2` e
+   `perna_anterior(3)=2bi+1uni` preservadas. Pytest 202 (196 base + 6
+   novos), harness 16/16 OK. Detalhes na Seção 8.15.13 da
+   `dimensoes_proximidade.md`.
 6. ~~**UI Histórico exposed**~~ ✅ **Fechado 2026-05-17** (branch
    `feat/ui-historico-r1`). Clean break do hard block legado
    `evitar_ultimos` (dropdown 0/1/2/3 períodos) → toggle checkbox
@@ -445,8 +452,9 @@ escassez). CSS novo em `base.html` (`.rationale-section--origem`,
 
 - Captura no pareamento e na pré-alocação ✅ ambas concluídas (2026-05-17).
 - Outros itens da 8.15.7 da `dimensoes_proximidade.md` continuam abertos
-  (UI Histórico item 6 ✅ fechado, setup B 4.1 item 7 ✅ fechado, escalada
-  2.3 item 8, cycling determinístico item 5, cleanup YAML)
+  (UI Histórico item 6 ✅ fechado, setup B 4.1 item 7 ✅ fechado,
+  cycling determinístico item 5 ✅ fechado 2026-05-17 — Seção 8.15.13,
+  escalada 2.3 item 8, cleanup YAML)
 
 ## Stack
 

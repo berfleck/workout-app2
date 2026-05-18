@@ -3395,10 +3395,13 @@ melhoria. **Refinamento da métrica 4.1 fica pra Fase 7.5 ou 7.6:**
    Barra Aberta, Barra Supinada, Recuo do Estepe, Russian Twist,
    INFRA Alternado/Suspenso/Chão/Roll-Up). Confirmação user
    Sessão 7c. Fase 4 protocolo já registrado Seção 9.
-5. **Cycling determinístico de subregião** (achado paralelo Sessão 7a):
-   `_selecionar_ciclando` em modo subregião com `preferir_composto=True`
-   produz 100% mesmo padrão sequence — investigar se relevante
-   pós-Etapa 7 (pode afetar calibração C se houver).
+5. ~~**Cycling determinístico de subregião**~~ ✅ **Fechado em 2026-05-17**
+   (branch `refactor/cycling-fallback`). Refator do `_decompor_demanda_*`
+   fallback (subregiões sem âncora) — quota agora ponderada por pool via
+   novo helper `_quotas_por_pool`. Resolve 6º NO-OP da Seção 8.15.12
+   (4.1: **21.54% → 14.95%** slots overlap, abaixo do alvo histórico
+   <15%). Caminho com âncora intocado — paridade `costas(4)=2+2` e
+   `perna_anterior(3)=2bi+1uni` preservadas. Detalhes Seção 8.15.13.
 6. ~~**UI Histórico exposed**~~ ✅ **Fechado em 2026-05-17** (branch
    `feat/ui-historico-r1`). Decisão A do user: substituir hard block
    legado (`evitar_ultimos` dropdown) pelo score HIST D3.3 (clean break).
@@ -4025,6 +4028,85 @@ overlay YAML aplicado):**
   (2.3, 4.1 pré-Etapa 8, 4.1 pós-Etapa 8) — procedimento operacional
   ratificado, com a adição da diretriz **"instrumentação de sondagem
   deve replicar overlay do harness"** (achado v1 vs v2 desta seção).
+
+#### 8.15.13 Fechamento Item 5 da 8.15.7 — refator cycling fallback resolve 6º NO-OP (2026-05-17)
+
+> **Decisão registrada:** refator do `_decompor_demanda_*` fallback
+> (subregiões sem âncora: core_dinamico, core_isometrico, bracos,
+> adutores; região cardio) — quota agora é ponderada por tamanho do
+> pool via novo helper `_quotas_por_pool` (Hamilton-like com sorteio
+> sem reposição ponderado). Resolve viés de distribuição por padrões
+> mono-ex documentado em 8.15.12 SEM violar paridade documentada
+> (`costas(4)=2+2`, `perna_anterior(3)=2bi+1uni`) que passa pelo
+> caminho com âncora. **4.1 cai de 21.54% → 14.95% slots overlap**
+> (abaixo do alvo histórico <15%) — 6º NO-OP destravado.
+
+**Mecanismo:**
+
+Pré-refator (cycling 1-de-cada-padrão):
+- `_decompor_demanda_subregiao("core_isometrico", 1)` → sorteia 1
+  dos 4 padrões uniformemente → P(rotacao_tronco escolhido) = 1/4 →
+  P(Pallof Press) = 1/4 × 1/1 = **25%**.
+
+Pós-refator (`_quotas_por_pool` ponderado por pool):
+- Pool: flexao_tronco=8, flexao_lateral=1, rotacao_tronco=1,
+  flexao_quadril=3. qtd=1. Sample ponderado: P(rotacao_tronco) = 1/13.
+- P(Pallof Press) = 1/13 × 1 = **7.7%** teórico; observado **4%** no
+  banco real (~25 ex em core_isometrico com Fase 4).
+- Para qtd > 1: sorteio sem reposição ponderado (pool decrementa
+  após cada escolha) — preserva propriedade "by-exercise" também em
+  demandas maiores.
+
+**Escopo do refator (cirúrgico):**
+
+- **Toca** `_decompor_demanda_subregiao` fallback + `_decompor_demanda_regiao`
+  fallback. Adiciona kwarg `banco: Optional[list[Exercicio]] = None`
+  em ambas. Quando `banco=None` (chamadas legacy/testes diretos),
+  preserva cycling antigo — zero quebra de retrocompat.
+- **NÃO toca** caminho com âncora (Hamilton-ponderado por pesos
+  clínicos): `costas`, `perna_anterior`, `peito`, `ombro`, etc.
+  continuam idênticos.
+- **NÃO toca** `_selecionar_ciclando` (usado em standalone /regerar).
+  Standalone é fluxo cirúrgico — preserva comportamento histórico.
+
+**Resultado pós-decisão:**
+
+- 4.1 = **14.95%** slots overlap (vs 21.54% pré-refator) → OK informativo
+  com sinal saudável (<15% alvo histórico atingido pela primeira vez).
+- 4.2 = 47.64% (vs 70.72% pré-refator) → gap 4.2-4.1 = 32.69 pp confirma
+  HIST continua ativo.
+- Harness pós-decisão: **16/16 OK** preservado. 2.3 segue informativo
+  (NO-OP banco-limitado, Seção 8.15.10).
+- Pytest 202 passed (196 base + 6 novos: 4 unit de `_quotas_por_pool`
+  + 1 regressão Pallof Press <12% em core_iso(1) + 1 import-only).
+- 13 snapshots regenerados (test_regressao.py): mudanças visíveis e
+  esperadas — Pallof e Prancha Lateral aparecem menos, Russian Twist
+  e exs de flexao_quadril aparecem mais.
+- Defaults da Fase 7.1 (pesos da proximidade) **mantidos sem alteração**
+  — refator é estrutural, não calibração de pesos.
+
+**Trade-off aceito (cobertura ↓ vs uniformidade ↑):**
+
+Pré-refator: `core_isometrico(4)` sempre cobre os 4 padrões biomecânicos
+(1 de cada). Pós-refator: pode dar 2 flexao_tronco + 1 flexao_quadril +
+1 outro (faltam 1-2 padrões biomecânicos). Trade-off deliberado: a
+cobertura em demandas iguais ao número de padrões era artefato do
+algoritmo, não invariante clínico — Pallof Press dominante era a
+distorção visível. Em demandas grandes (qtd >> n_padroes) a cobertura
+ainda emerge naturalmente do sorteio ponderado.
+
+**Cross-references:**
+
+- Resolve item 5 da Seção 8.15.7 (cycling determinístico de subregião).
+- Destrava 6º NO-OP da Seção 8.15.12 (viés mono-ex pós-CORE).
+- Implementação: branch `refactor/cycling-fallback`, novo helper
+  `_quotas_por_pool` em `gerador_treino.py` (~linha 345), wire em
+  `_decompor_demanda_subregiao` (~linha 2497) e `_decompor_demanda_regiao`
+  (~linha 2615), 5 call-sites em `pre_alocar_rotina` ganharam `banco=banco`.
+- Testes: `tests/test_pre_alocacao.py` ganhou seção "_quotas_por_pool"
+  com 5 testes (incluindo regressão Pallof Press <12%).
+- Test atualizado (par bloqueado novo): `test_filtro_carga_realmente_dissolve_par_conhecido`
+  agora usa seed=71 + par Lev. Terra + Remada Baixa Aberta.
 
 ---
 
