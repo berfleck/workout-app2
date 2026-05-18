@@ -1,0 +1,298 @@
+"""Cadastra 10 novos exercícios no banco_exercicios.xlsx.
+
+6 do Anexo 4.2 (itens 18, 21, 22, 23, 24, 27) + 4 novos exercícios
+(Stiff B-Stance, Agach. Goblet Rampa, Agach. Smith Rampa, Kickback Polia).
+
+Branch: feat/cadastros-pullover-mitigation
+"""
+import openpyxl
+from pathlib import Path
+
+XLSX = Path(__file__).parent.parent / "banco_exercicios.xlsx"
+
+NOVOS = [
+    # --- Anexo 4.2 ---
+    {
+        "nome": "Crucifixo Inclinado Halteres",
+        "variacao_de": "crucifixo",
+        "eq_primario": "Halteres",
+        "eq_secundario": "Banco inclinado",
+        "regiao": "upper",
+        "subregiao": "peito",
+        "padrao": "empurrar_isolados",
+        "purpose": "isolation",
+        "unilateral": "bilateral",
+        "complexidade": 2,
+        "fadiga": 3,
+        "circuito": "não",
+        "similaridade": "horizontal_press_compound",
+        "musculo_primario": "peitoral",
+        "obs": None,
+        "carga_grip": 1,
+        "carga_lombar": 0,
+        "demanda_core": 0,
+        "pegada": "neutra",
+        "plano_corporal": "inclinado",
+        "equipamento_grupo": "halter",
+        "variante_pontual": False,
+        "ativo": True,
+    },
+    {
+        "nome": "Serrote Aberto",
+        "variacao_de": "unilateral",
+        "eq_primario": "Halteres",
+        "eq_secundario": "Banco reto",
+        "regiao": "upper",
+        "subregiao": "costas",
+        "padrao": "remadas",
+        "purpose": "compound",
+        "unilateral": "unilateral",
+        "complexidade": 3,
+        "fadiga": 4,
+        "circuito": "não",
+        "similaridade": "horizontal_pull_compound",
+        "musculo_primario": "dorsal, romboides",
+        "obs": "pegada pronada-wide (variante do Serrote regular)",
+        "carga_grip": 2,
+        "carga_lombar": 2,
+        "demanda_core": 2,
+        "pegada": "aberta",
+        "plano_corporal": "unilateral_apoiada",
+        "equipamento_grupo": "halter",
+        "variante_pontual": False,
+        "ativo": True,
+    },
+    {
+        "nome": "Barra C/ Borracha",
+        "variacao_de": "Barra",
+        "eq_primario": "Barra fixa (crossover)",
+        "eq_secundario": "Banda elástica",
+        "regiao": "upper",
+        "subregiao": "costas",
+        "padrao": "puxadas",
+        "purpose": "compound",
+        "unilateral": "bilateral",
+        "complexidade": 3,
+        "fadiga": 3,
+        "circuito": "não",
+        "similaridade": "vertical_pull_compound",
+        "musculo_primario": "dorsal, bíceps",
+        "obs": "barra fixa assistida com banda elástica nos pés",
+        "carga_grip": 3,
+        "carga_lombar": 1,
+        "demanda_core": 2,
+        "pegada": "aberta",
+        "plano_corporal": None,
+        "equipamento_grupo": "corporal",
+        "variante_pontual": False,
+        "ativo": True,
+    },
+    {
+        "nome": "Puxada Unilateral Polia",
+        "variacao_de": "Puxada",
+        "eq_primario": "Polia",
+        "eq_secundario": "Manopla",
+        "regiao": "upper",
+        "subregiao": "costas",
+        "padrao": "puxadas",
+        "purpose": "compound",
+        "unilateral": "unilateral",
+        "complexidade": 3,
+        "fadiga": 3,
+        "circuito": "não",
+        "similaridade": "vertical_pull_compound",
+        "musculo_primario": "dorsal, bíceps",
+        "obs": None,
+        "carga_grip": 2,
+        "carga_lombar": 1,
+        "demanda_core": 1,
+        "pegada": "neutra",
+        "plano_corporal": None,
+        "equipamento_grupo": "polia",
+        "variante_pontual": False,
+        "ativo": True,
+    },
+    {
+        "nome": "Pulldown Braço Estendido",
+        "variacao_de": "Pulldown",
+        "eq_primario": "Polia",
+        "eq_secundario": "Barra reta",
+        "regiao": "upper",
+        "subregiao": "costas",
+        "padrao": "puxadas",
+        "purpose": "isolation",
+        "unilateral": "bilateral",
+        "complexidade": 2,
+        "fadiga": 2,
+        "circuito": "não",
+        "similaridade": "vertical_pull_compound",
+        "musculo_primario": "dorsal",
+        "obs": "straight-arm pulldown — isolation de lat",
+        "carga_grip": 1,
+        "carga_lombar": 0,
+        "demanda_core": 1,
+        "pegada": "aberta",
+        "plano_corporal": "pullover",
+        "equipamento_grupo": "polia",
+        "variante_pontual": False,
+        "ativo": True,
+    },
+    {
+        "nome": "Tríceps Francês Corda",
+        "variacao_de": "Tríceps Francês",
+        "eq_primario": "Polia",
+        "eq_secundario": "Corda",
+        "regiao": "upper",
+        "subregiao": "bracos",
+        "padrao": "triceps",
+        "purpose": "isolation",
+        "unilateral": "bilateral",
+        "complexidade": 2,
+        "fadiga": 2,
+        "circuito": "não",
+        "similaridade": "elbow_extension_isolation",
+        "musculo_primario": "tríceps",
+        "obs": None,
+        "carga_grip": 1,
+        "carga_lombar": 0,
+        "demanda_core": 1,
+        "pegada": "neutra",
+        "plano_corporal": None,
+        "equipamento_grupo": "polia",
+        "variante_pontual": False,
+        "ativo": True,
+    },
+    # --- Novos exercícios (fora do Anexo) ---
+    {
+        "nome": "Stiff B-Stance",
+        "variacao_de": "stiff",
+        "eq_primario": "Halteres",
+        "eq_secundario": None,
+        "regiao": "lower",
+        "subregiao": "perna_posterior",
+        "padrao": "hinge",
+        "purpose": "compound",
+        "unilateral": "unilateral",
+        "complexidade": 3,
+        "fadiga": 3,
+        "circuito": "não",
+        "similaridade": "hip_hinge_compound",
+        "musculo_primario": "isquiotibiais, glúteos",
+        "obs": "postura escalonada (B-stance), apoio leve da perna de trás",
+        "carga_grip": 2,
+        "carga_lombar": 3,
+        "demanda_core": 3,
+        "pegada": None,
+        "plano_corporal": "em_pe",
+        "equipamento_grupo": "halter",
+        "variante_pontual": False,
+        "ativo": True,
+    },
+    {
+        "nome": "Agachamento Goblet Rampa",
+        "variacao_de": "calcanhar_elevado",
+        "eq_primario": "Halter",
+        "eq_secundario": "Rampa",
+        "regiao": "lower",
+        "subregiao": "perna_anterior",
+        "padrao": "squat_bilateral",
+        "purpose": "compound",
+        "unilateral": "bilateral",
+        "complexidade": 2,
+        "fadiga": 3,
+        "circuito": "sim",
+        "similaridade": "squat_bilateral_compound",
+        "musculo_primario": "quadríceps, glúteos",
+        "obs": "calcanhares elevados em rampa (quad-dominant)",
+        "carga_grip": 1,
+        "carga_lombar": 1,
+        "demanda_core": 1,
+        "pegada": None,
+        "plano_corporal": None,
+        "equipamento_grupo": "halter",
+        "variante_pontual": False,
+        "ativo": True,
+    },
+    {
+        "nome": "Agachamento Smith Rampa",
+        "variacao_de": "calcanhar_elevado",
+        "eq_primario": "Barra Smith (crossover)",
+        "eq_secundario": "Rampa",
+        "regiao": "lower",
+        "subregiao": "perna_anterior",
+        "padrao": "squat_bilateral",
+        "purpose": "compound",
+        "unilateral": "bilateral",
+        "complexidade": 2,
+        "fadiga": 3,
+        "circuito": "não",
+        "similaridade": "squat_bilateral_compound",
+        "musculo_primario": "quadríceps, glúteos",
+        "obs": "calcanhares elevados em rampa (quad-dominant)",
+        "carga_grip": 1,
+        "carga_lombar": 2,
+        "demanda_core": 1,
+        "pegada": None,
+        "plano_corporal": None,
+        "equipamento_grupo": "barra_guiada",
+        "variante_pontual": False,
+        "ativo": True,
+    },
+    {
+        "nome": "Kickback Polia",
+        "variacao_de": "Kickback",
+        "eq_primario": "Polia",
+        "eq_secundario": "Tornozeleira",
+        "regiao": "lower",
+        "subregiao": "perna_posterior",
+        "padrao": "hinge",
+        "purpose": "isolation",
+        "unilateral": "unilateral",
+        "complexidade": 2,
+        "fadiga": 2,
+        "circuito": "não",
+        "similaridade": "glute_isolation",
+        "musculo_primario": "glúteos",
+        "obs": "extensão de quadril unilateral, mãos apoiadas",
+        "carga_grip": 1,
+        "carga_lombar": 1,
+        "demanda_core": 1,
+        "pegada": None,
+        "plano_corporal": "em_pe",
+        "equipamento_grupo": "polia",
+        "variante_pontual": False,
+        "ativo": True,
+    },
+]
+
+
+def main():
+    wb = openpyxl.load_workbook(XLSX)
+    ws = wb["Exercícios"]
+    header = [c.value for c in ws[1]]
+    print(f"Header ({len(header)} cols): {header}")
+    print(f"Linhas antes: {ws.max_row}")
+
+    nomes_existentes = {ws.cell(row=r, column=1).value for r in range(2, ws.max_row + 1)}
+    conflitos = [ex["nome"] for ex in NOVOS if ex["nome"] in nomes_existentes]
+    if conflitos:
+        raise SystemExit(f"ABORTANDO — nomes já no banco: {conflitos}")
+
+    for ex in NOVOS:
+        faltando = [c for c in header if c not in ex]
+        if faltando:
+            raise SystemExit(f"ABORTANDO — exercício {ex['nome']!r} faltando colunas: {faltando}")
+
+    for ex in NOVOS:
+        row = ws.max_row + 1
+        for col_idx, col_name in enumerate(header, start=1):
+            ws.cell(row=row, column=col_idx, value=ex[col_name])
+        print(f"  + linha {row}: {ex['nome']}")
+
+    print(f"Linhas depois: {ws.max_row}")
+    wb.save(XLSX)
+    print(f"Salvo em {XLSX}")
+
+
+if __name__ == "__main__":
+    main()
