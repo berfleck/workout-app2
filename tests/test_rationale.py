@@ -447,3 +447,138 @@ def test_pareamento_componentes_refletem_score_pareamento(banco):
             f"score do par {b.ex2.nome} divergente — capturado "
             f"{p['score_pareamento']}, recomputado {score_recomputado}"
         )
+
+
+# 7. Pré-alocação — extensão pós-MVP (captura em `pre_alocar_rotina`) ----------
+
+
+def test_pre_alocacao_capturada_em_todos_exs(banco):
+    """Todo ex escolhido via score-aware deve ter rationale.pre_alocacao."""
+    random.seed(42)
+    configs = [
+        {
+            "demandas": [("regiao", "upper", 4), ("subregiao", "core", 2)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    for ex in _iter_exercicios(sessoes):
+        pa = (ex.rationale or {}).get("pre_alocacao")
+        assert pa is not None, f"{ex.nome} sem pre_alocacao"
+        assert set(pa.keys()) >= {
+            "nivel_demanda_original", "subregiao_intermediaria",
+            "ordem_processamento", "total_slots", "escassez_no_momento"
+        }
+
+
+def test_pre_alocacao_subregiao_intermediaria_so_quando_demanda_regiao(banco):
+    """Demanda regiao → subregiao_intermediaria preenchida.
+    Demanda subregiao/padrao → subregiao_intermediaria = None.
+    """
+    random.seed(7)
+    configs = [
+        {
+            "demandas": [
+                ("regiao", "upper", 4),         # gera sub_int populada
+                ("subregiao", "core", 2),       # gera sub_int = None
+                ("padrao", "flexao_plantar", 1) # gera sub_int = None
+            ],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    cobertura = {"regiao": 0, "subregiao": 0, "padrao": 0}
+    for ex in _iter_exercicios(sessoes):
+        pa = ex.rationale["pre_alocacao"]
+        nivel_orig = pa["nivel_demanda_original"]
+        sub_int = pa["subregiao_intermediaria"]
+        if nivel_orig == "regiao":
+            assert sub_int is not None, (
+                f"{ex.nome}: demanda regiao deveria ter subregiao_intermediaria, viu None"
+            )
+            cobertura["regiao"] += 1
+        else:
+            assert sub_int is None, (
+                f"{ex.nome}: demanda {nivel_orig} não deveria ter subregiao_intermediaria, viu {sub_int}"
+            )
+            cobertura[nivel_orig] += 1
+    assert cobertura["regiao"] > 0, "esperava pelo menos 1 ex de demanda regiao"
+    assert cobertura["subregiao"] > 0, "esperava pelo menos 1 ex de demanda subregiao"
+    assert cobertura["padrao"] > 0, "esperava pelo menos 1 ex de demanda padrao"
+
+
+def test_pre_alocacao_ordem_unica_e_dentro_dos_limites(banco):
+    """Em uma rotina, ordens são 1..total_slots únicos no passe."""
+    random.seed(11)
+    configs = [
+        {
+            "demandas": [("regiao", "upper", 6)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    ordens = []
+    totais = set()
+    for ex in _iter_exercicios([sessoes[0]]):
+        pa = ex.rationale["pre_alocacao"]
+        ordens.append(pa["ordem_processamento"])
+        totais.add(pa["total_slots"])
+    assert len(set(ordens)) == len(ordens), (
+        f"ordens devem ser únicas, viu {sorted(ordens)}"
+    )
+    assert all(1 <= o <= max(totais) for o in ordens)
+    # Total deve ser consistente entre slots do mesmo passe
+    assert len(totais) <= 2, f"esperava 1-2 totais (estrito + relax), viu {totais}"
+
+
+def test_pre_alocacao_round_trip_serializacao(banco):
+    """_exercicio_to_dict → JSON → _dict_to_exercicio preserva pre_alocacao."""
+    from app_flask import _dict_to_exercicio, _exercicio_to_dict
+
+    random.seed(99)
+    configs = [
+        {
+            "demandas": [("regiao", "upper", 4)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    cobertura = 0
+    for ex in _iter_exercicios(sessoes):
+        d = _exercicio_to_dict(ex)
+        js = json.dumps(d)
+        d2 = json.loads(js)
+        ex2 = _dict_to_exercicio(d2)
+        assert ex2.rationale == ex.rationale, (
+            f"rationale (incl. pre_alocacao) não sobreviveu round-trip pro ex {ex.nome}"
+        )
+        if (ex.rationale or {}).get("pre_alocacao"):
+            cobertura += 1
+    assert cobertura > 0, "esperava pelo menos 1 ex com pre_alocacao serializada"
+
+
+def test_pre_alocacao_escassez_positiva_quando_ex_escolhido(banco):
+    """Se o ex foi escolhido, escassez_no_momento deve ser >= 1 (havia candidato)."""
+    random.seed(13)
+    configs = [
+        {
+            "demandas": [("regiao", "upper", 6)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    for ex in _iter_exercicios(sessoes):
+        pa = ex.rationale["pre_alocacao"]
+        assert pa["escassez_no_momento"] >= 1, (
+            f"{ex.nome}: escassez deveria ser >= 1 (foi escolhido), viu {pa['escassez_no_momento']}"
+        )

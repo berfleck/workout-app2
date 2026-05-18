@@ -413,14 +413,40 @@ UI: nova seção "Pareamento no bloco" em `_rationale_inline.html` entre
 pra componentes de sinal misto). Pytest 191 passed (184 + 7 novos), harness
 16/16 OK preservados.
 
+**Extensão pós-Etapa 8 Explic — pré-alocação (2026-05-17):** captura de
+rationale na pré-alocação global em `pre_alocar_rotina` implementada.
+Fecha a outra metade da "Extensão futura" do log da etapa. `_Slot` ganha
+campo `subregiao_intermediaria`; pre_alocar_rotina rastreia ordem + total +
+escassez por passe (estrito e relax separados). `_montar_rationale` aceita
+arg `pre_alocacao_info`. Shape:
+
+```python
+rationale["pre_alocacao"] = {
+    "nivel_demanda_original": "regiao" | "subregiao" | "padrao",
+    "subregiao_intermediaria": str | None,  # populado só quando nivel_orig == "regiao"
+    "ordem_processamento": int,             # 1-based, dentro do passe
+    "total_slots": int,                     # total no passe (estrito ou relax)
+    "escassez_no_momento": int,             # candidatos viáveis no instante da escolha
+}
+```
+
+Implementação técnica: mapa paralelo `subregiao_intermediaria_por_sub`
+indexado por `(t_idx, d_idx, sub_idx)` evita refator das tuplas
+`sub_demandas_por_origem`. Conflito raro (mesmo padrão derivando de 2
+subregiões via decomposição CORE 1:N pós-Etapa 8) resolvido com regra
+"first wins" via `dict.setdefault`. UI: nova seção "Origem do slot"
+em `_rationale_inline.html` entre meta line e "Penalizações", renderizada
+como breadcrumb (chips laranja com setas) + meta line (slot N de M +
+escassez). CSS novo em `base.html` (`.rationale-section--origem`,
+`.rationale-origem-chip/-arrow/-meta/-sep`). Pytest 196 passed (191 +
+5 novos), harness 16/16 OK preservados.
+
 **Pendências pós-Etapa 8 Explicabilidade (não bloqueiam uso real):**
 
-- Captura de rationale na **pré-alocação global** (escassez do slot, ordem de
-  processamento, decomposição demanda → subregião → padrão) — estrutura `dict`
-  já permite adicionar chave `pre_alocacao` sem breaking change
+- Captura no pareamento e na pré-alocação ✅ ambas concluídas (2026-05-17).
 - Outros itens da 8.15.7 da `dimensoes_proximidade.md` continuam abertos
-  (UI Histórico item 6, setup B 4.1 item 7, escalada 2.3 item 8, cycling
-  determinístico item 5, cleanup YAML)
+  (UI Histórico item 6 ✅ fechado, setup B 4.1 item 7 ✅ fechado, escalada
+  2.3 item 8, cycling determinístico item 5, cleanup YAML)
 
 ## Stack
 

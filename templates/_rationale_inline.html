@@ -47,6 +47,33 @@
         <span class="rationale-meta-item rationale-score"><b>Score:</b> {{ '%.0f'|format(r.score_total) }}</span>
     </div>
 
+    {% if r.pre_alocacao %}
+    {% set pa = r.pre_alocacao %}
+    <div class="rationale-section rationale-section--origem">
+        <div class="rationale-section-title">Origem do slot</div>
+        <div class="rationale-origem">
+            <span class="rationale-origem-trace">
+                <b>Demanda raiz:</b>
+                {{ NIVEL_LABEL.get(pa.nivel_demanda_original, pa.nivel_demanda_original) }}
+                <span class="rationale-origem-chip">{{ slot.escopo_demanda_original }}</span>
+                {% if pa.subregiao_intermediaria %}
+                    <span class="rationale-origem-arrow">→</span>
+                    <b>Subregião:</b>
+                    <span class="rationale-origem-chip">{{ pa.subregiao_intermediaria }}</span>
+                {% endif %}
+                <span class="rationale-origem-arrow">→</span>
+                <b>Padrão:</b>
+                <span class="rationale-origem-chip">{{ slot.escopo }}</span>
+            </span>
+            <span class="rationale-origem-meta">
+                <span><b>Slot {{ pa.ordem_processamento }}</b> de {{ pa.total_slots }} no passe {{ slot.passe }}</span>
+                <span class="rationale-origem-sep">·</span>
+                <span><b>Escassez:</b> {{ pa.escassez_no_momento }} candidato{{ '' if pa.escassez_no_momento == 1 else 's' }} viáve{{ 'l' if pa.escassez_no_momento == 1 else 'is' }}</span>
+            </span>
+        </div>
+    </div>
+    {% endif %}
+
     {% if comps %}
     <div class="rationale-section">
         <div class="rationale-section-title">Penalizações que pesaram</div>

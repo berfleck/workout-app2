@@ -1611,6 +1611,11 @@ class _Slot:
     # requer_composto aposentado na Etapa 3: quota composta emerge dos pesos
     # das âncoras subregião. Mantido como kwarg opcional pra retrocompat.
     requer_composto: bool = False
+    # Extensão pós-Etapa 8 Explic (pre_alocacao): quando a demanda original é
+    # `regiao`, este campo guarda o nome da subregião intermediária pela qual
+    # o slot foi decomposto (regiao → subregiao_intermediaria → padrao).
+    # `None` quando demanda original é subregiao ou padrao (sem intermediária).
+    subregiao_intermediaria: Optional[str] = None
 
 
 def _peso_nivel(nivel: str) -> int:
@@ -2021,12 +2026,17 @@ def _montar_rationale(
     historico_r1: list["Exercicio"],
     pesos_config: ConfigPesosProximidade,
     max_alternativas: int = 3,
+    pre_alocacao_info: Optional[dict] = None,
 ) -> dict:
     """Monta o dict de rationale pro exercício escolhido.
 
     `cands_scored` é a lista completa `(exercicio, score)` (mesma que o
     softmax usa). Inclui o escolhido. As alternativas exibidas são as `K`
     de maior score depois do escolhido (não passaram no sorteio softmax).
+
+    `pre_alocacao_info` (extensão pós-MVP) — quando passado, atacha chave
+    `"pre_alocacao"` no rationale com info sobre a decomposição (subregião
+    intermediária), ordem do slot no passe e escassez no momento da escolha.
     """
     componentes_escolhido = _componentes_intra(
         escolhido, alocados_intra, pesos_config
@@ -2057,13 +2067,16 @@ def _montar_rationale(
             "delta": score_escolhido - total_alt,
         })
 
-    return {
+    resultado: dict = {
         "slot": slot_info,
         "score_total": score_escolhido,
         "componentes": componentes_escolhido,
         "alternativas": alternativas,
         "tamanho_pool": len(cands_scored),
     }
+    if pre_alocacao_info is not None:
+        resultado["pre_alocacao"] = pre_alocacao_info
+    return resultado
 
 
 def _componentes_pareamento(
@@ -2203,6 +2216,7 @@ def _selecionar_cand_score_aware(
     historico_r1: Optional[list["Exercicio"]] = None,
     pesos_config: ConfigPesosProximidade = PESOS_DEFAULT,
     slot_info: Optional[dict] = None,
+    pre_alocacao_info: Optional[dict] = None,
 ) -> "Exercicio":
     """Escolhe um candidato em `cands` ponderando pelo score soft total.
 
@@ -2244,6 +2258,7 @@ def _selecionar_cand_score_aware(
             slot_info,
             alocados_intra, inter_list, hist_list,
             pesos_config,
+            pre_alocacao_info=pre_alocacao_info,
         )
         return replace(escolhido, rationale=rationale)
 
@@ -2270,6 +2285,7 @@ def _selecionar_cand_score_aware(
         slot_info,
         alocados_intra, inter_list, hist_list,
         pesos_config,
+        pre_alocacao_info=pre_alocacao_info,
     )
     return replace(escolhido, rationale=rationale)
 
@@ -2639,6 +2655,12 @@ def pre_alocar_rotina(
     # Etapa 3: quota_composta aposentada (pesos das âncoras decidem composto/iso).
     quota_total: dict[tuple[int, int], tuple[str, str, int]] = {}
     sub_demandas_por_origem: dict[tuple[int, int], list[tuple[str, str, int]]] = {}
+    # Mapa paralelo pra rationale.pre_alocacao (extensão pós-MVP Etapa 8 Explic):
+    # `(t_idx, d_idx, sub_idx)` → nome da subregião intermediária pela qual essa
+    # sub-demanda foi decomposta. Populado só quando demanda original é regiao
+    # (e portanto há um nível intermediário). Travados mutam qtd mas preservam
+    # ordem do sub_idx, então o mapa segue válido após Etapa B.
+    subregiao_intermediaria_por_sub: dict[tuple[int, int, int], Optional[str]] = {}
 
     # Pré-mapeamento travados → primeira demanda compatível (D3.1).
     # Esse mapeamento informa a decomposição (subregioes_obrigatorias e
@@ -2680,6 +2702,9 @@ def pre_alocar_rotina(
     # Pra cada grupo com >1 treino e nivel != "padrao" (padrão é imune às
     # âncoras), calcular quotas globais e redistribuir
     quotas_pre_alocadas: dict[tuple[int, int], dict[str, int]] = {}
+    # Mapa paralelo: para demandas regiao agregadas, padrão → primeira subregião
+    # que aportou aquela vaga. Usado em rationale.pre_alocacao.subregiao_intermediaria.
+    sub_intermediaria_aggr: dict[tuple[int, int], dict[str, str]] = {}
     for (nv, esc, qt), instancias in demandas_agregadas.items():
         if nv == "padrao":
             continue  # demanda padrão imune a âncoras
@@ -2722,6 +2747,7 @@ def pre_alocar_rotina(
             # sobre cada subregião alocada
             for i, (t_idx, d_idx) in enumerate(instancias):
                 quotas_padrao_treino: dict[str, int] = {}
+                pad_to_sub_treino: dict[str, str] = {}  # first subregião que aportou cada padrão
                 for sub_esc, sub_qt in por_treino_sub[i].items():
                     if sub_qt <= 0:
                         continue
@@ -2734,7 +2760,9 @@ def pre_alocar_rotina(
                         avisos_rotina.append(av)
                     for (_n, p, q) in sub_dems_p:
                         quotas_padrao_treino[p] = quotas_padrao_treino.get(p, 0) + q
+                        pad_to_sub_treino.setdefault(p, sub_esc)
                 quotas_pre_alocadas[(t_idx, d_idx)] = quotas_padrao_treino
+                sub_intermediaria_aggr[(t_idx, d_idx)] = pad_to_sub_treino
 
         elif nv == "subregiao":
             if esc not in ANCORAS_POR_SUBREGIAO:
@@ -2782,9 +2810,15 @@ def pre_alocar_rotina(
             # no nível rotina (Etapa A.0) se essa demanda foi agregada.
             quotas_aggr = quotas_pre_alocadas.get((t_idx, d_idx))
             if quotas_aggr is not None:
-                sub_demandas_por_origem[(t_idx, d_idx)] = [
+                pad_to_sub = sub_intermediaria_aggr.get((t_idx, d_idx), {})
+                sub_dems_aggr = [
                     ("padrao", p, q) for p, q in quotas_aggr.items() if q > 0
                 ]
+                sub_demandas_por_origem[(t_idx, d_idx)] = sub_dems_aggr
+                for sub_idx, (_n, p, _q) in enumerate(sub_dems_aggr):
+                    subregiao_intermediaria_por_sub[(t_idx, d_idx, sub_idx)] = (
+                        pad_to_sub.get(p)  # presente só pro caminho regiao agregado
+                    )
                 continue
 
             if nivel == "regiao":
@@ -2796,6 +2830,8 @@ def pre_alocar_rotina(
                     av["escopo_demanda"] = escopo
                     avisos_rotina.append(av)
                 sub_dems_padrao: list[tuple[str, str, int]] = []
+                # Track sub_esc parent para cada padrão produzido (primeira ocorrência)
+                pad_sub_origem: list[Optional[str]] = []
                 for (_n, sub_esc, sub_qt) in sub_dems_subregiao:
                     # Etapa 8: padrão pertence à subregião sse o nome está
                     # no set do mapa (1:N pra core).
@@ -2806,12 +2842,16 @@ def pre_alocar_rotina(
                     sub_dems_p, avs_sub = _decompor_demanda_subregiao(
                         sub_esc, sub_qt, padroes_obrigatorios=pads_obrig_sub,
                     )
-                    sub_dems_padrao.extend(sub_dems_p)
+                    for sd in sub_dems_p:
+                        sub_dems_padrao.append(sd)
+                        pad_sub_origem.append(sub_esc)
                     for av in avs_sub:
                         av["treino_idx"] = t_idx
                         av["escopo_demanda"] = escopo
                         avisos_rotina.append(av)
                 sub_demandas_por_origem[(t_idx, d_idx)] = sub_dems_padrao
+                for sub_idx, sub_esc in enumerate(pad_sub_origem):
+                    subregiao_intermediaria_por_sub[(t_idx, d_idx, sub_idx)] = sub_esc
             elif nivel == "subregiao":
                 sub_dems_p, avs_sub = _decompor_demanda_subregiao(
                     escopo, qtd, padroes_obrigatorios=padroes_obrig,
@@ -2821,8 +2861,13 @@ def pre_alocar_rotina(
                     av["treino_idx"] = t_idx
                     av["escopo_demanda"] = escopo
                     avisos_rotina.append(av)
+                # subregiao_intermediaria fica None pra todos os slots desta demanda
+                # (demanda original JÁ é subregião — sem intermediário no meio)
+                for sub_idx in range(len(sub_dems_p)):
+                    subregiao_intermediaria_por_sub[(t_idx, d_idx, sub_idx)] = None
             else:
                 sub_demandas_por_origem[(t_idx, d_idx)] = [(nivel, escopo, qtd)]
+                subregiao_intermediaria_por_sub[(t_idx, d_idx, 0)] = None
 
     # ─── Etapa B: processar travados (D3.1) ──────────────────────────────
     # Travado consome 1 vaga da primeira demanda compatível (mesmo padrão >
@@ -2870,7 +2915,8 @@ def pre_alocar_rotina(
     slots_pendentes: list[_Slot] = []
     for (t_idx, d_idx), sub_dems in sub_demandas_por_origem.items():
         nivel_orig, escopo_orig, _ = quota_total[(t_idx, d_idx)]
-        for (sub_nivel, sub_escopo, sub_qtd) in sub_dems:
+        for sub_idx, (sub_nivel, sub_escopo, sub_qtd) in enumerate(sub_dems):
+            sub_int = subregiao_intermediaria_por_sub.get((t_idx, d_idx, sub_idx))
             for _ in range(sub_qtd):
                 slot = _Slot(
                     treino_idx=t_idx,
@@ -2878,6 +2924,7 @@ def pre_alocar_rotina(
                     nivel=sub_nivel,
                     escopo_alocacao=sub_escopo,
                     escopo_demanda_original=escopo_orig,
+                    subregiao_intermediaria=sub_int,
                 )
                 slots_pendentes.append(slot)
 
@@ -2917,6 +2964,11 @@ def pre_alocar_rotina(
     # rastreado pra propagar a Fase 1 via `variacao_pais_globais` (info
     # em avisos `incompleta`), sem bloquear seleção.
     slots_para_relax: list[_Slot] = []
+    total_slots_estrito = len(slots_pendentes)  # snapshot pré-loop pra rationale
+    ordem_estrito = 0
+    nivel_orig_por_d: dict[tuple[int, int], str] = {
+        k: v[0] for k, v in quota_total.items()
+    }
     while slots_pendentes:
         # Calcular escassez de cada slot pendente (usando filtro INTER soft)
         def _escassez_slot(s: _Slot) -> int:
@@ -2932,6 +2984,8 @@ def pre_alocar_rotina(
         )
 
         slot = slots_pendentes.pop(0)
+        ordem_estrito += 1
+        escassez_no_momento = _escassez_slot(slot)
         cfg_t = configs_norm[slot.treino_idx]
 
         alocados_t = _alocados_intra(slot.treino_idx)
@@ -2951,9 +3005,19 @@ def pre_alocar_rotina(
                 "escopo_demanda_original": slot.escopo_demanda_original,
                 "passe": "estrito",
             }
+            pre_alocacao_info = {
+                "nivel_demanda_original": nivel_orig_por_d.get(
+                    (slot.treino_idx, slot.d_idx_original), slot.nivel
+                ),
+                "subregiao_intermediaria": slot.subregiao_intermediaria,
+                "ordem_processamento": ordem_estrito,
+                "total_slots": total_slots_estrito,
+                "escassez_no_momento": escassez_no_momento,
+            }
             escolhido = _selecionar_cand_score_aware(
                 cands, alocados_t, alocados_inter_t, hist_list, pesos,
                 slot_info=slot_info,
+                pre_alocacao_info=pre_alocacao_info,
             )
             alocacao[slot.treino_idx][slot.d_idx_original].append(escolhido)
             nomes_globais.add(escolhido.nome)
@@ -2983,11 +3047,15 @@ def pre_alocar_rotina(
                 alocados_intra=_alocados_intra(s.treino_idx),
             )
 
+        total_slots_relax = len(slots_para_relax)
+        ordem_relax = 0
         while slots_para_relax:
             slots_para_relax.sort(
                 key=lambda s: (_escassez_relax(s), _peso_nivel(s.nivel), random.random())
             )
             slot = slots_para_relax.pop(0)
+            ordem_relax += 1
+            escassez_no_momento = _escassez_relax(slot)
             cfg_t = configs_norm[slot.treino_idx]
             alocados_t = _alocados_intra(slot.treino_idx)
             alocados_inter_t = _alocados_inter(slot.treino_idx)
@@ -3005,9 +3073,19 @@ def pre_alocar_rotina(
                     "escopo_demanda_original": slot.escopo_demanda_original,
                     "passe": "relax",
                 }
+                pre_alocacao_info = {
+                    "nivel_demanda_original": nivel_orig_por_d.get(
+                        (slot.treino_idx, slot.d_idx_original), slot.nivel
+                    ),
+                    "subregiao_intermediaria": slot.subregiao_intermediaria,
+                    "ordem_processamento": ordem_relax,
+                    "total_slots": total_slots_relax,
+                    "escassez_no_momento": escassez_no_momento,
+                }
                 escolhido = _selecionar_cand_score_aware(
                     cands, alocados_t, alocados_inter_t, hist_list, pesos,
                     slot_info=slot_info,
+                    pre_alocacao_info=pre_alocacao_info,
                 )
                 alocacao[slot.treino_idx][slot.d_idx_original].append(escolhido)
                 nomes_globais.add(escolhido.nome)
