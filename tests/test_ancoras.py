@@ -25,15 +25,22 @@ def test_quota_costas_4_paritaria():
     assert avisos == []
 
 
-def test_quota_costas_3_tie_break_alfabetico_estavel():
-    """costas(3): pesos 2:2 dão tie. Tie-break por ordem definição (estável)."""
+def test_quota_costas_3_tie_break_sorteado_em_empate_total():
+    """costas(3): pesos 2:2 dão tie em (obrig, peso, resto).
+
+    Tie-break final é sorteado (random.random()), não pela ordem de definição.
+    Invariantes preserváveis: total = 3; ambas com qtd >= 1; vencedora do +1
+    pode ser qualquer uma das duas. Determinismo via seed.
+    """
     ancoras = [
         {"chave": "remadas", "peso": 2, "obrigatoria": True},
         {"chave": "puxadas", "peso": 2, "obrigatoria": True},
     ]
+    random.seed(0)
     quotas, _ = calcular_quotas(ancoras, vagas=3)
-    # Ambos têm resto 0.5; primeiro definido (remadas) ganha o +1
-    assert quotas == {"remadas": 2, "puxadas": 1}
+    assert set(quotas.keys()) == {"remadas", "puxadas"}
+    assert sum(quotas.values()) == 3
+    assert min(quotas.values()) == 1 and max(quotas.values()) == 2
 
 
 # ─── Hamilton com pesos diferenciados ──────────────────────────────────
