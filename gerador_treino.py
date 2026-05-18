@@ -342,6 +342,80 @@ def _quotas_de_subregiao(subregiao: str, vagas: int) -> tuple[dict[str, int], li
     return quotas, avisos
 
 
+def _quotas_por_pool(
+    chaves: list[str],
+    qtd: int,
+    pool_por_chave: dict[str, int],
+    obrigatorias: Optional[list[str]] = None,
+) -> dict[str, int]:
+    """Distribui `qtd` vagas entre `chaves` sorteando vaga-a-vaga com peso
+    proporcional ao tamanho do pool, SEM reposição (pool decrementa a cada
+    escolha).
+
+    Resolve viés mono-ex documentado na Seção 8.15.12 (6º NO-OP pós-CORE):
+    fallback antigo do `_decompor_demanda_*` atribuía 1 vaga por chave em
+    ordem random, ignorando tamanho do pool — padrão com 1 candidato
+    (Pallof Press, Prancha Lateral) ganhava o mesmo peso de padrão com 8
+    candidatos (flexao_tronco). Resultado: P(Pallof em core_iso(1)) = 25%
+    via cycling vs 7.7% se fosse uniforme por exercício. Esta função
+    pondera por pool — Pallof recebe peso 1, flexao_tronco recebe peso 8.
+
+    Args:
+        chaves: nomes (padrão ou subregião) a distribuir vagas.
+        qtd: total de vagas.
+        pool_por_chave: tamanho do pool de exercícios de cada chave.
+            Chaves com pool=0 são ignoradas no sorteio.
+        obrigatorias: chaves que devem ter ≥ 1 vaga (travados — D3.1).
+            Consome 1 vaga inicial pra cada obrigatória antes de sortear o
+            resto. Se pool=0 do obrigatório, vira no-op.
+
+    Returns:
+        dict {chave: qtd} (só chaves com qtd > 0).
+    """
+    if qtd <= 0 or not chaves:
+        return {}
+
+    obrig = [c for c in (obrigatorias or []) if c in chaves]
+    pool = {c: int(pool_por_chave.get(c, 0)) for c in chaves}
+    quotas: dict[str, int] = {c: 0 for c in chaves}
+    qtd_rest = qtd
+
+    # Garantir 1 vaga pra cada obrigatória (consome 1 do pool dela)
+    for c in obrig:
+        if pool[c] > 0 and qtd_rest > 0:
+            quotas[c] += 1
+            pool[c] -= 1
+            qtd_rest -= 1
+
+    # Sortear vagas restantes ponderado por pool, sem reposição
+    while qtd_rest > 0:
+        total = sum(pool.values())
+        if total == 0:
+            break  # pool global esgotado — vagas restantes ficam sem alocação
+        r = random.random() * total
+        cum = 0
+        escolhida = None
+        for c in chaves:
+            cum += pool[c]
+            if r < cum:
+                escolhida = c
+                break
+        if escolhida is None:
+            # Fallback numérico (r == total por erro de float): pega a última
+            # chave com pool > 0
+            for c in reversed(chaves):
+                if pool[c] > 0:
+                    escolhida = c
+                    break
+            if escolhida is None:
+                break
+        quotas[escolhida] += 1
+        pool[escolhida] -= 1
+        qtd_rest -= 1
+
+    return {c: q for c, q in quotas.items() if q > 0}
+
+
 def _distribuir_quotas_entre_treinos(
     quotas_global: dict[str, int],
     n_treinos: int,
@@ -2384,17 +2458,23 @@ def _decompor_demanda_subregiao(
     subregiao: str,
     qtd: int,
     padroes_obrigatorios: Optional[list[str]] = None,
+    banco: Optional[list[Exercicio]] = None,
 ) -> tuple[list[tuple[str, str, int]], list[dict]]:
     """Decompõe demanda subregião em sub-demandas por padrão.
 
     Etapa 3: usa ANCORAS_POR_SUBREGIAO quando definida pra distribuir vagas
     pelos pesos via Hamilton's Largest Remainder. Subregiões sem âncoras
-    (core_dinamico, core_isometrico, bracos, adutores) caem em fallback
-    Etapa 2 (cycling uniforme 1-de-cada).
+    (core_dinamico, core_isometrico, bracos, adutores) caem em fallback.
 
     `padroes_obrigatorios`: padrões da subregião que devem ter ≥ 1 vaga
     (suporte a travados — D3.1). No caminho com âncoras, força inclusão
     doando 1 vaga da maior quota se necessário.
+
+    `banco`: quando fornecido (caso normal via pre_alocar_rotina), o
+    fallback usa quota ponderada por tamanho do pool de cada padrão
+    (`_quotas_por_pool`), resolvendo o viés mono-ex documentado na Seção
+    8.15.12. Quando `None` (chamada legacy/teste direto), preserva o
+    cycling uniforme 1-de-cada da Etapa 2.
 
     Returns:
         (sub_demandas, avisos):
@@ -2419,7 +2499,9 @@ def _decompor_demanda_subregiao(
             q_filha = cada + (1 if i < sobra else 0)
             if q_filha <= 0:
                 continue
-            sd, av = _decompor_demanda_subregiao(filha, q_filha, padroes_obrigatorios)
+            sd, av = _decompor_demanda_subregiao(
+                filha, q_filha, padroes_obrigatorios, banco=banco,
+            )
             sub_dems_out.extend(sd)
             avisos_out.extend(av)
         return sub_dems_out, avisos_out
@@ -2446,7 +2528,19 @@ def _decompor_demanda_subregiao(
 
         return [("padrao", p, q) for p, q in quotas.items() if q > 0], avisos
 
-    # ── Caminho fallback (Etapa 2 — cycling uniforme) ────────────────────
+    # ── Caminho fallback ─────────────────────────────────────────────────
+    # Subregiões sem âncora: core_dinamico, core_isometrico, bracos,
+    # adutores. Quando `banco` fornecido, usa quota ponderada por pool
+    # (fix do viés mono-ex pós-CORE — Seção 8.15.12). Sem `banco`, mantém
+    # cycling uniforme legacy (compat com chamadas externas/testes).
+    if banco is not None:
+        pool_por_padrao = {
+            p: sum(1 for e in banco if e.padrao == p) for p in padroes
+        }
+        quotas = _quotas_por_pool(padroes, qtd, pool_por_padrao, obrigatorias=obrig)
+        return [("padrao", p, q) for p, q in quotas.items() if q > 0], []
+
+    # Legacy: cycling uniforme 1-de-cada (Etapa 2)
     if qtd <= len(obrig):
         escolhidos = random.sample(obrig, qtd)
         return [("padrao", p, 1) for p in escolhidos], []
@@ -2474,17 +2568,23 @@ def _decompor_demanda_regiao(
     regiao: str,
     qtd: int,
     subregioes_obrigatorias: Optional[list[str]] = None,
+    banco: Optional[list[Exercicio]] = None,
 ) -> tuple[list[tuple[str, str, int]], list[dict]]:
     """Decompõe demanda região em sub-demandas por subregião.
 
     Etapa 3: usa ANCORAS_POR_REGIAO quando definida pra distribuir vagas
     pelas subregiões via Hamilton. Filtro pré-quotas preserva regra Etapa
     2 D2.1: acessórias (obrigatoria=False) só competem se qtd > 2 ×
-    num_obrigatorias. Regiões sem âncoras caem em fallback Etapa 2
-    (essencial/acessório de SUBREGIOES_POR_REGIAO).
+    num_obrigatorias. Regiões sem âncoras caem em fallback.
 
     `subregioes_obrigatorias`: subregiões que devem ter ≥ 1 vaga (suporte
     a travados — D3.1). Pode forçar inclusão de subregião com peso baixo.
+
+    `banco`: quando fornecido (caso normal via pre_alocar_rotina), o
+    fallback usa quota ponderada por tamanho do pool de cada subregião
+    (espelha o que `_decompor_demanda_subregiao` faz pra padrões). Atual
+    estado real: única região em fallback é `cardio` (1 subregião só),
+    então o efeito prático é cosmético — mas mantemos consistência.
 
     Returns:
         (sub_demandas, avisos):
@@ -2550,6 +2650,27 @@ def _decompor_demanda_regiao(
         escolhidos = random.sample(obrig_validas, qtd)
         return [("subregiao", sub, 1) for sub in escolhidos], []
 
+    # Determinar pool de candidatas (essenciais + acessórias quando qtd
+    # justifica), preservando regra D2.1 (acessórias só competem se
+    # qtd > 2 × num_essenciais).
+    inclui_acessorias = (qtd > 2 * len(essenciais)) or any(s in acessorias for s in obrig_validas)
+    pool_subs = essenciais + acessorias if (inclui_acessorias and acessorias) else essenciais
+
+    if not pool_subs:
+        return [], []
+
+    # Caminho novo (banco fornecido): quota ponderada por pool de
+    # exercícios cadastrados em cada subregião. Resolve viés mono-ex.
+    if banco is not None:
+        pool_por_sub: dict[str, int] = {
+            s: sum(1 for e in banco if e.subregiao == s) for s in pool_subs
+        }
+        quotas = _quotas_por_pool(
+            pool_subs, qtd, pool_por_sub, obrigatorias=obrig_validas,
+        )
+        return [("subregiao", s, q) for s, q in quotas.items() if q > 0], []
+
+    # Legacy: cycling uniforme 1-de-cada (Etapa 2)
     alocacao = {sub: 1 for sub in obrig_validas}
     vagas_restantes = qtd - len(obrig_validas)
 
@@ -2563,11 +2684,8 @@ def _decompor_demanda_regiao(
     if vagas_restantes <= 0:
         return [("subregiao", sub, qt) for sub, qt in alocacao.items() if qt > 0], []
 
-    inclui_acessorias = (qtd > 2 * len(essenciais)) or any(s in acessorias for s in obrig_validas)
-    pool_ciclo = essenciais + acessorias if (inclui_acessorias and acessorias) else essenciais
-
-    if vagas_restantes > 0 and pool_ciclo:
-        pool_shuffled = random.sample(pool_ciclo, len(pool_ciclo))
+    if vagas_restantes > 0 and pool_subs:
+        pool_shuffled = random.sample(pool_subs, len(pool_subs))
         for i in range(vagas_restantes):
             sub = pool_shuffled[i % len(pool_shuffled)]
             alocacao[sub] = alocacao.get(sub, 0) + 1
@@ -2752,7 +2870,7 @@ def pre_alocar_rotina(
                     if sub_qt <= 0:
                         continue
                     sub_dems_p, avs_sub = _decompor_demanda_subregiao(
-                        sub_esc, sub_qt
+                        sub_esc, sub_qt, banco=banco,
                     )
                     for av in avs_sub:
                         av["treino_idx"] = t_idx
@@ -2823,7 +2941,7 @@ def pre_alocar_rotina(
 
             if nivel == "regiao":
                 sub_dems_subregiao, avs_reg = _decompor_demanda_regiao(
-                    escopo, qtd, subregioes_obrigatorias=subs_obrig,
+                    escopo, qtd, subregioes_obrigatorias=subs_obrig, banco=banco,
                 )
                 for av in avs_reg:
                     av["treino_idx"] = t_idx
@@ -2840,7 +2958,7 @@ def pre_alocar_rotina(
                         if sub_esc in PADRAO_PARA_SUBREGIAO.get(p, set())
                     ]
                     sub_dems_p, avs_sub = _decompor_demanda_subregiao(
-                        sub_esc, sub_qt, padroes_obrigatorios=pads_obrig_sub,
+                        sub_esc, sub_qt, padroes_obrigatorios=pads_obrig_sub, banco=banco,
                     )
                     for sd in sub_dems_p:
                         sub_dems_padrao.append(sd)
@@ -2854,7 +2972,7 @@ def pre_alocar_rotina(
                     subregiao_intermediaria_por_sub[(t_idx, d_idx, sub_idx)] = sub_esc
             elif nivel == "subregiao":
                 sub_dems_p, avs_sub = _decompor_demanda_subregiao(
-                    escopo, qtd, padroes_obrigatorios=padroes_obrig,
+                    escopo, qtd, padroes_obrigatorios=padroes_obrig, banco=banco,
                 )
                 sub_demandas_por_origem[(t_idx, d_idx)] = sub_dems_p
                 for av in avs_sub:

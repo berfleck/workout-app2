@@ -13,9 +13,12 @@ from gerador_treino import (
     SUBREGIOES_POR_REGIAO,
     _calcular_escassez,
     _decompor_demanda_regiao,
+    _decompor_demanda_subregiao,
     _eh_composto,
     _normalizar_config,
+    _quotas_por_pool,
     _Slot,
+    gerar_multiplos_treinos,
     pre_alocar_rotina,
 )
 
@@ -368,6 +371,83 @@ def test_calcular_escassez_filtra_complexidade_e_equipamento(banco):
         slot, banco, {"max_complexidade": 1, "equipamentos_bloqueados": []}, set(), set()
     )
     assert n_baixa_cx <= n_default
+
+
+# ─── _quotas_por_pool (refator cycling fallback — Seção 8.15.12) ──────
+
+
+def test_quotas_por_pool_qtd_zero_retorna_vazio():
+    """Edge case: qtd=0 → dict vazio."""
+    out = _quotas_por_pool(["a", "b"], 0, {"a": 5, "b": 3})
+    assert out == {}
+
+
+def test_quotas_por_pool_chaves_vazias_retorna_vazio():
+    out = _quotas_por_pool([], 5, {})
+    assert out == {}
+
+
+def test_quotas_por_pool_pool_zero_global_retorna_vazio():
+    """Pool global = 0 → sem vagas alocadas (degenera)."""
+    out = _quotas_por_pool(["a", "b"], 3, {"a": 0, "b": 0})
+    assert out == {}
+
+
+def test_quotas_por_pool_obrigatoria_garante_uma_vaga():
+    """Obrigatórias ganham 1 vaga antes do sorteio ponderado."""
+    random.seed(42)
+    # Pool: a=8, b=1. Obrigatória: b. qtd=2.
+    # b ganha 1 garantida, depois sortear 1 com pesos restantes (7,0) → a.
+    out = _quotas_por_pool(["a", "b"], 2, {"a": 8, "b": 1}, obrigatorias=["b"])
+    assert out == {"a": 1, "b": 1}
+
+
+def test_quotas_por_pool_distribuicao_proporcional_ao_pool():
+    """qtd=1 sobre pool [8,1,1,3] dá P(a)≈8/13, P(b)≈1/13, P(c)≈1/13, P(d)≈3/13.
+
+    Mono-ex (b, c, pool=1) NÃO recebe 1/4=25% como cycling legado faria —
+    recebe 1/13≈7.7% (Seção 8.15.12 — resolução do 6º NO-OP).
+    """
+    counts = Counter()
+    n = 4000
+    for seed in range(n):
+        random.seed(seed)
+        out = _quotas_por_pool(["a", "b", "c", "d"], 1, {"a": 8, "b": 1, "c": 1, "d": 3})
+        for k, v in out.items():
+            counts[k] += v
+    # Esperado: a≈61.5%, b≈7.7%, c≈7.7%, d≈23.1%
+    assert 0.55 <= counts["a"] / n <= 0.68, f"P(a)={counts['a']/n:.3f}, esperado ~0.615"
+    assert 0.04 <= counts["b"] / n <= 0.12, f"P(b)={counts['b']/n:.3f}, esperado ~0.077"
+    assert 0.04 <= counts["c"] / n <= 0.12, f"P(c)={counts['c']/n:.3f}, esperado ~0.077"
+    assert 0.18 <= counts["d"] / n <= 0.28, f"P(d)={counts['d']/n:.3f}, esperado ~0.231"
+
+
+def test_core_isometrico_1_pallof_press_nao_concentra(banco):
+    """Regressão Seção 8.15.12 (6º NO-OP pós-CORE): cycling fallback antigo
+    dava P(Pallof Press em core_iso(1)) ≈ 25% via 1-de-cada padrão uniforme.
+
+    Pós-refator (quota ponderada por pool), P(Pallof) cai pra ~1/N_pool,
+    proporcional ao tamanho do pool de core_isometrico no banco. Alvo
+    conservador: <12% (legado era 25%; uniforme-por-ex seria 7.7% em
+    banco mock de 13 ex, menos no banco real).
+    """
+    n = 500
+    hits = 0
+    for seed in range(n):
+        random.seed(seed)
+        cfg = {"demandas": [("subregiao", "core_isometrico", 1)]}
+        sessoes = gerar_multiplos_treinos(banco, [cfg], relaxar_familia=True)
+        for s in sessoes:
+            for bloco in s.blocos:
+                for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                    if ex and ex.nome == "Pallof Press":
+                        hits += 1
+                        break
+    pct = hits / n
+    assert pct < 0.12, (
+        f"P(Pallof em core_iso(1)) = {pct:.2%} >= 12% — regressão do "
+        f"viés mono-ex resolvido na Seção 8.15.12"
+    )
 
 
 # ─── Sanity / smoke ────────────────────────────────────────────────────

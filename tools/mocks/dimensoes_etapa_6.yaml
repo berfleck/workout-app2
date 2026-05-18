@@ -1,17 +1,22 @@
 # Mocks das dimensões da Etapa 6 (família refinada + 5 dims core + 1 narrow-scope).
 #
 # Usado pelo harness `tools/calibrar_pesos_dimensoes.py` (Fase 3 / E.1).
-# NÃO altera o XLSX. Loader sobrescreve `variacao_de` no Exercicio in-memory
-# (origem=cadastrado) ou cria Exercicio in-memory (origem=mock_futuro) antes
-# de chamar o gerador.
+# NÃO altera o XLSX. Loader sobrescreve campos do `Exercicio` in-memory
+# (origem=cadastrado) antes de chamar o gerador.
+#
+# Histórico: até 2026-05-17 também havia entries `origem: mock_futuro` pra
+# exercícios ainda não cadastrados no XLSX (loader criava `Exercicio` in-memory
+# via campo `extras`). A Fase 4 (2026-05-15) cadastrou todos os 11 mock_futuros
+# no XLSX com dimensões idênticas — overlay virou no-op completo. Entries
+# removidas no cleanup de 2026-05-17 (item 4 da Seção 8.15.7 da
+# `dimensoes_proximidade.md`). Loader continua suportando `origem: mock_futuro`
+# pra eventual reintrodução (linhas 100-101, 128-156 de calibrar_pesos_dimensoes.py).
 #
 # Campos:
 #   - origem: "cadastrado" → exercício existe no XLSX, overlay sobrescreve
-#       campos de proximidade. APENAS `familia_estrita` afeta o gerador
-#       atual (via `Exercicio.variacao_de`); outras dims ficam disponíveis
-#       num dict separado pro stub `_penalty_proximidade` futuro.
-#   - origem: "mock_futuro" → cadastro futuro da Etapa 6/7. Loader cria
-#       Exercicio com defaults pros campos não-overlay (campo `extras`).
+#       campos de proximidade. Pós-Fase 4 (XLSX 137 ex com dimensões cadastradas),
+#       overlay é frequentemente no-op — mantido pra preservar histórico de
+#       decisões clínicas + permitir A/B testing fácil.
 #
 # Sources das decisões:
 #   - Etapa 6 Sessão 1+2 — `docs/refatoracao/dimensoes_proximidade.md`
@@ -115,70 +120,10 @@ exercicios:
       equipamento_grupo: "polia"
       variante_pontual: false
 
-  # Cadastros futuros (mock_futuro) — Anexo itens 16, 17
-
-  - nome: "Apoio Fechado"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "Apoio"
-      plano_corporal: null
-      pegada: "pronada"
-      equipamento_grupo: "corporal"
-      variante_pontual: true  # Anexo 15-septies
-    extras:
-      regiao: "upper"
-      subregiao: "peito"
-      padrao: "empurrar_compostos"
-      purpose: "compound"
-      unilateral: "bilateral"
-      complexidade: 2
-      fadiga: 3
-      eq_primario: "Sem equipamento"
-      musculo_primario: "Peitoral"
-
-  - nome: "Supino Fechado"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "Supino Reto"
-      plano_corporal: "reto"
-      pegada: "pronada"  # pronada-fechada — matriz 4×4 ainda usa "pronada"
-      equipamento_grupo: "barra"
-      variante_pontual: true
-    extras:
-      regiao: "upper"
-      subregiao: "peito"
-      padrao: "empurrar_compostos"
-      purpose: "compound"
-      unilateral: "bilateral"
-      complexidade: 3
-      fadiga: 4
-      eq_primario: "Barra"
-      musculo_primario: "Peitoral"
-
-  # Supino Inclinado Halteres — mock_futuro G1 adicionado Sessão 7c
-  # (2026-05-08). Cadastro pra completar ranking 3-faixas do cenário 2.1
-  # (sem ele, banco só tem 1 Supino Inclinado — Smith — e a faixa "2
-  # Inclinados" não é mensurável). Vai pro XLSX real na Fase 4 junto com
-  # os outros mock_futuros.
-
-  - nome: "Supino Inclinado Halteres"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "Supino Inclinado"
-      plano_corporal: "inclinado"
-      pegada: "pronada"  # alinha Supino Com Halteres + Supino Smith Inclinado
-      equipamento_grupo: "halter"
-      variante_pontual: false
-    extras:
-      regiao: "upper"
-      subregiao: "peito"
-      padrao: "empurrar_compostos"
-      purpose: "compound"
-      unilateral: "bilateral"
-      complexidade: 3   # alinha Supino Com Halteres (livre, halteres = +1 vs Smith)
-      fadiga: 3
-      eq_primario: "Halteres + Banco inclinado"
-      musculo_primario: "peitoral, tríceps, deltóide ant."
+  # Cadastros G1 (Apoio Fechado, Supino Fechado, Supino Inclinado Halteres)
+  # cadastrados na Fase 4 — Anexo 15-bis/15-septies aplicado direto no XLSX.
+  # Entries `mock_futuro` removidas no cleanup de 2026-05-17 (item 4 da
+  # Seção 8.15.7 — overlay no-op).
 
   # =========================================================================
   # G2 — REMADAS (cobertura cenários 2.2A baseline, 2.3 timebox)
@@ -379,45 +324,10 @@ exercicios:
       equipamento_grupo: "polia"
       variante_pontual: false
 
-  # Cadastros futuros G3 — Anexo Seção 2 G3 (split Barra genérica)
-
-  - nome: "Barra Aberta"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "Barra"
-      plano_corporal: null
-      pegada: "aberta"
-      equipamento_grupo: "corporal"
-      variante_pontual: false
-    extras:
-      regiao: "upper"
-      subregiao: "costas"
-      padrao: "puxadas"
-      purpose: "compound"
-      unilateral: "bilateral"
-      complexidade: 4
-      fadiga: 4
-      eq_primario: "Barra fixa (crossover)"
-      musculo_primario: "dorsal, bíceps"
-
-  - nome: "Barra Supinada"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "Barra"
-      plano_corporal: null
-      pegada: "supinada"
-      equipamento_grupo: "corporal"
-      variante_pontual: false
-    extras:
-      regiao: "upper"
-      subregiao: "costas"
-      padrao: "puxadas"
-      purpose: "compound"
-      unilateral: "bilateral"
-      complexidade: 4
-      fadiga: 4
-      eq_primario: "Barra fixa (crossover)"
-      musculo_primario: "dorsal, bíceps"
+  # Cadastros G3 (Barra Aberta + Barra Supinada) cadastrados na Fase 4 —
+  # split Barra genérica do Anexo Seção 2 G3 aplicado direto no XLSX.
+  # Entries `mock_futuro` removidas no cleanup de 2026-05-17 (item 4 da
+  # Seção 8.15.7 — overlay no-op).
 
   # =========================================================================
   # G4 — AGACHAMENTOS (cobertura cenários 3.2, 3.3, 2.4)
@@ -615,27 +525,9 @@ exercicios:
       equipamento_grupo: null  # Seção 7.2 nota 8 — Slide Board = vazio
       variante_pontual: false
 
-  # ── Cadastro futuro G4 — Recuo do Estepe (Anexo 4.2 item 26) ────────
-
-  - nome: "Recuo do Estepe"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "subida_elevada"  # desde já — Sessão 2 / Caminho 5
-      plano_corporal: null
-      pegada: null
-      equipamento_grupo: "caixa"
-      variante_pontual: false
-    extras:
-      regiao: "lower"
-      subregiao: "perna_anterior"
-      padrao: "squat_unilateral"
-      purpose: "compound"
-      unilateral: "unilateral"
-      complexidade: 3   # alinha Step Up — apoio elevado padrão (decisão D Sessão 7b)
-      fadiga: 3
-      eq_primario: "Halteres + Caixa"
-      musculo_primario: "Glúteos, Quadríceps"
-
+  # Cadastro G4 (Recuo do Estepe) cadastrado na Fase 4 — família refinada
+  # "subida_elevada" aplicada direto no XLSX. Entry `mock_futuro` removida
+  # no cleanup de 2026-05-17 (item 4 da Seção 8.15.7 — overlay no-op).
 
   # =========================================================================
   # G8 — CORE (20 atuais + 5 cadastros novos = 25 — cobertura cenários 6.1,
@@ -860,102 +752,9 @@ exercicios:
       equipamento_grupo: null  # Banco passivo, não diferencia
       variante_pontual: false
 
-  # ── Cadastros futuros G8 (5 mock_futuros — Decisões D + E Sessão 7c) ──
-  # Padrão refinado (`flexao_quadril`/`rotacao_tronco`) cadastrado direto
-  # em Etapa 8.2 conforme Anexo 15-quater. Cadastro no XLSX real fica pra
-  # Fase 4 (5 cadastros novos adiados da Etapa 8 — P2 Sessão atual).
-
-  - nome: "Russian Twist"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "russian twist"  # família solo nova
-      plano_corporal: null
-      pegada: null
-      equipamento_grupo: null  # diretriz G8 — equipamento é só fonte de carga
-      variante_pontual: false
-    extras:
-      regiao: "core"
-      subregiao: "core_dinamico"
-      padrao: "rotacao_tronco"  # Etapa 8.2: padrão refinado aplicado (Anexo 15-quater)
-      purpose: "isolation"
-      unilateral: "bilateral"
-      complexidade: 3
-      fadiga: 3
-      eq_primario: "Halteres"
-      musculo_primario: "obliquos, reto abdominal"
-
-  - nome: "INFRA Alternado"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "INFRA"
-      plano_corporal: null
-      pegada: null
-      equipamento_grupo: null
-      variante_pontual: false
-    extras:
-      regiao: "core"
-      subregiao: "core_dinamico"
-      padrao: "flexao_quadril"  # Etapa 8.2: padrão refinado aplicado (Anexo 15-quater)
-      purpose: "isolation"
-      unilateral: "unilateral"
-      complexidade: 2
-      fadiga: 2
-      eq_primario: "Colchonete"
-      musculo_primario: "iliopsoas, reto abdominal"
-
-  - nome: "INFRA Suspenso"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "INFRA"
-      plano_corporal: null
-      pegada: null
-      equipamento_grupo: null  # diretriz G8 — barra fixa é estrutura passiva
-      variante_pontual: false
-    extras:
-      regiao: "core"
-      subregiao: "core_dinamico"
-      padrao: "flexao_quadril"  # Etapa 8.2: padrão refinado aplicado (Anexo 15-quater)
-      purpose: "isolation"
-      unilateral: "bilateral"
-      complexidade: 4
-      fadiga: 3
-      eq_primario: "Barra fixa (crossover)"
-      musculo_primario: "iliopsoas, reto abdominal"
-
-  - nome: "INFRA Chão"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "INFRA"
-      plano_corporal: null
-      pegada: null
-      equipamento_grupo: null
-      variante_pontual: false
-    extras:
-      regiao: "core"
-      subregiao: "core_dinamico"
-      padrao: "flexao_quadril"  # Etapa 8.2: padrão refinado aplicado (Anexo 15-quater)
-      purpose: "isolation"
-      unilateral: "bilateral"
-      complexidade: 2
-      fadiga: 2
-      eq_primario: "Colchonete"
-      musculo_primario: "iliopsoas, reto abdominal"
-
-  - nome: "INFRA Roll-Up"
-    origem: mock_futuro
-    dimensoes:
-      familia_estrita: "INFRA"
-      plano_corporal: null
-      pegada: null
-      equipamento_grupo: null
-      variante_pontual: false
-    extras:
-      regiao: "core"
-      subregiao: "core_dinamico"
-      padrao: "flexao_quadril"  # Etapa 8.2: padrão refinado aplicado (Anexo 15-quater)
-      purpose: "isolation"
-      unilateral: "bilateral"
-      complexidade: 3
-      fadiga: 3
-      eq_primario: "Colchonete"
-      musculo_primario: "iliopsoas, reto abdominal"
+  # ── Cadastros G8 (Russian Twist + 4 INFRAs) cadastrados na Fase 4 ─────
+  # Os 5 exercícios deste grupo já estão no XLSX `banco_exercicios.xlsx`
+  # desde a Fase 4 (2026-05-15) — Russian Twist em `rotacao_tronco` dyn,
+  # INFRAs em `flexao_quadril` dyn. Entries `mock_futuro` removidas no
+  # cleanup de 2026-05-17 (item 4 da Seção 8.15.7 — `dimensoes_proximidade.md`)
+  # porque overlay era no-op completo (dimensões idênticas no XLSX).
