@@ -25,6 +25,14 @@
     "familia_estrita":"família",
     "variante_pontual":"variante pontual"
 } %}
+{% set PAREAMENTO_LABEL = {
+    "regiao_diff":"região diferente do bloco",
+    "padrao_diff":"padrão diferente",
+    "nao_agonista":"não agonista",
+    "composto":"purpose composto",
+    "anti_uni_mesmo_grupo":"2 unilaterais do mesmo grupo",
+    "anti_uni_diff_grupo":"2 unilaterais de grupos diferentes"
+} %}
 <div class="rationale-panel">
     <div class="rationale-head">
         <span class="rationale-title">Por que <b>{{ ex.nome }}</b>?</span>
@@ -61,6 +69,60 @@
     <div class="rationale-section rationale-section--neutro">
         Sem conflitos com outros exercícios da rotina ou da última semana —
         candidato neutro no pool.
+    </div>
+    {% endif %}
+
+    {% if r.pareamento %}
+    {% set par = r.pareamento %}
+    <div class="rationale-section rationale-section--pareamento">
+        <div class="rationale-section-title">Pareamento no bloco</div>
+        {% if par.papel == "ancora" %}
+        <div class="rationale-pareamento-ancora">
+            Âncora do bloco — pareada com
+            {% for nome in par.parceiros %}<b>{{ nome }}</b>{% if not loop.last %}, {% endif %}{% endfor %}.
+        </div>
+        {% else %}
+        <div class="rationale-meta rationale-meta--par">
+            <span class="rationale-meta-item"><b>Pareada com:</b> {{ par.ancora }}</span>
+            {% if par.outros_no_momento %}
+            <span class="rationale-meta-item"><b>Já no bloco:</b>
+                {% for n in par.outros_no_momento %}{{ n }}{% if not loop.last %}, {% endif %}{% endfor %}
+            </span>
+            {% endif %}
+            <span class="rationale-meta-item rationale-score"><b>Score:</b> {{ '%+.0f'|format(par.score_pareamento) }}</span>
+        </div>
+
+        {% if par.componentes %}
+        <ul class="rationale-list">
+            {% for c in par.componentes %}
+            <li class="rationale-item rationale-item--pareamento">
+                <span class="rationale-dim">{{ PAREAMENTO_LABEL.get(c.tipo, c.tipo) }}</span>
+                <span class="rationale-peso {% if c.peso < 0 %}rationale-peso--neg{% else %}rationale-peso--pos{% endif %}">{{ '%+.0f'|format(c.peso) }}</span>
+                {% if c.com %}<span class="rationale-com">com <b>{{ c.com }}</b></span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if par.alternativas %}
+        <div class="rationale-subtitle">Outros pares considerados (top {{ par.alternativas|length }})</div>
+        <ul class="rationale-alts">
+            {% for a in par.alternativas %}
+            <li class="rationale-alt">
+                <span class="rationale-alt-nome">{{ a.nome }}</span>
+                <span class="rationale-alt-score">score {{ '%+.0f'|format(a.score_total) }}</span>
+                {% if a.delta > 0 %}
+                <span class="rationale-alt-delta rationale-alt-delta--pior" title="Alternativa era pior em {{ '%.0f'|format(a.delta) }} pontos">Δ {{ '%+.0f'|format(a.delta) }}</span>
+                {% elif a.delta < 0 %}
+                <span class="rationale-alt-delta rationale-alt-delta--melhor" title="Alternativa era melhor — softmax sorteou o escolhido">Δ {{ '%+.0f'|format(a.delta) }}</span>
+                {% else %}
+                <span class="rationale-alt-delta rationale-alt-delta--empate" title="Empate técnico — softmax escolheu uniformemente">Δ 0</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% endif %}
     </div>
     {% endif %}
 

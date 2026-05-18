@@ -1097,8 +1097,13 @@ def _buscar_candidato(
     cargas_config: dict | None = None,
     exercicios_travados: list | set | None = None,
     pesos_config: Optional["ConfigPesosProximidade"] = None,
-) -> int | None:
-    """Retorna o índice do candidato escolhido via softmax top-K, ou None.
+) -> tuple[int | None, list[tuple[int, float]]]:
+    """Retorna `(indice, scored)` — índice via softmax top-K + lista scored.
+
+    `scored` = `[(j, score), ...]` de todos os candidatos hard-viáveis (mesmo
+    os fora do top-K). Útil pra captura de rationale de pareamento (Etapa 8
+    Explicabilidade — extensão pós-MVP). Quando não há candidatos, retorna
+    `(None, [])`.
 
     Filtros hard (cargas, fadiga) continuam em `pode_adicionar_ao_bloco`. Os
     candidatos que sobrevivem são scored via `_score_pareamento`; os top-K
@@ -1114,10 +1119,9 @@ def _buscar_candidato(
       -10   2 unilaterais de grupos diferentes (anti-uni cross-group)
     """
     if not bloco_atual:
-        return None
+        return None, []
 
-    # Coleta candidatos hard-aceitáveis e seus scores
-    candidatos: list[tuple[int, int]] = []
+    candidatos: list[tuple[int, float]] = []
     for j in range(len(exercicios)):
         if usados[j]:
             continue
@@ -1132,16 +1136,16 @@ def _buscar_candidato(
         candidatos.append((j, s))
 
     if not candidatos:
-        return None
+        return None, []
 
-    # Top-K por score; softmax com normalização por max (evita overflow do exp)
     candidatos.sort(key=lambda t: t[1], reverse=True)
     top = candidatos[:SOFTMAX_TOP_K]
     max_s = top[0][1]
     exps = [math.exp((s - max_s) / SOFTMAX_TEMPERATURA) for _, s in top]
     total = sum(exps)
     pesos = [e / total for e in exps]
-    return random.choices([j for j, _ in top], weights=pesos, k=1)[0]
+    escolhido_idx = random.choices([j for j, _ in top], weights=pesos, k=1)[0]
+    return escolhido_idx, candidatos
 
 
 def montar_blocos(
@@ -1182,7 +1186,11 @@ def montar_blocos(
         usados[i] = True
 
         while len(bloco_atual) < tamanho:
-            melhor = _buscar_candidato(
+            # Snapshot do contexto pré-append — usado pra rationale de
+            # pareamento (papel "par") refletir o estado quando o candidato
+            # foi escolhido (não o estado pós-append).
+            bloco_no_momento = list(bloco_atual)
+            melhor, scored = _buscar_candidato(
                 exercicios, usados, bloco_atual, tamanho,
                 evitar_agonistas=evitar_agonistas,
                 cargas_config=cargas_config,
@@ -1195,7 +1203,7 @@ def montar_blocos(
                 # está ativo, tentar novamente sem filtro pra ver se carga era
                 # a causa do solo. Se sim, emitir aviso.
                 if cargas_config and avisos_carga is not None:
-                    melhor_off = _buscar_candidato(
+                    melhor_off, _scored_off = _buscar_candidato(
                         exercicios, usados, bloco_atual, tamanho,
                         evitar_agonistas=evitar_agonistas,
                         cargas_config=None,  # filtro desligado
@@ -1228,8 +1236,38 @@ def montar_blocos(
                             })
                 break
 
-            bloco_atual.append(exercicios[melhor])
+            # Captura rationale de pareamento pro par (papel="par") —
+            # extensão pós-MVP da Etapa 8 Explicabilidade. Usa snapshot
+            # `bloco_no_momento` (estado pré-append) pra capturar quem era
+            # âncora + outros parceiros já presentes quando este candidato
+            # foi escolhido. Custo: O(N) sobre `scored` (lista pequena).
+            escolhido = exercicios[melhor]
+            pareamento = _montar_rationale_pareamento(
+                escolhido, scored, exercicios, bloco_no_momento,
+                evitar_agonistas, pesos_config,
+            )
+            escolhido = replace(escolhido, rationale={
+                **(escolhido.rationale or {}),
+                "pareamento": pareamento,
+            })
+            bloco_atual.append(escolhido)
             usados[melhor] = True
+
+        # Captura rationale na âncora (papel="ancora") só quando o bloco
+        # acabou com parceiros — solo (tamanho 1 ou fallhrough quando relax
+        # falhou) não recebe pareamento. Mutação local em `bloco_atual[0]`
+        # via `replace`, sem mexer na lista de input `exercicios`.
+        if len(bloco_atual) > 1:
+            ancora_atual = bloco_atual[0]
+            parceiros_nomes = [ex.nome for ex in bloco_atual[1:]]
+            pareamento_ancora = {
+                "papel": "ancora",
+                "parceiros": parceiros_nomes,
+            }
+            bloco_atual[0] = replace(ancora_atual, rationale={
+                **(ancora_atual.rationale or {}),
+                "pareamento": pareamento_ancora,
+            })
 
         blocos.append(tuple(bloco_atual))
         i += 1
@@ -2025,6 +2063,136 @@ def _montar_rationale(
         "componentes": componentes_escolhido,
         "alternativas": alternativas,
         "tamanho_pool": len(cands_scored),
+    }
+
+
+def _componentes_pareamento(
+    candidato: "Exercicio",
+    bloco_atual: list["Exercicio"],
+    evitar_agonistas: bool,
+    pesos_config: Optional["ConfigPesosProximidade"] = None,
+) -> list[dict]:
+    """Decomposição por componente do `_score_pareamento` — mirror analítico.
+
+    Cada evento: `{tipo, peso, com}`. `com` é o nome do parceiro quando o
+    componente é par-a-par (anti_uni_*); `None` quando é propriedade do
+    candidato vs bloco inteiro (regiao_diff, padrao_diff, nao_agonista,
+    composto). Soma dos pesos == `_score_pareamento(candidato, bloco_atual, ...)`.
+    """
+    pesos = PESOS_SCORE_PAREAMENTO
+    eventos: list[dict] = []
+
+    regioes_no_bloco = {e.regiao for e in bloco_atual}
+    padroes_no_bloco = {e.padrao for e in bloco_atual}
+    if candidato.regiao not in regioes_no_bloco:
+        eventos.append({
+            "tipo": "regiao_diff",
+            "peso": pesos["regiao_diff"],
+            "com": None,
+        })
+    if candidato.padrao not in padroes_no_bloco:
+        eventos.append({
+            "tipo": "padrao_diff",
+            "peso": pesos["padrao_diff"],
+            "com": None,
+        })
+
+    if evitar_agonistas:
+        grupos_no_bloco = {GRUPO_MUSCULAR_PADRAO.get(e.padrao) for e in bloco_atual}
+        if GRUPO_MUSCULAR_PADRAO.get(candidato.padrao) not in grupos_no_bloco:
+            eventos.append({
+                "tipo": "nao_agonista",
+                "peso": pesos["nao_agonista"],
+                "com": None,
+            })
+
+    if _eh_composto(candidato):
+        eventos.append({
+            "tipo": "composto",
+            "peso": pesos["composto"],
+            "com": None,
+        })
+
+    anti_uni_pesos = (
+        pesos_config.anti_uni_mesmo_grupo_pesos
+        if pesos_config is not None else None
+    )
+    if candidato.unilateral == "unilateral":
+        grupo_cand = GRUPO_MUSCULAR_PADRAO.get(candidato.padrao)
+        for ex in bloco_atual:
+            if ex.unilateral != "unilateral":
+                continue
+            grupo_outro = GRUPO_MUSCULAR_PADRAO.get(ex.padrao)
+            if grupo_cand == grupo_outro:
+                if anti_uni_pesos is not None and grupo_cand in anti_uni_pesos:
+                    peso = anti_uni_pesos[grupo_cand]
+                else:
+                    peso = pesos["anti_uni_mesmo_grupo"]
+                eventos.append({
+                    "tipo": "anti_uni_mesmo_grupo",
+                    "peso": peso,
+                    "com": ex.nome,
+                })
+            else:
+                eventos.append({
+                    "tipo": "anti_uni_diff_grupo",
+                    "peso": pesos["anti_uni_diff_grupo"],
+                    "com": ex.nome,
+                })
+
+    return eventos
+
+
+def _montar_rationale_pareamento(
+    escolhido: "Exercicio",
+    scored: list[tuple[int, float]],
+    exercicios: list["Exercicio"],
+    bloco_atual_no_momento: list["Exercicio"],
+    evitar_agonistas: bool,
+    pesos_config: Optional["ConfigPesosProximidade"] = None,
+    max_alternativas: int = 3,
+) -> dict:
+    """Monta dict de rationale do pareamento (papel=par) pro ex escolhido.
+
+    `scored` = lista `(indice, score)` produzida por `_buscar_candidato` no
+    momento da escolha. Contém o escolhido + alternativas viáveis. As alts
+    exibidas são as `K` de maior score depois do escolhido (não passaram no
+    sorteio softmax).
+    """
+    ancora = bloco_atual_no_momento[0]
+    outros = [e.nome for e in bloco_atual_no_momento[1:]]
+
+    componentes_escolhido = _componentes_pareamento(
+        escolhido, bloco_atual_no_momento, evitar_agonistas, pesos_config,
+    )
+    score_escolhido = sum(c["peso"] for c in componentes_escolhido)
+
+    outros_scored = [
+        (exercicios[j], s) for j, s in scored
+        if exercicios[j].nome != escolhido.nome
+    ]
+    outros_scored.sort(key=lambda t: t[1], reverse=True)
+
+    alternativas: list[dict] = []
+    for alt, _s in outros_scored[:max_alternativas]:
+        comps_alt = _componentes_pareamento(
+            alt, bloco_atual_no_momento, evitar_agonistas, pesos_config,
+        )
+        score_alt = sum(c["peso"] for c in comps_alt)
+        alternativas.append({
+            "nome": alt.nome,
+            "score_total": score_alt,
+            "componentes": comps_alt,
+            "delta": score_escolhido - score_alt,
+        })
+
+    return {
+        "papel": "par",
+        "ancora": ancora.nome,
+        "outros_no_momento": outros,
+        "score_pareamento": score_escolhido,
+        "componentes": componentes_escolhido,
+        "alternativas": alternativas,
     }
 
 

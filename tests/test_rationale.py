@@ -261,3 +261,189 @@ def test_rationale_em_rotina_estressada_captura_historia_completa(banco):
         f"Treino 3 com pool saturado de peito deveria mostrar componentes INTER. "
         f"Contextos observados: {contextos_t3}"
     )
+
+
+# 6. Pareamento — extensão pós-MVP (captura em `montar_blocos`) ----------------
+
+
+def test_pareamento_papel_ancora_e_par_em_bloco_2ex(banco):
+    """Bloco de 2 exs: primeiro tem papel='ancora', segundo papel='par'."""
+    random.seed(42)
+    configs = [
+        {
+            "demandas": [("regiao", "upper", 6)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    for b in sessoes[0].blocos:
+        if b.ex2 is None:
+            continue  # solo, sem pareamento — coberto por outro teste
+        assert b.ex1.rationale and b.ex1.rationale.get("pareamento"), (
+            f"ex1 ({b.ex1.nome}) deveria ter rationale.pareamento"
+        )
+        assert b.ex2.rationale and b.ex2.rationale.get("pareamento"), (
+            f"ex2 ({b.ex2.nome}) deveria ter rationale.pareamento"
+        )
+        assert b.ex1.rationale["pareamento"]["papel"] == "ancora"
+        assert b.ex2.rationale["pareamento"]["papel"] == "par"
+        # Ancora vê o nome do par; par vê o nome da âncora
+        assert b.ex2.nome in b.ex1.rationale["pareamento"]["parceiros"]
+        assert b.ex2.rationale["pareamento"]["ancora"] == b.ex1.nome
+
+
+def test_pareamento_bloco_solo_nao_atacha_na_ancora(banco):
+    """Bloco solo (tamanho 1 ou par não encontrado) → âncora sem pareamento."""
+    random.seed(42)
+    # Demanda 1 ex de peito + bloco_size 2 → forçará pareamento ou solo
+    configs = [
+        {
+            "demandas": [("padrao", "biceps", 1)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    # Único ex → bloco solo
+    b = sessoes[0].blocos[0]
+    assert b.ex2 is None, "esperava bloco solo"
+    # ex1 deve ter rationale do slot mas SEM pareamento attached
+    assert b.ex1.rationale is not None
+    assert "pareamento" not in b.ex1.rationale or b.ex1.rationale["pareamento"] is None
+
+
+def test_pareamento_score_bate_com_soma_componentes(banco):
+    """Invariante: score_pareamento == soma dos pesos dos componentes."""
+    random.seed(7)
+    configs = [
+        {
+            "demandas": [("regiao", "upper", 6)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ] * 2
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    for ex in _iter_exercicios(sessoes):
+        p = (ex.rationale or {}).get("pareamento")
+        if not p or p.get("papel") != "par":
+            continue
+        soma = sum(c["peso"] for c in p["componentes"])
+        assert pytest.approx(p["score_pareamento"], abs=1e-6) == soma, (
+            f"score_pareamento ({p['score_pareamento']}) != soma componentes "
+            f"({soma}) para {ex.nome}"
+        )
+
+
+def test_pareamento_alternativas_excluem_o_proprio(banco):
+    """Alternativas do pareamento não incluem o exercício escolhido."""
+    random.seed(11)
+    configs = [
+        {
+            "demandas": [("regiao", "upper", 6)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    for ex in _iter_exercicios(sessoes):
+        p = (ex.rationale or {}).get("pareamento")
+        if not p or p.get("papel") != "par":
+            continue
+        nomes_alts = {a["nome"] for a in p["alternativas"]}
+        assert ex.nome not in nomes_alts, (
+            f"alternativa de pareamento não pode ser o próprio escolhido ({ex.nome})"
+        )
+
+
+def test_pareamento_round_trip_serializacao_preserva_dados(banco):
+    """_exercicio_to_dict → JSON → _dict_to_exercicio mantém pareamento."""
+    from app_flask import _dict_to_exercicio, _exercicio_to_dict
+
+    random.seed(99)
+    configs = [
+        {
+            "demandas": [("regiao", "upper", 6)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    cobertura = 0
+    for ex in _iter_exercicios(sessoes):
+        d = _exercicio_to_dict(ex)
+        js = json.dumps(d)
+        d2 = json.loads(js)
+        ex2 = _dict_to_exercicio(d2)
+        assert ex2.rationale == ex.rationale, (
+            f"rationale (incl. pareamento) não sobreviveu round-trip pro ex {ex.nome}"
+        )
+        if (ex.rationale or {}).get("pareamento"):
+            cobertura += 1
+    assert cobertura > 0, "esperava pelo menos 1 ex com pareamento serializado"
+
+
+def test_pareamento_outros_no_momento_reflete_ordem_pre_append(banco):
+    """Em bloco de 3, o terceiro ex tem 'outros_no_momento' com 2 nomes
+    (âncora + segundo par adicionado antes dele)."""
+    random.seed(42)
+    configs = [
+        {
+            "demandas": [("regiao", "upper", 6)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 3,  # forçar trio
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    cobertura = 0
+    for b in sessoes[0].blocos:
+        if b.ex3 is None:
+            continue
+        p3 = b.ex3.rationale["pareamento"]
+        assert p3["papel"] == "par"
+        # No momento que ex3 entrou, bloco era [ex1, ex2]: ancora=ex1, outros=[ex2]
+        assert p3["ancora"] == b.ex1.nome
+        assert p3["outros_no_momento"] == [b.ex2.nome], (
+            f"ex3 ({b.ex3.nome}) deveria ver outros=[{b.ex2.nome}], "
+            f"viu {p3['outros_no_momento']}"
+        )
+        cobertura += 1
+    assert cobertura > 0, "esperava pelo menos 1 bloco de 3 pra cobrir o teste"
+
+
+def test_pareamento_componentes_refletem_score_pareamento(banco):
+    """Componentes capturados batem com `_score_pareamento` recomputado.
+
+    Sanity numérica do mirror analítico — `_componentes_pareamento` deve
+    decompor exatamente o que `_score_pareamento` calcula.
+    """
+    from gerador_treino import _score_pareamento
+
+    random.seed(13)
+    configs = [
+        {
+            "demandas": [("regiao", "upper", 6)],
+            "max_complexidade": 5,
+            "evitar_agonistas": True,
+            "tamanho_bloco": 2,
+        }
+    ]
+    sessoes = gerar_multiplos_treinos(banco, configs)
+    for b in sessoes[0].blocos:
+        if b.ex2 is None:
+            continue
+        # Reconstruir contexto: ex2 entrou contra bloco [ex1] (âncora sozinha)
+        score_recomputado = _score_pareamento(
+            b.ex2, [b.ex1], evitar_agonistas=True,
+        )
+        p = b.ex2.rationale["pareamento"]
+        assert pytest.approx(p["score_pareamento"], abs=1e-6) == score_recomputado, (
+            f"score do par {b.ex2.nome} divergente — capturado "
+            f"{p['score_pareamento']}, recomputado {score_recomputado}"
+        )

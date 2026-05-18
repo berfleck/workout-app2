@@ -384,10 +384,40 @@ em score (softmax sorteou dentro do top-K), Δ>0 = escolhido era favorito,
 13 snapshots verdes; harness 16/16 OK (2 FAIL benignas pré-existentes
 preservadas).
 
+**Extensão pós-Etapa 8 Explic — pareamento (2026-05-17):** captura de rationale
+de pareamento no `_buscar_candidato` implementada. `_buscar_candidato` agora
+retorna `(indice, scored)` em vez de só índice; `montar_blocos` atacha
+`rationale.pareamento` via `dataclasses.replace` pra cada ex do bloco. Shape:
+
+```python
+# Para a âncora (primeiro ex do bloco):
+rationale["pareamento"] = {"papel": "ancora", "parceiros": [str, ...]}
+
+# Para o par (segundo/terceiro ex):
+rationale["pareamento"] = {
+    "papel": "par",
+    "ancora": str,                          # nome da âncora do bloco
+    "outros_no_momento": [str, ...],        # parceiros já no bloco quando este entrou
+    "score_pareamento": float,
+    "componentes": [{"tipo": str, "peso": int, "com": str | None}, ...],
+    "alternativas": [{"nome": str, "score_total": float,
+                      "componentes": [...], "delta": float}, ...],
+}
+```
+
+Funções novas em `gerador_treino.py`: `_componentes_pareamento` +
+`_montar_rationale_pareamento` (mirrors analíticos do `_score_pareamento`).
+UI: nova seção "Pareamento no bloco" em `_rationale_inline.html` entre
+"Penalizações" e "Alternativas consideradas". CSS novo em `base.html`
+(`.rationale-section--pareamento`, `.rationale-peso--pos/--neg` verde/vermelho
+pra componentes de sinal misto). Pytest 191 passed (184 + 7 novos), harness
+16/16 OK preservados.
+
 **Pendências pós-Etapa 8 Explicabilidade (não bloqueiam uso real):**
 
-- Captura de rationale no pareamento (`_buscar_candidato`) e pré-alocação
-  global — estrutura `dict` permite estensão sem breaking change
+- Captura de rationale na **pré-alocação global** (escassez do slot, ordem de
+  processamento, decomposição demanda → subregião → padrão) — estrutura `dict`
+  já permite adicionar chave `pre_alocacao` sem breaking change
 - Outros itens da 8.15.7 da `dimensoes_proximidade.md` continuam abertos
   (UI Histórico item 6, setup B 4.1 item 7, escalada 2.3 item 8, cycling
   determinístico item 5, cleanup YAML)
