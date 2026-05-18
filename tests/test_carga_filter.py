@@ -279,8 +279,10 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     dims completas) → seed=71 Lev.Terra + Remada Baixa Aberta (refator
     cycling fallback) → seed=2 Agachamento Livre + Remada Baixa Aberta
     (fix distribuição) → seed=57 Agachamento Livre + Remada Baixa Aberta
-    (cadastros pullover-mitigation: +10 ex, Apoios c/ plano=reto). Mesmo
-    contrato clínico: par viola HIB2 sem filtro, some com filtro.
+    (cadastros pullover-mitigation: +10 ex, Apoios c/ plano=reto) →
+    seed=358 Stiff Barra Smith + Remada Baixa Aberta (tiebreaker aleatório
+    no softmax). Mesmo contrato clínico: par viola HIB2 sem filtro,
+    some com filtro.
     """
     import random
     from gerador_treino import gerar_multiplos_treinos
@@ -291,8 +293,8 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
         "equipamentos_bloqueados": [],
         "evitar_agonistas": True,
     }
-    PAR = {"Agachamento Livre", "Remada Baixa Aberta"}
-    SEED = 57
+    PAR = {"Stiff Barra Smith", "Remada Baixa Aberta"}
+    SEED = 358
 
     def par_aparece(sessoes):
         for s in sessoes:
