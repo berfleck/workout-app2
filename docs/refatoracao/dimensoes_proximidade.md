@@ -4283,6 +4283,132 @@ posicional emerge sistemático.
 
 ---
 
+#### 8.15.15 Cobertura de padrões obrigatórios na rotina (agregação rotina-level no nível padrão — 2026-05-18 noite)
+
+> **Decisão registrada:** estender a agregação rotina-level (que já
+> existia no nível subregião desde Etapa 3) para também atuar no nível
+> padrão, garantindo cobertura cruzada de obrigatórias entre treinos.
+> Caso clínico de origem: rotina real de Bernardo (config
+> `upper(3) + lower(3) + core(2) × 2T`) saiu com 2 puxadas e 0 remadas
+> — `costas qt_rotina=2` deveria ter 1 de cada obrigatória.
+
+**Diagnóstico:**
+
+Pipeline pré-fix em `pre_alocar_rotina`:
+1. Camada rotina-level (existia): Hamilton em `upper(3)×2T` distribui
+   6 vagas via `calcular_quotas` → `{peito:3, costas:2, ombro:1}`.
+2. Bresenham distribui costas (qt=2) entre 2 treinos → 1+1.
+3. **Camada per-treino (raiz do bug)**: cada treino recebe
+   `("subregiao", "costas", 1)` e chama `_decompor_demanda_subregiao`
+   independentemente. `calcular_quotas` com `qt=1 < n_obrig=2` cai no
+   caso especial `random.sample(obrigatorias, 1)` — sorteia 1 entre
+   remadas/puxadas.
+4. Cada treino sorteia INDEPENDENTEMENTE → 25% prob ambos puxadas,
+   25% ambos remadas, 50% misto.
+
+**Sondagem confirmou** (N=1000 rotinas):
+
+| Cenário | Cobertura completa pré-fix |
+|---|---|
+| `upper(3) × 2T` (costas r+p) | **73%** |
+| `upper(3) × 3T` (costas r+p) | ~85% |
+
+Cenários não-agregados (ex: `costas(2) × 1T` direto, sem agregação
+de região) já tinham 100% — confirma que o bug é específico do path
+"região agregada → subregião per-treino".
+
+**Fix — agregação rotina-level no nível padrão:**
+
+Substituiu o loop per-treino que chamava `_decompor_demanda_subregiao`
+por:
+
+1. Agregar capacidade por subregião: `qts_treino = [por_treino_sub[i][sub] for i]`
+2. Para cada subregião com âncoras: somar `qt_total_sub = sum(qts_treino)`,
+   chamar `calcular_quotas(ancoras, qt_total_sub)` UMA VEZ no nível
+   rotina → quotas globais de padrão.
+3. Distribuir quotas via `_distribuir_quotas_entre_treinos(quotas_pad,
+   n_tr, qts_treino, pesos)` — respeitando capacidade individual de
+   cada treino.
+
+Subregiões sem âncoras (cardio etc) mantêm path legado per-treino.
+
+**Piso de cobertura por treino:**
+
+Hamilton ponderado pode dar `quotas[obrigatoria] = 1` mesmo com
+2 treinos pedindo. Ex: `peito qt_rotina=2`, pesos 3:2 → `compostos:1,
+isolados:1`. Distribuído entre 2 treinos → um deles fica sem composto.
+
+Quebra invariante clínica "cada treino com vagas de peito deve ter
+1 composto". Fix adicional: após Hamilton, se `sum(quotas_obrig) <
+n_treinos_qt_pos`, doar de não-obrigatórias.
+
+```python
+deficit = n_treinos_qt_pos - sum(quotas_pad.get(p, 0) for p in obrigs)
+if deficit > 0:
+    for doador in nao_obrigs:
+        while deficit > 0 and quotas_pad.get(doador, 0) > 0:
+            alvo = min(obrigs, key=lambda p: (quotas_pad.get(p, 0), random.random()))
+            quotas_pad[doador] -= 1
+            quotas_pad[alvo] += 1
+            deficit -= 1
+```
+
+Validação: `test_upper_3x2treinos_tem_composto_de_cada_ancora` cai de
+48/200 falhas → 0/200.
+
+**Sondagem pós-fix (N=1000 rotinas):**
+
+| Cenário | Pré | Pós |
+|---|---|---|
+| `upper(3) × 2T` costas r+p | 73% | **100%** |
+| `upper(3) × 2T` peito composto | quebrava 48/200 | **0/200** |
+| `upper(4) × 2T` costas r+p | ~100% | 100% |
+| `upper(3) × 3T` costas r+p | ~85% | **100%** |
+| `lower(4) × 2T` perna_post h+k | ~100% | 100% |
+| `lower(3) × 2T` perna_post h+k | ~100% | 100% |
+
+**Validação geral:**
+
+- pytest 206 passed + 1 skipped preservado
+- 2 snapshots regenerados (`test_upper_3x2treinos_seed11` +
+  `test_upper_3_lower_2_core_2_3treinos_seed42`) — avisos
+  `ancora_nao_cumprida puxadas` removidos. Diff positivo (cobertura
+  garantida).
+- Fixture HIB2: seed 543 → **2202** (4ª transição em ~30h)
+- Harness 16/16 OK preservado, 4.1 = 15.81% inalterado
+- **Métrica secundária do 6.1 (% com ancora_nao_cumprida): 100% → 0%**
+  — ganho clínico significativo. Antes, basicamente toda rotina tinha
+  ≥1 obrigatória descoberta; agora zero.
+
+**Por que o score INTER não cobria esse caso (resposta arquitetural):**
+
+O motor tem 2 camadas sequenciais:
+
+1. **Planejamento** (`pre_alocar_rotina` → `_decompor_demanda_*` →
+   `calcular_quotas`): decide *quantos exercícios de cada padrão*
+   cada treino vai ter. Saída: slots tipados como `("padrao", "puxadas")`.
+2. **Escolha** (`_selecionar_cand_score_aware` + `_score_proximidade`):
+   pra cada slot já tipado, pontua candidatos do pool DAQUELE padrão e
+   escolhe via softmax. INTRA/INTER/HISTÓRICO entram aqui.
+
+INTER opera em granularidades menores que padrão (família, pegada,
+plano_corporal, equipamento, variante_pontual). **Quando o
+planejamento entrega 2 slots de puxadas (1 por treino), a escolha não
+consegue trocar um por remada** — só vê candidatos com `padrao=="puxadas"`.
+
+Fix conceitualmente correto na camada certa (planejamento), não no
+scoring — preserva invariante "score escolhe dentro do que foi
+planejado, sem reabrir alocação".
+
+**Cross-references:**
+
+- `docs/refatoracao/logs/sessao_2026-05-18_cobertura_padroes_obrigatorios.md`
+  — log completo desta sessão
+- Caso clínico: rotina `20260518_203030_2a06` (Bernardo, 2026-05-18 20:30)
+  exibia 2 puxadas + 0 remadas em `costas qt_rotina=2`
+
+---
+
 ## 9. Fase 4 — estratégia de preenchimento dos 125+ exercícios
 
 > **Status:** protocolo registrado (Sessão 6 — 2026-05-08), execução
