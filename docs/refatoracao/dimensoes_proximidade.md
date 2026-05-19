@@ -4409,6 +4409,113 @@ planejado, sem reabrir alocação".
 
 ---
 
+#### 8.15.16 Âncora de bracos (biceps + triceps obrig pesos iguais — 2026-05-18 madrugada)
+
+> **Decisão registrada:** cadastrar `bracos` em `ANCORAS_POR_SUBREGIAO`
+> com `biceps` e `triceps` ambos obrigatórios e peso 1 cada. Extensão
+> natural da 8.15.15 — bracos sofria da mesma classe de bug (sorteio
+> independente per-treino) agravado por viés pool-weighted, mas não
+> era coberto porque ficava no caminho fallback (sem âncoras).
+
+**Diagnóstico:**
+
+Sondagem N=1000 antes do fix:
+
+| Cenário | Cobertura completa | Distribuição |
+|---|---|---|
+| `bracos(2) × 2T` | **86%** | triceps **65%** / biceps 35% |
+| `bracos(1) × 2T` | **51%** | triceps 60% / biceps 40% |
+| `bracos(3) × 2T` | 96% | triceps 69% / biceps 31% |
+
+Duas patologias simultâneas:
+1. **Cobertura incompleta**: 14% das rotinas `bracos(2)×2T` perdem
+   biceps ou triceps. 49% em `bracos(1)×2T`.
+2. **Viés pool-weighted**: triceps pool=9, biceps pool=6 → fallback
+   `_quotas_por_pool` distribuía 60/40, agravando para 65/35 (drift
+   por escolha downstream).
+
+Conflito direto com [[tamanho-familia-nao-e-centralidade-clinica]]:
+centralidade clínica curada (biceps e triceps igualmente importantes)
+não deve emergir do tamanho do banco.
+
+**Por que o fix da 8.15.15 não cobria bracos:**
+
+Estrutura pré-existente de âncoras tinha 2 níveis:
+- `ANCORAS_POR_REGIAO`: declara estrutura nível região → subregião
+- `ANCORAS_POR_SUBREGIAO`: declara estrutura nível subregião → padrão
+
+Bracos não estava em nenhum dos dois:
+- **Não está em** `ANCORAS_POR_REGIAO['upper']` (só peito + costas + ombro)
+- **Não estava em** `ANCORAS_POR_SUBREGIAO`
+
+Quando usuário pede `subregiao bracos(N)`, vai pelo caminho `nv ==
+"subregiao"` em `pre_alocar_rotina` (~linha 3138), que checa
+`ANCORAS_POR_SUBREGIAO`. Sem entrada, cai no path normal
+`_decompor_demanda_subregiao` per-treino → fallback `_quotas_por_pool`
+sem cobertura cruzada.
+
+Contraste com **core**: tem âncora de **região** (`ANCORAS_POR_REGIAO
+['core']` com core_dinamico+core_isometrico peso 1 cada). Quando user
+pede `regiao core(N)`, Hamilton rotina-level distribui entre as 2
+subregiões garantindo cobertura. Padrões internos de cada uma
+(flexao_tronco vs flexao_quadril etc) ficam sem âncora porque são
+variações, não obrigatórias clínicas.
+
+**Fix:**
+
+Adicionar em `ANCORAS_POR_SUBREGIAO`:
+
+```python
+"bracos": [
+    {"padrao": "biceps",  "peso": 1, "obrigatoria": True},
+    {"padrao": "triceps", "peso": 1, "obrigatoria": True},
+],
+```
+
+Mudança declarativa (4 linhas). Bracos passa pelo mesmo path agregado
+de costas — Hamilton rotina-level + cobertura garantida.
+
+**Sondagem pós-fix:**
+
+| Cenário | Cobertura | Distribuição |
+|---|---|---|
+| `bracos(1) × 2T` | **100%** | 50/50 |
+| `bracos(2) × 2T` | **100%** | 50/50 |
+| `bracos(3) × 2T` | 100% | 40/60 (resto do Hamilton) |
+| `bracos(2) × 3T` | 100% | 50/50 |
+| `bracos(4) × 2T` | 100% | proporção Hamilton |
+
+**Validação geral:**
+
+- pytest 206 passed + 1 skipped (preservado)
+- **0 snapshots regenerados** — mudança é restrita ao path
+  `subregiao bracos`, snapshots de regressão usam outras subregiões.
+- **Fixture HIB2 inalterada** — não toca path do teste.
+- Harness 16/16 OK preservado.
+
+**Decisão clínica registrada:**
+
+Biceps e triceps são padrões **igualmente centrais** dentro de
+bracos. Pesos 1:1 são declaração explícita disso — não derivação do
+banco. Consistente com a memória de tamanho ≠ centralidade.
+
+**Adutores e core_dinamico/core_isometrico ficam sem âncora de
+subregião** por razões clínicas distintas (não bug):
+- **Adutores**: só tem 1 padrão (adduction). Não há decisão a tomar.
+- **core_dinamico/core_isometrico**: padrões internos
+  (flexao_tronco, flexao_quadril etc) são variações sem
+  obrigatoriedade entre si. A âncora clínica forte é no nível região
+  (`ANCORAS_POR_REGIAO['core']`), já existente.
+
+**Cross-references:**
+
+- `docs/refatoracao/logs/sessao_2026-05-18_ancora_bracos.md` — log
+  completo desta sessão
+- Seção 8.15.15 — fix da camada de planejamento que cobertura agora
+  aproveita via âncora declarada
+
+---
+
 ## 9. Fase 4 — estratégia de preenchimento dos 125+ exercícios
 
 > **Status:** protocolo registrado (Sessão 6 — 2026-05-08), execução
