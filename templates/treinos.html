@@ -1173,6 +1173,7 @@ function aplicarConfigs(data) {
                     setQtdInput(t, `squat_bi_${t}`, lat.squat.bilateral || 0);
                     setQtdInput(t, `squat_uni_${t}`, lat.squat.unilateral || 0);
                 }
+                updateTotal(t);
             }
         } else {
             const demandas = cfg.demandas || [];
@@ -1241,6 +1242,7 @@ function aplicarConfigs(data) {
                         setQtdInput(t, `dem_qtd_${t}_${i}`, qtd);
                     }
                 });
+                updateTotal(t);
             }, 50);
         }
     });
