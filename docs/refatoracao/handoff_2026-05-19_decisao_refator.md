@@ -215,6 +215,105 @@ revisão, todos vindos do usuário nesta sessão:
 
 ---
 
+## Anexo: padrão multi-sessão (não é frustração pontual)
+
+Depois do fechamento da discussão estratégica, o usuário trouxe o
+resumo de uma sessão da véspera (2026-05-18) que reforça o diagnóstico.
+**Essa não é a primeira vez que o mesmo padrão aparece.**
+
+### Sessão de 2026-05-18 — carve-outs de quotas + roadmap centralidade
+
+**Sintoma observado**: rotinas `upper(3)+lower(3)+core(2) × 2T` saíam
+estruturalmente idênticas pra todos os alunos. Peito 3 + costas 2 +
+ombro 1 (sempre Desenvolvimento). Elevação Lateral em 0% das rotinas.
+Abdução em 0% mesmo com 3 vagas em perna_posterior.
+
+**Diagnóstico raso**: Hamilton determinístico travava acessórias por
+causa de tie-break "obrigatória vence empate de resto".
+
+**Patch aplicado e mergeado em main** (commits `53207c8` + `3fe2e9d`,
+branch `feat/ombro-vaga-unica-sorteio`): nova estrutura declarativa
+`SUBREGIOES_CARVE_OUT_QUOTAS` que **bypassa o Hamilton** em
+(subregião, vagas) específicos. Spec atual:
+- ombro vaga única: 70% composto / 30% isolado
+- perna_posterior vaga única: 60% hinge / 20% kn / 20% ab
+- perna_posterior 2 vagas: hinge sempre + 50/50 kn/ab
+- perna_posterior 3 vagas: 60% [1+1+1] / 20% [2h+1kn] / 20% [2h+1ab]
+
+Empírico em 500 rotinas: hinge 67/33/0 → 46/27/27, ombro 100/0 → 70/30,
+Elevação Lateral 0% → 18%.
+
+**Achado mais profundo emergiu**: score é cego pra **centralidade
+dentro da família** — Supino com Anilha compete em pé de igualdade com
+Supino com Barra; variações leves dominam clássicos quando o softmax
+desempata uniforme.
+
+**Próximo passo anotado mas NÃO implementado**: coluna `centralidade`
+(1-5) no XLSX como bias no softmax + peso desse bias como **parâmetro
+por aluno** (campo na tabela alunos). Embrião de "arquitetura de perfil
+de geração": cada aluno = vetor de preferências sobre eixos ortogonais.
+
+**Pré-requisito proposto pelo usuário antes de implementar**: rascunhar
+3 alunos hipotéticos com perfis distintos e descrever como o treinador
+geraria a rotina manualmente.
+
+### Os 5 paralelos diretos entre sessões
+
+| Aspecto | 2026-05-18 (carve-outs) | 2026-05-19 (LMs) |
+|---|---|---|
+| Sintoma de superfície | Estrutura idêntica entre alunos | LMs sub-representadas |
+| Diagnóstico raso | Hamilton tie-break | Bug bilateral + pegada mal modelada |
+| Patch necessário | Exception table (`SUBREGIOES_CARVE_OUT_QUOTAS`) | Re-tag XLSX (opção A) ou fix de scoring (B/C) |
+| Achado profundo | Score cego pra centralidade na família | Scoring+Hamilton têm viés de ordem de alocação |
+| Pergunta arquitetural | *"O score ainda serve pra algo?"* | *"É hora de CSP/ILP?"* |
+| Próximo passo proposto | Adicionar coluna + perfil de aluno | Documento de princípios clínicos |
+
+### Por que isso confirma o diagnóstico estrutural
+
+1. **Exception tables = sintoma**. `SUBREGIOES_CARVE_OUT_QUOTAS` existe
+   pra bypassar o Hamilton porque o Hamilton tá modelando errado o que
+   o usuário quer. Em CSP/ILP, 70/30 vira preferência declarativa
+   direta — sem precisar de exception layer.
+
+2. **"Camadas distintas" é resposta técnica correta a uma pergunta que
+   é sintoma arquitetural**. A conclusão de ontem ("carve-outs decidem
+   PADRÃO, score decide EXERCÍCIO") tá tecnicamente certa, mas
+   precisar explicar isso é sinal de acoplamento ruim — num sistema
+   bem modelado, padrão e exercício seriam decididos com awareness
+   mútuo.
+
+3. **Centralidade vs pegada**: mesma natureza de problema. Score é
+   cego pra centralidade dentro da família pelo MESMO motivo que é
+   cego pra aberta=pronada-wide — as dimensões codificadas não
+   capturam a estrutura clínica que importa. Adicionar mais uma
+   dimensão é cascata, não solução.
+
+4. **Perfil de aluno como vetor de preferências encaixa naturalmente
+   em CSP/ILP**. *"aluno clássico tem peso α alto, aluno variado tem
+   α baixo"* é literalmente função objetivo parametrizada. Bolt-on
+   no greedy atual exige tocar Hamilton + score + softmax + pareamento
+   pra propagar o peso — não escala.
+
+5. **O usuário já flertou com a ideia de tirar a lógica do código e
+   colocar no papel** (rascunho de alunos hipotéticos, na sessão de
+   ontem). Era brainstorming pra calibrar centralidade, não método
+   validado — mas mostra que o instinto de "sair do código pra pensar
+   no problema" já tava ali.
+
+### Implicações concretas pra próxima sessão
+
+1. **Carve-outs ficam onde estão** (mergeados em main). São bandaid
+   funcional, não impedem o refator, não precisam ser desfeitos.
+2. **Roadmap centralidade PAUSADO**. Não implementar a coluna nem o
+   campo do aluno antes do documento de princípios. Centralidade vai
+   reaparecer naturalmente quando o usuário escrever sobre como
+   prescreve treino.
+3. **O alvo é a lógica do app funcionar bem.** Metodologia da
+   entrevista (3 alunos, perguntas-tema, ou outro formato) é
+   secundária. Adaptar ao que o usuário preferir na hora.
+
+---
+
 ## Próximo passo combinado: documento de princípios clínicos
 
 **NÃO escrever código ainda.**
@@ -237,6 +336,13 @@ descartável.
 
 **Método sugerido pra próxima sessão**: Claude faz perguntas guiadas em
 sequência, usuário responde em texto, Claude compila em documento novo.
+Formato exato (uma pergunta por vez? lista temática? rascunho de aluno
+hipotético?) fica em aberto — adaptar à preferência do usuário na hora.
+
+**O alvo importa, não a forma**: extrair a lógica clínica que hoje
+está implícita no greedy + scoring + carve-outs e tornar ela explícita
+em texto. A partir desse texto, mapear pra hard constraints, soft
+preferences, função objetivo.
 
 ---
 
@@ -285,14 +391,24 @@ durante o refator (o fix bilateral está bem, scripts não fazem mal).
 3. **Próximo passo concreto se o usuário pedir pra continuar**: ajudar
    a estruturar o documento de princípios clínicos via entrevista guiada.
 
-4. **Sugestão de abertura pra entrevista**:
-   > "Imagine um aluno novo, 35 anos, treinado, 4 treinos/semana. Pense
-   > num upper que você desenharia pra ele — no papel, sem pensar em
-   > código. Que padrões de movimento você quer cobrir? Por quê esses?
-   > E o que NÃO pode acontecer nesse upper?"
+4. **Não fixar metodologia da entrevista de antemão.** O usuário deixou
+   claro que a ideia dos "3 alunos hipotéticos" (Anexo, sessão de
+   2026-05-18) foi brainstorm pra calibrar centralidade, não método
+   validado. **O alvo é a lógica clínica clara — o caminho é o que
+   funcionar na hora.** Pode ser pergunta-a-pergunta, lista temática,
+   crítica do sistema atual, ou outro formato. Perguntar ao usuário
+   como ele prefere começar.
    
-   Fazer **uma pergunta por vez**, esperar resposta, depois aprofundar.
-   Não dump de 10 perguntas — vira survey, não conversa.
+   **Possíveis aberturas (não escolher antes da hora)**:
+   - *"Por onde você quer começar — descrevendo o que é um bom upper
+     em texto livre, ou eu te puxar com perguntas?"*
+   - *"O que mais te incomoda no app hoje? Vamos partir do sintoma e
+     dissecar a lógica que deveria ter."*
+   - *"Tem um aluno real ou hipotético em mente que sirva de caso de
+     teste?"*
+   
+   Uma pergunta por vez. Não dump de 10 perguntas — vira survey, não
+   conversa.
 
 5. **Compilar respostas em documento novo** separado deste handoff
    (proposta: `docs/refatoracao/principios_clinicos.md`). Atualizar
@@ -301,6 +417,12 @@ durante o refator (o fix bilateral está bem, scripts não fazem mal).
 6. **Não invente vocabulário técnico do usuário.** Se ele diz "pegada
    é menos importante que família", anote essa frase exata. Não traduza
    pra "soft_alto vs hard" sem confirmar.
+
+7. **Se o usuário trouxer o roadmap centralidade** (coluna no XLSX +
+   perfil de aluno) e quiser implementar — **PARE**. Ver Anexo,
+   "Implicações concretas pra próxima sessão" item 2. Centralidade
+   reaparece naturalmente no documento de princípios; implementar
+   antes vira mais 1 layer de patch.
 
 ---
 
