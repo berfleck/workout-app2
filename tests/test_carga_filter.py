@@ -286,7 +286,9 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     seed=809 Stiff Barra Smith + Remada Baixa Aberta (random.random() no
     Bresenham + nos doadores de _decompor_demanda_*, auditoria 2026-05-18) →
     seed=543 Stiff Barra Smith + Remada Baixa Aberta (offset inicial
-    aleatório do Bresenham, fix do viés estrutural pós-auditoria).
+    aleatório do Bresenham, fix do viés estrutural pós-auditoria) →
+    seed=2202 Stiff Barra Smith + Remada Baixa Aberta (agregação
+    rotina-level no nível padrão — fix cobertura de obrigatórias).
     Mesmo contrato clínico: par viola HIB2 sem filtro, some com filtro.
     """
     import random
@@ -299,7 +301,7 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
         "evitar_agonistas": True,
     }
     PAR = {"Stiff Barra Smith", "Remada Baixa Aberta"}
-    SEED = 543
+    SEED = 2202
 
     def par_aparece(sessoes):
         for s in sessoes:

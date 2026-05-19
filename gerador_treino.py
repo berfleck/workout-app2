@@ -3097,26 +3097,108 @@ def pre_alocar_rotina(
                 quotas_reg, n_tr, [qt] * n_tr, pesos_reg,
             )
 
-            # Pra cada treino, descer um nível: aplicar quotas de padrão
-            # sobre cada subregião alocada
-            for i, (t_idx, d_idx) in enumerate(instancias):
-                quotas_padrao_treino: dict[str, int] = {}
-                pad_to_sub_treino: dict[str, str] = {}  # first subregião que aportou cada padrão
+            # Descer um nível: aplicar quotas de padrão. Agregação rotina-level
+            # também aqui (2026-05-18) — antes cada treino chamava
+            # `_decompor_demanda_subregiao` independentemente, o que sorteava
+            # padrões obrigatórios per-treino quando qt<n_obrig (ex: costas
+            # qt=1 em cada treino → 25% das rotinas perdia 1 obrigatória).
+            # Agora: soma qt_subregiao na rotina, aplica Hamilton uma vez,
+            # distribui resultado entre treinos via Bresenham respeitando
+            # capacidade individual.
+            quotas_pre_alocadas_por_inst: dict[int, dict[str, int]] = {
+                i: {} for i in range(n_tr)
+            }
+            pad_to_sub_por_inst: dict[int, dict[str, str]] = {
+                i: {} for i in range(n_tr)
+            }
+
+            subs_qts_por_treino: dict[str, list[int]] = {}
+            for i in range(n_tr):
                 for sub_esc, sub_qt in por_treino_sub[i].items():
-                    if sub_qt <= 0:
-                        continue
-                    sub_dems_p, avs_sub = _decompor_demanda_subregiao(
-                        sub_esc, sub_qt, banco=banco,
+                    if sub_qt > 0:
+                        subs_qts_por_treino.setdefault(sub_esc, [0] * n_tr)[i] = sub_qt
+
+            for sub_esc, qts_treino in subs_qts_por_treino.items():
+                qt_total_sub = sum(qts_treino)
+                if qt_total_sub <= 0:
+                    continue
+
+                if sub_esc in ANCORAS_POR_SUBREGIAO:
+                    ancoras_sub = ANCORAS_POR_SUBREGIAO[sub_esc]
+                    anc_dict_sub = [
+                        {"chave": a["padrao"], "peso": a["peso"],
+                         "obrigatoria": a["obrigatoria"]}
+                        for a in ancoras_sub
+                    ]
+                    quotas_pad_rotina, avs_pad = calcular_quotas(
+                        anc_dict_sub, qt_total_sub,
                     )
-                    for av in avs_sub:
-                        av["treino_idx"] = t_idx
+                    for av in avs_pad:
+                        av["nivel"] = "subregiao"
+                        av["escopo"] = sub_esc
                         av["escopo_demanda"] = esc
+                        av["treino_idx"] = instancias[0][0]
                         avisos_rotina.append(av)
-                    for (_n, p, q) in sub_dems_p:
-                        quotas_padrao_treino[p] = quotas_padrao_treino.get(p, 0) + q
-                        pad_to_sub_treino.setdefault(p, sub_esc)
-                quotas_pre_alocadas[(t_idx, d_idx)] = quotas_padrao_treino
-                sub_intermediaria_aggr[(t_idx, d_idx)] = pad_to_sub_treino
+
+                    # Piso de cobertura por treino: cada treino com qt>0
+                    # da subregião deve receber ≥1 padrão obrigatório. Se
+                    # soma das quotas obrigatórias < n_treinos_pos, doa
+                    # de não-obrigatórias. (Caso típico: peito qt_rotina=2,
+                    # 2 treinos → Hamilton dá compostos:1+isolados:1 pela
+                    # proporção 3:2, mas T2 ficaria sem composto — Bernardo
+                    # rotina 2026-05-18.)
+                    obrigs_sub = [a["padrao"] for a in ancoras_sub if a["obrigatoria"]]
+                    nao_obrigs_sub = [a["padrao"] for a in ancoras_sub if not a["obrigatoria"]]
+                    n_treinos_qt_pos = sum(1 for q in qts_treino if q > 0)
+                    if obrigs_sub and nao_obrigs_sub:
+                        soma_obrig = sum(quotas_pad_rotina.get(p, 0) for p in obrigs_sub)
+                        deficit = n_treinos_qt_pos - soma_obrig
+                        for doador in nao_obrigs_sub:
+                            while deficit > 0 and quotas_pad_rotina.get(doador, 0) > 0:
+                                alvo = min(
+                                    obrigs_sub,
+                                    key=lambda p: (quotas_pad_rotina.get(p, 0), random.random()),
+                                )
+                                quotas_pad_rotina[doador] -= 1
+                                quotas_pad_rotina[alvo] = quotas_pad_rotina.get(alvo, 0) + 1
+                                deficit -= 1
+                            if deficit <= 0:
+                                break
+
+                    pesos_pad = {a["padrao"]: a["peso"] for a in ancoras_sub}
+                    por_treino_pad = _distribuir_quotas_entre_treinos(
+                        quotas_pad_rotina, n_tr, qts_treino, pesos_pad,
+                    )
+                    for i in range(n_tr):
+                        for pad, q in por_treino_pad[i].items():
+                            if q > 0:
+                                quotas_pre_alocadas_por_inst[i][pad] = (
+                                    quotas_pre_alocadas_por_inst[i].get(pad, 0) + q
+                                )
+                                pad_to_sub_por_inst[i].setdefault(pad, sub_esc)
+                else:
+                    # Subregião sem âncoras (raro em região agregada — só
+                    # cardio cai aqui). Mantém path per-treino legado.
+                    for i in range(n_tr):
+                        sub_qt = qts_treino[i]
+                        if sub_qt <= 0:
+                            continue
+                        sub_dems_p, avs_sub = _decompor_demanda_subregiao(
+                            sub_esc, sub_qt, banco=banco,
+                        )
+                        for av in avs_sub:
+                            av["treino_idx"] = instancias[i][0]
+                            av["escopo_demanda"] = esc
+                            avisos_rotina.append(av)
+                        for (_n, p, q) in sub_dems_p:
+                            quotas_pre_alocadas_por_inst[i][p] = (
+                                quotas_pre_alocadas_por_inst[i].get(p, 0) + q
+                            )
+                            pad_to_sub_por_inst[i].setdefault(p, sub_esc)
+
+            for i, (t_idx, d_idx) in enumerate(instancias):
+                quotas_pre_alocadas[(t_idx, d_idx)] = quotas_pre_alocadas_por_inst[i]
+                sub_intermediaria_aggr[(t_idx, d_idx)] = pad_to_sub_por_inst[i]
 
         elif nv == "subregiao":
             if esc not in ANCORAS_POR_SUBREGIAO:
