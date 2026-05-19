@@ -178,8 +178,15 @@ ANCORAS_POR_SUBREGIAO: dict[str, list[dict]] = {
     "panturrilha": [
         {"padrao": "flexao_plantar", "peso": 1, "obrigatoria": True},
     ],
-    # core_dinamico, core_isometrico, bracos, adutores: sem âncoras
-    # (fallback pra cycling uniforme da Etapa 2).
+    "bracos": [
+        {"padrao": "biceps",  "peso": 1, "obrigatoria": True},
+        {"padrao": "triceps", "peso": 1, "obrigatoria": True},
+    ],
+    # core_dinamico, core_isometrico, adutores: sem âncoras
+    # (fallback pra cycling uniforme da Etapa 2). core_din/core_iso têm
+    # decisão clínica forte só no nível região (declarada em
+    # ANCORAS_POR_REGIAO['core']); padrões internos são variações sem
+    # obrigatoriedade entre si. Adutores tem só 1 padrão (adduction).
 }
 
 
@@ -1131,6 +1138,58 @@ def _bloqueio_cargas(ex_a: "Exercicio", ex_b: "Exercicio", thresholds: dict) -> 
     return False
 
 
+def _rejeicoes_carga_vs_bloco(
+    bloco: list["Exercicio"],
+    pool: list["Exercicio"],
+    excluir_idx: set[int],
+    cargas_config: dict | None,
+    exercicios_travados: list | set | None,
+) -> list[dict]:
+    """Lista candidatos do `pool` bloqueados por `_bloqueio_cargas` vs algum ex
+    do `bloco`. Cada item: `{nome, contra, dimensao, soma, threshold}`.
+
+    Mirror analítico de `_bloqueio_cargas` pra rationale de pareamento —
+    captura quem foi descartado pela regra hard de cargas (grip/lombar/core).
+    Travados (em `bloco` ou candidato) bypassam, conforme regra do filtro.
+    Retorna `[]` quando `cargas_config` ausente/vazio.
+    """
+    if not cargas_config:
+        return []
+    travados_nomes = {
+        e.nome if hasattr(e, "nome") else e
+        for e in (exercicios_travados or [])
+    }
+    rejeicoes: list[dict] = []
+    for k, cand in enumerate(pool):
+        if k in excluir_idx:
+            continue
+        if cand.nome in travados_nomes:
+            continue
+        for ex_bloco in bloco:
+            if ex_bloco.nome in travados_nomes:
+                continue
+            motivo = None
+            for dim, attr in _DIMS_CARGA:
+                thr = cargas_config.get(dim)
+                if not thr:
+                    continue
+                va = getattr(ex_bloco, attr, 0)
+                vb = getattr(cand, attr, 0)
+                if va >= 1 and vb >= 1 and (va + vb) >= thr:
+                    motivo = (dim, va + vb, thr)
+                    break
+            if motivo:
+                rejeicoes.append({
+                    "nome": cand.nome,
+                    "contra": ex_bloco.nome,
+                    "dimensao": motivo[0],
+                    "soma": motivo[1],
+                    "threshold": motivo[2],
+                })
+                break
+    return rejeicoes
+
+
 def pode_adicionar_ao_bloco(
     bloco_atual: list,
     candidato: Exercicio,
@@ -1421,11 +1480,19 @@ def _montar_blocos_matching(
             "pareamento": pareamento_par,
         })
 
+        rejeitados_carga = _rejeicoes_carga_vs_bloco(
+            bloco=[ancora_ex],
+            pool=exercicios,
+            excluir_idx={ancora_idx, parceiro_idx},
+            cargas_config=cargas_config,
+            exercicios_travados=exercicios_travados,
+        )
         ancora_com_rat = replace(ancora_ex, rationale={
             **(ancora_ex.rationale or {}),
             "pareamento": {
                 "papel": "ancora",
                 "parceiros": [parceiro_ex.nome],
+                "rejeitados_carga": rejeitados_carga,
             },
         })
 
@@ -1561,9 +1628,17 @@ def montar_blocos(
         if len(bloco_atual) > 1:
             ancora_atual = bloco_atual[0]
             parceiros_nomes = [ex.nome for ex in bloco_atual[1:]]
+            rejeitados_carga = _rejeicoes_carga_vs_bloco(
+                bloco=[exercicios[i]],
+                pool=exercicios,
+                excluir_idx={i},
+                cargas_config=cargas_config,
+                exercicios_travados=exercicios_travados,
+            )
             pareamento_ancora = {
                 "papel": "ancora",
                 "parceiros": parceiros_nomes,
+                "rejeitados_carga": rejeitados_carga,
             }
             bloco_atual[0] = replace(ancora_atual, rationale={
                 **(ancora_atual.rationale or {}),
