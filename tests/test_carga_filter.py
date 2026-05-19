@@ -62,13 +62,13 @@ def test_carga_fields_exist_with_default_zero():
 
 
 def test_carregar_banco_le_cargas(banco):
-    """Banco real tem 90/112/119 ex com grip/lombar/core >= 1 (pós Fase 4 Sub-H: +Remada LM Aberta)."""
+    """Banco real tem 100/118/127 ex com grip/lombar/core >= 1 (pós cadastros pullover-mitigation: +10 ex)."""
     grip_nz = sum(1 for e in banco if e.carga_grip >= 1)
     lombar_nz = sum(1 for e in banco if e.carga_lombar >= 1)
     core_nz = sum(1 for e in banco if e.demanda_core >= 1)
-    assert grip_nz == 90
-    assert lombar_nz == 112
-    assert core_nz == 119
+    assert grip_nz == 100
+    assert lombar_nz == 118
+    assert core_nz == 127
 
 
 def test_carregar_banco_cargas_em_faixa_0_3(banco):
@@ -278,8 +278,20 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     Sub-D, 136 ex) → seed=4 Lev.Terra + Barra Isométrica (Fase 4 Sub-F,
     dims completas) → seed=71 Lev.Terra + Remada Baixa Aberta (refator
     cycling fallback) → seed=2 Agachamento Livre + Remada Baixa Aberta
-    (fix distribuição). Mesmo contrato clínico: par viola HIB2 sem filtro,
-    some com filtro.
+    (fix distribuição) → seed=57 Agachamento Livre + Remada Baixa Aberta
+    (cadastros pullover-mitigation: +10 ex, Apoios c/ plano=reto) →
+    seed=358 Stiff Barra Smith + Remada Baixa Aberta (tiebreaker aleatório
+    no softmax) → seed=672 Stiff Barra Smith + Remada Baixa Aberta
+    (random.random() no tie-break do Hamilton em calcular_quotas) →
+    seed=809 Stiff Barra Smith + Remada Baixa Aberta (random.random() no
+    Bresenham + nos doadores de _decompor_demanda_*, auditoria 2026-05-18) →
+    seed=543 Stiff Barra Smith + Remada Baixa Aberta (offset inicial
+    aleatório do Bresenham, fix do viés estrutural pós-auditoria) →
+    seed=2202 Stiff Barra Smith + Remada Baixa Aberta (agregação
+    rotina-level no nível padrão — fix cobertura de obrigatórias) →
+    seed=2730 Stiff Barra Smith + Remada Baixa Aberta (carve-out de
+    vaga única em ombro pula piso de cobertura — sorteio 70/30 final).
+    Mesmo contrato clínico: par viola HIB2 sem filtro, some com filtro.
     """
     import random
     from gerador_treino import gerar_multiplos_treinos
@@ -290,8 +302,8 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
         "equipamentos_bloqueados": [],
         "evitar_agonistas": True,
     }
-    PAR = {"Agachamento Livre", "Remada Baixa Aberta"}
-    SEED = 2
+    PAR = {"Stiff Barra Smith", "Remada Baixa Aberta"}
+    SEED = 2730
 
     def par_aparece(sessoes):
         for s in sessoes:

@@ -178,8 +178,67 @@ ANCORAS_POR_SUBREGIAO: dict[str, list[dict]] = {
     "panturrilha": [
         {"padrao": "flexao_plantar", "peso": 1, "obrigatoria": True},
     ],
-    # core_dinamico, core_isometrico, bracos, adutores: sem âncoras
-    # (fallback pra cycling uniforme da Etapa 2).
+    "bracos": [
+        {"padrao": "biceps",  "peso": 1, "obrigatoria": True},
+        {"padrao": "triceps", "peso": 1, "obrigatoria": True},
+    ],
+    # core_dinamico, core_isometrico, adutores: sem âncoras
+    # (fallback pra cycling uniforme da Etapa 2). core_din/core_iso têm
+    # decisão clínica forte só no nível região (declarada em
+    # ANCORAS_POR_REGIAO['core']); padrões internos são variações sem
+    # obrigatoriedade entre si. Adutores tem só 1 padrão (adduction).
+}
+
+
+# Carve-out de quotas por subregião: distribuições explícitas que substituem
+# o Hamilton normal em (subregião, vagas) específicos.
+#
+# Motivação clínica (2026-05-18): Hamilton determinístico cria 0% para
+# acessórias em vários cenários por causa do tie-break "obrigatória vence
+# empate de resto". Esta estrutura permite, por subregião e por número de
+# vagas, declarar a distribuição clínica desejada explicitamente.
+#
+# Formato: SUBREGIOES_CARVE_OUT_QUOTAS[subregiao][vagas] é uma lista de
+# tuplas (quotas_dict, peso_prob). Sorteia-se UM quota_dict da lista
+# proporcional aos pesos. Soma das quotas em cada dict deve bater com
+# vagas. Use peso 100 quando quiser distribuição fixa (1 entrada só).
+#
+# Quando NÃO há entrada pra (subregião, vagas), Hamilton normal opera.
+SUBREGIOES_CARVE_OUT_QUOTAS: dict[str, dict[int, list[tuple[dict[str, int], int]]]] = {
+    "ombro": {
+        # Vaga única: 70/30 composto/isolado. posterior_ombro fora —
+        # específico demais pra uma rotina single-slot de ombro.
+        1: [
+            ({"ombro_composto": 1}, 70),
+            ({"ombro_isolado":  1}, 30),
+        ],
+        # vagas ≥ 2: Hamilton normal (composto:1 + isolado:1 em 2 vagas,
+        # composto:2 + isolado:1 em 3 vagas; posterior só entra em 4+).
+    },
+    "perna_posterior": {
+        # Vaga única: variedade ampla (hinge dominante mas kn/ab têm vez).
+        1: [
+            ({"hinge":        1}, 60),
+            ({"knee_flexion": 1}, 20),
+            ({"abduction":    1}, 20),
+        ],
+        # Vaga dupla: hinge sempre presente; 2º slot 50/50 kn vs ab.
+        2: [
+            ({"hinge": 1, "knee_flexion": 1}, 50),
+            ({"hinge": 1, "abduction":    1}, 50),
+        ],
+        # 3 vagas: cobertura completa preferida; 40% das rotinas dobra
+        # hinge (priorização leve do composto) sacrificando 1 das
+        # acessórias. kn e ab permanecem simétricas entre si.
+        # Slot-level esperado: hinge ~47%, kn ~27%, ab ~27%.
+        3: [
+            ({"hinge": 1, "knee_flexion": 1, "abduction": 1}, 60),
+            ({"hinge": 2, "knee_flexion": 1},                 20),
+            ({"hinge": 2, "abduction":    1},                 20),
+        ],
+        # vagas ≥ 4: Hamilton normal (já distribui os 3 padrões
+        # naturalmente — hinge:2 kn:1 ab:1 em 4; hinge:3 kn:2 ab:1 em 6).
+    },
 }
 
 
@@ -280,7 +339,7 @@ def calcular_quotas(
     restantes = vagas - distribuidas
 
     # Distribuir vagas restantes pelos maiores restos com tie-break:
-    # obrigatória > peso maior > ordem de definição (estável)
+    # obrigatória > peso maior > sorteio aleatório (evita viés da ordem)
     if restantes > 0:
         def tiebreak_key(p):
             idx, a, ideal, floor = p
@@ -289,7 +348,7 @@ def calcular_quotas(
                 -resto,                          # maior resto primeiro
                 0 if a.get("obrigatoria") else 1,  # obrig primeiro
                 -a["peso"],                      # peso maior primeiro
-                idx,                             # ordem definição (estável)
+                random.random(),                 # sorteio (evita viés da ordem de definição)
             )
         pares_ord = sorted(pares, key=tiebreak_key)
         for _, a, _, _ in pares_ord[:restantes]:
@@ -330,6 +389,16 @@ def _quotas_de_subregiao(subregiao: str, vagas: int) -> tuple[dict[str, int], li
     em fallback Etapa 2 (cycling uniforme via _decompor_demanda_subregiao).
     Avisos retornados têm campo `nivel="subregiao"` e `escopo=subregiao`.
     """
+    # Carve-out: subregião com distribuição explícita pra esse nº de vagas.
+    # Sorteia 1 entrada da lista (peso = probabilidade); copia o dict
+    # resultante pra não mutar o estado da constante.
+    distribs = SUBREGIOES_CARVE_OUT_QUOTAS.get(subregiao, {}).get(vagas)
+    if distribs:
+        dicts = [d for d, _ in distribs]
+        pesos = [p for _, p in distribs]
+        escolhido = random.choices(dicts, weights=pesos, k=1)[0]
+        return dict(escolhido), []
+
     ancoras_raw = ANCORAS_POR_SUBREGIAO.get(subregiao, [])
     ancoras = [
         {"chave": a["padrao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
@@ -449,15 +518,23 @@ def _distribuir_quotas_entre_treinos(
     if sum(quotas_global.values()) == 0:
         return [{} for _ in range(n_treinos)]
 
-    # Ordenar chaves por quota desc (tie-break alfabético estável)
+    # Ordenar chaves por quota desc (tie-break sorteado — evita que chaves
+    # com quotas iguais caiam sempre nos mesmos treinos. Ver auditoria
+    # 2026-05-18: empate alfabético criava viés posicional residual mesmo
+    # após o fix do Hamilton em calcular_quotas).
     chaves_ord = sorted(
         quotas_global.keys(),
-        key=lambda k: (-quotas_global[k], k),
+        key=lambda k: (-quotas_global[k], random.random()),
     )
 
     por_treino: list[dict[str, int]] = [{} for _ in range(n_treinos)]
     capacidade = list(vagas_por_treino)
-    acumulador = 0
+    # Offset inicial aleatório (em vez de 0 fixo). Sem isso, a soma
+    # determinística das quotas anteriores fazia chaves de qtd menor caírem
+    # sempre no mesmo treino mesmo após o tie-break aleatório acima (ex.
+    # ombro 100% T2 em upper(3)x2T pré-2026-05-18). Distribui o offset
+    # acumulado entre rotinas — preserva Bresenham, quebra viés estrutural.
+    acumulador = random.randrange(n_treinos)
 
     for chave in chaves_ord:
         qtd = quotas_global[chave]
@@ -1123,6 +1200,58 @@ def _bloqueio_cargas(ex_a: "Exercicio", ex_b: "Exercicio", thresholds: dict) -> 
     return False
 
 
+def _rejeicoes_carga_vs_bloco(
+    bloco: list["Exercicio"],
+    pool: list["Exercicio"],
+    excluir_idx: set[int],
+    cargas_config: dict | None,
+    exercicios_travados: list | set | None,
+) -> list[dict]:
+    """Lista candidatos do `pool` bloqueados por `_bloqueio_cargas` vs algum ex
+    do `bloco`. Cada item: `{nome, contra, dimensao, soma, threshold}`.
+
+    Mirror analítico de `_bloqueio_cargas` pra rationale de pareamento —
+    captura quem foi descartado pela regra hard de cargas (grip/lombar/core).
+    Travados (em `bloco` ou candidato) bypassam, conforme regra do filtro.
+    Retorna `[]` quando `cargas_config` ausente/vazio.
+    """
+    if not cargas_config:
+        return []
+    travados_nomes = {
+        e.nome if hasattr(e, "nome") else e
+        for e in (exercicios_travados or [])
+    }
+    rejeicoes: list[dict] = []
+    for k, cand in enumerate(pool):
+        if k in excluir_idx:
+            continue
+        if cand.nome in travados_nomes:
+            continue
+        for ex_bloco in bloco:
+            if ex_bloco.nome in travados_nomes:
+                continue
+            motivo = None
+            for dim, attr in _DIMS_CARGA:
+                thr = cargas_config.get(dim)
+                if not thr:
+                    continue
+                va = getattr(ex_bloco, attr, 0)
+                vb = getattr(cand, attr, 0)
+                if va >= 1 and vb >= 1 and (va + vb) >= thr:
+                    motivo = (dim, va + vb, thr)
+                    break
+            if motivo:
+                rejeicoes.append({
+                    "nome": cand.nome,
+                    "contra": ex_bloco.nome,
+                    "dimensao": motivo[0],
+                    "soma": motivo[1],
+                    "threshold": motivo[2],
+                })
+                break
+    return rejeicoes
+
+
 def pode_adicionar_ao_bloco(
     bloco_atual: list,
     candidato: Exercicio,
@@ -1413,11 +1542,19 @@ def _montar_blocos_matching(
             "pareamento": pareamento_par,
         })
 
+        rejeitados_carga = _rejeicoes_carga_vs_bloco(
+            bloco=[ancora_ex],
+            pool=exercicios,
+            excluir_idx={ancora_idx, parceiro_idx},
+            cargas_config=cargas_config,
+            exercicios_travados=exercicios_travados,
+        )
         ancora_com_rat = replace(ancora_ex, rationale={
             **(ancora_ex.rationale or {}),
             "pareamento": {
                 "papel": "ancora",
                 "parceiros": [parceiro_ex.nome],
+                "rejeitados_carga": rejeitados_carga,
             },
         })
 
@@ -1553,9 +1690,17 @@ def montar_blocos(
         if len(bloco_atual) > 1:
             ancora_atual = bloco_atual[0]
             parceiros_nomes = [ex.nome for ex in bloco_atual[1:]]
+            rejeitados_carga = _rejeicoes_carga_vs_bloco(
+                bloco=[exercicios[i]],
+                pool=exercicios,
+                excluir_idx={i},
+                cargas_config=cargas_config,
+                exercicios_travados=exercicios_travados,
+            )
             pareamento_ancora = {
                 "papel": "ancora",
                 "parceiros": parceiros_nomes,
+                "rejeitados_carga": rejeitados_carga,
             }
             bloco_atual[0] = replace(ancora_atual, rationale={
                 **(ancora_atual.rationale or {}),
@@ -2562,7 +2707,14 @@ def _selecionar_cand_score_aware(
         return s
 
     scored = [(e, _total_score(e)) for e in cands]
-    scored.sort(key=lambda t: t[1], reverse=True)
+    # Tiebreaker aleatório em empates (2026-05-18): sort estável + ordem do XLSX
+    # introduzia viés sistemático — quando vários candidatos empatavam em score
+    # 0, os primeiros do XLSX entravam no top-K do softmax de forma
+    # determinística. Caso real: em costas(2)×2 slot puxada do T2, Pullover
+    # Halteres + Pullover Polia ficavam nas 2 primeiras posições do empate por
+    # ordem de cadastro, sendo escolhidos em ~50% das rotinas. Tupla
+    # (-score, random) preserva ranking por score e desempata uniformemente.
+    scored.sort(key=lambda t: (-t[1], random.random()))
     top = scored[:SOFTMAX_TOP_K]
     max_s = top[0][1]
     exps = [math.exp((s - max_s) / SOFTMAX_TEMPERATURA) for _, s in top]
@@ -2740,7 +2892,8 @@ def _decompor_demanda_subregiao(
         for p_trav in obrig:
             if quotas.get(p_trav, 0) == 0:
                 if quotas:
-                    p_doador = max(quotas, key=lambda k: (quotas[k], k))
+                    # Tie-break sorteado entre quotas iguais (auditoria 2026-05-18)
+                    p_doador = max(quotas, key=lambda k: (quotas[k], random.random()))
                     if quotas[p_doador] > 1:
                         quotas[p_doador] -= 1
                         quotas[p_trav] = 1
@@ -2844,7 +2997,8 @@ def _decompor_demanda_regiao(
         for s_trav in obrig:
             if quotas.get(s_trav, 0) == 0:
                 if quotas:
-                    s_doador = max(quotas, key=lambda k: (quotas[k], k))
+                    # Tie-break sorteado entre quotas iguais (auditoria 2026-05-18)
+                    s_doador = max(quotas, key=lambda k: (quotas[k], random.random()))
                     if quotas[s_doador] > 1:
                         quotas[s_doador] -= 1
                         quotas[s_trav] = 1
@@ -3080,39 +3234,122 @@ def pre_alocar_rotina(
                 quotas_reg, n_tr, [qt] * n_tr, pesos_reg,
             )
 
-            # Pra cada treino, descer um nível: aplicar quotas de padrão
-            # sobre cada subregião alocada
-            for i, (t_idx, d_idx) in enumerate(instancias):
-                quotas_padrao_treino: dict[str, int] = {}
-                pad_to_sub_treino: dict[str, str] = {}  # first subregião que aportou cada padrão
+            # Descer um nível: aplicar quotas de padrão. Agregação rotina-level
+            # também aqui (2026-05-18) — antes cada treino chamava
+            # `_decompor_demanda_subregiao` independentemente, o que sorteava
+            # padrões obrigatórios per-treino quando qt<n_obrig (ex: costas
+            # qt=1 em cada treino → 25% das rotinas perdia 1 obrigatória).
+            # Agora: soma qt_subregiao na rotina, aplica Hamilton uma vez,
+            # distribui resultado entre treinos via Bresenham respeitando
+            # capacidade individual.
+            quotas_pre_alocadas_por_inst: dict[int, dict[str, int]] = {
+                i: {} for i in range(n_tr)
+            }
+            pad_to_sub_por_inst: dict[int, dict[str, str]] = {
+                i: {} for i in range(n_tr)
+            }
+
+            subs_qts_por_treino: dict[str, list[int]] = {}
+            for i in range(n_tr):
                 for sub_esc, sub_qt in por_treino_sub[i].items():
-                    if sub_qt <= 0:
-                        continue
-                    sub_dems_p, avs_sub = _decompor_demanda_subregiao(
-                        sub_esc, sub_qt, banco=banco,
+                    if sub_qt > 0:
+                        subs_qts_por_treino.setdefault(sub_esc, [0] * n_tr)[i] = sub_qt
+
+            for sub_esc, qts_treino in subs_qts_por_treino.items():
+                qt_total_sub = sum(qts_treino)
+                if qt_total_sub <= 0:
+                    continue
+
+                if sub_esc in ANCORAS_POR_SUBREGIAO:
+                    ancoras_sub = ANCORAS_POR_SUBREGIAO[sub_esc]
+                    # Passa por _quotas_de_subregiao em vez de chamar
+                    # calcular_quotas direto: respeita o carve-out
+                    # SUBREGIOES_SORTEIO_VAGA_UNICA (ombro com vaga única).
+                    quotas_pad_rotina, avs_pad = _quotas_de_subregiao(
+                        sub_esc, qt_total_sub,
                     )
-                    for av in avs_sub:
-                        av["treino_idx"] = t_idx
+                    for av in avs_pad:
                         av["escopo_demanda"] = esc
+                        av["treino_idx"] = instancias[0][0]
                         avisos_rotina.append(av)
-                    for (_n, p, q) in sub_dems_p:
-                        quotas_padrao_treino[p] = quotas_padrao_treino.get(p, 0) + q
-                        pad_to_sub_treino.setdefault(p, sub_esc)
-                quotas_pre_alocadas[(t_idx, d_idx)] = quotas_padrao_treino
-                sub_intermediaria_aggr[(t_idx, d_idx)] = pad_to_sub_treino
+
+                    # Piso de cobertura por treino: cada treino com qt>0
+                    # da subregião deve receber ≥1 padrão obrigatório. Se
+                    # soma das quotas obrigatórias < n_treinos_pos, doa
+                    # de não-obrigatórias. (Caso típico: peito qt_rotina=2,
+                    # 2 treinos → Hamilton dá compostos:1+isolados:1 pela
+                    # proporção 3:2, mas T2 ficaria sem composto — Bernardo
+                    # rotina 2026-05-18.)
+                    #
+                    # Carve-out: subregiões em SUBREGIOES_CARVE_OUT_QUOTAS
+                    # com entrada pra esse nº de vagas já decidiram a
+                    # distribuição por sorteio ponderado (decisão clínica
+                    # deliberada). Aplicar piso aqui anularia o sorteio
+                    # (forçaria de volta pra obrigatória), então pulamos.
+                    obrigs_sub = [a["padrao"] for a in ancoras_sub if a["obrigatoria"]]
+                    nao_obrigs_sub = [a["padrao"] for a in ancoras_sub if not a["obrigatoria"]]
+                    n_treinos_qt_pos = sum(1 for q in qts_treino if q > 0)
+                    carve_out_ativo = qt_total_sub in (
+                        SUBREGIOES_CARVE_OUT_QUOTAS.get(sub_esc) or {}
+                    )
+                    if obrigs_sub and nao_obrigs_sub and not carve_out_ativo:
+                        soma_obrig = sum(quotas_pad_rotina.get(p, 0) for p in obrigs_sub)
+                        deficit = n_treinos_qt_pos - soma_obrig
+                        for doador in nao_obrigs_sub:
+                            while deficit > 0 and quotas_pad_rotina.get(doador, 0) > 0:
+                                alvo = min(
+                                    obrigs_sub,
+                                    key=lambda p: (quotas_pad_rotina.get(p, 0), random.random()),
+                                )
+                                quotas_pad_rotina[doador] -= 1
+                                quotas_pad_rotina[alvo] = quotas_pad_rotina.get(alvo, 0) + 1
+                                deficit -= 1
+                            if deficit <= 0:
+                                break
+
+                    pesos_pad = {a["padrao"]: a["peso"] for a in ancoras_sub}
+                    por_treino_pad = _distribuir_quotas_entre_treinos(
+                        quotas_pad_rotina, n_tr, qts_treino, pesos_pad,
+                    )
+                    for i in range(n_tr):
+                        for pad, q in por_treino_pad[i].items():
+                            if q > 0:
+                                quotas_pre_alocadas_por_inst[i][pad] = (
+                                    quotas_pre_alocadas_por_inst[i].get(pad, 0) + q
+                                )
+                                pad_to_sub_por_inst[i].setdefault(pad, sub_esc)
+                else:
+                    # Subregião sem âncoras (raro em região agregada — só
+                    # cardio cai aqui). Mantém path per-treino legado.
+                    for i in range(n_tr):
+                        sub_qt = qts_treino[i]
+                        if sub_qt <= 0:
+                            continue
+                        sub_dems_p, avs_sub = _decompor_demanda_subregiao(
+                            sub_esc, sub_qt, banco=banco,
+                        )
+                        for av in avs_sub:
+                            av["treino_idx"] = instancias[i][0]
+                            av["escopo_demanda"] = esc
+                            avisos_rotina.append(av)
+                        for (_n, p, q) in sub_dems_p:
+                            quotas_pre_alocadas_por_inst[i][p] = (
+                                quotas_pre_alocadas_por_inst[i].get(p, 0) + q
+                            )
+                            pad_to_sub_por_inst[i].setdefault(p, sub_esc)
+
+            for i, (t_idx, d_idx) in enumerate(instancias):
+                quotas_pre_alocadas[(t_idx, d_idx)] = quotas_pre_alocadas_por_inst[i]
+                sub_intermediaria_aggr[(t_idx, d_idx)] = pad_to_sub_por_inst[i]
 
         elif nv == "subregiao":
             if esc not in ANCORAS_POR_SUBREGIAO:
                 continue  # fallback Etapa 2
             ancoras_raw = ANCORAS_POR_SUBREGIAO[esc]
-            anc_dict = [
-                {"chave": a["padrao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
-                for a in ancoras_raw
-            ]
-            quotas_sub, avs_sub = calcular_quotas(anc_dict, vagas_total)
+            # Passa por _quotas_de_subregiao pra respeitar o carve-out
+            # SUBREGIOES_SORTEIO_VAGA_UNICA (ombro com vaga única).
+            quotas_sub, avs_sub = _quotas_de_subregiao(esc, vagas_total)
             for av in avs_sub:
-                av["nivel"] = "subregiao"
-                av["escopo"] = esc
                 av["escopo_demanda"] = esc
                 av["treino_idx"] = instancias[0][0]
                 avisos_rotina.append(av)

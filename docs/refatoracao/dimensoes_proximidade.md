@@ -4119,6 +4119,403 @@ ainda emerge naturalmente do sorteio ponderado.
 
 ---
 
+#### 8.15.14 Fechamento fix tie-break determinístico em `calcular_quotas` + auditoria upstream (2026-05-18 segunda metade)
+
+> **Decisão registrada:** randomizar tie-break em 4 locais distintos de
+> `gerador_treino.py` que decidiam empates de distribuição por ordem
+> alfabética / ordem de definição da lista — todos da mesma patologia
+> conceitual descoberta 24h antes em `_selecionar_cand_score_aware`
+> (sessão 2026-05-18 primeira metade, fix downstream). Esta sessão
+> resolve a camada **upstream** (distribuição de quotas), distinta da
+> downstream (escolha de exercício dentro de pool).
+
+**Diagnóstico (handoff inicial):**
+
+`calcular_quotas` distribui vagas entre âncoras via Hamilton's Largest
+Remainder. Tie-break original `(-resto, obrig, -peso, idx)` — onde
+`idx` = ordem de definição na lista `ANCORAS_POR_REGIAO` /
+`ANCORAS_POR_SUBREGIAO`. Empate triplo (resto + obrig + peso iguais)
+resolvido determinísticamente. Casos clínicos:
+
+| Cenário agregado | Vencedor sistemático |
+|---|---|
+| upper(4-6) | peito vs costas → peito |
+| lower(4-6) | perna_anterior vs perna_posterior → perna_anterior |
+| core(3) | core_dinamico vs core_isometrico → core_dinamico |
+| costas-sub(3-7) | remadas vs puxadas → remadas |
+
+Explica retroativamente Q4 do `analise_vies_upper.md` (peito 25% T1,
+50% T2, χ²=533, zero variação em 1000 iters) — pré-existente mas sem
+diagnóstico mecânico.
+
+**Fix principal (1 linha) — Hamilton em `calcular_quotas`:**
+
+```python
+def tiebreak_key(p):
+    idx, a, ideal, floor = p
+    resto = ideal - floor
+    return (
+        -resto,
+        0 if a.get("obrigatoria") else 1,
+        -a["peso"],
+        random.random(),  # era idx
+    )
+```
+
+Critérios anteriores preservados — sorteio só dispara em empate triplo.
+
+**Validação test-first (pré-fix):** `tests/test_calcular_quotas_vies.py`
+com 4 casos parametrizados × 2000 seeds cada. Asserção: ratio ~50%
+(entre 45% e 55%) entre as duas âncoras empatadas. Pré-fix: todos
+**ratio = 100%** (vencedor sempre o primeiro da lista). Pós-fix:
+ratios 49-51% nos 4 casos.
+
+**Auditoria upstream — 3 patologias adicionais (mesma classe):**
+
+| Local | Mecanismo | Sondagem pré-fix |
+|---|---|---|
+| `_distribuir_quotas_entre_treinos` ~linha 455 | `sorted(quotas.keys(), key=lambda k: (-q[k], k))` — tie-break alfabético no Bresenham | 3 chaves qtd=1 em 3 treinos: **100% T1/T2/T3 determinístico por ordem alfabética** (2000 seeds) |
+| `_decompor_demanda_subregiao` ~linha 2750 | `max(quotas, key=lambda k: (q[k], k))` no doador raro | 100% determinístico em empate de quotas |
+| `_decompor_demanda_regiao` ~linha 2855 | mesma estrutura | mesma patologia |
+
+Fixes: trocar `k` final por `random.random()` no key da ordenação /
+max. Pós-fix isolado: Bresenham distribui 33/33/33 entre T1/T2/T3 com
+3 chaves de qtd=1.
+
+**Fix adicional — viés estrutural do cycling Bresenham (4ª patologia,
+classe diferente):**
+
+Sondagem real pós-fixes 1-3: `cfg=upper(3) x 2 treinos`, 1000 iters
+→ ombro **100% T2**, peito 60% T1 / 40% T2. Causa: viés ESTRUTURAL do
+cycling, não tie-break. O `acumulador` do Bresenham começa em 0 fixo;
+chave de menor quota (ordenada por último via `-quota`) sempre cycla
+com offset = soma das quotas anteriores % n_treinos, que é
+determinístico.
+
+Sondagem N=500 confirmou extensão da patologia em 4 cenários realistas
+(`upper(3)x2T`, `upper(3)x3T`, `perna_posterior(3)x2T`, `ombro(3)x2T`),
+com chaves variadas caindo 100% num treino fixo (ombro, abduction,
+posterior_ombro) ou 66/33 (hinge, ombro_composto). Cenários com quotas
+balanceadas (`upper(4-5)`, `lower(3-5)`, `costas(3)`) já estavam ok.
+
+Fix (~linha 463):
+
+```python
+acumulador = random.randrange(n_treinos)  # era 0
+```
+
+Pós-fix: todos os 4 cenários afetados caem para ~50/50 (ou 33/33/33
+com 3 treinos). Cenários ok continuam ok. Validação:
+
+| Cenário | Chave | Pré-fix | Pós-fix |
+|---|---|---|---|
+| `upper(3) x 2T` | ombro | T1=0% / T2=100% | T1=53% / T2=46% |
+| `upper(3) x 3T` | ombro | T1=0% / T2=50% / T3=50% | T1=35% / T2=32% / T3=32% |
+| `perna_posterior(3) x 2T` | abduction | T1=0% / T2=100% | T1=49% / T2=50% |
+| `perna_posterior(3) x 2T` | hinge | T1=66% / T2=33% | T1=50% / T2=49% |
+| `ombro(3) x 2T` | posterior_ombro | T1=0% / T2=100% | T1=49% / T2=50% |
+| `ombro(3) x 2T` | ombro_composto | T1=66% / T2=33% | T1=50% / T2=49% |
+
+Justificativa: distribuir o offset acumulado entre rotinas. Preserva
+Bresenham (mantém cycling intra-rotina via `acumulador += qtd`), só
+quebra a fase inicial determinística. Validado: rotinas individuais
+continuam tendo total correto (Bresenham é exato por construção); só
+muda em qual treino cada chave começa.
+
+**Validação completa:**
+
+- `tests/test_calcular_quotas_vies.py` — 4/4 OK (era 4/4 FAIL pré-fix)
+- pytest geral — 206 passed + 1 skipped (era 202 + 1 skipped; ganho
+  vem do novo arquivo de teste do handoff)
+- 15 snapshots regenerados (7 do fix Hamilton + 5 do fix Bresenham
+  tie-break + doadores + 3 do offset inicial). Diff principal:
+  - `core_3x1treino_seed17` pré-fix: 3 dinâmicos consecutivos (V-Up +
+    Russian Twist + Canoinha) — caso clínico do viés. Pós-fix:
+    1 dinâmico + 2 isométricos (mix saudável).
+  - `upper_3x2treinos_seed11` pré-fix: T1 sem cobertura `puxadas`
+    (remadas sempre vencia). Pós-fix: T1 cobre puxadas; avisos
+    `ancora_nao_cumprida` em T2 apenas (não T1).
+  - Avisos `ancora_nao_cumprida` migram `chave: remadas → puxadas` ou
+    `treino_idx: 0 → 1` conforme empate sorteado. Nenhuma obrigatória
+    sumiu indevidamente.
+- 2 testes que codificavam o viés reescritos:
+  - `test_quota_costas_3_tie_break_alfabetico_estavel` →
+    `test_quota_costas_3_tie_break_sorteado_em_empate_total` (asserção
+    nova: `{total=3, ambas ≥1, min=1 max=2}`)
+  - `test_decompor_lower_6_proporcional`: relaxado pra `{qa, qp} == {2, 3}`
+- Fixture HIB2: seed 358 → 672 → 809 → **543** (3 transições pra
+  absorver shifts da sequência random)
+- Harness 16/16 OK preservado; métrica 4.1 contínua: pré 14.95% (pós
+  cycling fix 2026-05-17) → pós 15.81%. Variação dentro do mesmo
+  regime estrutural (piso gateado pelo NO-OP Seção 8.15.12).
+
+**Taxonomia das 4 descobertas em 24h (variações da mesma família):**
+
+1. **Tag faltando no XLSX** (Apoios `plano_corporal=NaN`) — escapava do
+   score INTRA, fix por cadastro (sessão `cadastros_e_tiebreaker`).
+2. **Tie-break downstream** (`_selecionar_cand_score_aware` ~2572) —
+   empate de score resolvido pela ordem do XLSX, fix com
+   `key=(-score, random.random())` (sessão `cadastros_e_tiebreaker`).
+3. **Tie-break upstream** (Hamilton + Bresenham + doadores) — empate
+   de distribuição resolvido por ordem de declaração / alfabética,
+   fix com `random.random()` em 4 locais (esta sessão).
+4. **Cycling determinístico do Bresenham** — `acumulador = 0` fixo
+   fazia chave de menor quota sempre cair no mesmo treino, mesmo após
+   tie-break aleatorizado. Fix: `acumulador = random.randrange(n_treinos)`.
+   **Classe distinta** das três primeiras (não é tie-break, é fase
+   inicial determinística do algoritmo). Esta sessão.
+
+Unidade conceitual: sempre que o algoritmo precisa quebrar empate
+aleatorizável ou escolher fase inicial e fica determinístico por
+acidente da estrutura de dados ou por inicialização hard-coded, viés
+posicional emerge sistemático.
+
+**Cross-references:**
+
+- `docs/refatoracao/logs/handoff_calcular_quotas_tiebreak.md` — handoff
+  desta sessão
+- `docs/refatoracao/logs/sessao_2026-05-18_fix_calcular_quotas_tiebreak.md`
+  — log completo desta sessão
+- `docs/refatoracao/logs/sessao_2026-05-18_cadastros_e_tiebreaker.md` —
+  sessão prévia mesmo dia (fixes downstream + tags)
+- `docs/refatoracao/logs/analise_vies_upper.md` Q4 — caso clínico
+  retroativamente explicado por este fix
+
+---
+
+#### 8.15.15 Cobertura de padrões obrigatórios na rotina (agregação rotina-level no nível padrão — 2026-05-18 noite)
+
+> **Decisão registrada:** estender a agregação rotina-level (que já
+> existia no nível subregião desde Etapa 3) para também atuar no nível
+> padrão, garantindo cobertura cruzada de obrigatórias entre treinos.
+> Caso clínico de origem: rotina real de Bernardo (config
+> `upper(3) + lower(3) + core(2) × 2T`) saiu com 2 puxadas e 0 remadas
+> — `costas qt_rotina=2` deveria ter 1 de cada obrigatória.
+
+**Diagnóstico:**
+
+Pipeline pré-fix em `pre_alocar_rotina`:
+1. Camada rotina-level (existia): Hamilton em `upper(3)×2T` distribui
+   6 vagas via `calcular_quotas` → `{peito:3, costas:2, ombro:1}`.
+2. Bresenham distribui costas (qt=2) entre 2 treinos → 1+1.
+3. **Camada per-treino (raiz do bug)**: cada treino recebe
+   `("subregiao", "costas", 1)` e chama `_decompor_demanda_subregiao`
+   independentemente. `calcular_quotas` com `qt=1 < n_obrig=2` cai no
+   caso especial `random.sample(obrigatorias, 1)` — sorteia 1 entre
+   remadas/puxadas.
+4. Cada treino sorteia INDEPENDENTEMENTE → 25% prob ambos puxadas,
+   25% ambos remadas, 50% misto.
+
+**Sondagem confirmou** (N=1000 rotinas):
+
+| Cenário | Cobertura completa pré-fix |
+|---|---|
+| `upper(3) × 2T` (costas r+p) | **73%** |
+| `upper(3) × 3T` (costas r+p) | ~85% |
+
+Cenários não-agregados (ex: `costas(2) × 1T` direto, sem agregação
+de região) já tinham 100% — confirma que o bug é específico do path
+"região agregada → subregião per-treino".
+
+**Fix — agregação rotina-level no nível padrão:**
+
+Substituiu o loop per-treino que chamava `_decompor_demanda_subregiao`
+por:
+
+1. Agregar capacidade por subregião: `qts_treino = [por_treino_sub[i][sub] for i]`
+2. Para cada subregião com âncoras: somar `qt_total_sub = sum(qts_treino)`,
+   chamar `calcular_quotas(ancoras, qt_total_sub)` UMA VEZ no nível
+   rotina → quotas globais de padrão.
+3. Distribuir quotas via `_distribuir_quotas_entre_treinos(quotas_pad,
+   n_tr, qts_treino, pesos)` — respeitando capacidade individual de
+   cada treino.
+
+Subregiões sem âncoras (cardio etc) mantêm path legado per-treino.
+
+**Piso de cobertura por treino:**
+
+Hamilton ponderado pode dar `quotas[obrigatoria] = 1` mesmo com
+2 treinos pedindo. Ex: `peito qt_rotina=2`, pesos 3:2 → `compostos:1,
+isolados:1`. Distribuído entre 2 treinos → um deles fica sem composto.
+
+Quebra invariante clínica "cada treino com vagas de peito deve ter
+1 composto". Fix adicional: após Hamilton, se `sum(quotas_obrig) <
+n_treinos_qt_pos`, doar de não-obrigatórias.
+
+```python
+deficit = n_treinos_qt_pos - sum(quotas_pad.get(p, 0) for p in obrigs)
+if deficit > 0:
+    for doador in nao_obrigs:
+        while deficit > 0 and quotas_pad.get(doador, 0) > 0:
+            alvo = min(obrigs, key=lambda p: (quotas_pad.get(p, 0), random.random()))
+            quotas_pad[doador] -= 1
+            quotas_pad[alvo] += 1
+            deficit -= 1
+```
+
+Validação: `test_upper_3x2treinos_tem_composto_de_cada_ancora` cai de
+48/200 falhas → 0/200.
+
+**Sondagem pós-fix (N=1000 rotinas):**
+
+| Cenário | Pré | Pós |
+|---|---|---|
+| `upper(3) × 2T` costas r+p | 73% | **100%** |
+| `upper(3) × 2T` peito composto | quebrava 48/200 | **0/200** |
+| `upper(4) × 2T` costas r+p | ~100% | 100% |
+| `upper(3) × 3T` costas r+p | ~85% | **100%** |
+| `lower(4) × 2T` perna_post h+k | ~100% | 100% |
+| `lower(3) × 2T` perna_post h+k | ~100% | 100% |
+
+**Validação geral:**
+
+- pytest 206 passed + 1 skipped preservado
+- 2 snapshots regenerados (`test_upper_3x2treinos_seed11` +
+  `test_upper_3_lower_2_core_2_3treinos_seed42`) — avisos
+  `ancora_nao_cumprida puxadas` removidos. Diff positivo (cobertura
+  garantida).
+- Fixture HIB2: seed 543 → **2202** (4ª transição em ~30h)
+- Harness 16/16 OK preservado, 4.1 = 15.81% inalterado
+- **Métrica secundária do 6.1 (% com ancora_nao_cumprida): 100% → 0%**
+  — ganho clínico significativo. Antes, basicamente toda rotina tinha
+  ≥1 obrigatória descoberta; agora zero.
+
+**Por que o score INTER não cobria esse caso (resposta arquitetural):**
+
+O motor tem 2 camadas sequenciais:
+
+1. **Planejamento** (`pre_alocar_rotina` → `_decompor_demanda_*` →
+   `calcular_quotas`): decide *quantos exercícios de cada padrão*
+   cada treino vai ter. Saída: slots tipados como `("padrao", "puxadas")`.
+2. **Escolha** (`_selecionar_cand_score_aware` + `_score_proximidade`):
+   pra cada slot já tipado, pontua candidatos do pool DAQUELE padrão e
+   escolhe via softmax. INTRA/INTER/HISTÓRICO entram aqui.
+
+INTER opera em granularidades menores que padrão (família, pegada,
+plano_corporal, equipamento, variante_pontual). **Quando o
+planejamento entrega 2 slots de puxadas (1 por treino), a escolha não
+consegue trocar um por remada** — só vê candidatos com `padrao=="puxadas"`.
+
+Fix conceitualmente correto na camada certa (planejamento), não no
+scoring — preserva invariante "score escolhe dentro do que foi
+planejado, sem reabrir alocação".
+
+**Cross-references:**
+
+- `docs/refatoracao/logs/sessao_2026-05-18_cobertura_padroes_obrigatorios.md`
+  — log completo desta sessão
+- Caso clínico: rotina `20260518_203030_2a06` (Bernardo, 2026-05-18 20:30)
+  exibia 2 puxadas + 0 remadas em `costas qt_rotina=2`
+
+---
+
+#### 8.15.16 Âncora de bracos (biceps + triceps obrig pesos iguais — 2026-05-18 madrugada)
+
+> **Decisão registrada:** cadastrar `bracos` em `ANCORAS_POR_SUBREGIAO`
+> com `biceps` e `triceps` ambos obrigatórios e peso 1 cada. Extensão
+> natural da 8.15.15 — bracos sofria da mesma classe de bug (sorteio
+> independente per-treino) agravado por viés pool-weighted, mas não
+> era coberto porque ficava no caminho fallback (sem âncoras).
+
+**Diagnóstico:**
+
+Sondagem N=1000 antes do fix:
+
+| Cenário | Cobertura completa | Distribuição |
+|---|---|---|
+| `bracos(2) × 2T` | **86%** | triceps **65%** / biceps 35% |
+| `bracos(1) × 2T` | **51%** | triceps 60% / biceps 40% |
+| `bracos(3) × 2T` | 96% | triceps 69% / biceps 31% |
+
+Duas patologias simultâneas:
+1. **Cobertura incompleta**: 14% das rotinas `bracos(2)×2T` perdem
+   biceps ou triceps. 49% em `bracos(1)×2T`.
+2. **Viés pool-weighted**: triceps pool=9, biceps pool=6 → fallback
+   `_quotas_por_pool` distribuía 60/40, agravando para 65/35 (drift
+   por escolha downstream).
+
+Conflito direto com [[tamanho-familia-nao-e-centralidade-clinica]]:
+centralidade clínica curada (biceps e triceps igualmente importantes)
+não deve emergir do tamanho do banco.
+
+**Por que o fix da 8.15.15 não cobria bracos:**
+
+Estrutura pré-existente de âncoras tinha 2 níveis:
+- `ANCORAS_POR_REGIAO`: declara estrutura nível região → subregião
+- `ANCORAS_POR_SUBREGIAO`: declara estrutura nível subregião → padrão
+
+Bracos não estava em nenhum dos dois:
+- **Não está em** `ANCORAS_POR_REGIAO['upper']` (só peito + costas + ombro)
+- **Não estava em** `ANCORAS_POR_SUBREGIAO`
+
+Quando usuário pede `subregiao bracos(N)`, vai pelo caminho `nv ==
+"subregiao"` em `pre_alocar_rotina` (~linha 3138), que checa
+`ANCORAS_POR_SUBREGIAO`. Sem entrada, cai no path normal
+`_decompor_demanda_subregiao` per-treino → fallback `_quotas_por_pool`
+sem cobertura cruzada.
+
+Contraste com **core**: tem âncora de **região** (`ANCORAS_POR_REGIAO
+['core']` com core_dinamico+core_isometrico peso 1 cada). Quando user
+pede `regiao core(N)`, Hamilton rotina-level distribui entre as 2
+subregiões garantindo cobertura. Padrões internos de cada uma
+(flexao_tronco vs flexao_quadril etc) ficam sem âncora porque são
+variações, não obrigatórias clínicas.
+
+**Fix:**
+
+Adicionar em `ANCORAS_POR_SUBREGIAO`:
+
+```python
+"bracos": [
+    {"padrao": "biceps",  "peso": 1, "obrigatoria": True},
+    {"padrao": "triceps", "peso": 1, "obrigatoria": True},
+],
+```
+
+Mudança declarativa (4 linhas). Bracos passa pelo mesmo path agregado
+de costas — Hamilton rotina-level + cobertura garantida.
+
+**Sondagem pós-fix:**
+
+| Cenário | Cobertura | Distribuição |
+|---|---|---|
+| `bracos(1) × 2T` | **100%** | 50/50 |
+| `bracos(2) × 2T` | **100%** | 50/50 |
+| `bracos(3) × 2T` | 100% | 40/60 (resto do Hamilton) |
+| `bracos(2) × 3T` | 100% | 50/50 |
+| `bracos(4) × 2T` | 100% | proporção Hamilton |
+
+**Validação geral:**
+
+- pytest 206 passed + 1 skipped (preservado)
+- **0 snapshots regenerados** — mudança é restrita ao path
+  `subregiao bracos`, snapshots de regressão usam outras subregiões.
+- **Fixture HIB2 inalterada** — não toca path do teste.
+- Harness 16/16 OK preservado.
+
+**Decisão clínica registrada:**
+
+Biceps e triceps são padrões **igualmente centrais** dentro de
+bracos. Pesos 1:1 são declaração explícita disso — não derivação do
+banco. Consistente com a memória de tamanho ≠ centralidade.
+
+**Adutores e core_dinamico/core_isometrico ficam sem âncora de
+subregião** por razões clínicas distintas (não bug):
+- **Adutores**: só tem 1 padrão (adduction). Não há decisão a tomar.
+- **core_dinamico/core_isometrico**: padrões internos
+  (flexao_tronco, flexao_quadril etc) são variações sem
+  obrigatoriedade entre si. A âncora clínica forte é no nível região
+  (`ANCORAS_POR_REGIAO['core']`), já existente.
+
+**Cross-references:**
+
+- `docs/refatoracao/logs/sessao_2026-05-18_ancora_bracos.md` — log
+  completo desta sessão
+- Seção 8.15.15 — fix da camada de planejamento que cobertura agora
+  aproveita via âncora declarada
+
+---
+
 ## 9. Fase 4 — estratégia de preenchimento dos 125+ exercícios
 
 > **Status:** protocolo registrado (Sessão 6 — 2026-05-08), execução

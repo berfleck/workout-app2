@@ -8,6 +8,12 @@
         <div class="treino-titulo-linha">
             <div class="treino-title-row">
                 <span class="treino-num-badge">T{{ idx + 1 }}</span>
+                <a href="/hub/rotina/{{ aluno_id }}/treino/{{ idx }}/decisoes"
+                   class="treino-decisoes-btn"
+                   title="Relatório de decisões do gerador (dev)"
+                   aria-label="Decisões do gerador">
+                    <svg class="icon"><use href="#i-search"/></svg>
+                </a>
                 <span class="treino-nome-display">{{ nome_exibir }}</span>
             </div>
             {% set chips = sessao_chips(sessao) %}
@@ -73,20 +79,11 @@
                 {% elif not estados_rascunho and nomes_anteriores and ex.nome in nomes_anteriores %}
                 <span class="ex-pill ex-pill-mantido" title="Mantido do período anterior"><svg class="icon"><use href="#i-check"/></svg></span>
                 {% endif %}
-                {% if ex.rationale %}
-                <button type="button" class="btn-rationale"
-                        title="Por que este exercício?"
-                        aria-label="Por que este exercício"
-                        hx-get="/hub/rotina/{{ aluno_id }}/treino/{{ idx }}/rationale/{{ bi }}/{{ ei }}"
-                        hx-target="#rationale-hub-{{ idx }}-{{ bi }}-{{ ei }}"
-                        hx-swap="innerHTML"><svg class="icon"><use href="#i-info"/></svg></button>
-                {% endif %}
             </span>
         </div>
         {% if ex.series or ex.reps %}
         <span class="prescr-badge">{% if ex.series %}{{ ex.series }}×{% endif %}{{ ex.reps or '' }}{% if ex.rir is not none %} · RIR {{ ex.rir }}{% endif %}</span>
         {% endif %}
-        <div class="rationale-container" id="rationale-hub-{{ idx }}-{{ bi }}-{{ ei }}"></div>
     </div>
     {% endfor %}
     </div>

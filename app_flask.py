@@ -13,6 +13,7 @@ from gerador_treino import (
     TEMPLATES, TEMPLATE_EPP, EXERCICIOS_POR_PADRAO,
     PADRAO_PARA_SUBREGIAO, SUBREGIAO_PARA_REGIAO,
     REGIAO_PARA_SUBREGIOES, SUBREGIAO_PARA_PADROES,
+    ANCORAS_POR_REGIAO, ANCORAS_POR_SUBREGIAO,
     Exercicio, Sessao, SuperSerie,
 )
 from gerar_imagem import gerar_png
@@ -321,7 +322,8 @@ def _sessao_to_dict(s):
             "ex2": _exercicio_to_dict(b.ex2) if b.ex2 else None,
             "ex3": _exercicio_to_dict(b.ex3) if b.ex3 else None})
     return {"tipo": s.tipo, "blocos": blocos,
-            "relaxados": list(getattr(s, "relaxados", []) or [])}
+            "relaxados": list(getattr(s, "relaxados", []) or []),
+            "avisos": list(getattr(s, "avisos", []) or [])}
 
 def _dict_to_sessao(d):
     blocos = []
@@ -332,6 +334,7 @@ def _dict_to_sessao(d):
             ex3=_dict_to_exercicio(b["ex3"]) if b.get("ex3") else None))
     s = Sessao(tipo=d["tipo"], blocos=blocos)
     s.relaxados = list(d.get("relaxados") or [])
+    s.avisos = list(d.get("avisos") or [])
     return s
 
 def _configs_to_serializable(configs):
@@ -1621,38 +1624,97 @@ def _ex_do_slot(sessao, bi, ei):
     return slots[ei]
 
 
-@app.route("/treino/<int:t>/rationale/<int:bi>/<int:ei>")
-def treino_rationale(t, bi, ei):
-    """Etapa 8 — Explicabilidade. Renderiza o painel inline com o rationale
-    do exercício no slot (t, bi, ei) das sessoes_ativas (modo gerador)."""
-    if t >= len(sessoes_ativas):
-        return "Treino não encontrado", 404
-    ex = _ex_do_slot(sessoes_ativas[t], bi, ei)
-    if ex is None:
-        return "Exercício não encontrado", 404
-    return render_template("_rationale_inline.html", ex=ex, bi=bi, ei=ei)
-
-
-@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/rationale/<int:bi>/<int:ei>")
-def hub_treino_rationale(aluno_id, t, bi, ei):
-    """Etapa 8 — Explicabilidade no contexto HUB. Lê do rascunho ou da
-    rotina ativa (mesmo padrão de `_hub_treino_card.html`)."""
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/decisoes")
+def hub_treino_decisoes(aluno_id, t):
+    """Página dedicada de dev — relatório completo das decisões do gerador para
+    um treino. Agrega rationale de pré-alocação, pareamento, alternativas softmax,
+    rejeições por filtro de cargas e avisos da rotina (incompleta / familia
+    repetida / relaxado_carga). Lê rascunho ou rotina ativa, mesmo padrão de
+    `hub_treino_rationale`."""
     aluno = next((a for a in carregar_alunos() if a["id"] == aluno_id), None)
     if not aluno:
         return "Aluno não encontrado", 404
-    # Rascunho tem prioridade quando existe; senão rotina ativa.
     sessoes_dicts = carregar_rascunho(aluno_id)
-    if not sessoes_dicts and aluno.get("rotina_ativa_id"):
-        rotina = carregar_registro(aluno["rotina_ativa_id"])
-        if rotina:
-            sessoes_dicts = rotina["sessoes"]
+    rotina_id = None
+    configs = None
+    fonte = "rascunho"
+    if sessoes_dicts:
+        # Rascunho não persiste configs — busca da rotina ativa se houver
+        if aluno.get("rotina_ativa_id"):
+            rotina = carregar_registro(aluno["rotina_ativa_id"])
+            if rotina:
+                rotina_id = rotina["id"]
+                configs = rotina.get("configs")
+    else:
+        if aluno.get("rotina_ativa_id"):
+            rotina = carregar_registro(aluno["rotina_ativa_id"])
+            if rotina:
+                sessoes_dicts = rotina["sessoes"]
+                rotina_id = rotina["id"]
+                configs = rotina.get("configs")
+                fonte = "rotina_ativa"
     if not sessoes_dicts or t >= len(sessoes_dicts):
         return "Treino não encontrado", 404
     sessao = _dict_to_sessao(sessoes_dicts[t])
-    ex = _ex_do_slot(sessao, bi, ei)
-    if ex is None:
-        return "Exercício não encontrado", 404
-    return render_template("_rationale_inline.html", ex=ex, bi=bi, ei=ei)
+    config_treino = None
+    if configs and isinstance(configs, list) and t < len(configs):
+        config_treino = configs[t]
+
+    # Agrega distribuição real por demanda raiz lendo o rationale.pre_alocacao
+    # de cada exercício escolhido. Devolve, por (nivel, escopo), a contagem de
+    # exercícios por subregião (quando nivel="regiao") ou por padrão (quando
+    # nivel="subregiao"). Permite comparar a distribuição obtida com as
+    # âncoras declaradas. Computa pra o treino corrente E pros demais treinos
+    # da rotina — o fix de cobertura rotina-level (Seção 8.15.15) sacrifica
+    # ótimo per-treino pra garantir cobertura agregada, então a coluna
+    # "em outros" desambigua "obrig ✗ neste treino" vs "obrig ✗ na rotina toda".
+    def _agregar_distribuicao(sessoes_iter):
+        agg = {}
+        for s in sessoes_iter:
+            for bloco in s.blocos:
+                for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                    if not ex or not getattr(ex, "rationale", None):
+                        continue
+                    pa = ex.rationale.get("pre_alocacao") or {}
+                    slot = ex.rationale.get("slot") or {}
+                    nivel_orig = pa.get("nivel_demanda_original")
+                    escopo_orig = slot.get("escopo_demanda_original")
+                    if not nivel_orig or not escopo_orig:
+                        continue
+                    chave = (nivel_orig, escopo_orig)
+                    bucket = agg.setdefault(chave, {
+                        "por_subregiao": {}, "por_padrao": {}, "total": 0,
+                    })
+                    bucket["total"] += 1
+                    sub = pa.get("subregiao_intermediaria") or ex.subregiao
+                    if sub:
+                        bucket["por_subregiao"][sub] = bucket["por_subregiao"].get(sub, 0) + 1
+                    if ex.padrao:
+                        bucket["por_padrao"][ex.padrao] = bucket["por_padrao"].get(ex.padrao, 0) + 1
+        return agg
+
+    distribuicao_por_demanda = _agregar_distribuicao([sessao])
+    outras_sessoes = [
+        _dict_to_sessao(sd) for ti, sd in enumerate(sessoes_dicts) if ti != t
+    ]
+    distribuicao_outros_treinos = _agregar_distribuicao(outras_sessoes)
+
+    return render_template(
+        "decisoes_treino.html",
+        sessao=sessao,
+        idx=t,
+        aluno=aluno,
+        aluno_id=aluno_id,
+        rotina_id=rotina_id,
+        fonte=fonte,
+        config_treino=config_treino,
+        ancoras_por_regiao=ANCORAS_POR_REGIAO,
+        ancoras_por_subregiao=ANCORAS_POR_SUBREGIAO,
+        distribuicao_por_demanda=distribuicao_por_demanda,
+        distribuicao_outros_treinos=distribuicao_outros_treinos,
+        total_treinos_rotina=len(sessoes_dicts),
+    )
+
 
 @app.route("/treino/<int:t>/editar")
 def treino_editar(t):

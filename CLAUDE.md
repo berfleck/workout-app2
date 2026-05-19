@@ -2,6 +2,20 @@
 
 App para personal trainer gerar, editar e exportar sessões de treino. Roda localmente. Dados em SQLite + XLSX.
 
+## ⚠️ DECISÃO ESTRUTURAL PENDENTE (2026-05-19)
+
+Refator profundo do gerador sob avaliação. As Etapas 1-8 do
+`guia_refatoracao_v4.md` (caminho do meio incremental) estão sob
+revisão estrutural — diagnóstico é que o algoritmo greedy sequencial
+gera ordem-de-alocação + vieses sistemáticos + patches em cascata.
+
+**ANTES de mexer no gerador, em pesos, ou em dimensões de proximidade, ler:**
+`docs/refatoracao/handoff_2026-05-19_decisao_refator.md`
+
+Próximo passo combinado: **documento de princípios clínicos** (não código).
+Se o usuário trouxer viés ou edge case novo, **NÃO patchar** antes de
+checar se ele quer aguardar o refator estrutural.
+
 ## Refatoração em andamento
 
 Estamos em refatoração planejada do gerador de treinos.
