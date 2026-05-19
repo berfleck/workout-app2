@@ -25,7 +25,11 @@
 {% set AVISO_LABEL = {
     "incompleta":"Demanda incompleta",
     "familia_repetida":"Flexibilização de família",
-    "relaxado_carga":"Solo forçado por carga"
+    "relaxado_carga":"Solo forçado por carga",
+    "ancora_nao_cumprida":"Âncora obrigatória sem vagas"
+} %}
+{% set MOTIVO_ANCORA_LABEL = {
+    "vagas_insuficientes":"vagas insuficientes na demanda"
 } %}
 
 {# Macro: linha de delta softmax (verde = pior, vermelho = melhor, cinza = empate) #}
@@ -279,6 +283,51 @@
     .dec-pareamento-peso--pos { color: #166534; }
     .dec-pareamento-peso--neg { color: #991b1b; }
     .dec-pareamento-peso--zero { color: #6b7280; }
+    /* Distribuição por âncoras */
+    .dec-ancora-demanda {
+        border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;
+        margin-bottom: 12px; background: #fafafa;
+    }
+    .dec-ancora-demanda-head {
+        display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px;
+        flex-wrap: wrap;
+    }
+    .dec-ancora-demanda-title {
+        font-weight: 600; color: #1f2937; font-size: 13px;
+    }
+    .dec-ancora-table {
+        width: 100%; border-collapse: collapse; font-size: 12px;
+    }
+    .dec-ancora-table th, .dec-ancora-table td {
+        padding: 5px 8px; text-align: left;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .dec-ancora-table th {
+        background: #f9fafb; color: #6b7280; font-weight: 600;
+        font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .dec-ancora-table tr:last-child td { border-bottom: 0; }
+    .dec-ancora-table .dec-cell-num {
+        font-variant-numeric: tabular-nums; text-align: right;
+    }
+    .dec-ancora-obrig {
+        display: inline-flex; padding: 1px 5px; border-radius: 3px;
+        background: #fee2e2; color: #991b1b;
+        font-size: 10px; font-weight: 600; text-transform: uppercase;
+    }
+    .dec-ancora-acess {
+        display: inline-flex; padding: 1px 5px; border-radius: 3px;
+        background: #f3f4f6; color: #6b7280;
+        font-size: 10px; font-weight: 600; text-transform: uppercase;
+    }
+    .dec-ancora-row--zero { opacity: 0.55; }
+    .dec-ancora-row--zero .dec-ancora-obrig {
+        background: #fef3c7; color: #92400e;
+    }
+    .dec-ancora-empty-msg {
+        color: #6b7280; font-style: italic; font-size: 12px;
+        padding: 6px 0;
+    }
 </style>
 
 <div class="dec-page">
@@ -368,6 +417,14 @@
                     par bloqueado: <b>{{ av.get('par_bloqueado', '?') }}</b>
                     (carga {{ av.get('dimensao', '?') }}:
                     soma {{ av.get('soma', '?') }} ≥ threshold {{ av.get('threshold', '?') }}).
+                {% elif av.tipo == "ancora_nao_cumprida" %}
+                    Âncora obrigatória <b>{{ av.get('chave', '?') }}</b>
+                    de {{ NIVEL_LABEL.get(av.get('nivel'), av.get('nivel', '?')) }}
+                    <b>{{ av.get('escopo', '?') }}</b> ficou sem vagas
+                    (motivo: {{ MOTIVO_ANCORA_LABEL.get(av.get('motivo'), av.get('motivo', '?')) }}).
+                    Hamilton's Largest Remainder não conseguiu alocar nenhum slot
+                    porque a demanda tinha menos vagas que o número de âncoras
+                    obrigatórias — o sorteio entre obrigatórias excluiu esta.
                 {% else %}
                     {{ av | tojson }}
                 {% endif %}
@@ -382,6 +439,137 @@
     <div class="dec-section">
         <div class="dec-section-title">⚙️ Configuração</div>
         <div class="dec-config-pre">{{ config_treino | tojson(indent=2) }}</div>
+    </div>
+    {% endif %}
+
+    {# ─── Distribuição por âncoras ─── #}
+    {% if distribuicao_por_demanda %}
+    <div class="dec-section">
+        <div class="dec-section-title">⚓ Distribuição por âncoras
+            <span class="dec-section-count">{{ distribuicao_por_demanda | length }}</span>
+        </div>
+        <div style="font-size:11px; color:#6b7280; margin-bottom:10px;">
+            Para cada demanda raiz, lista as âncoras declaradas em
+            <code style="font-family:ui-monospace,monospace; background:#f3f4f6; padding:1px 4px; border-radius:3px;">ANCORAS_POR_*</code>
+            e compara com a distribuição obtida nesta rotina. Hamilton's Largest
+            Remainder define quantos slots cada âncora recebe pelos pesos
+            relativos; obrigatórias sem vaga geram aviso <i>ancora_nao_cumprida</i>.
+        </div>
+
+        {% for (nivel_d, escopo_d), dist in distribuicao_por_demanda.items() %}
+        <div class="dec-ancora-demanda">
+            <div class="dec-ancora-demanda-head">
+                <span class="dec-chip">{{ NIVEL_LABEL.get(nivel_d, nivel_d) }}</span>
+                <span class="dec-ancora-demanda-title">{{ escopo_d }}</span>
+                <span style="color:#6b7280; font-size:11px;">total obtido: <b style="color:#1f2937;">{{ dist.total }}</b> ex</span>
+            </div>
+
+            {% if nivel_d == "regiao" and ancoras_por_regiao.get(escopo_d) %}
+                {% set ancoras_decl = ancoras_por_regiao[escopo_d] %}
+                {% set total_peso = ancoras_decl | sum(attribute='peso') %}
+                <table class="dec-ancora-table">
+                    <thead>
+                        <tr>
+                            <th>Subregião (âncora)</th>
+                            <th>Tipo</th>
+                            <th style="text-align:right;">Peso</th>
+                            <th style="text-align:right;">% peso</th>
+                            <th style="text-align:right;">Obtidos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for a in ancoras_decl %}
+                        {% set obt = dist.por_subregiao.get(a.subregiao, 0) %}
+                        <tr {% if a.obrigatoria and obt == 0 %}class="dec-ancora-row--zero"{% endif %}>
+                            <td><b>{{ a.subregiao }}</b></td>
+                            <td>
+                                {% if a.obrigatoria %}
+                                <span class="dec-ancora-obrig">obrig{% if obt == 0 %} ✗{% endif %}</span>
+                                {% else %}
+                                <span class="dec-ancora-acess">acessória</span>
+                                {% endif %}
+                            </td>
+                            <td class="dec-cell-num">{{ a.peso }}</td>
+                            <td class="dec-cell-num">{{ '%.0f'|format(100.0 * a.peso / total_peso) if total_peso else '—' }}%</td>
+                            <td class="dec-cell-num"><b>{{ obt }}</b></td>
+                        </tr>
+                    {% endfor %}
+                    {# Subregiões obtidas que não estão entre as âncoras declaradas #}
+                    {% set chaves_decl = ancoras_decl | map(attribute='subregiao') | list %}
+                    {% for sub, qtd in dist.por_subregiao.items() if sub not in chaves_decl %}
+                        <tr style="background:#fff7ed;">
+                            <td><b>{{ sub }}</b> <span style="color:#9a3412; font-size:10px;">(fora das âncoras)</span></td>
+                            <td><span class="dec-ancora-acess">extra</span></td>
+                            <td class="dec-cell-num">—</td>
+                            <td class="dec-cell-num">—</td>
+                            <td class="dec-cell-num"><b>{{ qtd }}</b></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% elif nivel_d == "subregiao" and ancoras_por_subregiao.get(escopo_d) %}
+                {% set ancoras_decl = ancoras_por_subregiao[escopo_d] %}
+                {% set total_peso = ancoras_decl | sum(attribute='peso') %}
+                <table class="dec-ancora-table">
+                    <thead>
+                        <tr>
+                            <th>Padrão (âncora)</th>
+                            <th>Tipo</th>
+                            <th style="text-align:right;">Peso</th>
+                            <th style="text-align:right;">% peso</th>
+                            <th style="text-align:right;">Obtidos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for a in ancoras_decl %}
+                        {% set obt = dist.por_padrao.get(a.padrao, 0) %}
+                        <tr {% if a.obrigatoria and obt == 0 %}class="dec-ancora-row--zero"{% endif %}>
+                            <td><b>{{ a.padrao }}</b></td>
+                            <td>
+                                {% if a.obrigatoria %}
+                                <span class="dec-ancora-obrig">obrig{% if obt == 0 %} ✗{% endif %}</span>
+                                {% else %}
+                                <span class="dec-ancora-acess">acessória</span>
+                                {% endif %}
+                            </td>
+                            <td class="dec-cell-num">{{ a.peso }}</td>
+                            <td class="dec-cell-num">{{ '%.0f'|format(100.0 * a.peso / total_peso) if total_peso else '—' }}%</td>
+                            <td class="dec-cell-num"><b>{{ obt }}</b></td>
+                        </tr>
+                    {% endfor %}
+                    {% set chaves_decl = ancoras_decl | map(attribute='padrao') | list %}
+                    {% for pad, qtd in dist.por_padrao.items() if pad not in chaves_decl %}
+                        <tr style="background:#fff7ed;">
+                            <td><b>{{ pad }}</b> <span style="color:#9a3412; font-size:10px;">(fora das âncoras)</span></td>
+                            <td><span class="dec-ancora-acess">extra</span></td>
+                            <td class="dec-cell-num">—</td>
+                            <td class="dec-cell-num">—</td>
+                            <td class="dec-cell-num"><b>{{ qtd }}</b></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% elif nivel_d == "subregiao" %}
+                <div class="dec-ancora-empty-msg">
+                    Subregião <b>{{ escopo_d }}</b> sem âncoras declaradas (cycling
+                    uniforme via fallback). Distribuição por padrão:
+                    {% for pad, qtd in dist.por_padrao.items() %}{{ pad }} ({{ qtd }}){% if not loop.last %}, {% endif %}{% endfor %}.
+                </div>
+            {% elif nivel_d == "regiao" %}
+                <div class="dec-ancora-empty-msg">
+                    Região <b>{{ escopo_d }}</b> sem âncoras declaradas (cycling
+                    uniforme via fallback). Distribuição por subregião:
+                    {% for sub, qtd in dist.por_subregiao.items() %}{{ sub }} ({{ qtd }}){% if not loop.last %}, {% endif %}{% endfor %}.
+                </div>
+            {% else %}
+                <div class="dec-ancora-empty-msg">
+                    Demanda de nível <b>{{ NIVEL_LABEL.get(nivel_d, nivel_d) }}</b> não passa por âncoras —
+                    {{ dist.total }} ex foram alocados diretamente em
+                    <b>{{ escopo_d }}</b>.
+                </div>
+            {% endif %}
+        </div>
+        {% endfor %}
     </div>
     {% endif %}
 

@@ -13,6 +13,7 @@ from gerador_treino import (
     TEMPLATES, TEMPLATE_EPP, EXERCICIOS_POR_PADRAO,
     PADRAO_PARA_SUBREGIAO, SUBREGIAO_PARA_REGIAO,
     REGIAO_PARA_SUBREGIOES, SUBREGIAO_PARA_PADROES,
+    ANCORAS_POR_REGIAO, ANCORAS_POR_SUBREGIAO,
     Exercicio, Sessao, SuperSerie,
 )
 from gerar_imagem import gerar_png
@@ -1658,6 +1659,34 @@ def hub_treino_decisoes(aluno_id, t):
     config_treino = None
     if configs and isinstance(configs, list) and t < len(configs):
         config_treino = configs[t]
+
+    # Agrega distribuição real por demanda raiz lendo o rationale.pre_alocacao
+    # de cada exercício escolhido. Devolve, por (nivel, escopo), a contagem de
+    # exercícios por subregião (quando nivel="regiao") ou por padrão (quando
+    # nivel="subregiao"). Permite comparar a distribuição obtida com as
+    # âncoras declaradas.
+    distribuicao_por_demanda = {}
+    for bloco in sessao.blocos:
+        for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+            if not ex or not getattr(ex, "rationale", None):
+                continue
+            pa = ex.rationale.get("pre_alocacao") or {}
+            slot = ex.rationale.get("slot") or {}
+            nivel_orig = pa.get("nivel_demanda_original")
+            escopo_orig = slot.get("escopo_demanda_original")
+            if not nivel_orig or not escopo_orig:
+                continue
+            chave = (nivel_orig, escopo_orig)
+            bucket = distribuicao_por_demanda.setdefault(chave, {
+                "por_subregiao": {}, "por_padrao": {}, "total": 0,
+            })
+            bucket["total"] += 1
+            sub = pa.get("subregiao_intermediaria") or ex.subregiao
+            if sub:
+                bucket["por_subregiao"][sub] = bucket["por_subregiao"].get(sub, 0) + 1
+            if ex.padrao:
+                bucket["por_padrao"][ex.padrao] = bucket["por_padrao"].get(ex.padrao, 0) + 1
+
     return render_template(
         "decisoes_treino.html",
         sessao=sessao,
@@ -1667,6 +1696,9 @@ def hub_treino_decisoes(aluno_id, t):
         rotina_id=rotina_id,
         fonte=fonte,
         config_treino=config_treino,
+        ancoras_por_regiao=ANCORAS_POR_REGIAO,
+        ancoras_por_subregiao=ANCORAS_POR_SUBREGIAO,
+        distribuicao_por_demanda=distribuicao_por_demanda,
     )
 
 
