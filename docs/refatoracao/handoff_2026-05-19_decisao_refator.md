@@ -9,6 +9,13 @@ app atualmente.**
 
 ---
 
+## Documentos vivos relacionados
+
+- **`docs/refatoracao/principios_clinicos.md`** — rascunho mutável dos
+  princípios clínicos extraídos via entrevista guiada (iniciado
+  2026-05-19, Lente A sobre Variante B 2x semana). Atualizar a cada
+  sessão de avaliação.
+
 ## TL;DR pra próxima sessão
 
 O usuário está considerando refator estrutural profundo do gerador.
