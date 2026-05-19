@@ -468,3 +468,128 @@ def test_distribuir_quota_vazia():
         {}, n_treinos=3, vagas_por_treino=[2, 2, 2], pesos={},
     )
     assert out == [{}, {}, {}]
+
+
+# ─── Carve-out de quotas por subregião (2026-05-18) ────────────────────
+
+
+def test_ombro_vaga_unica_sorteia_70_30_composto_isolado():
+    """Ombro vagas=1: 70% composto / 30% isolado / 0% posterior."""
+    from gerador_treino import _quotas_de_subregiao
+    N = 2000
+    contagem = {"ombro_composto": 0, "ombro_isolado": 0, "posterior_ombro": 0}
+    for seed in range(N):
+        random.seed(seed)
+        quotas, _ = _quotas_de_subregiao("ombro", 1)
+        assert sum(quotas.values()) == 1
+        for padrao in quotas:
+            contagem[padrao] += 1
+    assert contagem["posterior_ombro"] == 0
+    pct_composto = contagem["ombro_composto"] / N
+    assert 0.65 <= pct_composto <= 0.75, (
+        f"composto = {pct_composto:.1%} (esperado ~70%). Dist: {contagem}"
+    )
+
+
+def test_ombro_vagas_2_volta_para_hamilton_normal():
+    """Ombro vagas≥2: sem carve-out, Hamilton normal opera."""
+    from gerador_treino import _quotas_de_subregiao
+    random.seed(42)
+    quotas, _ = _quotas_de_subregiao("ombro", 2)
+    assert quotas.get("ombro_composto", 0) == 1
+    assert quotas.get("ombro_isolado", 0) == 1
+    assert quotas.get("posterior_ombro", 0) == 0
+
+    quotas, _ = _quotas_de_subregiao("ombro", 6)
+    assert quotas == {"ombro_composto": 3, "ombro_isolado": 2, "posterior_ombro": 1}
+
+
+def test_perna_posterior_vaga_unica_sorteia_60_20_20():
+    """Perna_posterior vagas=1: 60% hinge / 20% kn / 20% ab."""
+    from gerador_treino import _quotas_de_subregiao
+    N = 3000
+    contagem = {"hinge": 0, "knee_flexion": 0, "abduction": 0}
+    for seed in range(N):
+        random.seed(seed)
+        quotas, _ = _quotas_de_subregiao("perna_posterior", 1)
+        assert sum(quotas.values()) == 1
+        for padrao in quotas:
+            contagem[padrao] += 1
+    pct_hinge = contagem["hinge"] / N
+    pct_kn    = contagem["knee_flexion"] / N
+    pct_ab    = contagem["abduction"] / N
+    assert 0.55 <= pct_hinge <= 0.65, f"hinge = {pct_hinge:.1%} (esperado ~60%)"
+    assert 0.15 <= pct_kn    <= 0.25, f"kn    = {pct_kn:.1%} (esperado ~20%)"
+    assert 0.15 <= pct_ab    <= 0.25, f"ab    = {pct_ab:.1%} (esperado ~20%)"
+
+
+def test_perna_posterior_vaga_dupla_hinge_fixo_50_50():
+    """Perna_posterior vagas=2: hinge sempre presente; 2º slot 50/50 kn/ab."""
+    from gerador_treino import _quotas_de_subregiao
+    N = 2000
+    com_kn = com_ab = 0
+    for seed in range(N):
+        random.seed(seed)
+        quotas, _ = _quotas_de_subregiao("perna_posterior", 2)
+        assert sum(quotas.values()) == 2
+        assert quotas.get("hinge", 0) == 1, f"hinge faltando: {quotas}"
+        if quotas.get("knee_flexion", 0) == 1:
+            com_kn += 1
+        elif quotas.get("abduction", 0) == 1:
+            com_ab += 1
+    pct_kn = com_kn / N
+    pct_ab = com_ab / N
+    assert 0.45 <= pct_kn <= 0.55, f"% kn = {pct_kn:.1%} (esperado ~50%)"
+    assert 0.45 <= pct_ab <= 0.55, f"% ab = {pct_ab:.1%} (esperado ~50%)"
+
+
+def test_perna_posterior_vagas_3_prioriza_hinge_levemente():
+    """Perna_posterior vagas=3: 60% cobertura completa (1+1+1),
+    40% prioriza hinge (2+1+0 ou 2+0+1) com kn/ab simétricas.
+    Slot-level esperado: hinge ~47%, kn ~27%, ab ~27%."""
+    from gerador_treino import _quotas_de_subregiao
+    N = 3000
+    contagem = {"hinge": 0, "knee_flexion": 0, "abduction": 0}
+    cobertura_completa = 0
+    for seed in range(N):
+        random.seed(seed)
+        quotas, _ = _quotas_de_subregiao("perna_posterior", 3)
+        assert sum(quotas.values()) == 3
+        assert quotas.get("hinge", 0) >= 1, f"hinge ausente: {quotas}"
+        for padrao, qtd in quotas.items():
+            contagem[padrao] += qtd
+        if quotas == {"hinge": 1, "knee_flexion": 1, "abduction": 1}:
+            cobertura_completa += 1
+    total = sum(contagem.values())
+    pct_hinge = contagem["hinge"] / total
+    pct_kn    = contagem["knee_flexion"] / total
+    pct_ab    = contagem["abduction"] / total
+    pct_cc    = cobertura_completa / N
+    assert 0.43 <= pct_hinge <= 0.51, f"hinge slot = {pct_hinge:.1%} (esperado ~47%)"
+    assert 0.23 <= pct_kn    <= 0.31, f"kn slot    = {pct_kn:.1%} (esperado ~27%)"
+    assert 0.23 <= pct_ab    <= 0.31, f"ab slot    = {pct_ab:.1%} (esperado ~27%)"
+    # Simetria kn/ab (diff < 4pp)
+    assert abs(pct_kn - pct_ab) < 0.04, f"kn-ab diff = {abs(pct_kn-pct_ab):.1%} (esperado simétrico)"
+    assert 0.55 <= pct_cc <= 0.65, f"cobertura completa = {pct_cc:.1%} (esperado ~60%)"
+
+
+def test_perna_posterior_vagas_4_volta_para_hamilton():
+    """Perna_posterior vagas≥4: sem carve-out, Hamilton normal opera."""
+    from gerador_treino import _quotas_de_subregiao
+    random.seed(0)
+    quotas, _ = _quotas_de_subregiao("perna_posterior", 4)
+    assert quotas == {"hinge": 2, "knee_flexion": 1, "abduction": 1}
+
+    quotas, _ = _quotas_de_subregiao("perna_posterior", 6)
+    assert quotas == {"hinge": 3, "knee_flexion": 2, "abduction": 1}
+
+
+def test_peito_nao_afetado_pelos_carveouts():
+    """Peito não tem carve-out — Hamilton normal em todas as vagas.
+    Crítico: vagas=3 continua 2 compostos + 1 isolado (ortodoxia clínica)."""
+    from gerador_treino import _quotas_de_subregiao
+    quotas, _ = _quotas_de_subregiao("peito", 1)
+    assert quotas == {"empurrar_compostos": 1}
+
+    quotas, _ = _quotas_de_subregiao("peito", 3)
+    assert quotas == {"empurrar_compostos": 2, "empurrar_isolados": 1}

@@ -190,6 +190,58 @@ ANCORAS_POR_SUBREGIAO: dict[str, list[dict]] = {
 }
 
 
+# Carve-out de quotas por subregião: distribuições explícitas que substituem
+# o Hamilton normal em (subregião, vagas) específicos.
+#
+# Motivação clínica (2026-05-18): Hamilton determinístico cria 0% para
+# acessórias em vários cenários por causa do tie-break "obrigatória vence
+# empate de resto". Esta estrutura permite, por subregião e por número de
+# vagas, declarar a distribuição clínica desejada explicitamente.
+#
+# Formato: SUBREGIOES_CARVE_OUT_QUOTAS[subregiao][vagas] é uma lista de
+# tuplas (quotas_dict, peso_prob). Sorteia-se UM quota_dict da lista
+# proporcional aos pesos. Soma das quotas em cada dict deve bater com
+# vagas. Use peso 100 quando quiser distribuição fixa (1 entrada só).
+#
+# Quando NÃO há entrada pra (subregião, vagas), Hamilton normal opera.
+SUBREGIOES_CARVE_OUT_QUOTAS: dict[str, dict[int, list[tuple[dict[str, int], int]]]] = {
+    "ombro": {
+        # Vaga única: 70/30 composto/isolado. posterior_ombro fora —
+        # específico demais pra uma rotina single-slot de ombro.
+        1: [
+            ({"ombro_composto": 1}, 70),
+            ({"ombro_isolado":  1}, 30),
+        ],
+        # vagas ≥ 2: Hamilton normal (composto:1 + isolado:1 em 2 vagas,
+        # composto:2 + isolado:1 em 3 vagas; posterior só entra em 4+).
+    },
+    "perna_posterior": {
+        # Vaga única: variedade ampla (hinge dominante mas kn/ab têm vez).
+        1: [
+            ({"hinge":        1}, 60),
+            ({"knee_flexion": 1}, 20),
+            ({"abduction":    1}, 20),
+        ],
+        # Vaga dupla: hinge sempre presente; 2º slot 50/50 kn vs ab.
+        2: [
+            ({"hinge": 1, "knee_flexion": 1}, 50),
+            ({"hinge": 1, "abduction":    1}, 50),
+        ],
+        # 3 vagas: cobertura completa preferida; 40% das rotinas dobra
+        # hinge (priorização leve do composto) sacrificando 1 das
+        # acessórias. kn e ab permanecem simétricas entre si.
+        # Slot-level esperado: hinge ~47%, kn ~27%, ab ~27%.
+        3: [
+            ({"hinge": 1, "knee_flexion": 1, "abduction": 1}, 60),
+            ({"hinge": 2, "knee_flexion": 1},                 20),
+            ({"hinge": 2, "abduction":    1},                 20),
+        ],
+        # vagas ≥ 4: Hamilton normal (já distribui os 3 padrões
+        # naturalmente — hinge:2 kn:1 ab:1 em 4; hinge:3 kn:2 ab:1 em 6).
+    },
+}
+
+
 def _validar_ancoras() -> None:
     """Sanity check: nomes em ANCORAS_* batem com PADRAO_PARA_SUBREGIAO."""
     for regiao, ancoras in ANCORAS_POR_REGIAO.items():
@@ -337,6 +389,16 @@ def _quotas_de_subregiao(subregiao: str, vagas: int) -> tuple[dict[str, int], li
     em fallback Etapa 2 (cycling uniforme via _decompor_demanda_subregiao).
     Avisos retornados têm campo `nivel="subregiao"` e `escopo=subregiao`.
     """
+    # Carve-out: subregião com distribuição explícita pra esse nº de vagas.
+    # Sorteia 1 entrada da lista (peso = probabilidade); copia o dict
+    # resultante pra não mutar o estado da constante.
+    distribs = SUBREGIOES_CARVE_OUT_QUOTAS.get(subregiao, {}).get(vagas)
+    if distribs:
+        dicts = [d for d, _ in distribs]
+        pesos = [p for _, p in distribs]
+        escolhido = random.choices(dicts, weights=pesos, k=1)[0]
+        return dict(escolhido), []
+
     ancoras_raw = ANCORAS_POR_SUBREGIAO.get(subregiao, [])
     ancoras = [
         {"chave": a["padrao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
@@ -3200,17 +3262,13 @@ def pre_alocar_rotina(
 
                 if sub_esc in ANCORAS_POR_SUBREGIAO:
                     ancoras_sub = ANCORAS_POR_SUBREGIAO[sub_esc]
-                    anc_dict_sub = [
-                        {"chave": a["padrao"], "peso": a["peso"],
-                         "obrigatoria": a["obrigatoria"]}
-                        for a in ancoras_sub
-                    ]
-                    quotas_pad_rotina, avs_pad = calcular_quotas(
-                        anc_dict_sub, qt_total_sub,
+                    # Passa por _quotas_de_subregiao em vez de chamar
+                    # calcular_quotas direto: respeita o carve-out
+                    # SUBREGIOES_SORTEIO_VAGA_UNICA (ombro com vaga única).
+                    quotas_pad_rotina, avs_pad = _quotas_de_subregiao(
+                        sub_esc, qt_total_sub,
                     )
                     for av in avs_pad:
-                        av["nivel"] = "subregiao"
-                        av["escopo"] = sub_esc
                         av["escopo_demanda"] = esc
                         av["treino_idx"] = instancias[0][0]
                         avisos_rotina.append(av)
@@ -3222,10 +3280,19 @@ def pre_alocar_rotina(
                     # 2 treinos → Hamilton dá compostos:1+isolados:1 pela
                     # proporção 3:2, mas T2 ficaria sem composto — Bernardo
                     # rotina 2026-05-18.)
+                    #
+                    # Carve-out: subregiões em SUBREGIOES_CARVE_OUT_QUOTAS
+                    # com entrada pra esse nº de vagas já decidiram a
+                    # distribuição por sorteio ponderado (decisão clínica
+                    # deliberada). Aplicar piso aqui anularia o sorteio
+                    # (forçaria de volta pra obrigatória), então pulamos.
                     obrigs_sub = [a["padrao"] for a in ancoras_sub if a["obrigatoria"]]
                     nao_obrigs_sub = [a["padrao"] for a in ancoras_sub if not a["obrigatoria"]]
                     n_treinos_qt_pos = sum(1 for q in qts_treino if q > 0)
-                    if obrigs_sub and nao_obrigs_sub:
+                    carve_out_ativo = qt_total_sub in (
+                        SUBREGIOES_CARVE_OUT_QUOTAS.get(sub_esc) or {}
+                    )
+                    if obrigs_sub and nao_obrigs_sub and not carve_out_ativo:
                         soma_obrig = sum(quotas_pad_rotina.get(p, 0) for p in obrigs_sub)
                         deficit = n_treinos_qt_pos - soma_obrig
                         for doador in nao_obrigs_sub:
@@ -3279,14 +3346,10 @@ def pre_alocar_rotina(
             if esc not in ANCORAS_POR_SUBREGIAO:
                 continue  # fallback Etapa 2
             ancoras_raw = ANCORAS_POR_SUBREGIAO[esc]
-            anc_dict = [
-                {"chave": a["padrao"], "peso": a["peso"], "obrigatoria": a["obrigatoria"]}
-                for a in ancoras_raw
-            ]
-            quotas_sub, avs_sub = calcular_quotas(anc_dict, vagas_total)
+            # Passa por _quotas_de_subregiao pra respeitar o carve-out
+            # SUBREGIOES_SORTEIO_VAGA_UNICA (ombro com vaga única).
+            quotas_sub, avs_sub = _quotas_de_subregiao(esc, vagas_total)
             for av in avs_sub:
-                av["nivel"] = "subregiao"
-                av["escopo"] = esc
                 av["escopo_demanda"] = esc
                 av["treino_idx"] = instancias[0][0]
                 avisos_rotina.append(av)
