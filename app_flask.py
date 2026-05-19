@@ -1664,28 +1664,40 @@ def hub_treino_decisoes(aluno_id, t):
     # de cada exercício escolhido. Devolve, por (nivel, escopo), a contagem de
     # exercícios por subregião (quando nivel="regiao") ou por padrão (quando
     # nivel="subregiao"). Permite comparar a distribuição obtida com as
-    # âncoras declaradas.
-    distribuicao_por_demanda = {}
-    for bloco in sessao.blocos:
-        for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
-            if not ex or not getattr(ex, "rationale", None):
-                continue
-            pa = ex.rationale.get("pre_alocacao") or {}
-            slot = ex.rationale.get("slot") or {}
-            nivel_orig = pa.get("nivel_demanda_original")
-            escopo_orig = slot.get("escopo_demanda_original")
-            if not nivel_orig or not escopo_orig:
-                continue
-            chave = (nivel_orig, escopo_orig)
-            bucket = distribuicao_por_demanda.setdefault(chave, {
-                "por_subregiao": {}, "por_padrao": {}, "total": 0,
-            })
-            bucket["total"] += 1
-            sub = pa.get("subregiao_intermediaria") or ex.subregiao
-            if sub:
-                bucket["por_subregiao"][sub] = bucket["por_subregiao"].get(sub, 0) + 1
-            if ex.padrao:
-                bucket["por_padrao"][ex.padrao] = bucket["por_padrao"].get(ex.padrao, 0) + 1
+    # âncoras declaradas. Computa pra o treino corrente E pros demais treinos
+    # da rotina — o fix de cobertura rotina-level (Seção 8.15.15) sacrifica
+    # ótimo per-treino pra garantir cobertura agregada, então a coluna
+    # "em outros" desambigua "obrig ✗ neste treino" vs "obrig ✗ na rotina toda".
+    def _agregar_distribuicao(sessoes_iter):
+        agg = {}
+        for s in sessoes_iter:
+            for bloco in s.blocos:
+                for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                    if not ex or not getattr(ex, "rationale", None):
+                        continue
+                    pa = ex.rationale.get("pre_alocacao") or {}
+                    slot = ex.rationale.get("slot") or {}
+                    nivel_orig = pa.get("nivel_demanda_original")
+                    escopo_orig = slot.get("escopo_demanda_original")
+                    if not nivel_orig or not escopo_orig:
+                        continue
+                    chave = (nivel_orig, escopo_orig)
+                    bucket = agg.setdefault(chave, {
+                        "por_subregiao": {}, "por_padrao": {}, "total": 0,
+                    })
+                    bucket["total"] += 1
+                    sub = pa.get("subregiao_intermediaria") or ex.subregiao
+                    if sub:
+                        bucket["por_subregiao"][sub] = bucket["por_subregiao"].get(sub, 0) + 1
+                    if ex.padrao:
+                        bucket["por_padrao"][ex.padrao] = bucket["por_padrao"].get(ex.padrao, 0) + 1
+        return agg
+
+    distribuicao_por_demanda = _agregar_distribuicao([sessao])
+    outras_sessoes = [
+        _dict_to_sessao(sd) for ti, sd in enumerate(sessoes_dicts) if ti != t
+    ]
+    distribuicao_outros_treinos = _agregar_distribuicao(outras_sessoes)
 
     return render_template(
         "decisoes_treino.html",
@@ -1699,6 +1711,8 @@ def hub_treino_decisoes(aluno_id, t):
         ancoras_por_regiao=ANCORAS_POR_REGIAO,
         ancoras_por_subregiao=ANCORAS_POR_SUBREGIAO,
         distribuicao_por_demanda=distribuicao_por_demanda,
+        distribuicao_outros_treinos=distribuicao_outros_treinos,
+        total_treinos_rotina=len(sessoes_dicts),
     )
 
 

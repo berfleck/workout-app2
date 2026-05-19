@@ -315,6 +315,11 @@
         background: #fee2e2; color: #991b1b;
         font-size: 10px; font-weight: 600; text-transform: uppercase;
     }
+    .dec-ancora-obrig-spread {
+        display: inline-flex; padding: 1px 5px; border-radius: 3px;
+        background: #dbeafe; color: #1e40af;
+        font-size: 10px; font-weight: 600; text-transform: uppercase;
+    }
     .dec-ancora-acess {
         display: inline-flex; padding: 1px 5px; border-radius: 3px;
         background: #f3f4f6; color: #6b7280;
@@ -451,9 +456,13 @@
         <div style="font-size:11px; color:#6b7280; margin-bottom:10px;">
             Para cada demanda raiz, lista as âncoras declaradas em
             <code style="font-family:ui-monospace,monospace; background:#f3f4f6; padding:1px 4px; border-radius:3px;">ANCORAS_POR_*</code>
-            e compara com a distribuição obtida nesta rotina. Hamilton's Largest
-            Remainder define quantos slots cada âncora recebe pelos pesos
-            relativos; obrigatórias sem vaga geram aviso <i>ancora_nao_cumprida</i>.
+            e compara com a distribuição obtida. <b>Neste treino</b> = quantos slots
+            esta âncora obteve em T{{ idx + 1 }}; <b>em outros</b> = soma nos
+            {{ total_treinos_rotina - 1 }} demais treino{{ '' if total_treinos_rotina - 1 == 1 else 's' }}
+            da rotina. O fix de cobertura rotina-level (8.15.15) deliberadamente
+            permite obrigatórias = 0 num treino isolado contanto que a rotina
+            agregada cubra todas — "obrig ✗" só aparece quando obtidos = 0
+            tanto neste quanto nos outros.
         </div>
 
         {% for (nivel_d, escopo_d), dist in distribuicao_por_demanda.items() %}
@@ -464,6 +473,7 @@
                 <span style="color:#6b7280; font-size:11px;">total obtido: <b style="color:#1f2937;">{{ dist.total }}</b> ex</span>
             </div>
 
+            {% set dist_outros = distribuicao_outros_treinos.get((nivel_d, escopo_d), {"por_subregiao": {}, "por_padrao": {}, "total": 0}) %}
             {% if nivel_d == "regiao" and ancoras_por_regiao.get(escopo_d) %}
                 {% set ancoras_decl = ancoras_por_regiao[escopo_d] %}
                 {% set total_peso = ancoras_decl | sum(attribute='peso') %}
@@ -474,17 +484,27 @@
                             <th>Tipo</th>
                             <th style="text-align:right;">Peso</th>
                             <th style="text-align:right;">% peso</th>
-                            <th style="text-align:right;">Obtidos</th>
+                            <th style="text-align:right;">Neste treino</th>
+                            <th style="text-align:right;">Em outros</th>
                         </tr>
                     </thead>
                     <tbody>
                     {% for a in ancoras_decl %}
                         {% set obt = dist.por_subregiao.get(a.subregiao, 0) %}
-                        <tr {% if a.obrigatoria and obt == 0 %}class="dec-ancora-row--zero"{% endif %}>
+                        {% set outros = dist_outros.por_subregiao.get(a.subregiao, 0) %}
+                        {% set obrig_falha = a.obrigatoria and obt == 0 and outros == 0 %}
+                        {% set obrig_aqui_falha = a.obrigatoria and obt == 0 and outros > 0 %}
+                        <tr {% if obrig_falha %}class="dec-ancora-row--zero"{% endif %}>
                             <td><b>{{ a.subregiao }}</b></td>
                             <td>
                                 {% if a.obrigatoria %}
-                                <span class="dec-ancora-obrig">obrig{% if obt == 0 %} ✗{% endif %}</span>
+                                    {% if obrig_falha %}
+                                    <span class="dec-ancora-obrig">obrig ✗</span>
+                                    {% elif obrig_aqui_falha %}
+                                    <span class="dec-ancora-obrig-spread" title="Obrigatória cumprida em outro treino — fix de cobertura rotina-level">obrig (spread)</span>
+                                    {% else %}
+                                    <span class="dec-ancora-obrig">obrig</span>
+                                    {% endif %}
                                 {% else %}
                                 <span class="dec-ancora-acess">acessória</span>
                                 {% endif %}
@@ -492,17 +512,20 @@
                             <td class="dec-cell-num">{{ a.peso }}</td>
                             <td class="dec-cell-num">{{ '%.0f'|format(100.0 * a.peso / total_peso) if total_peso else '—' }}%</td>
                             <td class="dec-cell-num"><b>{{ obt }}</b></td>
+                            <td class="dec-cell-num" style="color:#6b7280;">{{ outros }}</td>
                         </tr>
                     {% endfor %}
                     {# Subregiões obtidas que não estão entre as âncoras declaradas #}
                     {% set chaves_decl = ancoras_decl | map(attribute='subregiao') | list %}
-                    {% for sub, qtd in dist.por_subregiao.items() if sub not in chaves_decl %}
+                    {% set extras = (dist.por_subregiao.keys() | list + dist_outros.por_subregiao.keys() | list) | unique | reject('in', chaves_decl) | list %}
+                    {% for sub in extras %}
                         <tr style="background:#fff7ed;">
                             <td><b>{{ sub }}</b> <span style="color:#9a3412; font-size:10px;">(fora das âncoras)</span></td>
                             <td><span class="dec-ancora-acess">extra</span></td>
                             <td class="dec-cell-num">—</td>
                             <td class="dec-cell-num">—</td>
-                            <td class="dec-cell-num"><b>{{ qtd }}</b></td>
+                            <td class="dec-cell-num"><b>{{ dist.por_subregiao.get(sub, 0) }}</b></td>
+                            <td class="dec-cell-num" style="color:#6b7280;">{{ dist_outros.por_subregiao.get(sub, 0) }}</td>
                         </tr>
                     {% endfor %}
                     </tbody>
@@ -517,17 +540,27 @@
                             <th>Tipo</th>
                             <th style="text-align:right;">Peso</th>
                             <th style="text-align:right;">% peso</th>
-                            <th style="text-align:right;">Obtidos</th>
+                            <th style="text-align:right;">Neste treino</th>
+                            <th style="text-align:right;">Em outros</th>
                         </tr>
                     </thead>
                     <tbody>
                     {% for a in ancoras_decl %}
                         {% set obt = dist.por_padrao.get(a.padrao, 0) %}
-                        <tr {% if a.obrigatoria and obt == 0 %}class="dec-ancora-row--zero"{% endif %}>
+                        {% set outros = dist_outros.por_padrao.get(a.padrao, 0) %}
+                        {% set obrig_falha = a.obrigatoria and obt == 0 and outros == 0 %}
+                        {% set obrig_aqui_falha = a.obrigatoria and obt == 0 and outros > 0 %}
+                        <tr {% if obrig_falha %}class="dec-ancora-row--zero"{% endif %}>
                             <td><b>{{ a.padrao }}</b></td>
                             <td>
                                 {% if a.obrigatoria %}
-                                <span class="dec-ancora-obrig">obrig{% if obt == 0 %} ✗{% endif %}</span>
+                                    {% if obrig_falha %}
+                                    <span class="dec-ancora-obrig">obrig ✗</span>
+                                    {% elif obrig_aqui_falha %}
+                                    <span class="dec-ancora-obrig-spread" title="Obrigatória cumprida em outro treino — fix de cobertura rotina-level">obrig (spread)</span>
+                                    {% else %}
+                                    <span class="dec-ancora-obrig">obrig</span>
+                                    {% endif %}
                                 {% else %}
                                 <span class="dec-ancora-acess">acessória</span>
                                 {% endif %}
@@ -535,16 +568,19 @@
                             <td class="dec-cell-num">{{ a.peso }}</td>
                             <td class="dec-cell-num">{{ '%.0f'|format(100.0 * a.peso / total_peso) if total_peso else '—' }}%</td>
                             <td class="dec-cell-num"><b>{{ obt }}</b></td>
+                            <td class="dec-cell-num" style="color:#6b7280;">{{ outros }}</td>
                         </tr>
                     {% endfor %}
                     {% set chaves_decl = ancoras_decl | map(attribute='padrao') | list %}
-                    {% for pad, qtd in dist.por_padrao.items() if pad not in chaves_decl %}
+                    {% set extras = (dist.por_padrao.keys() | list + dist_outros.por_padrao.keys() | list) | unique | reject('in', chaves_decl) | list %}
+                    {% for pad in extras %}
                         <tr style="background:#fff7ed;">
                             <td><b>{{ pad }}</b> <span style="color:#9a3412; font-size:10px;">(fora das âncoras)</span></td>
                             <td><span class="dec-ancora-acess">extra</span></td>
                             <td class="dec-cell-num">—</td>
                             <td class="dec-cell-num">—</td>
-                            <td class="dec-cell-num"><b>{{ qtd }}</b></td>
+                            <td class="dec-cell-num"><b>{{ dist.por_padrao.get(pad, 0) }}</b></td>
+                            <td class="dec-cell-num" style="color:#6b7280;">{{ dist_outros.por_padrao.get(pad, 0) }}</td>
                         </tr>
                     {% endfor %}
                     </tbody>
