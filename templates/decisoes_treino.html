@@ -1,0 +1,626 @@
+{% extends "base.html" %}
+
+{# Página dev — relatório completo das decisões do gerador para 1 treino.
+   Acessada via botão 🔍 ao lado do chip "T1" no card de treino do HUB.
+   Lê rascunho ou rotina ativa. Não é UX de usuário final — densidade
+   informacional alta, copy técnico OK. Reusa CSS de `_rationale_inline.html`
+   pra consistência visual. #}
+
+{% set nome_custom = sessao.tipo if sessao and sessao.tipo and sessao.tipo != 'manual' and ' + ' not in sessao.tipo else None %}
+{% set nome_exibir = nome_custom or ('Treino ' ~ (idx + 1)) %}
+{% set NIVEL_LABEL = {"regiao":"região","subregiao":"subregião","padrao":"padrão"} %}
+{% set CTX_LABEL = {"intra":"mesmo treino","inter":"outro treino","historico":"última rotina"} %}
+{% set DIM_LABEL = {
+    "pegada":"pegada", "plano_corporal":"plano corporal",
+    "equipamento_grupo":"equipamento", "familia_estrita":"família",
+    "variante_pontual":"variante pontual"
+} %}
+{% set PAREAMENTO_LABEL = {
+    "regiao_diff":"região diferente do bloco", "padrao_diff":"padrão diferente",
+    "nao_agonista":"não agonista", "composto":"purpose composto",
+    "anti_uni_mesmo_grupo":"2 unilaterais do mesmo grupo",
+    "anti_uni_diff_grupo":"2 unilaterais de grupos diferentes"
+} %}
+{% set CARGA_LABEL = {"grip":"grip", "lombar":"lombar", "core":"core"} %}
+{% set AVISO_LABEL = {
+    "incompleta":"Demanda incompleta",
+    "familia_repetida":"Flexibilização de família",
+    "relaxado_carga":"Solo forçado por carga"
+} %}
+
+{# Macro: linha de delta softmax (verde = pior, vermelho = melhor, cinza = empate) #}
+{% macro delta_pill(delta) %}
+    {% if delta > 0 %}
+    <span class="rationale-alt-delta rationale-alt-delta--pior" title="Alternativa era pior em {{ '%.0f'|format(delta) }} pontos">Δ {{ '%+.0f'|format(delta) }}</span>
+    {% elif delta < 0 %}
+    <span class="rationale-alt-delta rationale-alt-delta--melhor" title="Alternativa era melhor — softmax sorteou o escolhido">Δ {{ '%+.0f'|format(delta) }}</span>
+    {% else %}
+    <span class="rationale-alt-delta rationale-alt-delta--empate" title="Empate técnico — softmax escolheu uniformemente">Δ 0</span>
+    {% endif %}
+{% endmacro %}
+
+{# Macro: label "top-1" vs "sorteado" derivado das alternativas #}
+{% macro softmax_label(escolhido_score, alts) %}
+    {% if not alts %}
+        <span class="dec-softmax-tag dec-softmax-solo" title="Sem alternativas viáveis">único candidato</span>
+    {% else %}
+        {% set melhor_alt = alts | map(attribute='score_total') | max %}
+        {% if escolhido_score > melhor_alt %}
+            <span class="dec-softmax-tag dec-softmax-top1" title="Escolhido era o top-1 do pool">top-1</span>
+        {% elif escolhido_score == melhor_alt %}
+            <span class="dec-softmax-tag dec-softmax-empate" title="Empate de score — softmax distribuiu uniformemente">empate</span>
+        {% else %}
+            <span class="dec-softmax-tag dec-softmax-sorteio" title="Softmax sorteou dentro do top-K — não era o favorito">sorteado</span>
+        {% endif %}
+    {% endif %}
+{% endmacro %}
+
+{# Agrega timeline de pré-alocação cronologicamente #}
+{% set timeline = [] %}
+{% for bloco in sessao.blocos %}
+    {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
+        {% if ex.rationale and ex.rationale.get('pre_alocacao') %}
+            {% set _ = timeline.append({'ex': ex, 'bloco': bloco, 'bi': loop.index0}) %}
+        {% endif %}
+    {% endfor %}
+{% endfor %}
+{# Ordenar por (passe, ordem). 'estrito' antes de 'relax'. #}
+{% set timeline_ord = timeline | sort(attribute='ex.rationale.pre_alocacao.ordem_processamento') %}
+{% set timeline_estrito = timeline_ord | selectattr('ex.rationale.slot.passe', 'equalto', 'estrito') | list %}
+{% set timeline_relax = timeline_ord | selectattr('ex.rationale.slot.passe', 'equalto', 'relax') | list %}
+
+{% block content %}
+
+<style type="text/tailwindcss">
+    .dec-page {
+        max-width: 960px; margin: 0 auto; padding: 16px 16px 96px;
+        font-size: 13px; color: #1f2937;
+    }
+    .dec-header {
+        background: #fff; border-radius: 10px; padding: 14px 16px;
+        margin-bottom: 14px; border: 1px solid #e5e7eb;
+        display: flex; flex-direction: column; gap: 4px;
+    }
+    .dec-header-top {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .dec-back {
+        color: #6b7280; text-decoration: none; display: inline-flex;
+        align-items: center; gap: 4px; font-size: 12px; padding: 4px 8px;
+        border-radius: 6px;
+    }
+    .dec-back:hover { background: #f3f4f6; color: #1f2937; }
+    .dec-title { font-size: 16px; font-weight: 600; color: #7c2d12; }
+    .dec-treino-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: #fed7aa; color: #7c2d12; font-weight: 600;
+        padding: 2px 8px; border-radius: 6px; font-size: 12px;
+    }
+    .dec-header-meta {
+        display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px;
+        color: #6b7280;
+    }
+    .dec-header-meta b { color: #1f2937; font-weight: 600; }
+    .dec-header-meta .dec-fonte-tag {
+        background: #f3f4f6; color: #4b5563; padding: 1px 6px;
+        border-radius: 4px; font-size: 11px; font-weight: 500;
+    }
+    .dec-section {
+        background: #fff; border-radius: 10px; padding: 14px 16px;
+        margin-bottom: 12px; border: 1px solid #e5e7eb;
+    }
+    .dec-section-title {
+        font-size: 13px; font-weight: 700; color: #7c2d12;
+        text-transform: uppercase; letter-spacing: 0.04em;
+        margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .dec-section-count {
+        background: #fed7aa; color: #7c2d12; font-size: 11px;
+        font-weight: 600; padding: 1px 6px; border-radius: 999px;
+        letter-spacing: 0;
+    }
+    .dec-empty {
+        color: #9ca3af; font-style: italic; font-size: 12px; padding: 4px 0;
+    }
+    .dec-table {
+        width: 100%; border-collapse: collapse; font-size: 12px;
+    }
+    .dec-table th {
+        text-align: left; font-weight: 600; color: #6b7280;
+        text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px;
+        padding: 6px 8px; border-bottom: 1px solid #e5e7eb;
+        background: #f9fafb;
+    }
+    .dec-table td {
+        padding: 6px 8px; border-bottom: 1px solid #f3f4f6;
+        vertical-align: top;
+    }
+    .dec-table tr:last-child td { border-bottom: 0; }
+    .dec-table .dec-cell-num {
+        font-variant-numeric: tabular-nums; color: #6b7280;
+    }
+    .dec-table .dec-cell-ex { font-weight: 500; color: #1f2937; }
+    .dec-table .dec-cell-score {
+        font-variant-numeric: tabular-nums; font-weight: 600;
+        text-align: right;
+    }
+    .dec-chip {
+        display: inline-flex; align-items: center; padding: 1px 6px;
+        background: #f3f4f6; color: #4b5563; border-radius: 4px;
+        font-size: 11px; font-weight: 500;
+    }
+    .dec-chip-passe-estrito { background: #dcfce7; color: #166534; }
+    .dec-chip-passe-relax { background: #fef3c7; color: #92400e; }
+    .dec-softmax-tag {
+        display: inline-flex; align-items: center; padding: 1px 6px;
+        border-radius: 4px; font-size: 10px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .dec-softmax-top1 { background: #dcfce7; color: #166534; }
+    .dec-softmax-sorteio { background: #fee2e2; color: #991b1b; }
+    .dec-softmax-empate { background: #f3f4f6; color: #4b5563; }
+    .dec-softmax-solo { background: #e0e7ff; color: #3730a3; }
+    .dec-aviso {
+        padding: 8px 10px; border-radius: 6px; margin-bottom: 6px;
+        font-size: 12px; border: 1px solid; display: flex; gap: 8px;
+        align-items: flex-start;
+    }
+    .dec-aviso--incompleta {
+        background: #fef3c7; border-color: #f59e0b; color: #92400e;
+    }
+    .dec-aviso--familia_repetida {
+        background: #fef9c3; border-color: #facc15; color: #854d0e;
+    }
+    .dec-aviso--relaxado_carga {
+        background: #fee2e2; border-color: #fca5a5; color: #991b1b;
+    }
+    .dec-aviso-tag {
+        font-weight: 700; text-transform: uppercase; font-size: 10px;
+        letter-spacing: 0.04em; flex-shrink: 0;
+    }
+    .dec-bloco {
+        border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;
+        margin-bottom: 12px; background: #fafafa;
+    }
+    .dec-bloco-head {
+        display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+        flex-wrap: wrap;
+    }
+    .dec-bloco-label {
+        font-weight: 700; color: #7c2d12; font-size: 14px;
+        background: #fed7aa; padding: 2px 8px; border-radius: 6px;
+    }
+    .dec-bloco-exs { color: #1f2937; font-weight: 500; }
+    .dec-ex-role {
+        display: inline-flex; align-items: center; padding: 1px 6px;
+        background: #ddd6fe; color: #5b21b6; border-radius: 4px;
+        font-size: 10px; font-weight: 600; text-transform: uppercase;
+    }
+    .dec-ex-role--par { background: #fce7f3; color: #9d174d; }
+    .dec-ex-role--solo { background: #f3f4f6; color: #4b5563; }
+    .dec-subsection {
+        margin-top: 12px; padding-top: 10px;
+        border-top: 1px dashed #e5e7eb;
+    }
+    .dec-subsection-title {
+        font-size: 11px; font-weight: 600; color: #6b7280;
+        text-transform: uppercase; letter-spacing: 0.04em;
+        margin-bottom: 6px;
+    }
+    .dec-rejeitados {
+        list-style: none; padding: 0; margin: 0;
+        display: flex; flex-direction: column; gap: 4px;
+    }
+    .dec-rejeitado {
+        display: flex; gap: 6px; align-items: center; font-size: 12px;
+        padding: 4px 8px; background: #fff; border-radius: 4px;
+        border: 1px solid #fecaca;
+    }
+    .dec-rejeitado-nome { color: #1f2937; flex: 1; }
+    .dec-rejeitado-motivo { color: #991b1b; font-size: 11px; }
+    .dec-rejeitado-dim {
+        background: #fee2e2; color: #991b1b; padding: 1px 5px;
+        border-radius: 3px; font-size: 10px; font-weight: 600;
+        text-transform: uppercase;
+    }
+    .dec-stats {
+        display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;
+    }
+    .dec-stat {
+        display: inline-flex; align-items: baseline; gap: 4px;
+        padding: 6px 10px; background: #f9fafb; border-radius: 6px;
+        border: 1px solid #e5e7eb;
+    }
+    .dec-stat-value {
+        font-weight: 700; color: #7c2d12; font-size: 14px;
+        font-variant-numeric: tabular-nums;
+    }
+    .dec-stat-label { color: #6b7280; font-size: 11px; }
+    .dec-foot {
+        margin-top: 16px; padding: 12px 14px; background: #f9fafb;
+        border-radius: 8px; color: #6b7280; font-size: 11px;
+        line-height: 1.5; border: 1px dashed #d1d5db;
+    }
+    .dec-foot b { color: #1f2937; }
+    .dec-config-pre {
+        background: #f9fafb; border-radius: 6px; padding: 8px 10px;
+        font-family: ui-monospace, monospace; font-size: 11px;
+        color: #1f2937; white-space: pre-wrap; word-break: break-all;
+        border: 1px solid #e5e7eb; max-height: 220px; overflow: auto;
+    }
+    .dec-ex-block {
+        border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;
+        margin-bottom: 10px; background: #fafafa;
+    }
+    .dec-ex-block-head {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        margin-bottom: 8px;
+    }
+    .dec-ex-block-nome {
+        font-weight: 600; color: #1f2937; font-size: 13px;
+    }
+    .dec-ex-block-pos { color: #6b7280; font-size: 11px; }
+    /* Tabela de pareamento detalhada */
+    .dec-pareamento-grid {
+        display: grid; gap: 4px; font-size: 12px;
+        grid-template-columns: minmax(0,1fr);
+    }
+    .dec-pareamento-row {
+        display: flex; gap: 8px; align-items: center;
+        padding: 4px 8px; border-radius: 4px; background: #fff;
+        border: 1px solid #e5e7eb;
+    }
+    .dec-pareamento-tipo { font-weight: 600; color: #1f2937; flex: 1; }
+    .dec-pareamento-com { color: #6b7280; font-size: 11px; }
+    .dec-pareamento-peso {
+        font-weight: 700; font-variant-numeric: tabular-nums;
+        font-size: 12px;
+    }
+    .dec-pareamento-peso--pos { color: #166534; }
+    .dec-pareamento-peso--neg { color: #991b1b; }
+    .dec-pareamento-peso--zero { color: #6b7280; }
+</style>
+
+<div class="dec-page">
+
+    <div class="dec-header">
+        <div class="dec-header-top">
+            <a href="/?aluno_id={{ aluno_id }}" class="dec-back" title="Voltar pra rotina">
+                <svg class="icon icon-sm"><use href="#i-chevron-left"/></svg>
+                <span>Rotina</span>
+            </a>
+            <span class="dec-treino-badge">T{{ idx + 1 }}</span>
+            <span class="dec-title">{{ nome_exibir }} — Decisões do gerador</span>
+        </div>
+        <div class="dec-header-meta">
+            <span><b>Aluno:</b> {{ aluno.nome }}</span>
+            {% if rotina_id %}<span><b>Rotina:</b> #{{ rotina_id }}</span>{% endif %}
+            <span class="dec-fonte-tag">fonte: {{ fonte }}</span>
+            <span><b>Blocos:</b> {{ sessao.blocos | length }}</span>
+            {% set _n_exs = timeline | length %}
+            <span><b>Exercícios:</b> {{ _n_exs }}</span>
+        </div>
+    </div>
+
+    {# ─── Estatísticas agregadas ─── #}
+    {% set _top1 = [] %}
+    {% set _sorteio = [] %}
+    {% set _empate = [] %}
+    {% set _solo_cand = [] %}
+    {% set _comps_negativos = [] %}
+    {% set _rejeitados_total = [] %}
+    {% for entry in timeline %}
+        {% set r = entry.ex.rationale %}
+        {% set alts = r.alternativas or [] %}
+        {% if not alts %}
+            {% set _ = _solo_cand.append(entry.ex.nome) %}
+        {% else %}
+            {% set _max_alt = alts | map(attribute='score_total') | max %}
+            {% if r.score_total > _max_alt %}{% set _ = _top1.append(entry.ex.nome) %}
+            {% elif r.score_total == _max_alt %}{% set _ = _empate.append(entry.ex.nome) %}
+            {% else %}{% set _ = _sorteio.append(entry.ex.nome) %}{% endif %}
+        {% endif %}
+        {% for c in (r.componentes or []) %}
+            {% if c.peso < 0 %}{% set _ = _comps_negativos.append(c) %}{% endif %}
+        {% endfor %}
+        {% if r.get('pareamento') %}
+            {% for rej in (r.pareamento.get('rejeitados_carga') or []) %}
+                {% set _ = _rejeitados_total.append(rej) %}
+            {% endfor %}
+        {% endif %}
+    {% endfor %}
+
+    <div class="dec-section">
+        <div class="dec-section-title">📊 Visão geral</div>
+        <div class="dec-stats">
+            <div class="dec-stat"><span class="dec-stat-value">{{ _top1 | length }}</span><span class="dec-stat-label">top-1</span></div>
+            <div class="dec-stat"><span class="dec-stat-value">{{ _sorteio | length }}</span><span class="dec-stat-label">sorteado softmax</span></div>
+            <div class="dec-stat"><span class="dec-stat-value">{{ _empate | length }}</span><span class="dec-stat-label">empate</span></div>
+            <div class="dec-stat"><span class="dec-stat-value">{{ _solo_cand | length }}</span><span class="dec-stat-label">único candidato</span></div>
+            <div class="dec-stat"><span class="dec-stat-value">{{ _comps_negativos | length }}</span><span class="dec-stat-label">penalizações soft</span></div>
+            <div class="dec-stat"><span class="dec-stat-value">{{ _rejeitados_total | length }}</span><span class="dec-stat-label">rejeições por carga</span></div>
+            <div class="dec-stat"><span class="dec-stat-value">{{ sessao.relaxados | length }}</span><span class="dec-stat-label">família repetida</span></div>
+        </div>
+    </div>
+
+    {# ─── Avisos ─── #}
+    {% set avisos = (sessao.avisos or []) %}
+    {% if avisos %}
+    <div class="dec-section">
+        <div class="dec-section-title">⚠️ Avisos
+            <span class="dec-section-count">{{ avisos | length }}</span>
+        </div>
+        {% for av in avisos %}
+        <div class="dec-aviso dec-aviso--{{ av.tipo }}">
+            <span class="dec-aviso-tag">{{ AVISO_LABEL.get(av.tipo, av.tipo) }}</span>
+            <span>
+                {% if av.tipo == "incompleta" %}
+                    Demanda <b>{{ av.get('nivel', '?') }} {{ av.get('escopo', '?') }}</b>
+                    pediu <b>{{ av.get('pedido', '?') }}</b> mas só obteve
+                    <b>{{ av.get('obtido', '?') }}</b>
+                    {% if av.get('faltam') %} — faltaram {{ av.faltam }}{% endif %}.
+                {% elif av.tipo == "familia_repetida" %}
+                    <b>{{ av.get('exercicio', '?') }}</b> entrou via flexibilização
+                    de família (banco não tinha mais variações novas).
+                {% elif av.tipo == "relaxado_carga" %}
+                    <b>{{ av.get('exercicio', '?') }}</b> ficou solo no bloco
+                    {{ av.get('bloco_idx', 0) + 1 }} —
+                    par bloqueado: <b>{{ av.get('par_bloqueado', '?') }}</b>
+                    (carga {{ av.get('dimensao', '?') }}:
+                    soma {{ av.get('soma', '?') }} ≥ threshold {{ av.get('threshold', '?') }}).
+                {% else %}
+                    {{ av | tojson }}
+                {% endif %}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ─── Configuração do treino ─── #}
+    {% if config_treino %}
+    <div class="dec-section">
+        <div class="dec-section-title">⚙️ Configuração</div>
+        <div class="dec-config-pre">{{ config_treino | tojson(indent=2) }}</div>
+    </div>
+    {% endif %}
+
+    {# ─── Timeline de pré-alocação ─── #}
+    <div class="dec-section">
+        <div class="dec-section-title">🕒 Timeline da pré-alocação
+            <span class="dec-section-count">{{ timeline | length }}</span>
+        </div>
+
+        {% if not timeline %}
+        <div class="dec-empty">Nenhum exercício deste treino carrega rationale de pré-alocação (talvez seja rotina antiga ou criada manualmente).</div>
+        {% else %}
+
+        {% for passe_nome, passe_list in [("estrito", timeline_estrito), ("relax", timeline_relax)] %}
+        {% if passe_list %}
+        <div class="dec-subsection-title">Passe <span class="dec-chip dec-chip-passe-{{ passe_nome }}">{{ passe_nome }}</span> · {{ passe_list | length }} slot{{ '' if passe_list | length == 1 else 's' }}</div>
+        <table class="dec-table" style="margin-bottom:14px;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Demanda raiz</th>
+                    <th>Padrão</th>
+                    <th>Exercício</th>
+                    <th>Escassez</th>
+                    <th style="text-align:right;">Score</th>
+                    <th>Softmax</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in passe_list %}
+                {% set r = entry.ex.rationale %}
+                {% set pa = r.pre_alocacao %}
+                {% set slot = r.slot %}
+                <tr>
+                    <td class="dec-cell-num">{{ pa.ordem_processamento }}/{{ pa.total_slots }}</td>
+                    <td>
+                        <span class="dec-chip">{{ NIVEL_LABEL.get(pa.nivel_demanda_original, pa.nivel_demanda_original) }}</span>
+                        {{ slot.escopo_demanda_original }}
+                        {% if pa.subregiao_intermediaria %}<br><small style="color:#9ca3af;">via {{ pa.subregiao_intermediaria }}</small>{% endif %}
+                    </td>
+                    <td><span class="dec-chip">{{ slot.escopo }}</span></td>
+                    <td class="dec-cell-ex">{{ entry.ex.nome }}</td>
+                    <td class="dec-cell-num">{{ pa.escassez_no_momento }}</td>
+                    <td class="dec-cell-score">{{ '%+.0f'|format(r.score_total) }}</td>
+                    <td>{{ softmax_label(r.score_total, r.alternativas or []) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% endfor %}
+
+        {% endif %}
+    </div>
+
+    {# ─── Decisões por bloco ─── #}
+    <div class="dec-section">
+        <div class="dec-section-title">🧱 Decisões por bloco
+            <span class="dec-section-count">{{ sessao.blocos | length }}</span>
+        </div>
+
+        {% for bloco in sessao.blocos %}
+        {% set bi = loop.index0 %}
+        {% set exs = [bloco.ex1, bloco.ex2, bloco.ex3] | select | list %}
+        <div class="dec-bloco">
+            <div class="dec-bloco-head">
+                <span class="dec-bloco-label">{{ bloco.label }}</span>
+                <span class="dec-bloco-exs">
+                    {% for e in exs %}{{ e.nome }}{% if not loop.last %} · {% endif %}{% endfor %}
+                </span>
+                <span class="dec-chip" style="margin-left:auto;">{{ exs | length }} ex</span>
+            </div>
+
+            {% for ex in exs %}
+            {% set ei = loop.index0 %}
+            {% set r = ex.rationale %}
+            {% set par = r.get('pareamento') if r else None %}
+            {% if par %}
+                <div class="dec-subsection">
+                    <div class="dec-subsection-title">
+                        {% if par.papel == 'ancora' %}
+                        <span class="dec-ex-role">âncora</span>
+                        {% elif par.papel == 'par' %}
+                        <span class="dec-ex-role dec-ex-role--par">par</span>
+                        {% else %}
+                        <span class="dec-ex-role dec-ex-role--solo">{{ par.papel or '?' }}</span>
+                        {% endif %}
+                        <b style="color:#1f2937; margin-left:6px;">{{ ex.nome }}</b>
+                    </div>
+
+                    {% if par.papel == 'par' %}
+                        <div style="font-size:12px; color:#6b7280; margin-bottom:8px;">
+                            Pareada com <b style="color:#1f2937;">{{ par.ancora }}</b>
+                            {% if par.outros_no_momento %}
+                                · outros no bloco no momento: {{ par.outros_no_momento | join(', ') }}
+                            {% endif %}
+                            · score <b style="color:#1f2937;">{{ '%+.0f'|format(par.score_pareamento) }}</b>
+                        </div>
+
+                        {% if par.componentes %}
+                        <div class="dec-pareamento-grid">
+                            {% for c in par.componentes %}
+                            {% set _peso_cls = 'dec-pareamento-peso--pos' if c.peso > 0 else ('dec-pareamento-peso--neg' if c.peso < 0 else 'dec-pareamento-peso--zero') %}
+                            <div class="dec-pareamento-row">
+                                <span class="dec-pareamento-tipo">{{ PAREAMENTO_LABEL.get(c.tipo, c.tipo) }}</span>
+                                {% if c.com %}<span class="dec-pareamento-com">com {{ c.com }}</span>{% endif %}
+                                <span class="dec-pareamento-peso {{ _peso_cls }}">{{ '%+.0f'|format(c.peso) }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% if par.alternativas %}
+                        <div class="dec-subsection" style="border-top:0; padding-top:6px;">
+                            <div class="dec-subsection-title">Outros pares considerados (top {{ par.alternativas | length }}) · {{ softmax_label(par.score_pareamento, par.alternativas) }}</div>
+                            <ul class="rationale-alts" style="margin:0;">
+                                {% for a in par.alternativas %}
+                                <li class="rationale-alt">
+                                    <span class="rationale-alt-nome">{{ a.nome }}</span>
+                                    <span class="rationale-alt-score">score {{ '%+.0f'|format(a.score_total) }}</span>
+                                    {{ delta_pill(a.delta) }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div style="font-size:12px; color:#6b7280;">
+                            Âncora do bloco — escolheu como parceiros:
+                            {% for n in par.parceiros %}<b style="color:#1f2937;">{{ n }}</b>{% if not loop.last %}, {% endif %}{% endfor %}.
+                        </div>
+                    {% endif %}
+
+                    {% set rej = par.get('rejeitados_carga') or [] %}
+                    {% if rej %}
+                    <div class="dec-subsection" style="border-top:0; padding-top:8px;">
+                        <div class="dec-subsection-title">Candidatos rejeitados pelo filtro de cargas ({{ rej | length }})</div>
+                        <ul class="dec-rejeitados">
+                            {% for r in rej %}
+                            <li class="dec-rejeitado">
+                                <span class="dec-rejeitado-nome">{{ r.nome }}</span>
+                                <span class="dec-rejeitado-dim">{{ CARGA_LABEL.get(r.dimensao, r.dimensao) }}</span>
+                                <span class="dec-rejeitado-motivo">vs <b>{{ r.contra }}</b> · soma {{ r.soma }} ≥ {{ r.threshold }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+            {% elif exs | length == 1 %}
+                <div class="dec-subsection">
+                    <div class="dec-subsection-title">
+                        <span class="dec-ex-role dec-ex-role--solo">solo</span>
+                        <b style="color:#1f2937; margin-left:6px;">{{ ex.nome }}</b>
+                    </div>
+                    <div style="font-size:12px; color:#6b7280;">
+                        Bloco de 1 exercício — sem pareamento. Pode ser bloco de tamanho 1 configurado,
+                        ou solo forçado por carga/fadiga (ver Avisos acima).
+                    </div>
+                </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {# ─── Score breakdown por exercício ─── #}
+    <div class="dec-section">
+        <div class="dec-section-title">🎯 Score breakdown por exercício
+            <span class="dec-section-count">{{ timeline | length }}</span>
+        </div>
+
+        {% if not timeline %}
+        <div class="dec-empty">Nenhum exercício carrega rationale de seleção.</div>
+        {% endif %}
+
+        {% for entry in timeline_ord %}
+        {% set ex = entry.ex %}
+        {% set r = ex.rationale %}
+        {% set slot = r.slot %}
+        {% set comps = r.componentes or [] %}
+        {% set alts = r.alternativas or [] %}
+        <div class="dec-ex-block">
+            <div class="dec-ex-block-head">
+                <span class="dec-ex-block-nome">{{ ex.nome }}</span>
+                <span class="dec-ex-block-pos">B{{ entry.bi + 1 }} · {{ NIVEL_LABEL.get(slot.nivel, slot.nivel) }} {{ slot.escopo }}</span>
+                <span class="dec-chip dec-chip-passe-{{ slot.passe }}" style="margin-left:auto;">passe: {{ slot.passe }}</span>
+                <span class="dec-chip">pool: {{ r.tamanho_pool }}</span>
+                <span style="font-variant-numeric:tabular-nums; font-weight:600; color:#7c2d12;">score {{ '%+.0f'|format(r.score_total) }}</span>
+                {{ softmax_label(r.score_total, alts) }}
+            </div>
+
+            {% if comps %}
+            <div class="dec-subsection-title">Componentes que pesaram ({{ comps | length }})</div>
+            <ul class="rationale-list" style="margin:0 0 8px;">
+                {% for c in comps %}
+                <li class="rationale-item rationale-item--{{ c.contexto }}">
+                    <span class="rationale-tag">{{ CTX_LABEL.get(c.contexto, c.contexto) }}</span>
+                    <span class="rationale-dim">{{ DIM_LABEL.get(c.dim, c.dim) }}</span>
+                    <span class="rationale-peso">{{ '%+.0f'|format(c.peso) }}</span>
+                    {% if c.contexto == 'historico' %}
+                    <span class="rationale-com">match por {{ c.com }}</span>
+                    {% else %}
+                    <span class="rationale-com">com <b>{{ c.com }}</b></span>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="dec-empty" style="margin-bottom:8px;">Nenhum conflito de proximidade — neutro no pool.</div>
+            {% endif %}
+
+            {% if alts %}
+            <div class="dec-subsection-title">Alternativas softmax (top {{ alts | length }})</div>
+            <ul class="rationale-alts" style="margin:0;">
+                {% for a in alts %}
+                <li class="rationale-alt">
+                    <span class="rationale-alt-nome">{{ a.nome }}</span>
+                    <span class="rationale-alt-score">score {{ '%+.0f'|format(a.score_total) }}</span>
+                    {{ delta_pill(a.delta) }}
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="dec-foot">
+        <b>Como ler:</b>
+        Δ = score do escolhido − score da alternativa. Δ &lt; 0 = softmax sorteou um candidato dentro do top-K
+        que <b>não</b> era o de maior score (não-guloso). Δ &gt; 0 = escolhido foi o top-1. Δ = 0 = empate
+        técnico, softmax distribuiu uniformemente.
+        Componentes negativos (intra/inter/histórico) <b>penalizam</b> o candidato por proximidade com
+        outro exercício do mesmo treino, de outro treino, ou da rotina anterior (R-1).
+        Rejeições por carga = filtro <b>hard</b> em `pode_adicionar_ao_bloco` — candidatos eliminados
+        antes do score de pareamento por violar threshold de grip/lombar/core.
+    </div>
+
+</div>
+
+{% endblock %}
