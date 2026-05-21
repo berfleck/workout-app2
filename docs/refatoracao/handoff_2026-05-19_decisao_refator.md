@@ -517,3 +517,48 @@ durante o refator (o fix bilateral está bem, scripts não fazem mal).
 - Estado pós-fix bilateral, N=10000: `python tools/analisar_remada_lm.py --n-iter 10000`
 - Confirmar que ordem-de-alocação ainda é o problema: `python tools/investigar_ordem_alocacao.py`
 - Lista de famílias de remada no banco: ver achado #8 ou rodar `analisar_remada_lm.py`
+
+---
+
+## Update 2026-05-21 — Passo 2 do fluxo iniciado
+
+Sessão de brainstorming pós-IAs realizada. Bernardo trouxe duas mensagens de IAs externas com propostas de princípios de geração de treinos; foram avaliadas contra os 12 conceitos clínicos. Resultado: a maior parte estava duplicada ou fora de escopo (volume semanal, frequência, RIR e progressão são prescrição, não geração).
+
+**Decisões da sessão:**
+
+1. **Vetor de perfil de aluno fechado** (resolve pendência #4 do `principios_clinicos.md`). 4 dimensões ortogonais: Nível técnico + Centralidade dos compostos pesados + Densidade de pareamento + Aderência ao tier. Extraído via entrevista com 3 alunos contrastantes (Fernanda, turma 7h, perfil saúde). Detalhes na nova seção do `principios_clinicos.md`.
+
+2. **Catálogo de constraints criado** (`catalogo_constraints.md`). 8 hard + 12 soft + função objetivo + modelo de dados consolidado. Esse documento materializa o passo 2 do fluxo do refator.
+
+3. **Operação híbrida no MVP**: 4 moduladores ativos (S-T1, S-B4, S-T3, S-R2), 8 restantes em modulador 1.0. Razão: preservar diferenciação por aluno no MVP sem inflar a calibração inicial. Resto ativa-se conforme dashboard quantitativo (passo 5) flagrar necessidade.
+
+4. **Princípios arquiteturais explicitados** em resposta à preocupação de Bernardo sobre extensibilidade futura (*"a lógica nova deve permitir alterações sem fixes pra tapar buraco"*). Registrados na Seção "Princípios arquiteturais" do `catalogo_constraints.md`.
+
+5. **Não-constraints documentadas**: cobertura de glúteo (redundante com H-T4 + Conceito 1), anti-redundância cross-treino (cortada — caso original capturado por pegada fechada, não sub_enfase), ponderação por intervalo entre treinos (cortada por complexidade), fairness anti-extinção (vira dashboard, não constraint do solver).
+
+**Estado atual do fluxo:**
+
+    1. Princípios clínicos (prosa)              [OK] 12 conceitos + perfil de aluno
+    2. Modelo de dados + catálogo de constraints [OK] catalogo_constraints.md
+    3. Cadastro: preencher dados que faltam     [PENDENTE] cadastrar tier, estabilidade_externa, demanda_lombar
+    4. Engine declarativa (CSP/ILP)             [PENDENTE] próxima fase de design
+    5. Dashboard de calibração quantitativa     [PENDENTE] extensão dos tools/ existentes
+
+**Próximo passo concreto da próxima sessão**:
+
+Decidir entre dois caminhos:
+
+- **Avançar pro passo 3 (cadastro)** — preencher `tier`, `estabilidade_externa`, `demanda_lombar` no XLSX pros 146 exercícios. Trabalho braçal mas pré-requisito pro motor declarativo funcionar.
+- **Avançar pro passo 4 (engine declarativa)** — começar prototipagem do solver CSP/ILP com os dados que já existem, e refinar conforme problemas aparecem.
+
+Argumento pra cadastro primeiro: engine sem dados é vazio, não testa nada.
+Argumento pra engine primeiro: prototipagem revela dados que faltam que não estão no catálogo ainda.
+
+Decisão: pendente, próxima sessão.
+
+**Para próximas Claudes que retomarem este trabalho:**
+
+1. Ler `principios_clinicos.md` (incluindo a nova seção de perfil de aluno).
+2. Ler `catalogo_constraints.md` (passo 2 materializado).
+3. Ler este handoff atualizado (passo 2 fechado).
+4. Perguntar ao Bernardo qual caminho da decisão acima ele prefere antes de avançar.
