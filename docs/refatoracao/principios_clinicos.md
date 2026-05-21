@@ -20,9 +20,11 @@ vez). 3 rotinas geradas da Variante B do 2x/semana (Sec 2.2 de
 `configuracoes_comuns.md`) foram avaliadas pelo usuário como se fossem
 propostas de um colega pra um aluno do perfil modal.
 
-Cobertura desta v1: **upper/lower em formato split Empurrar/Posterior +
-Puxar/Anterior, 8 ex por treino, blocos de 2.** Não cobre 1x/semana
-full body, 3x semana, frequência maior, perfis não-modais.
+Cobertura: **(v1)** upper/lower split Empurrar/Posterior +
+Puxar/Anterior (Variante B 2x, 3 rotinas). **(v2, 2026-05-19)**
+Variante A 3x semana (`upper(3)+lower(3)+core(2)`, 1 rotina = 3
+treinos full body com viés). Não cobre 1x/semana full body, frequência
+maior, perfis não-modais.
 
 ---
 
@@ -178,6 +180,116 @@ mas inativa.
 soma das cargas implícitas. Possíveis eixos: core/lombar, ombro
 estabilizador, exigência neural, fadiga global.
 
+### Conceito 7 — Vaga única tem que ser principal/composto
+
+Quando uma região/subregião tem **só 1 slot** na rotina, esse slot
+quase nunca deveria ser um exercício isolado.
+
+**Caso negativo (Rotina 1 Var.A, T2)**: único exercício de coxa do
+treino era Cadeira Extensora (isolado). *"Se for pra deixar 1
+exercício de coxa, esse único quase nunca seria Cadeira Extensora."*
+
+Relaciona com Conceitos 1 (tier) e 4 (frequência) mas é uma regra mais
+forte e diretamente acionável: **N=1 slot ⇒ exigir composto/principal**.
+
+### Conceito 8 — Cobertura muscular implícita dos compostos
+
+Exercícios compostos recrutam músculos além do alvo nominal. Isso deve
+contar na **cobertura muscular** da rotina, não só a contagem de slots.
+
+**Caso (Rotina 1 Var.A, T2)**: glúteo ficou fraco porque o único
+exercício de coxa era isolado (Cadeira Extensora não pega glúteo). Se
+fosse um composto de coxa (que *"quase sempre trabalha glúteo junto"*),
+complementar com Side Clams + Ponte seria aceitável.
+
+**Implicação pro modelo**: "demanda" não é só contagem de slots por
+grupo. Um composto de coxa cobre glúteo implicitamente; o sistema
+deveria saber disso ao avaliar se a rotina cobre glúteo. Precisa de
+**mapa de recrutamento muscular** (primário + secundários) por
+exercício, não só `musculo_primario` textual.
+
+### Conceito 9 — Distribuição entre treinos da rotina (múltiplos eixos)
+
+Numa rotina multi-treino (ex: 3 full body com viés), propriedades
+importantes devem ser **distribuídas entre os treinos**, não
+concentradas em um só.
+
+**Eixos identificados:**
+- **Força/tier**: não concentrar 2 pernas fortes em T3 e deixar T2 só
+  com isolado (caso real Rotina 1 Var.A — solução: trocar Cadeira
+  Extensora do T2 com Smith/Step Up do T3)
+- **Tipo de movimento**: os 2 verticais de costas (puxadas)
+  concentraram em T3; T1 e T2 só com remadas. Vertical/horizontal
+  deveria distribuir (caso real Rotina 1 Var.A)
+- Provavelmente outros (a investigar)
+
+**Nuance**: com N treinos repetindo grupos musculares, *"não tem como
+esperar 3 treinos muito fortes em todas as áreas"* — há rotação de
+ênfase esperada (o "viés" da Variante A). Distribuir ≠ igualar; é
+espalhar pra nenhum treino ficar órfão de uma propriedade.
+
+### Conceito 10 — Proporção e variedade esperadas por região
+
+Cada região tem uma **proporção típica composto:isolado** e desvios em
+qualquer direção soam errados:
+- Peito 3 vagas, 0 isolado = atípico (*"provavelmente teria inserido
+  um isolado, não sempre mas muitas vezes"*)
+- Braço 2 isolados de 8 = atípico no outro extremo (Lente A Var.B)
+
+**Variedade tem múltiplos eixos** — não só composto/isolado:
+- composto / isolado
+- **unilateral / bilateral** (2 desenvolvimentos de ombro foi tolerável
+  porque um era unilateral — Landmine — *"dá variedade interessante"*)
+- tipo de movimento
+- pegada
+- posição
+
+**Implicação pro modelo**: variedade/redundância precisa ser avaliada
+em vários eixos simultâneos, não num só.
+
+### Conceito 11 — Sub-propriedades de ênfase não capturadas (reforça 3)
+
+`empurrar_compostos` é heterogêneo igual `puxadas` e `core`. Tem
+pressing chest-dominant (Supino/Apoio normais) e triceps-dominant
+(Supino Fechado, Apoio Fechado, Supino com Anilha).
+
+**Caso (Rotina 1 Var.A)**: Apoio Fechado (T1) ≈ Supino com Anilha (T3)
+— ambos pegada fechada, ênfase tríceps. Redundância **cross-treino**
+que o scoring INTER **não pegou**, porque a propriedade compartilhada
+(ênfase tríceps / pegada fechada) **não tem tag no banco** (pegada só
+tem aberta/neutra/pronada/supinada — não "fechada").
+
+**Diagnóstico técnico**: o mecanismo de evitar repetição entre treinos
+existe, mas é cego pra propriedades não-tagueadas. Tag ausente =
+proximidade invisível.
+
+**Implicação pro modelo**: padrões precisam de sub-classificação por
+**ênfase muscular / função**, não só por movimento. Vale pra:
+- `empurrar_compostos`: chest-dominant vs triceps-dominant
+- `puxadas`: vertical completo vs lat-isolation (Pullover — Conceito 3)
+- `core`: flexão quadril / flexão tronco / anti-extensão / anti-rotação,
+  por posição (supino/prancha/...) — ver Conceito 3 reforçado abaixo
+
+### Conceito 3 reforçado — CORE é fortemente heterogêneo
+
+Além de `puxadas` e `empurrar_compostos`, `core` precisa de
+sub-classificação fina. Redundâncias que o sistema não pegou (Rotina 1
+Var.A):
+- T1: Canoinha + Infra Chão (ambos flexão de quadril; Canoinha ainda
+  soma movimento de tronco)
+- T3: Dead Bug + Hollow Hold (ambos supino, anti-extensão, uso
+  muscular parecido)
+
+**Eixos de variação de core citados pelo usuário:**
+- flexão de quadril vs não (Infra tem; crunch não)
+- movimento de tronco vs não
+- posição (supino / prancha / em pé / ...)
+- uso muscular dominante
+
+*"Abdominal pede variedade."* A refatoração CORE da Etapa 8 (padrões
+flexao_tronco/flexao_quadril/etc) é um começo, mas claramente não está
+prevenindo essas redundâncias na prática.
+
 ---
 
 ## Coisas que o sistema acertou (não quebrar no refator)
@@ -185,14 +297,19 @@ estabilizador, exigência neural, fadiga global.
 Capturado pra evitar que o refator regrida em pontos que já funcionam:
 
 - **Pares composto → isolado dentro de subregião**: Stiff Uni →
-  Cadeira Flexora; Tríceps Francês + Side Clams
+  Cadeira Flexora; Tríceps Francês + Side Clams; Stiff Livre + Flexão
+  Joelhos (Var.A T1, "excelente")
 - **Acessórios genuínos no final**: abdução, abdominais, panturrilha
   como complementos no terceiro/quarto bloco
-- **Diversidade vert+horiz+pegada em costas (Rotina 3)**: emergiu
+- **Diversidade vert+horiz+pegada em costas (Var.B Rotina 3)**: emergiu
   organicamente, deveria ser PROJETADA não acidental
 - **Empurrar + Posterior pareados em mesmo treino**: combina
   naturalmente (confirma rationale da Variante B)
 - **Puxar + Anterior pareados em mesmo treino**: idem
+- **Agachamento Livre como abertura (Var.A T1)**: principal pesado
+  abrindo o treino, correto
+- **Variedade por unilateralidade**: Desenv. Landmine unilateral
+  mitigou a repetição de 2 desenvolvimentos de ombro
 
 ---
 
@@ -205,8 +322,17 @@ Capturado pra evitar que o refator regrida em pontos que já funcionam:
 - **Apoio como opener de peito**: 2 das 3 rotinas tiveram Apoio
   abrindo, contra a preferência de Supino. Distribuição interna do
   padrão `empurrar_compostos` parece sub-representar Supinos clássicos.
-- **Goblet/acessório antes do principal**: 3 de 3 rotinas. Tier-order
-  não é enforçado.
+- **Goblet/acessório antes do principal**: 3 de 3 rotinas (Var.B) +
+  reincidente na Var.A (Smith Rampa antes de Step Up). Tier-order não é
+  enforçado em lugar nenhum.
+- **Vaga única caindo em isolado**: Cadeira Extensora como único de
+  coxa (Var.A T2). Viola Conceito 7.
+- **Concentração de movimento**: 2 puxadas em T3 (Var.A), T1/T2 sem
+  vertical. Viola Conceito 9.
+- **Redundância de core não detectada**: Canoinha+Infra, Dead
+  Bug+Hollow (Var.A). Viola Conceito 3 reforçado.
+- **Redundância cross-treino de ênfase**: Apoio Fechado + Supino Anilha
+  (Var.A). INTER cego por falta de tag (Conceito 11).
 
 ---
 
@@ -228,6 +354,14 @@ elas em vocabulário técnico antes da hora.
 - *"Pullover é vertical de costas mas é um isolado"*
 - *"Puxadas exigem flexão de cotovelo e exigem mais da escápula
   também"*
+- *"Se for pra deixar apenas 1 exercício de coxa, esse único exercício
+  quase nunca seria cadeira extensora"*
+- *"Um exercício composto de coxa quase sempre trabalha glúteo junto"*
+- *"São 3 treinos que repetem os grupos musculares, então não tem como
+  esperar 3 treinos muito fortes em todas as áreas"*
+- *"Abdominal pede variedade"*
+- *"Um desenvolvimento é unilateral, o que dá uma variedade
+  interessante"*
 
 ---
 
@@ -306,10 +440,10 @@ problemas qualitativos sem **criar** novos vieses quantitativos.
 ## Próximos passos no roadmap da entrevista
 
 1. ✅ Lente A com Variante B 2x semana (3 rotinas) — **feito 2026-05-19**
-2. ⏳ Lente A com Variante A 3x semana / `upper(3)+lower(3)+core(2)` —
-   ver se conceitos novos emergem
-3. ⏳ Considerar Lente B (padrões cruzados nas rotinas) e Lente C
-   (ranking) se útil
+2. ✅ Lente A com Variante A 3x semana / `upper(3)+lower(3)+core(2)`
+   (1 rotina) — **feito 2026-05-19** — emergiram Conceitos 7-11 +
+   reforço do 3 (core) e do 9 (distribuição multi-eixo)
+3. ⏳ Conversa de síntese pendente (usuário pediu antes de seguir)
 4. ⏳ Avaliar perfis de aluno distintos pra extrair as dimensões do
    override 1 do Conceito 1
 5. ⏳ Esboço do dashboard de calibração quantitativa (frente
