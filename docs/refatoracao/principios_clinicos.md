@@ -581,15 +581,99 @@ problemas qualitativos sem **criar** novos vieses quantitativos.
    (1 rotina) — **feito 2026-05-19** — emergiram Conceitos 7-11 +
    reforço do 3 (core) e do 9 (distribuição multi-eixo)
 3. ⏳ Conversa de síntese pendente (usuário pediu antes de seguir)
-4. ⏳ Avaliar perfis de aluno distintos pra extrair as dimensões do
-   override 1 do Conceito 1
+4. ✅ Vetor de perfil de aluno extraído via entrevista (2026-05-21) —
+   ver seção "Perfil de aluno — vetor de 4 dimensões" abaixo. Substitui
+   a abordagem de "rascunhar 3 alunos hipotéticos" por entrevista com 3
+   alunos contrastantes reais.
 5. ⏳ Esboço do dashboard de calibração quantitativa (frente
    complementar à entrevista) — extensão dos tools existentes pra
    medir aderência aos conceitos enumerados aqui
 
 ---
 
-*Última atualização: 2026-05-21 (refinamento do Conceito 3 — separação
-explícita treino vs rotina, e constraint de rotina como cidadã de
-primeira classe na arquitetura declarativa). Atualizar este doc a cada
-sessão de avaliação que produzir refinamento ou conceito novo.*
+## Perfil de aluno — vetor de 4 dimensões
+
+> **Origem**: entrevista guiada de 2026-05-21 com 3 alunos reais contrastantes (Fernanda força/hipertrofia, Turma das 7h metabólica em grupo, perfil saúde/condicionamento geral). Resolve a pendência #4 do roadmap.
+
+### Estrutura
+
+O perfil do aluno é um **vetor de 4 dimensões ortogonais**:
+
+#### 1. Nível técnico (1/2/3)
+
+Filtra o pool de exercícios viáveis por `complexidade` antes do motor entrar. Não modula pesos — é hard.
+
+- **Nível 1** (iniciante): teto técnico baixo. Exercícios de baixa complexidade. Pareamento liberal (agachamento bilateral pode pareado, porque sem peso pesado).
+- **Nível 2** (intermediário): teto técnico médio. Barra livre e variedade entram no pool. Carga prevista é decisão separada do filtro — um intermediário aceita exercício complexo mas não necessariamente com peso pesado.
+- **Nível 3** (avançado): sem teto técnico. Qualquer exercício pode entrar. Carga depende do objetivo (vetor + contexto), não do nível.
+
+**Insight da sessão**: nível e carga são ortogonais. Nível filtra o pool técnico; intenção de uso (carga, proximidade da falha) é decisão das outras dimensões + contexto da rotina.
+
+#### 2. Centralidade dos compostos pesados (alta/média/baixa)
+
+Quão "estrelas" são os compostos básicos (terra, agachamento, supino, etc.) na rotina.
+
+- **Alta**: compostos são objetivo de progressão; protegidos contra substituição; ativam constraint hard de cobertura e bloco solo.
+- **Média**: bem-vindos mas não centrais.
+- **Baixa**: exercícios entre outros, sem proteção especial.
+
+#### 3. Densidade de pareamento (alta/média/baixa)
+
+Quão "denso" é o desenho dos blocos.
+
+- **Alta**: bi-sets/tri-sets agressivos, pode parear agonistas, blocos grandes (turma 7h, formato quase-circuito).
+- **Média**: pareamentos limpos, antagonistas/distantes (saúde).
+- **Baixa**: tolerância a blocos solo, pareamento conservador (Fernanda quando treinando força).
+
+#### 4. Aderência ao tier (alta/média/baixa)
+
+Quanto a rotina protege exercícios de tier alto contra substituição por tier mais baixo.
+
+- **Alta**: mantém-se no núcleo da família (Supino Barra/Halteres OK, Apoio não).
+- **Baixa**: tolera periferia da família (Apoio, Crossover OK).
+
+**Importante**: funde com o roadmap de "centralidade dentro da família" de 2026-05-18 — é a mesma dimensão olhada pelo lado do aluno. Centralidade dentro da família ≡ tier alto dentro da família.
+
+### Tabela de referência (3 alunos contrastantes)
+
+| | Nível técnico | Centralidade compostos | Densidade pareamento | Aderência ao tier |
+|---|---|---|---|---|
+| **Fernanda** (força/hipertrofia) | 3 | Alta | Baixa | Alta |
+| **Turma 7h** (metabólica em grupo) | 2-3 | Baixa | Alta | Baixa |
+| **Saúde** (condicionamento geral) | 1-2 | Média | Média | Média |
+
+### Decisão arquitetural — presets, sliders, override
+
+Vetor é representação **interna**, não interface:
+
+- **Presets nomeados** ("Força/hipertrofia clássico", "Metabólico em grupo", "Saúde geral", etc.) correspondem a vetores comuns. Tu escolhe um preset por aluno.
+- **Tweak fino** disponível atrás de botão "personalizar" pros casos de cauda (ex: aluno força que gosta de variedade alta).
+- **Override por geração** — flag manual na hora de gerar uma rotina sobrepõe o vetor do aluno só pra essa geração específica. Útil pra casos pontuais (Fernanda quer fazer um treino metabólico antes da viagem). Não persiste, não vira novo perfil.
+
+### Como o vetor afeta o motor
+
+Duas formas distintas:
+
+- **Filtro hard (Nível técnico)** — filtra o pool antes do solver começar. Exercício com complexidade acima do teto do aluno não entra.
+- **Modulador de peso (3 outras dimensões)** — multiplica o peso de constraints soft específicas na função objetivo. Detalhamento em `catalogo_constraints.md` (passo 2 do fluxo).
+
+### Princípio do "papel é contextual" (revalidação do Conceito 12)
+
+A entrevista revalidou o Conceito 12 num caso prático específico:
+
+- Terra com **Fernanda** (Nível 3 + Centralidade Alta + Aderência Alta) vira bloco solo
+- Terra com **turma 7h** (mesmo Nível 3, mas Centralidade Baixa + Densidade Alta) pode ser pareado em tri-set metabólico
+
+**Não é o exercício que tem demanda neural alta — é a intersecção tier do exercício × vetor do aluno**. Implementado como constraint hard derivada (tier Principal + Centralidade Alta + Aderência Alta → bloco solo), em vez de coluna `demanda_neural` fixa no XLSX.
+
+### Pendências do perfil
+
+- **Restrições físicas/dor** ainda não modeladas. Direcionamento: filtros hard sobre pool por aluno (lista de exercícios proibidos / padrões a evitar por causa de lesão), separados do vetor. Discutir em sessão futura.
+
+---
+
+*Última atualização: 2026-05-21 (vetor de perfil de aluno de 4 dimensões
+extraído via entrevista com 3 alunos contrastantes reais — nova seção
+"Perfil de aluno — vetor de 4 dimensões"; pendência #4 do roadmap marcada
+concluída). Atualizar este doc a cada sessão de avaliação que produzir
+refinamento ou conceito novo.*
