@@ -145,14 +145,28 @@ Padrões agrupam coisas funcionalmente distintas. Exemplo concreto:
 - Pullover (Halteres e Polia): movimento vertical, mas **isolado** —
   só dorsal, sem flexão de cotovelo, sem trabalho escapular
 
-**Implicação clínica**: Pullover NÃO substitui uma puxada completa.
-Uma rotina com Pullover + 2 Remadas ainda fica sem "movimento vertical
-de costas verdadeiro" (caso real da Rotina 1).
+**Implicação clínica**: a substituibilidade de Pullover por puxada
+completa depende do nível.
+
+- **No nível do treino**: Pullover + 2 remadas dentro de um mesmo
+  treino é distribuição válida. Remadas já cobrem romboides, trapézio
+  médio e bíceps via flexão de cotovelo + retração escapular — o
+  "vertical isolado" do Pullover complementa sem deixar nada órfão.
+- **No nível da rotina**: se a rotina inteira (todos os treinos
+  somados) tem só Pullover como "vertical de costas" e nenhuma puxada
+  multi-articular real, isso é ruim. O aluno passa o microciclo sem
+  trabalhar o padrão vertical completo. **Caso real (Rotina 1, Variante
+  B 2x)**: T1 + T2 não tiveram nenhuma puxada multi-articular, só
+  Pullover Polia em T2.
 
 **Implicação pro modelo**: padrão sozinho não captura função clínica.
 Precisa de algum eixo adicional — tipo `função_dominante` =
 {multi_articular, lat_isolation, scapula_focused, ...} — pra
-diferenciar membros dentro do mesmo padrão.
+diferenciar membros dentro do mesmo padrão. **A constraint resultante
+("≥1 puxada multi-articular") é de ROTINA, não de TREINO** — vários
+conceitos clínicos vivem nesse nível agregado, e o motor declarativo
+(Conceito 12) precisa expressar restrições de rotina como cidadãs de
+primeira classe, lado a lado com as de treino e de bloco.
 
 ### Conceito 4 — Frequência típica vs regra absoluta
 
@@ -565,6 +579,7 @@ problemas qualitativos sem **criar** novos vieses quantitativos.
 
 ---
 
-*Última atualização: 2026-05-19 (criação inicial + princípio
-metodológico qualitativo+quantitativo). Atualizar este doc a cada
+*Última atualização: 2026-05-21 (refinamento do Conceito 3 — separação
+explícita treino vs rotina, e constraint de rotina como cidadã de
+primeira classe na arquitetura declarativa). Atualizar este doc a cada
 sessão de avaliação que produzir refinamento ou conceito novo.*
