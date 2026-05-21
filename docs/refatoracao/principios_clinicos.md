@@ -13,6 +13,58 @@
 
 ---
 
+## ⭐ Objetivo fundador do app (lê isto antes dos conceitos)
+
+Citação do usuário (2026-05-19):
+
+> *"Eu sempre quis ter uma tabela/banco com meus exercícios pelo simples
+> fato de que ele me ajuda a LEMBRAR das várias variações de exercícios
+> e de exercícios diferentes. É por isso que eu temo tanto os vieses:
+> app priorizando exercícios que estão em maior quantidade no pool ou
+> algum viés de distribuição que, combinado com tags e penalidades,
+> acaba extinguindo ou priorizando alguns exercícios. Quando penso em um
+> app bom, quero que ele me ajude a ter opções de exercícios com
+> facilidade, mas com a inteligência de um app."*
+
+**O valor primário do app é ajudar o personal a LEMBRAR e ACESSAR a
+amplitude do repertório** — não "gerar o treino ótimo". O app existe
+pra combater a tendência humana de recair nos mesmos exercícios.
+
+### A inversão de design que isso impõe
+
+```
+OBJETIVO   = MAXIMIZAR variedade/cobertura do repertório (ao longo do tempo)
+CONSTRAINT = correção clínica (não fazer treino ruim)
+```
+
+**NÃO** o contrário. Um motor que MINIMIZA penalidade de proximidade
+converge nos favoritos e extingue a cauda do repertório — sabotando o
+propósito. Variedade é o OBJETIVO; correção clínica é a CONSTRAINT.
+
+### Implicações
+
+1. **Cobertura ao longo do tempo é first-class.** Não basta 1 rotina
+   variada — o app deve ciclar o repertório por semanas. O mecanismo
+   de HISTÓRICO (evitar R-1) é **central ao propósito**, não feature
+   secundária.
+2. **Fairness (nenhum exercício sistematicamente escondido) é
+   requisito DURO.** Os 11 vieses investigados nesta e em sessões
+   anteriores (landmine, ombro→desenvolvimento, etc.) violam o
+   propósito fundador.
+3. **Centralidade = knob ajustável, default = variedade.** Só sobe pra
+   "clássicos dominam" quando o personal quer (aluno específico).
+   Roadmap de 2026-05-18 estava certo, mas o default tem que pender
+   pra variedade.
+4. **Dashboard de calibração quantitativa = instrumento que mede se o
+   propósito é cumprido** (todo exercício do banco tem chance justa ao
+   longo do tempo). Não é "nice to have".
+
+**Os 12 conceitos abaixo são SUBORDINADOS a este objetivo**: são as
+constraints clínicas que organizam a variedade com bom senso, mas
+nunca devem colapsar a variedade.
+
+---
+
 ## Origem deste documento
 
 Entrevista de 2026-05-19, formato Lente A (caso a caso, 1 pergunta por
@@ -289,6 +341,67 @@ Var.A):
 *"Abdominal pede variedade."* A refatoração CORE da Etapa 8 (padrões
 flexao_tronco/flexao_quadril/etc) é um começo, mas claramente não está
 prevenindo essas redundâncias na prática.
+
+**Achado contundente (Rotina 2 Var.A)**: o eixo de classificação está
+ERRADO, não ausente. Dados reais:
+
+```
+Dead Bug        | padrao=flexao_quadril  | purpose=stability
+Hollow Hold     | padrao=flexao_tronco   | purpose=stability
+Abd Bicicleta   | padrao=flexao_tronco   | purpose=isolation
+Infra Alternado | padrao=flexao_quadril  | purpose=isolation
+```
+
+O sistema acha que Dead Bug ≠ Hollow (padrões diferentes) → coloca
+juntos achando que diversificou. Mas o usuário vê os dois como
+"supino + anti-extensão + uso muscular parecido". Mesma coisa com
+Abd Bicicleta + Infra ("ambos flexão de quadril alternada"). →
+**a tag de padrão CORE não bate com a percepção clínica de
+semelhança.** Eixos clínicos reais: posição + padrão de movimento +
+tipo de execução (alternado/bilateral/estático).
+
+### Conceito 12 — Seleção e arranjo são INSEPARÁVEIS (meta-arquitetural)
+
+Citação do usuário (2026-05-19):
+
+> *"Para encontrar o melhor par, às vezes o exercício não vai ficar na
+> melhor posição. Por isso, o ideal não é selecionar o pool e depois
+> ter que trabalhar com os exercícios escolhidos sem poder trocá-los.
+> O personal nunca pensa assim de forma fixa."*
+
+É o defeito de design central do motor atual, dito em linguagem
+clínica. O sistema hoje: (1) seleciona o pool, (2) arruma em blocos
+sem poder trocar os escolhidos. Daí a tensão: Goblet foi pro bloco A
+(cedo) porque calhou de parear bem com a Remada — não porque deveria
+vir cedo.
+
+**A decisão de QUAL exercício e a decisão de ONDE ele vai têm que ser
+tomadas JUNTAS**, não em fases separadas e irreversíveis. É o argumento
+do CSP/ILP (decisão global) traduzido pra clínica — e a confirmação
+mais forte, vinda espontaneamente do usuário, de que o problema é
+arquitetural.
+
+**Corolário — papel é contextual** (refina Conceitos 1/7): Cadeira
+Extensora como finisher depois de Terra+Passada = OK (Rotina 2 T2);
+como ÚNICO de coxa = ruim (Rotina 1 T2). Mesmo exercício, papéis
+opostos. Tier/papel não é fixo no exercício — depende do conjunto do
+treino, o que reforça que escolha+arranjo são inseparáveis.
+
+### Conceito 9 refinado² — distribuição pondera intervalos de descanso
+
+Além de força e tipo de movimento, a distribuição entre treinos deve
+considerar o **gap temporal do ciclo**. Ex seg/qua/sex: T3→T1 tem o
+maior intervalo (fim de semana), T1→T2 o menor. Logo, 2 estímulos
+similares (2 remadas) em T1+T2 (próximos) é pior que espaçá-los.
+Distribuir ≠ "espalhar igual"; é "espalhar ponderando os gaps".
+
+**Viés sistemático de ombro** (Rotinas 1 e 2 Var.A): ombro caiu em
+desenvolvimento nas 2× que apareceu na rotina, 0 elevação/posterior.
+Carve-out 70/30 aplicado 2× independente → ~49% de 2 compostos.
+Quando um grupo aparece em múltiplos treinos, o TIPO deveria variar
+(coordenação entre treinos, não sorteio independente). Tensão: usuário
+quer `posterior_ombro` disponível, mas carve-out de 2026-05-18 o
+excluiu ("específico demais") — exclusão talvez prematura.
 
 ---
 
