@@ -71,8 +71,9 @@ O passo APÓS coletar princípios é traduzir cada conceito em 2 coisas:
 - **Constraints**: hard (vaga única ⇒ composto; ≥1 vertical de costas
   verdadeiro; cobertura de glúteo) + soft/objetivo (tier-order;
   tolerância a fadiga; distribuição entre treinos; proporção
-  composto:isolado; anti-redundância de ênfase; **+ o objetivo
-  fundador: maximizar cobertura do repertório**).
+  composto:isolado; anti-redundância de ênfase; **+ cobertura do
+  repertório ao longo do tempo — um dos valores a equilibrar, não o
+  objetivo soberano; ver "Valores do app" em principios_clinicos.md**).
 
 Esse documento de design (esquema de dados + catálogo de constraints)
 **É o modelo do CSP/ILP**. É o passo 2 do fluxo:

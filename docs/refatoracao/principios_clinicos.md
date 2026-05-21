@@ -1,10 +1,19 @@
 # Princípios Clínicos do Gerador — documento de trabalho
 
-> **STATUS: RASCUNHO MUTÁVEL.** Compilado durante entrevista guiada
-> com o personal trainer (Bernardo) em 2026-05-19, **Lente A** (caso a
-> caso) sobre 3 rotinas da Variante B 2x/semana. Conceitos podem ser
-> revisados, refinados, divididos, fundidos ou descartados conforme
-> avaliação de mais rotinas e configurações.
+> **STATUS: RASCUNHO MUTÁVEL — observações provisórias, não regras.**
+> Compilado durante entrevista guiada com o personal trainer (Bernardo)
+> em 2026-05-19, **Lente A** (caso a caso) sobre poucas rotinas. Os
+> "conceitos" abaixo são **hipóteses de trabalho** extraídas de pouca
+> evidência, não leis estabelecidas. Podem ser revisados, refinados,
+> fundidos ou descartados.
+>
+> **Como ler**: o que importa são os **enunciados gerais** (os
+> princípios). Os exemplos de exercício específico (Pullover, Dead Bug,
+> Cadeira Extensora, rotinas com seed X) são **andaime/ilustração** —
+> serviram pra fazer o princípio emergir, mas não devem ser tratados
+> como âncora nem como regra de ouro. Se o banco mudar, os exemplos
+> envelhecem; os princípios não. **Não cristalizar caso pontual em
+> doutrina.**
 >
 > **Propósito**: capturar a lógica clínica que hoje está implícita no
 > greedy + scoring + carve-outs e tornar explícita em texto, sem
@@ -13,7 +22,7 @@
 
 ---
 
-## ⭐ Objetivo fundador do app (lê isto antes dos conceitos)
+## Valores do app (lê isto antes dos conceitos)
 
 Citação do usuário (2026-05-19):
 
@@ -22,46 +31,47 @@ Citação do usuário (2026-05-19):
 > e de exercícios diferentes. É por isso que eu temo tanto os vieses:
 > app priorizando exercícios que estão em maior quantidade no pool ou
 > algum viés de distribuição que, combinado com tags e penalidades,
-> acaba extinguindo ou priorizando alguns exercícios. Quando penso em um
-> app bom, quero que ele me ajude a ter opções de exercícios com
-> facilidade, mas com a inteligência de um app."*
+> acaba extinguindo ou priorizando alguns exercícios."*
 
-**O valor primário do app é ajudar o personal a LEMBRAR e ACESSAR a
-amplitude do repertório** — não "gerar o treino ótimo". O app existe
-pra combater a tendência humana de recair nos mesmos exercícios.
+O app nasceu **em parte** como apoio de memória — ajudar o personal a
+lembrar da amplitude do repertório. Disso decorre um valor importante:
+**não esconder exercícios sistematicamente** (e explica o medo de
+viés).
 
-### A inversão de design que isso impõe
+Mas isso é **um valor entre vários**, não a coisa central que subordina
+todo o resto. O app precisa equilibrar:
 
-```
-OBJETIVO   = MAXIMIZAR variedade/cobertura do repertório (ao longo do tempo)
-CONSTRAINT = correção clínica (não fazer treino ruim)
-```
+- **Acesso à variedade do repertório** (a motivação de memória acima)
+- **Qualidade clínica** (não montar treino ruim)
+- **Intenção do treinador** (respeitar o que o personal quer pra cada
+  aluno)
 
-**NÃO** o contrário. Um motor que MINIMIZA penalidade de proximidade
-converge nos favoritos e extingue a cauda do repertório — sabotando o
-propósito. Variedade é o OBJETIVO; correção clínica é a CONSTRAINT.
+Esses valores às vezes puxam em direções opostas (ex: variedade pode
+empurrar pra um exercício menos "central"; qualidade pode preferir o
+clássico). **Nenhum domina o outro de forma absoluta** — o design tem
+que balancear, e o ponto do balanço pode até variar por aluno/contexto.
 
-### Implicações
+> ⚠️ Correção registrada (2026-05-21): uma versão anterior deste doc
+> afirmava que "variedade é O objetivo e correção clínica é só
+> constraint", com uma "inversão de design". Isso foi
+> **extrapolação** — a fala original era sobre uma motivação, não uma
+> hierarquia de objetivos. Variedade tem valor real; não é a métrica
+> única e soberana.
 
-1. **Cobertura ao longo do tempo é first-class.** Não basta 1 rotina
-   variada — o app deve ciclar o repertório por semanas. O mecanismo
-   de HISTÓRICO (evitar R-1) é **central ao propósito**, não feature
-   secundária.
-2. **Fairness (nenhum exercício sistematicamente escondido) é
-   requisito DURO.** Os 11 vieses investigados nesta e em sessões
-   anteriores (landmine, ombro→desenvolvimento, etc.) violam o
-   propósito fundador.
-3. **Centralidade = knob ajustável, default = variedade.** Só sobe pra
-   "clássicos dominam" quando o personal quer (aluno específico).
-   Roadmap de 2026-05-18 estava certo, mas o default tem que pender
-   pra variedade.
-4. **Dashboard de calibração quantitativa = instrumento que mede se o
-   propósito é cumprido** (todo exercício do banco tem chance justa ao
-   longo do tempo). Não é "nice to have".
+**Implicações que seguem valendo (com a ressalva acima):**
 
-**Os 12 conceitos abaixo são SUBORDINADOS a este objetivo**: são as
-constraints clínicas que organizam a variedade com bom senso, mas
-nunca devem colapsar a variedade.
+1. **Cobertura ao longo do tempo importa.** Variedade não é só dentro
+   de 1 rotina — o repertório deveria circular ao longo de semanas. O
+   mecanismo de HISTÓRICO (evitar R-1) é relevante pra isso.
+2. **Viés sistemático é um problema real a vigiar** — exercícios
+   sumindo de forma não-intencional (landmine, etc.) contrariam o valor
+   de acesso à variedade.
+3. **Centralidade faz sentido como knob ajustável** (roadmap de
+   2026-05-18) — quanto o app pende pra "clássicos" vs "variado" pode
+   ser parâmetro, não decisão fixa.
+4. **Validação quantitativa (dashboard)** é útil pra enxergar viés que
+   não aparece a olho — mas é instrumento de diagnóstico, não o juiz
+   único de qualidade.
 
 ---
 
