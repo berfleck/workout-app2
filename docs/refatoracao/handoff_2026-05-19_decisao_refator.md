@@ -9,6 +9,84 @@ app atualmente.**
 
 ---
 
+## Discussões estratégicas do turno final (2026-05-19)
+
+Três discussões que não couberam no `principios_clinicos.md` mas
+importam pro refator:
+
+### 1. O motor novo "aprende" com o antigo? (migração)
+
+**A maior parte do trabalho transfere; o que se joga fora é a parte
+que causa os bugs.** O motor antigo tem 2 tipos de conteúdo:
+
+- **Conhecimento clínico (transfere ~100%)**: o banco (146 ex × ~20
+  campos) vai direto + ganha campos novos; dimensões viram constraints
+  soft; pesos calibrados viram pesos de objetivo; carve-outs viram
+  constraints declarativas limpas; ANCORAS viram hard constraints de
+  cobertura; regras hard (família, lateralidade) viram hard constraints
+  ~1:1; cenários/testes viram validação; rationale é conceito reusável.
+- **Encanamento algorítmico (joga fora — é o objetivo)**: alocação
+  greedy sequencial, softmax top-K, `pre_alocar_rotina` ordem-por-
+  escassez, separação de fases. Justamente a fonte dos vieses.
+
+Cada correção feita no motor antigo encodou conhecimento espalhado como
+patch; no motor novo vira **dado explícito + constraint declarativa**.
+A energia não foi desperdiçada — está gravada nas regras. Migração =
+"colher o conhecimento implícito do código antigo e torná-lo explícito".
+
+O motor antigo vira **oráculo de comparação** durante a migração: roda
+antigo vs novo nas mesmas configs, diff, o novo deve ganhar nos bugs
+conhecidos sem regredir no que o antigo acertava (checklist = seção
+"coisas que o sistema acertou" do `principios_clinicos.md`).
+
+Núcleo reescrito = só o miolo de alocação+seleção (~20-30% do
+`gerador_treino.py`). UI, banco, serialização, rotas, histórico ficam.
+
+### 2. Viabilidade — dá pra capturar "tudo"?
+
+Dúvida do usuário: *"esses detalhes me fazem questionar se há como criar
+um app que realmente seja capaz de entender e filtrar tudo"*.
+
+**Resposta: sim, mas não capturando tudo — capturando os EIXOS CERTOS.**
+As redundâncias clínicas que incomodaram colapsam num punhado de eixos
+(ex: core = posição + padrão de movimento + tipo de execução, ~3 tags).
+Não é complexidade infinita; é o sistema usando a tag errada. A arte é
+achar o conjunto MÍNIMO de eixos que explica a MAIORIA da redundância.
+
+A barra **não é perfeição**: (a) o próprio personal não é 100%
+consistente; (b) o app já deixa editar — sistema bom + edição humana >
+qualquer um sozinho; (c) Conceito 12 (seleção+arranjo juntos) já
+elimina boa parte do que incomoda (posição/ordem, não escolha).
+
+### 3. Ponte prosa → construível (modelo de dados + constraints)
+
+O passo APÓS coletar princípios é traduzir cada conceito em 2 coisas:
+
+- **Modelo de dados**: o que o sistema precisa SABER de cada exercício.
+  Conceitos revelaram dados faltando: `tier`; estabilidade externa
+  (máquina vs livre); sub-tipo de ênfase (chest vs triceps dominant;
+  vertical-completo vs lat-isolation; core por movimento+posição);
+  mapa de recrutamento muscular (primário + secundários); cargas
+  estruturadas (core/lombar/ombro/neural).
+- **Constraints**: hard (vaga única ⇒ composto; ≥1 vertical de costas
+  verdadeiro; cobertura de glúteo) + soft/objetivo (tier-order;
+  tolerância a fadiga; distribuição entre treinos; proporção
+  composto:isolado; anti-redundância de ênfase; **+ o objetivo
+  fundador: maximizar cobertura do repertório**).
+
+Esse documento de design (esquema de dados + catálogo de constraints)
+**É o modelo do CSP/ILP**. É o passo 2 do fluxo:
+
+```
+1. Princípios clínicos (prosa)              ← FEITO (12 conceitos)
+2. Modelo de dados + catálogo de constraints ← próximo passo de design
+3. Cadastro: preencher dados que faltam no banco
+4. Engine declarativa (CSP/ILP)
+5. Dashboard de calibração quantitativa (valida cobertura)
+```
+
+---
+
 ## Documentos vivos relacionados
 
 - **`docs/refatoracao/principios_clinicos.md`** — rascunho mutável dos
