@@ -2,47 +2,41 @@
 
 App para personal trainer gerar, editar e exportar sessões de treino. Roda localmente. Dados em SQLite + XLSX.
 
-## ⚠️ DECISÃO ESTRUTURAL PENDENTE (2026-05-19)
+## ⚠️ Refator declarativo em andamento (decisão 2026-05-19)
 
-Refator profundo do gerador sob avaliação. As Etapas 1-8 do
-`guia_refatoracao_v4.md` (caminho do meio incremental) estão sob
-revisão estrutural — diagnóstico é que o algoritmo greedy sequencial
-gera ordem-de-alocação + vieses sistemáticos + patches em cascata.
+Refator estrutural do gerador iniciado em 2026-05-19. Paradigma novo: declarativo (CSP/ILP via CP-SAT do OR-Tools), substituindo o algoritmo greedy sequencial das Etapas 1-7 do antigo `guia_refatoracao_v4.md` (arquivado em `docs/refatoracao/arquivo/era_v4_greedy_incremental/`).
 
-**ANTES de mexer no gerador, em pesos, ou em dimensões de proximidade, ler:**
-`docs/refatoracao/handoff_2026-05-19_decisao_refator.md`
+**Fontes de verdade (ler nesta ordem antes de qualquer mudança no gerador, banco ou rotas):**
 
-Próximo passo combinado: **documento de princípios clínicos** (não código).
-Se o usuário trouxer viés ou edge case novo, **NÃO patchar** antes de
-checar se ele quer aguardar o refator estrutural.
+1. `docs/refatoracao/handoff_2026-05-19_decisao_refator.md`
+2. `docs/refatoracao/principios_clinicos.md`
+3. `docs/refatoracao/catalogo_constraints.md`
+
+`docs/refatoracao/README.md` tem o mapa completo.
+
+**Estado atual do fluxo (passos 1-5):** princípios + catálogo fechados (passos 1-2). Próximo passo é a Fatia 1 do MVP — spike de viabilidade do CP-SAT em `gerador_csp.py` paralelo ao gerador antigo. Detalhes na seção "Update 2026-05-21" do handoff.
+
+**Se o usuário trouxer viés ou edge case novo:** NÃO patchar `gerador_treino.py` (antigo). Avaliar se cabe como constraint no novo catálogo ou se é caso pro spike resolver. O gerador antigo vive até o MVP estar maduro o suficiente pra substituir.
 
 ## Refatoração em andamento
 
-Estamos em refatoração planejada do gerador de treinos.
-Documento mestre: `docs/refatoracao/guia_refatoracao_v4.md`.
+Estamos em refatoração estrutural do gerador. Paradigma novo é declarativo (CSP/ILP). Fonte de verdade operacional: os 3 documentos listados na seção acima + `docs/refatoracao/README.md`.
 
-Antes de qualquer mudança em `gerador_treino.py`, no banco de
-exercícios, ou em rotas que toquem o motor de geração, ler o guia
-e identificar em qual etapa o trabalho atual se encaixa. Não
-acumular mudanças de etapas diferentes no mesmo PR.
+Antes de qualquer mudança em `gerador_treino.py` (antigo), `gerador_csp.py` (novo, em construção), banco de exercícios, ou rotas que toquem o motor de geração: ler os docs e identificar em qual passo do fluxo de 5 etapas o trabalho atual se encaixa.
 
-**Log por etapa — manter atualizado.** Cada etapa tem log próprio em
-`docs/refatoracao/logs/etapa_N.md`. O log é atualizado **ao fim de
-cada sessão substantiva** — registra contexto da sessão, decisões
-grandes, surpresas/desvios e atualizações em outros arquivos. **Não
-duplicar conteúdo de docs especializados** (`dimensoes_proximidade.md`
-etc) — usar ponteiros pra seções específicas. Padrão de granularidade:
-seguir o que está nas Sessões 1-2 do `etapa_6.md` como referência.
+**Documentação de sessões**: criar `docs/refatoracao/logs/` (vazio agora — o `logs/` antigo foi movido pra `arquivo/era_v4_greedy_incremental/`). Logs novos do MVP devem entrar lá conforme as Fatias avançam (ex: `docs/refatoracao/logs/mvp_fatia_1.md`).
 
-Documentos de apoio (em `docs/refatoracao/`):
-- `memoria_projeto.md` — contexto histórico (HIB2, casos clínicos,
-  conceitos). Tem nota de superação parcial no topo: consultar com
-  atenção a essa nota.
-- `arquivo/` — documentos superados, NÃO usar como referência.
-
-Fonte de verdade operacional: `guia_refatoracao_v4.md`.
+**Documentos de apoio histórico**:
+- `docs/refatoracao/arquivo/era_v4_greedy_incremental/` — todo o conhecimento da era greedy (guia v4, dimensões, memória, logs etapa_2 a etapa_6). Consultar para CONTEXTO ("por que decisão X foi tomada?"), nunca para planejar implementação nova.
+- `docs/refatoracao/arquivo/` (raiz) — documentos pré-v4 arquivados antes.
 
 ## Etapa 6 Fase 3 — decisões fechadas (não reabrir sem motivo forte)
+
+> **Nota histórica (2026-05-21)**: esta seção descreve decisões tomadas durante a era do refator greedy incremental (guia v4, arquivado). Várias decisões aqui SOBREVIVEM no refator declarativo novo — especialmente os filtros hard de `familia_estrita`, `variante_pontual`, e `lateralidade` em costas, que aparecem agora como constraints H-T1, H-T2, H-T3 no `docs/refatoracao/catalogo_constraints.md`. O cadastro de dimensões e as colunas do banco também sobrevivem.
+>
+> O QUE MUDOU: a forma como essas regras são aplicadas. No paradigma antigo elas eram filtros imperativos no código do `_compativel_intra`. No paradigma novo elas são entradas declarativas do catálogo de constraints, executadas por um constraint solver. Conteúdo das regras = igual; arquitetura = diferente.
+>
+> Esta seção fica preservada como referência histórica do raciocínio clínico. Para a especificação executável atual, consultar `docs/refatoracao/catalogo_constraints.md`.
 
 A Fase 3 conceitual foi 100% fechada na Sessão 6 (2026-05-08).
 Todas as decisões abaixo estão consolidadas em

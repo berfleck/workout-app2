@@ -52,3 +52,34 @@ exclusivamente `../guia_refatoracao_v4.md` como referência
 operacional. Os documentos aqui podem indicar caminhos
 abandonados ou parcialmente revisados que se aplicados gerarão
 inconsistências com o guia atual.
+
+---
+
+## Era v4 — refator greedy incremental (arquivada em 2026-05-21)
+
+A subpasta `era_v4_greedy_incremental/` contém o `guia_refatoracao_v4.md` e seus satélites (`memoria_projeto.md`, `dimensoes_proximidade.md`, logs `etapa_2.md` a `etapa_6.md`, baselines JSON).
+
+Esta era cobriu o planejamento e execução parcial das Etapas 1-7 do refator por caminho do meio — paradigma greedy sequencial com scoring + carve-outs + filtros em camadas. Foi superada em 2026-05-19 pela decisão de migrar pra paradigma declarativo (CSP/ILP), documentada em `../handoff_2026-05-19_decisao_refator.md`.
+
+### Por que foi superada
+
+Diagnóstico do handoff: o algoritmo greedy sequencial gera vieses de ordem-de-alocação (ex: puxadas caem antes de remadas em 100% das rotinas com costas=2) que não são removíveis com mais scoring ou mais carve-outs. Cada nova feature briga com as anteriores; cada problema vira patch em cascata. A solução não é mais uma Etapa — é mudar o paradigma de "preencher na ordem" pra "negociar simultaneamente via constraint solver".
+
+### O que sobrevive desta era
+
+Várias decisões e dados continuam válidos no novo paradigma:
+
+- O **banco de exercícios** e suas colunas (subregiao, padrao, familia_estrita, etc.)
+- Decisões de cadastro consolidadas na Etapa 6 Fase 3 (`familia_estrita`, `variante_pontual`, `lateralidade` hard em costas, matriz de pegada)
+- Conceitos clínicos extraídos durante a era (consolidados em `../principios_clinicos.md`)
+- Calibração de pesos da Etapa 7 (vai virar input pros pesos iniciais da função objetivo nova)
+
+### O que NÃO sobrevive
+
+- A estrutura de Etapas 1-8 do `guia_refatoracao_v4.md` (incluindo Etapa 7 já fechada e Etapa 8 que estava planejada)
+- O algoritmo greedy + scoring + carve-outs do `gerador_treino.py` (vai conviver com o `gerador_csp.py` novo durante o MVP, depois é substituído)
+- Vários "tapa-buracos" reconhecidos (ex: `squat_bilateral`/`squat_unilateral` como padrões separados — débito técnico documentado)
+
+### Aviso para agentes
+
+NÃO consultar `era_v4_greedy_incremental/` para planejar implementação do gerador novo. A fonte de verdade está em `../handoff_2026-05-19_decisao_refator.md`, `../principios_clinicos.md`, `../catalogo_constraints.md`.
