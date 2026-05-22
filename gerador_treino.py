@@ -41,6 +41,10 @@ PADRAO_PARA_SUBREGIAO: dict[str, set[str]] = {
     "squat_unilateral": {"perna_anterior"},
     "hinge":          {"perna_posterior"},
     "knee_flexion":   {"perna_posterior"},
+    # knee_extension → perna_anterior (extensão isolada de joelho, quad).
+    # Distinto de knee_flexion (perna_posterior, hamstring). Pool de 1
+    # (Cadeira Extensora) é por design — ver docs/refatoracao/notas_cadastro.md.
+    "knee_extension": {"perna_anterior"},
     "abduction":      {"perna_posterior"},
     "adduction":      {"adutores"},
     "flexao_plantar": {"panturrilha"},
@@ -639,6 +643,7 @@ GRUPO_MUSCULAR_PADRAO: dict[str, str] = {
     # Lower — anterior
     "squat_bilateral":  "quad",
     "squat_unilateral": "quad",
+    "knee_extension":   "quad",
     "knee_flexion": "hamstring",
     # Lower — posterior
     "hinge":     "hamstring",

@@ -62,13 +62,14 @@ def test_carga_fields_exist_with_default_zero():
 
 
 def test_carregar_banco_le_cargas(banco):
-    """Banco real tem 100/118/127 ex com grip/lombar/core >= 1 (pós cadastros pullover-mitigation: +10 ex)."""
+    """Banco real tem 98/118/125 ex com grip/lombar/core >= 1 (pós correções
+    pré-Fatia 1 2026-05-22: 3 ex marcados ativo=False saem do banco carregado)."""
     grip_nz = sum(1 for e in banco if e.carga_grip >= 1)
     lombar_nz = sum(1 for e in banco if e.carga_lombar >= 1)
     core_nz = sum(1 for e in banco if e.demanda_core >= 1)
-    assert grip_nz == 100
+    assert grip_nz == 98
     assert lombar_nz == 118
-    assert core_nz == 127
+    assert core_nz == 125
 
 
 def test_carregar_banco_cargas_em_faixa_0_3(banco):
@@ -290,7 +291,11 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     seed=2202 Stiff Barra Smith + Remada Baixa Aberta (agregação
     rotina-level no nível padrão — fix cobertura de obrigatórias) →
     seed=2730 Stiff Barra Smith + Remada Baixa Aberta (carve-out de
-    vaga única em ombro pula piso de cobertura — sorteio 70/30 final).
+    vaga única em ombro pula piso de cobertura — sorteio 70/30 final) →
+    seed=0 Agachamento Smith Rampa + Remada Curvada Smith (correções
+    pré-Fatia 1 2026-05-22: 3 ex ativo=False + Cadeira Extensora movida pra
+    knee_extension + Hip Thrust isolation + Agach. Lateral compound deslocam
+    o RNG seeded).
     Mesmo contrato clínico: par viola HIB2 sem filtro, some com filtro.
     """
     import random
@@ -302,8 +307,8 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
         "equipamentos_bloqueados": [],
         "evitar_agonistas": True,
     }
-    PAR = {"Stiff Barra Smith", "Remada Baixa Aberta"}
-    SEED = 2730
+    PAR = {"Agachamento Smith Rampa", "Remada Curvada Smith"}
+    SEED = 0
 
     def par_aparece(sessoes):
         for s in sessoes:
@@ -324,8 +329,8 @@ def test_filtro_carga_realmente_dissolve_par_conhecido(banco):
     cfg_on = {**cfg, "cargas_config": HIB2}
     s_on = gerar_multiplos_treinos(banco, [cfg_on, cfg_on], relaxar_familia=True)
     assert not par_aparece(s_on), (
-        "Filtro falhou: par 'Lev. Terra' + 'Barra Isometrica' apareceu "
-        "mesmo com cargas_config HIB2 ativo."
+        "Filtro falhou: par 'Agachamento Smith Rampa' + 'Remada Curvada Smith' "
+        "apareceu mesmo com cargas_config HIB2 ativo."
     )
 
 
