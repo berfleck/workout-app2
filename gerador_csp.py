@@ -18,8 +18,12 @@
 
 from __future__ import annotations
 
+import math
+import random
 import time
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Optional
 
 from ortools.sat.python import cp_model
 
@@ -59,6 +63,65 @@ def _tier_rank(exercicio: Exercicio) -> int:
     fallback é só pra fixtures legacy que constroem Exercicio direto.
     """
     return TIER_RANK.get(exercicio.tier, 1)
+
+
+# ---------------------------------------------------------------------------
+# ConfigVariedade — Frente B da Fatia 3 (2026-05-23)
+# ---------------------------------------------------------------------------
+#
+# Knobs pra ativar variedade INTRA-config no `gerar_rotina_csp`. Sem este
+# dataclass passado, o motor opera no modo legado (1 solve com Minimize,
+# 1 solução determinística — comportamento da Fatia 2 Parte 2).
+#
+# Com ConfigVariedade, motor entra em 2 fases:
+#   Phase 1: resolve com Minimize pra descobrir o ótimo (valor da função
+#            objetivo, ex.: nº de inversões de S-T1).
+#   Phase 2: reconstrói o modelo SEM Minimize, adiciona
+#            `total_penalidade <= optimal + slack`, enumera todas as
+#            soluções dentro do bound via CpSolverSolutionCallback (cap em
+#            `max_solucoes`), e amostra uma via softmax.
+#
+# Softmax: peso de cada solução = exp(-distancia / temperatura), onde
+# distancia = inversoes_da_solucao - optimal. Soluções "mais ótimas"
+# (distancia menor) têm peso maior. Reprodutibilidade via `python_seed`
+# (passado pra `random.Random`, isolado do `random` global).
+#
+# Decisão Bernardo (2026-05-23): default = opt-in via dataclass (Opção A).
+# Quando a integração com a UI Flask acontecer, o wiring DEVE passar
+# `variedade=ConfigVariedade()` por default — produto espera variedade,
+# não rotina determinística. TODO registrado pra Frente C.
+
+@dataclass
+class ConfigVariedade:
+    """Configuração de variedade INTRA-config pro `gerar_rotina_csp`.
+
+    Atributos:
+        slack: inversões adicionais aceitas acima do ótimo. 0 = só
+            soluções ótimas; >0 aceita soluções progressivamente piores
+            (com peso menor no softmax).
+        temperatura: T do softmax sobre as soluções enumeradas. T alto =
+            distribuição mais uniforme (qualquer solução enumerada tem
+            chance similar). T baixo = concentra perto do ótimo.
+        max_solucoes: cap da enumeração. Callback aborta com StopSearch()
+            quando atingido. Evita explosão combinatória em rotinas
+            subdeterminadas.
+        python_seed: seed do `random.Random` usado no softmax. None =
+            não-determinístico (cada chamada vê soluções diferentes).
+            Inteiro = reprodutível (mesma seed → mesma escolha).
+        alpha_tier: peso da modulação por tier (Frente 2 da Fatia 3).
+            0.0 = sem modulação (Frente 1 pura). >0 = desincentiva
+            soluções que diferem da referência (1ª solução enumerada)
+            em SLOTS de tier alto. Distância Hamming ponderada pelo
+            tier_rank do slot (Principal=3, Intermediário=2, Acessório=1).
+            Score modificado: `peso = exp(-(d + alpha_tier*H) / T)`,
+            onde H = sum_s ref_tier_rank[s] * (k[s] != ref[s]).
+            Intenção clínica: "varia em Acessórios, conserva Principais".
+    """
+    slack: int = 0
+    temperatura: float = 1.0
+    max_solucoes: int = 100
+    python_seed: Optional[int] = None
+    alpha_tier: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -194,27 +257,27 @@ def _subregioes_da_demanda(nivel: str, escopo: str) -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# Engine CP-SAT — rotina inteira (N treinos negociados no mesmo modelo)
+# Engine CP-SAT — helpers (Frente B Fatia 3 extraiu pra suportar enumeração)
 # ---------------------------------------------------------------------------
 
-def gerar_rotina_csp(
+def _construir_modelo(
     demandas_por_treino: list[list[tuple[str, str, int]]],
     banco: list[Exercicio],
     nivel_aluno: int,
-    seed: int = 0,
 ) -> dict:
-    """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
-    negociam no mesmo modelo — necessário pra H-R1 cross-treino.
+    """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
+    penalidades de S-T1) MAS sem chamar `Minimize`. Caller decide se
+    minimiza (Phase 1 / modo legado) ou adiciona bound + enumera (Phase 2
+    da Frente B / Fatia 3).
 
-    `demandas_por_treino[t]`: lista de (nivel, escopo, qtd) do treino t.
-    `banco`: lista já carregada (ativo=True). `nivel_aluno`: 1/2/3 (H-P1).
-    `seed`: semente do solver.
-
-    Retorna dict com:
-      - top-level: `viavel`, `status`, `nivel_aluno`, `seed`, `solve_time`,
-        `inversoes_totais` (soma cross-treino de S-T1).
-      - `treinos: list[dict]` — cada treino tem `grupos`, `ordem_global`,
-        `inversoes`.
+    Devolve dict com:
+      - model: CpModel sem objetivo definido
+      - assign: dict[(sid, cidx)] -> BoolVar
+      - slots_globais, treinos, grupo_por_idx: metadados pra decodificação
+      - h_r1_aplicadas: lista de aplicações H-R1 com flag degraded
+      - penalidades: list[IntVar] das inversões S-T1 (vazia se sem S-T1).
+        Caller decide se vira `Minimize(sum(penalidades))` (legacy + Phase 1)
+        ou IntVar de soma + bound `<= optimal + slack` (Phase 2).
     """
     # H-P1: filtra o pool global por complexidade ANTES de montar o modelo.
     banco_nivel = filtrar_pool_por_nivel(banco, nivel_aluno)
@@ -388,6 +451,11 @@ def gerar_rotina_csp(
                 })
 
     # ── S-T1 (SOFT): inversões de tier-order dentro de cada grupo ───────────
+    # Lista de IntVars `viol` — caller decide se vira `Minimize(sum(viol))`
+    # (legacy + Phase 1) ou se vira IntVar de soma `var_total` + bound
+    # `<= optimal + slack` (Phase 2 da variedade). Modelar a soma fora deste
+    # helper preserva BYTE-A-BYTE o código antigo no branch legacy — sem
+    # IntVar extra muda a ordem de busca do CP-SAT.
     rank_max = max(TIER_RANK.values())
     penalidades = []
     for grupos_t in treinos:
@@ -398,15 +466,134 @@ def gerar_rotina_csp(
                     viol = model.NewIntVar(0, rank_max, f"viol_{sids[i]}_{sids[j]}")
                     model.Add(viol >= tier_rank[sids[j]] - tier_rank[sids[i]])
                     penalidades.append(viol)
-    if penalidades:
-        model.Minimize(sum(penalidades))
 
-    # ── Resolve ─────────────────────────────────────────────────────────────
+    return {
+        "model": model,
+        "assign": assign,
+        "slots_globais": slots_globais,
+        "treinos": treinos,
+        "grupo_por_idx": grupo_por_idx,
+        "h_r1_aplicadas": h_r1_aplicadas,
+        "penalidades": penalidades,
+    }
+
+
+def _decode_solucao(treinos: list[list[dict]], sid_to_cidx: dict[int, int]) -> list[dict]:
+    """Decodifica `{sid -> cidx}` na estrutura de saída `list[dict]` que
+    `gerar_rotina_csp` devolve em `resultado['treinos']`.
+
+    Compartilhado entre o branch legacy (extrai sid_to_cidx do solver) e
+    o branch variedade (extrai do callback). Garante mesma forma de saída.
+    """
+    out = []
+    for grupos_t in treinos:
+        treino_dict: dict = {"grupos": [], "ordem_global": []}
+        for g in grupos_t:
+            nivel, _escopo, qtd = g["demanda"]
+            exs = [g["pool"][sid_to_cidx[sid]] for sid in g["slot_ids"]]
+            treino_dict["grupos"].append({
+                "demanda": g["demanda"],
+                "exercicios": exs,
+                "pool_size": len(g["pool"]),
+                "h_t4_aplicado": nivel == "subregiao" and qtd == 1,
+                "h_t4_aplicado_efetivamente": g.get("h_t4_aplicado_efetivamente", False),
+            })
+            treino_dict["ordem_global"].extend(exs)
+        out.append(treino_dict)
+    return out
+
+
+class _SolucoesCollector(cp_model.CpSolverSolutionCallback):
+    """Callback que coleta todas as soluções enumeradas até `max_solucoes`.
+
+    Cada solução vira `(sid_to_cidx: dict[int, int], inversoes: int)`.
+    Aborta a busca com `StopSearch()` quando o cap é atingido — evita
+    explosão combinatória em rotinas subdeterminadas.
+    """
+
+    def __init__(
+        self,
+        assign: dict[tuple[int, int], cp_model.IntVar],
+        var_total_penalidade: Optional[cp_model.IntVar],
+        max_solucoes: int,
+    ) -> None:
+        super().__init__()
+        self._assign_por_sid: dict[int, list[tuple[int, object]]] = defaultdict(list)
+        for (sid, cidx), v in assign.items():
+            self._assign_por_sid[sid].append((cidx, v))
+        self._var_total = var_total_penalidade
+        self._max = max_solucoes
+        self.solucoes: list[dict[int, int]] = []
+        self.inversoes: list[int] = []
+
+    def on_solution_callback(self) -> None:
+        sol: dict[int, int] = {}
+        for sid, lst in self._assign_por_sid.items():
+            for cidx, v in lst:
+                if self.Value(v) == 1:
+                    sol[sid] = cidx
+                    break
+        self.solucoes.append(sol)
+        inv = int(self.Value(self._var_total)) if self._var_total is not None else 0
+        self.inversoes.append(inv)
+        if len(self.solucoes) >= self._max:
+            self.StopSearch()
+
+
+# ---------------------------------------------------------------------------
+# Engine CP-SAT — rotina inteira (N treinos negociados no mesmo modelo)
+# ---------------------------------------------------------------------------
+
+def gerar_rotina_csp(
+    demandas_por_treino: list[list[tuple[str, str, int]]],
+    banco: list[Exercicio],
+    nivel_aluno: int,
+    seed: int = 0,
+    variedade: Optional[ConfigVariedade] = None,
+) -> dict:
+    """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
+    negociam no mesmo modelo — necessário pra H-R1 cross-treino.
+
+    `demandas_por_treino[t]`: lista de (nivel, escopo, qtd) do treino t.
+    `banco`: lista já carregada (ativo=True). `nivel_aluno`: 1/2/3 (H-P1).
+    `seed`: semente do CP-SAT (afeta exploração de busca).
+    `variedade`: None preserva comportamento Fatia 2 P2 (1 solve com
+    Minimize, 1 solução determinística por seed). ConfigVariedade ativa
+    enumeração + softmax — ver docstring de ConfigVariedade.
+
+    Retorna dict com:
+      - top-level: `viavel`, `status`, `nivel_aluno`, `seed`, `solve_time`,
+        `inversoes_totais` (soma cross-treino de S-T1).
+      - `treinos: list[dict]` — cada treino tem `grupos`, `ordem_global`.
+      - `h_r1_aplicadas`: lista de aplicações H-R1 (com flag degraded).
+      - `variedade` (só quando ConfigVariedade ativa): metadados da
+        enumeração (n_solucoes, distancia_escolhida, optimal_value,
+        enumeracao_limitada, tempo por fase).
+    """
+    if variedade is None:
+        return _resolver_legacy(demandas_por_treino, banco, nivel_aluno, seed)
+    return _resolver_com_variedade(
+        demandas_por_treino, banco, nivel_aluno, seed, variedade,
+    )
+
+
+def _resolver_legacy(
+    demandas_por_treino: list[list[tuple[str, str, int]]],
+    banco: list[Exercicio],
+    nivel_aluno: int,
+    seed: int,
+) -> dict:
+    """Branch legado: 1 solve com Minimize → 1 solução determinística por
+    seed. Preserva byte-a-byte o comportamento da Fatia 2 P2."""
+    md = _construir_modelo(demandas_por_treino, banco, nivel_aluno)
+    if md["penalidades"]:
+        md["model"].Minimize(sum(md["penalidades"]))
+
     solver = cp_model.CpSolver()
     solver.parameters.random_seed = seed
     solver.parameters.randomize_search = True
     t0 = time.perf_counter()
-    status = solver.Solve(model)
+    status = solver.Solve(md["model"])
     solve_time = time.perf_counter() - t0
 
     status_nome = solver.StatusName(status)
@@ -418,35 +605,205 @@ def gerar_rotina_csp(
         "seed": seed,
         "solve_time": solve_time,
         "inversoes_totais": (
-            int(round(solver.ObjectiveValue())) if (penalidades and viavel) else 0
+            int(round(solver.ObjectiveValue()))
+            if (md["penalidades"] and viavel) else 0
         ),
-        "h_r1_aplicadas": h_r1_aplicadas,
+        "h_r1_aplicadas": md["h_r1_aplicadas"],
         "treinos": [],
     }
     if not viavel:
         return resultado
 
-    # ── Decodifica por treino ───────────────────────────────────────────────
-    for grupos_t in treinos:
-        treino_dict = {"grupos": [], "ordem_global": []}
-        for g in grupos_t:
-            nivel, escopo, qtd = g["demanda"]
-            exs = []
-            for sid in g["slot_ids"]:
-                for cidx, ex in enumerate(g["pool"]):
-                    if solver.Value(assign[(sid, cidx)]) == 1:
-                        exs.append(ex)
-                        break
-            treino_dict["grupos"].append({
-                "demanda": g["demanda"],
-                "exercicios": exs,
-                "pool_size": len(g["pool"]),
-                "h_t4_aplicado": nivel == "subregiao" and qtd == 1,
-                "h_t4_aplicado_efetivamente": g.get("h_t4_aplicado_efetivamente", False),
-            })
-            treino_dict["ordem_global"].extend(exs)
-        resultado["treinos"].append(treino_dict)
+    sid_to_cidx: dict[int, int] = {}
+    for s in md["slots_globais"]:
+        pool = md["grupo_por_idx"][(s["t_idx"], s["di"])]["pool"]
+        for cidx in range(len(pool)):
+            if solver.Value(md["assign"][(s["sid"], cidx)]) == 1:
+                sid_to_cidx[s["sid"]] = cidx
+                break
+    resultado["treinos"] = _decode_solucao(md["treinos"], sid_to_cidx)
     return resultado
+
+
+def _resolver_com_variedade(
+    demandas_por_treino: list[list[tuple[str, str, int]]],
+    banco: list[Exercicio],
+    nivel_aluno: int,
+    seed: int,
+    variedade: ConfigVariedade,
+) -> dict:
+    """Branch variedade (Frente B Fatia 3): 2 fases.
+
+    Phase 1 (solver com Minimize): descobre `optimal` = valor mínimo da
+    função objetivo (nº de inversões de S-T1).
+
+    Phase 2 (modelo reconstruído, sem Minimize): cria IntVar `var_total`
+    = sum(penalidades), adiciona bound `var_total <= optimal + slack`,
+    ativa `enumerate_all_solutions`, coleta soluções via callback até
+    `max_solucoes`. Softmax sobre as
+    soluções coletadas: peso = exp(-(inversoes - optimal) / temperatura).
+    Amostra uma com `random.Random(python_seed)`.
+    """
+    # ── Phase 1: descobre o ótimo ───────────────────────────────────────────
+    md1 = _construir_modelo(demandas_por_treino, banco, nivel_aluno)
+    if md1["penalidades"]:
+        md1["model"].Minimize(sum(md1["penalidades"]))
+
+    solver1 = cp_model.CpSolver()
+    solver1.parameters.random_seed = seed
+    solver1.parameters.randomize_search = True
+    t0 = time.perf_counter()
+    status1 = solver1.Solve(md1["model"])
+    time_p1 = time.perf_counter() - t0
+
+    viavel_p1 = status1 in (cp_model.OPTIMAL, cp_model.FEASIBLE)
+    if not viavel_p1:
+        return {
+            "status": solver1.StatusName(status1),
+            "viavel": False,
+            "nivel_aluno": nivel_aluno,
+            "seed": seed,
+            "solve_time": time_p1,
+            "inversoes_totais": 0,
+            "h_r1_aplicadas": md1["h_r1_aplicadas"],
+            "treinos": [],
+            "variedade": _meta_variedade(variedade, n=0, dist=None, opt=None,
+                                         lim=False, t1=time_p1, t2=0.0),
+        }
+
+    optimal = (
+        int(round(solver1.ObjectiveValue()))
+        if md1["penalidades"] else 0
+    )
+
+    # ── Phase 2: enumera dentro do slack ────────────────────────────────────
+    # IntVar `var_total` criado AQUI (não no helper) porque só esta fase
+    # precisa de bound `<= optimal + slack` + leitura via callback.
+    md2 = _construir_modelo(demandas_por_treino, banco, nivel_aluno)
+    var_total: Optional[cp_model.IntVar] = None
+    if md2["penalidades"]:
+        teto = max(TIER_RANK.values()) * len(md2["penalidades"])
+        var_total = md2["model"].NewIntVar(0, teto, "var_total")
+        md2["model"].Add(var_total == sum(md2["penalidades"]))
+        md2["model"].Add(var_total <= optimal + variedade.slack)
+
+    collector = _SolucoesCollector(
+        md2["assign"], var_total, variedade.max_solucoes,
+    )
+    solver2 = cp_model.CpSolver()
+    solver2.parameters.random_seed = seed
+    solver2.parameters.enumerate_all_solutions = True
+    # enumerate_all_solutions exige busca single-thread (auto-imposto em
+    # versões modernas, mas setamos explicitamente pra evitar warnings).
+    solver2.parameters.num_search_workers = 1
+    t0 = time.perf_counter()
+    solver2.Solve(md2["model"], collector)
+    time_p2 = time.perf_counter() - t0
+
+    if not collector.solucoes:
+        # Inesperado: Phase 1 viável mas Phase 2 não enumerou nada.
+        # Fallback pro modo legado (não bloqueia o caller).
+        return _resolver_legacy(demandas_por_treino, banco, nivel_aluno, seed) | {
+            "variedade": _meta_variedade(variedade, n=0, dist=None, opt=optimal,
+                                         lim=False, t1=time_p1, t2=time_p2),
+        }
+
+    distancias = [inv - optimal for inv in collector.inversoes]
+
+    # ── Frente 2: Hamming ponderado por tier vs referência ──────────────────
+    # Referência = 1ª solução enumerada. Pra cada solução k, soma sobre slots
+    # de `ref_tier_rank[s] * (k[s] != ref[s])`. Mudar slot Principal (rank=3)
+    # custa 3× mais que mudar Acessório (rank=1). Score final do softmax:
+    # peso = exp(-(distancia_objetivo + alpha_tier * H) / T).
+    # `alpha_tier == 0` (default) zera H → comportamento Frente 1 puro.
+    if variedade.alpha_tier > 0 and collector.solucoes:
+        ref_sol = collector.solucoes[0]
+        # Tier rank por slot na referência (consulta pool via grupo_por_idx).
+        ref_tier_rank: dict[int, int] = {}
+        for sid, cidx_ref in ref_sol.items():
+            slot_info = next(s for s in md2["slots_globais"] if s["sid"] == sid)
+            pool = md2["grupo_por_idx"][(slot_info["t_idx"], slot_info["di"])]["pool"]
+            ref_tier_rank[sid] = _tier_rank(pool[cidx_ref])
+        hamming = []
+        for sol_k in collector.solucoes:
+            h = sum(
+                ref_tier_rank[sid]
+                for sid, cidx_k in sol_k.items()
+                if cidx_k != ref_sol[sid]
+            )
+            hamming.append(h)
+    else:
+        hamming = [0] * len(collector.solucoes)
+
+    # Softmax numericamente estável (subtrai max log antes do exp).
+    # Score composto: distancia objetivo + alpha_tier * Hamming ponderado.
+    pesos_log = [
+        -(d + variedade.alpha_tier * h) / variedade.temperatura
+        for d, h in zip(distancias, hamming)
+    ]
+    max_log = max(pesos_log)
+    exps = [math.exp(lp - max_log) for lp in pesos_log]
+    total_w = sum(exps)
+    pesos = [e / total_w for e in exps]
+
+    rng = random.Random(variedade.python_seed)
+    chosen_idx = rng.choices(range(len(collector.solucoes)), weights=pesos, k=1)[0]
+    chosen_sol = collector.solucoes[chosen_idx]
+    chosen_inv = collector.inversoes[chosen_idx]
+    chosen_dist = distancias[chosen_idx]
+    chosen_hamming = hamming[chosen_idx]
+
+    return {
+        "status": solver1.StatusName(status1),
+        "viavel": True,
+        "nivel_aluno": nivel_aluno,
+        "seed": seed,
+        "solve_time": time_p1 + time_p2,
+        "inversoes_totais": chosen_inv,
+        "h_r1_aplicadas": md2["h_r1_aplicadas"],
+        "treinos": _decode_solucao(md2["treinos"], chosen_sol),
+        "variedade": _meta_variedade(
+            variedade,
+            n=len(collector.solucoes),
+            dist=chosen_dist,
+            opt=optimal,
+            lim=len(collector.solucoes) >= variedade.max_solucoes,
+            t1=time_p1, t2=time_p2,
+            hamming=chosen_hamming,
+        ),
+    }
+
+
+def _meta_variedade(
+    cfg: ConfigVariedade,
+    n: int,
+    dist: Optional[int],
+    opt: Optional[int],
+    lim: bool,
+    t1: float,
+    t2: float,
+    hamming: Optional[int] = None,
+) -> dict:
+    """Empacota os metadados da enumeração no dict de retorno.
+
+    `hamming` (Frente 2): Hamming ponderado por tier da solução escolhida
+    em relação à 1ª enumerada (referência). None se alpha_tier=0.
+    """
+    return {
+        "ativa": True,
+        "slack": cfg.slack,
+        "temperatura": cfg.temperatura,
+        "max_solucoes": cfg.max_solucoes,
+        "python_seed": cfg.python_seed,
+        "alpha_tier": cfg.alpha_tier,
+        "n_solucoes_enumeradas": n,
+        "distancia_escolhida": dist,
+        "optimal_value": opt,
+        "enumeracao_limitada": lim,
+        "hamming_ponderado_escolhido": hamming,
+        "tempo_phase_1": t1,
+        "tempo_phase_2": t2,
+    }
 
 
 def gerar_treino_csp(
@@ -454,16 +811,23 @@ def gerar_treino_csp(
     banco: list[Exercicio],
     nivel_aluno: int,
     seed: int = 0,
+    variedade: Optional[ConfigVariedade] = None,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
     Devolve dict no formato antigo (chaves `grupos`, `ordem_global`,
     `inversoes` top-level). H-R1 vai disparar se a demanda atender o
     min_slots — pode mudar o resultado vs Fatia 1.
+
+    `variedade` é repassado pra `gerar_rotina_csp` (Frente B Fatia 3).
+    Quando ativo, a saída ganha a chave `variedade` com metadados da
+    enumeração.
     """
-    rotina = gerar_rotina_csp([demandas], banco, nivel_aluno, seed)
+    rotina = gerar_rotina_csp(
+        [demandas], banco, nivel_aluno, seed, variedade=variedade,
+    )
     if not rotina["viavel"]:
-        return {
+        out = {
             "status": rotina["status"],
             "viavel": False,
             "nivel_aluno": nivel_aluno,
@@ -473,8 +837,11 @@ def gerar_treino_csp(
             "grupos": [],
             "ordem_global": [],
         }
+        if "variedade" in rotina:
+            out["variedade"] = rotina["variedade"]
+        return out
     t0 = rotina["treinos"][0]
-    return {
+    out = {
         "status": rotina["status"],
         "viavel": True,
         "nivel_aluno": nivel_aluno,
@@ -485,6 +852,9 @@ def gerar_treino_csp(
         "ordem_global": t0["ordem_global"],
         "h_r1_aplicadas": rotina["h_r1_aplicadas"],
     }
+    if "variedade" in rotina:
+        out["variedade"] = rotina["variedade"]
+    return out
 
 
 # ---------------------------------------------------------------------------
