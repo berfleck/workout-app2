@@ -22,26 +22,28 @@ Estado **final** da coluna `tier` no XLSX após curadoria manual do Bernardo sob
 | Tier | Quantidade | % |
 |---|---:|---:|
 | Principal | 52 | 35.4% |
-| Intermediário | 26 | 17.7% |
-| Acessório | 69 | 46.9% |
+| Intermediário | 27 | 18.4% |
+| Acessório | 68 | 46.3% |
 | **Total** | **147** | **100.0%** |
+
+> **Update 2026-05-23 (Parte 2)** — Nordic Curl movido de Acessório → Intermediário antes do wire da coluna `tier` no `gerador_csp.py`. Decisão tomada ao olhar resultado de S-T1 no Cenário 2. Acessório 69→68, Intermediário 26→27.
 
 ## Delta vs heurística
 
-A heurística (`purpose + padrão é âncora + subregião`) pré-preencheu 84 Principal / 0 Intermediário / 63 Acessório. A curadoria humana fez **42 ajustes** (28.6% do banco).
+A heurística (`purpose + padrão é âncora + subregião`) pré-preencheu 84 Principal / 0 Intermediário / 63 Acessório. A curadoria humana fez **43 ajustes** (29.3% do banco — 42 da Parte 1 + 1 ajuste pós-Parte 1).
 
 ### Tabela-resumo das transições
 
 | De → Para | Quantidade |
 |---|---:|
-| Acessório → Intermediário | 8 |
+| Acessório → Intermediário | 9 |
 | Acessório → Principal | 1 |
 | Principal → Acessório | 15 |
 | Principal → Intermediário | 18 |
 
 ### Cada transição em detalhe
 
-#### Acessório → Intermediário (8)
+#### Acessório → Intermediário (9)
 
 | Subregião | Padrão | Exercício | purpose |
 |---|---|---|---|
@@ -53,6 +55,7 @@ A heurística (`purpose + padrão é âncora + subregião`) pré-preencheu 84 Pr
 | ombro | ombro_isolado | Elevação Lateral Sentado | isolation |
 | perna_posterior | knee_flexion | Flexão Joelhos Feijão | isolation |
 | perna_posterior | knee_flexion | Flexão Joelhos Slide | isolation |
+| perna_posterior | knee_flexion | Nordic Curl | isolation |
 
 #### Acessório → Principal (1)
 
@@ -174,7 +177,7 @@ A heurística (`purpose + padrão é âncora + subregião`) pré-preencheu 84 Pr
 | Principal | perna_posterior | hinge | Stiff Uni. Smith | compound |  |
 | Principal | cardio | cardio | Air Bike (Sprint) | explosive | inativo |
 
-### Intermediário (26)
+### Intermediário (27)
 
 | Tier | Subregião | Padrão | Exercício | Purpose | Notas |
 |---|---|---|---|---|---|
@@ -204,8 +207,9 @@ A heurística (`purpose + padrão é âncora + subregião`) pré-preencheu 84 Pr
 | Intermediário | perna_posterior | hinge | Lev. Terra Anilha | compound | curado de Principal |
 | Intermediário | perna_posterior | knee_flexion | Flexão Joelhos Feijão | isolation | curado de Acessório |
 | Intermediário | perna_posterior | knee_flexion | Flexão Joelhos Slide | isolation | curado de Acessório |
+| Intermediário | perna_posterior | knee_flexion | Nordic Curl | isolation | curado de Acessório (2026-05-23, Parte 2) |
 
-### Acessório (69)
+### Acessório (68)
 
 | Tier | Subregião | Padrão | Exercício | Purpose | Notas |
 |---|---|---|---|---|---|
@@ -247,7 +251,6 @@ A heurística (`purpose + padrão é âncora + subregião`) pré-preencheu 84 Pr
 | Acessório | perna_posterior | hinge | Ponte Uni. Caixa | isolation |  |
 | Acessório | perna_posterior | hinge | Ponte Unilateral | isolation |  |
 | Acessório | perna_posterior | knee_flexion | Cadeira Flexora | isolation |  |
-| Acessório | perna_posterior | knee_flexion | Nordic Curl | isolation |  |
 | Acessório | adutores | adduction | Adução Polia | isolation |  |
 | Acessório | adutores | adduction | Copenhagen Adduction | isolation |  |
 | Acessório | panturrilha | flexao_plantar | Elevação De Panturrilha Em Pé | isolation |  |

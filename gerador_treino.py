@@ -911,6 +911,11 @@ class Exercicio:
     # Flag operacional — False exclui o exercício de todas as gerações.
     # Default True; XLSX vazio = ativo. Fase 4 cadastra.
     ativo: bool = True
+    # Tier clínico curado (Fatia 2 Parte 1, 2026-05-23): Principal /
+    # Intermediário / Acessório. Consumido pelo gerador_csp (H-T4, S-T1).
+    # Default "" (vazio) preserva retrocompat com fixtures legacy que constroem
+    # Exercicio direto. XLSX real tem coluna `tier` 100% preenchida pós-Parte 1.
+    tier: str = ""
     # Rationale da decisão (Etapa 8 — Explicabilidade). Default None;
     # populado em `_selecionar_cand_score_aware` para o exercício escolhido.
     # Estrutura em `_montar_rationale`.
@@ -1036,6 +1041,7 @@ def carregar_banco(path: str) -> list[Exercicio]:
             equipamento_grupo=_str(row.get("equipamento_grupo")) or None,
             variante_pontual=_bool_xlsx(row.get("variante_pontual"), False),
             ativo=_bool_xlsx(row.get("ativo"), True),
+            tier=_str(row.get("tier")),
         ))
     return exercicios
 

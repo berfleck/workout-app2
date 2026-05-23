@@ -1,16 +1,20 @@
 # gerador_csp.py
-# Spike Fatia 1 do MVP - 2026-05-21
+# MVP do refator declarativo - 2026-05-21 (Fatia 1) / 2026-05-23 (Fatia 2 Parte 2)
 # Engine declarativa minimalista usando CP-SAT do OR-Tools.
 #
 # Implementa (do catalogo_constraints.md):
-#   - H-T4 (vaga única => composto/principal, NÃO Acessório)
-#   - S-T1 (tier-order: tier alto antes de tier baixo na ordem do treino)
-#   - H-P1 (nível técnico do aluno filtra pool por complexidade)
-# Filtra: ativo=True no load (mesmo padrão do gerador_treino.py antigo).
-# Tier: heurística TEMPORÁRIA derivada de purpose+padrão (substituir na
-#       Fatia 2 por leitura de coluna `tier` cadastrada manualmente).
+#   - H-T1 (mesma família refinada não repete no treino) [Fatia 2 P2]
+#   - H-T2 (variante pontual cross-família same-subregião) [Fatia 2 P2]
+#   - H-T3 (lateralidade contextual em costas) [Fatia 2 P2]
+#   - H-T4 (vaga única na subregião ⇒ tier ≠ Acessório) [Fatia 1]
+#   - H-R1 (cobertura de eixos via compostos cross-treino) [Fatia 2 P2]
+#   - H-P1 (nível técnico do aluno filtra pool por complexidade) [Fatia 1]
+#   - S-T1 (tier-order: tier alto antes de tier baixo na ordem do treino) [Fatia 1]
+# Filtra: ativo=True no load (gerador_treino.carregar_banco descarta).
+# Tier: coluna `tier` curada manualmente no XLSX (Fatia 2 Parte 1, 2026-05-23).
 #
-# Roda em PARALELO ao gerador_treino.py antigo. NÃO toca no antigo.
+# Roda em PARALELO ao gerador_treino.py antigo (apenas o campo `tier` foi
+# adicionado ao dataclass `Exercicio` + populado em `carregar_banco`).
 
 from __future__ import annotations
 
@@ -19,14 +23,16 @@ from collections import defaultdict
 
 from ortools.sat.python import cp_model
 
-# Reusa o banco/dataclass/âncoras do gerador antigo SEM modificá-lo.
-# carregar_banco() já filtra ativo=True (gerador_treino.py:991).
+# Reusa o banco/dataclass do gerador antigo. carregar_banco filtra ativo=True
+# e popula `tier` desde a Fatia 2 Parte 2.
 from gerador_treino import (
     Exercicio,
     carregar_banco,
+    PADRAO_PARA_SUBREGIAO,
     XLSX_PATH,
-    ANCORAS_POR_SUBREGIAO,
 )
+# H-T3 reusa a configuração canônica de subregiões com lateralidade hard.
+from pesos_proximidade import SUBREGIOES_LATERALIDADE_HARD
 
 
 # ---------------------------------------------------------------------------
@@ -45,73 +51,14 @@ TIER_RANK: dict[str, int] = {
     TIER_ACESSORIO: 1,
 }
 
-# Conjunto canônico de "padrões âncora" derivado de ANCORAS_POR_SUBREGIAO
-# do gerador_treino.py. Decisão fechada com Bernardo (2026-05-22): um padrão
-# é âncora ⟺ APARECE em ANCORAS_POR_SUBREGIAO (qualquer obrigatoriedade).
-#
-# Por que membership e não obrigatoria=True: a estrutura SE CHAMA "âncoras" —
-# tudo nela já é âncora; `obrigatoria` é sub-propriedade (must-have vs opcional),
-# ortogonal a tier. Usar obrigatoria=True rebaixaria `squat_unilateral`
-# (compound) para Intermediário — criando hierarquia bilateral>unilateral que
-# NÃO deve existir clinicamente. `squat_unilateral` é, aliás, o ÚNICO padrão
-# obrigatoria=False com exercícios compound (os demais — empurrar_isolados,
-# ombro_isolado, posterior_ombro, knee_flexion, abduction — são isolation e
-# já caem em Acessório pela regra anterior). Logo membership ≡ "obrigatoria=True
-# + exceção squat_unilateral", só que sem caso especial hardcoded.
-#
-# NÃO é lista paralela — é derivado da fonte canônica do gerador antigo.
-PADROES_ANCORA: frozenset[str] = frozenset(
-    a["padrao"]
-    for ancoras in ANCORAS_POR_SUBREGIAO.values()
-    for a in ancoras
-)
 
+def _tier_rank(exercicio: Exercicio) -> int:
+    """Rank numérico do tier curado. Default 1 (= Acessório) se vazio.
 
-def _padrao_e_ancora(padrao: str) -> bool:
-    """Padrão é âncora? (= aparece em ANCORAS_POR_SUBREGIAO).
-
-    Fonte canônica: gerador_treino.ANCORAS_POR_SUBREGIAO. Ver PADROES_ANCORA.
+    Banco real (XLSX) tem `tier` 100% preenchido pós-Fatia 2 Parte 1; o
+    fallback é só pra fixtures legacy que constroem Exercicio direto.
     """
-    return padrao in PADROES_ANCORA
-
-
-# ┌─────────────────────────────────────────────────────────────────────┐
-# │ TEMPORÁRIA — substituir na Fatia 2 por leitura da coluna `tier`      │
-# │ cadastrada manualmente no XLSX. Esta heurística deriva tier de       │
-# │ purpose + padrão como andaime pro spike rodar sem cadastro.          │
-# └─────────────────────────────────────────────────────────────────────┘
-def derivar_tier_heuristico(exercicio: Exercicio) -> str:
-    """Deriva tier (Principal/Intermediário/Acessório) por heurística.
-
-    ⚠️ TEMPORÁRIA (Fatia 1). A coluna `tier` cadastrada à mão na Fatia 2
-    substitui esta função inteira. purpose e tier são ortogonais — esta
-    heurística é só uma aproximação inicial (ex: Hip Thrust=isolation cai
-    em Acessório; refinamento clínico previsto na Fatia 2).
-
-    Regras (cobrindo os 4 valores de purpose do banco):
-      compound  + padrão É âncora    → Principal
-      compound  + padrão NÃO é âncora → Intermediário
-      isolation                       → Acessório
-      stability + subregião core      → Principal (dentro de core)
-      stability + subregião não-core  → Acessório (fallback)
-      explosive                       → Principal (raro; só Agach. Lateral ativo)
-    """
-    purpose = (exercicio.purpose or "").strip().lower()
-
-    if purpose == "compound":
-        return TIER_PRINCIPAL if _padrao_e_ancora(exercicio.padrao) else TIER_INTERMEDIARIO
-    if purpose == "isolation":
-        return TIER_ACESSORIO
-    if purpose == "stability":
-        if (exercicio.subregiao or "").startswith("core"):
-            return TIER_PRINCIPAL
-        return TIER_ACESSORIO
-    if purpose == "explosive":
-        return TIER_PRINCIPAL
-
-    # purpose vazio/desconhecido: degrau mais baixo (não some do pool, mas
-    # nunca ocupa vaga única — H-T4 trata).
-    return TIER_ACESSORIO
+    return TIER_RANK.get(exercicio.tier, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -183,88 +130,274 @@ def _pool_da_demanda(banco: list[Exercicio], nivel: str, escopo: str) -> list[Ex
     return []
 
 
-def gerar_treino_csp(
-    demandas: list[tuple[str, str, int]],
+# ---------------------------------------------------------------------------
+# H-R1 — Cobertura de eixos via compostos cross-treino
+# ---------------------------------------------------------------------------
+#
+# Decisão fechada com Bernardo (2026-05-23): H-R1 usa `purpose == "compound"`
+# (composição biomecânica), NÃO `tier != Acessório` (centralidade clínica
+# curada). Tier e purpose são ortogonais — Apoio é Intermediário curado mas
+# composto biomecânico, conta como cobertura horizontal de peito. Hip Thrust
+# é Principal mas isolation, NÃO conta como composto.
+#
+# Cada regra: subregião precisa de N >= min_slots slots na ROTINA pra ativar.
+# Aí, pra cada eixo, soma de assign nos slots de subregião == X >= 1.
+
+H_R1_REGRAS: dict[str, dict] = {
+    "costas": {
+        "min_slots": 2,
+        "eixos": [
+            ("puxadas_composto",
+             lambda e: e.padrao == "puxadas" and e.purpose == "compound"),
+            ("remadas_composto",
+             lambda e: e.padrao == "remadas" and e.purpose == "compound"),
+        ],
+    },
+    "peito": {
+        "min_slots": 2,
+        "eixos": [
+            ("horizontal_composto",
+             lambda e: e.padrao == "empurrar_compostos" and e.purpose == "compound"),
+        ],
+    },
+    "perna_anterior": {
+        "min_slots": 2,
+        "eixos": [
+            ("bilateral_composto",
+             lambda e: (e.subregiao == "perna_anterior"
+                        and e.unilateral == "bilateral"
+                        and e.purpose == "compound")),
+            ("unilateral_composto",
+             lambda e: (e.subregiao == "perna_anterior"
+                        and e.unilateral == "unilateral"
+                        and e.purpose == "compound")),
+        ],
+    },
+}
+
+
+def _subregioes_da_demanda(nivel: str, escopo: str) -> set[str]:
+    """Subregiões que uma demanda DETERMINISTICAMENTE contribui.
+
+    - `subregiao`: trivialmente {escopo}.
+    - `padrao`: via mapa canônico `PADRAO_PARA_SUBREGIAO` do gerador antigo
+      (1:N pós-Etapa 8 — padrões CORE refinados retornam set de 2). Se 1:N,
+      H-R1 ignora (slot não tem subregião determinística pré-solver).
+    - `regiao`: ignorada (não modelado na Fatia 2 P2).
+    """
+    if nivel == "subregiao":
+        return {escopo}
+    if nivel == "padrao":
+        subs = PADRAO_PARA_SUBREGIAO.get(escopo, set())
+        return subs if len(subs) == 1 else set()
+    return set()
+
+
+# ---------------------------------------------------------------------------
+# Engine CP-SAT — rotina inteira (N treinos negociados no mesmo modelo)
+# ---------------------------------------------------------------------------
+
+def gerar_rotina_csp(
+    demandas_por_treino: list[list[tuple[str, str, int]]],
     banco: list[Exercicio],
     nivel_aluno: int,
     seed: int = 0,
 ) -> dict:
-    """Resolve um treino via CP-SAT. Devolve dict estruturado (ver imprimir_resultado).
+    """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
+    negociam no mesmo modelo — necessário pra H-R1 cross-treino.
 
-    `demandas`: lista de (nivel, escopo, qtd). `banco`: lista já carregada
-    (ativo=True). `nivel_aluno`: 1/2/3 (filtra pool por complexidade — H-P1).
-    `seed`: semente do solver (pra observar determinismo vs variedade).
+    `demandas_por_treino[t]`: lista de (nivel, escopo, qtd) do treino t.
+    `banco`: lista já carregada (ativo=True). `nivel_aluno`: 1/2/3 (H-P1).
+    `seed`: semente do solver.
+
+    Retorna dict com:
+      - top-level: `viavel`, `status`, `nivel_aluno`, `seed`, `solve_time`,
+        `inversoes_totais` (soma cross-treino de S-T1).
+      - `treinos: list[dict]` — cada treino tem `grupos`, `ordem_global`,
+        `inversoes`.
     """
     # H-P1: filtra o pool global por complexidade ANTES de montar o modelo.
     banco_nivel = filtrar_pool_por_nivel(banco, nivel_aluno)
 
     model = cp_model.CpModel()
 
-    # ── Monta grupos (1 por demanda) e slots (qtd por grupo) ────────────────
-    grupos: list[dict] = []
-    slots: list[dict] = []
-    for di, (nivel, escopo, qtd) in enumerate(demandas):
-        pool = _pool_da_demanda(banco_nivel, nivel, escopo)
-        g = {"di": di, "demanda": (nivel, escopo, qtd), "pool": pool, "slot_ids": []}
-        grupos.append(g)
-        for _pos in range(qtd):
-            sid = len(slots)
-            slots.append({"sid": sid, "di": di})
-            g["slot_ids"].append(sid)
+    # ── Monta treinos → grupos → slots (sid_global único cross-treino) ──────
+    treinos: list[list[dict]] = []
+    slots_globais: list[dict] = []
+    for t_idx, demandas in enumerate(demandas_por_treino):
+        grupos_t: list[dict] = []
+        for di, (nivel, escopo, qtd) in enumerate(demandas):
+            pool = _pool_da_demanda(banco_nivel, nivel, escopo)
+            g = {
+                "t_idx": t_idx, "di": di,
+                "demanda": (nivel, escopo, qtd),
+                "pool": pool, "slot_ids": [],
+            }
+            grupos_t.append(g)
+            for _pos in range(qtd):
+                sid = len(slots_globais)
+                slots_globais.append({"sid": sid, "t_idx": t_idx, "di": di})
+                g["slot_ids"].append(sid)
+        treinos.append(grupos_t)
 
-    # ── Variáveis de atribuição: assign[(sid, cidx)] ────────────────────────
+    # Lookup grupo por (t_idx, di) pra uso nas constraints.
+    grupo_por_idx: dict[tuple[int, int], dict] = {
+        (g["t_idx"], g["di"]): g for grupos_t in treinos for g in grupos_t
+    }
+
+    # ── assign[(sid, cidx)] + AddExactlyOne por slot ────────────────────────
     assign: dict[tuple[int, int], cp_model.IntVar] = {}
-    for s in slots:
-        pool = grupos[s["di"]]["pool"]
+    for s in slots_globais:
+        pool = grupo_por_idx[(s["t_idx"], s["di"])]["pool"]
         bvars = []
         for cidx in range(len(pool)):
-            b = model.NewBoolVar(f"a_s{s['sid']}_c{cidx}")
+            b = model.NewBoolVar(f"a_t{s['t_idx']}_s{s['sid']}_c{cidx}")
             assign[(s["sid"], cidx)] = b
             bvars.append(b)
         if bvars:
-            model.AddExactlyOne(bvars)  # cada slot = exatamente 1 exercício
+            model.AddExactlyOne(bvars)
 
-    # ── AllDifferent global (por nome do exercício) ─────────────────────────
+    # ── AllDifferent global (por nome do exercício) — cross-treino.
+    # Mantém comportamento do gerador antigo (nomes_exatos_globais).
     por_nome: dict[str, list] = defaultdict(list)
-    for s in slots:
-        pool = grupos[s["di"]]["pool"]
+    for s in slots_globais:
+        pool = grupo_por_idx[(s["t_idx"], s["di"])]["pool"]
         for cidx, ex in enumerate(pool):
             por_nome[ex.nome].append(assign[(s["sid"], cidx)])
     for vars_do_nome in por_nome.values():
         if len(vars_do_nome) > 1:
             model.AddAtMostOne(vars_do_nome)
 
-    # ── tier_rank por slot (IntVar = soma assign × rank) ────────────────────
+    # ── H-T1 / H-T2 / H-T3 (HARD intra-treino): aplicam por t_idx ──────────
+    for t_idx, grupos_t in enumerate(treinos):
+        slots_do_treino = [s for s in slots_globais if s["t_idx"] == t_idx]
+
+        # H-T1: mesma família refinada (variacao_de) — predicado clássico
+        # `cand.variacao_de == outro.variacao_de` ambos não-vazios.
+        por_familia: dict[str, list] = defaultdict(list)
+        for s in slots_do_treino:
+            pool = grupo_por_idx[(t_idx, s["di"])]["pool"]
+            for cidx, ex in enumerate(pool):
+                if ex.variacao_de:
+                    por_familia[ex.variacao_de].append(assign[(s["sid"], cidx)])
+        for vars_da_familia in por_familia.values():
+            if len(vars_da_familia) > 1:
+                model.AddAtMostOne(vars_da_familia)
+
+        # H-T2: variante_pontual cross-família same-subregião.
+        vp_por_subregiao: dict[str, list] = defaultdict(list)
+        for s in slots_do_treino:
+            pool = grupo_por_idx[(t_idx, s["di"])]["pool"]
+            for cidx, ex in enumerate(pool):
+                if ex.variante_pontual:
+                    vp_por_subregiao[ex.subregiao].append(
+                        (assign[(s["sid"], cidx)], ex.variacao_de)
+                    )
+        for lista in vp_por_subregiao.values():
+            for i in range(len(lista)):
+                var_a, fam_a = lista[i]
+                for j in range(i + 1, len(lista)):
+                    var_b, fam_b = lista[j]
+                    if fam_a != fam_b:
+                        model.AddAtMostOne([var_a, var_b])
+
+        # H-T3: lateralidade contextual (costas).
+        uni_por_subregiao: dict[str, list] = defaultdict(list)
+        for s in slots_do_treino:
+            pool = grupo_por_idx[(t_idx, s["di"])]["pool"]
+            for cidx, ex in enumerate(pool):
+                if (
+                    ex.unilateral == "unilateral"
+                    and ex.subregiao in SUBREGIOES_LATERALIDADE_HARD
+                ):
+                    uni_por_subregiao[ex.subregiao].append(assign[(s["sid"], cidx)])
+        for vars_uni in uni_por_subregiao.values():
+            if len(vars_uni) > 1:
+                model.AddAtMostOne(vars_uni)
+
+    # ── tier_rank por slot (IntVar = soma assign × rank) — usado por S-T1 ───
     tier_rank: dict[int, cp_model.IntVar] = {}
-    for s in slots:
-        pool = grupos[s["di"]]["pool"]
-        ranks = [TIER_RANK[derivar_tier_heuristico(ex)] for ex in pool]
+    for s in slots_globais:
+        pool = grupo_por_idx[(s["t_idx"], s["di"])]["pool"]
+        ranks = [_tier_rank(ex) for ex in pool]
         lo, hi = (min(ranks), max(ranks)) if ranks else (0, 0)
-        tr = model.NewIntVar(lo, hi, f"tier_s{s['sid']}")
+        tr = model.NewIntVar(lo, hi, f"tier_t{s['t_idx']}_s{s['sid']}")
         model.Add(tr == sum(assign[(s["sid"], c)] * ranks[c] for c in range(len(pool))))
         tier_rank[s["sid"]] = tr
 
-    # ── H-T4 (HARD): subregião + qtd==1 ⇒ não-Acessório ─────────────────────
-    for g in grupos:
-        nivel, escopo, qtd = g["demanda"]
-        if nivel == "subregiao" and qtd == 1:
-            sid = g["slot_ids"][0]
-            for cidx, ex in enumerate(g["pool"]):
-                if derivar_tier_heuristico(ex) == TIER_ACESSORIO:
-                    model.Add(assign[(sid, cidx)] == 0)
+    # ── H-T4 (HARD, graceful degradation): por grupo, scoped ao treino ──────
+    for grupos_t in treinos:
+        for g in grupos_t:
+            nivel, escopo, qtd = g["demanda"]
+            if nivel == "subregiao" and qtd == 1:
+                tem_nao_acessorio = any(ex.tier != TIER_ACESSORIO for ex in g["pool"])
+                if tem_nao_acessorio:
+                    sid = g["slot_ids"][0]
+                    for cidx, ex in enumerate(g["pool"]):
+                        if ex.tier == TIER_ACESSORIO:
+                            model.Add(assign[(sid, cidx)] == 0)
+                g["h_t4_aplicado_efetivamente"] = tem_nao_acessorio
+
+    # ── H-R1 (HARD cross-treino): cobertura de eixos via compostos ──────────
+    # Conta slots por subregião na ROTINA INTEIRA (via demandas DETERMINÍSTICAS:
+    # nivel=subregiao OU padrao→subregião 1:1). Se ≥ min_slots, exige cobertura
+    # por eixo: soma das vars assign sobre candidatos que satisfazem o
+    # predicado do eixo, sobre TODOS os slots da rotina cujo grupo declara
+    # essa subregião, deve ser ≥ 1.
+    slots_por_subregiao_rotina: dict[str, list[int]] = defaultdict(list)
+    for grupos_t in treinos:
+        for g in grupos_t:
+            nivel, escopo, qtd = g["demanda"]
+            subs_demanda = _subregioes_da_demanda(nivel, escopo)
+            if len(subs_demanda) == 1:
+                (sub,) = subs_demanda
+                slots_por_subregiao_rotina[sub].extend(g["slot_ids"])
+
+    # Decisão fechada (Bernardo, 2026-05-23): graceful degradation quando
+    # pool não tem candidato pra um eixo (caso real: nível 1 iniciante +
+    # perna_anterior, sem unilateral composto disponível). Eixo é pulado
+    # e marcado `degraded=True` — UI deve sinalizar ao usuário.
+    h_r1_aplicadas: list[dict] = []
+    for sub, regra in H_R1_REGRAS.items():
+        sids_da_sub = slots_por_subregiao_rotina.get(sub, [])
+        if len(sids_da_sub) < regra["min_slots"]:
+            continue
+        for label, predicado in regra["eixos"]:
+            termos = []
+            for sid in sids_da_sub:
+                slot_info = next(s for s in slots_globais if s["sid"] == sid)
+                pool = grupo_por_idx[(slot_info["t_idx"], slot_info["di"])]["pool"]
+                for cidx, ex in enumerate(pool):
+                    if predicado(ex):
+                        termos.append(assign[(sid, cidx)])
+            if termos:
+                model.Add(sum(termos) >= 1)
+                h_r1_aplicadas.append({
+                    "subregiao": sub, "eixo": label,
+                    "n_termos": len(termos),
+                    "n_slots": len(sids_da_sub),
+                    "degraded": False,
+                })
+            else:
+                h_r1_aplicadas.append({
+                    "subregiao": sub, "eixo": label,
+                    "n_termos": 0,
+                    "n_slots": len(sids_da_sub),
+                    "degraded": True,
+                    "motivo": "pool sem candidato (provavelmente filtrado por H-P1)",
+                })
 
     # ── S-T1 (SOFT): inversões de tier-order dentro de cada grupo ───────────
     rank_max = max(TIER_RANK.values())
     penalidades = []
-    for g in grupos:
-        sids = g["slot_ids"]
-        for i in range(len(sids)):
-            for j in range(i + 1, len(sids)):
-                # slot sids[i] vem antes de sids[j] na ordem do treino.
-                # viol = max(0, tier[j] - tier[i]): pune tier maior vindo depois.
-                viol = model.NewIntVar(0, rank_max, f"viol_{sids[i]}_{sids[j]}")
-                model.Add(viol >= tier_rank[sids[j]] - tier_rank[sids[i]])
-                penalidades.append(viol)
+    for grupos_t in treinos:
+        for g in grupos_t:
+            sids = g["slot_ids"]
+            for i in range(len(sids)):
+                for j in range(i + 1, len(sids)):
+                    viol = model.NewIntVar(0, rank_max, f"viol_{sids[i]}_{sids[j]}")
+                    model.Add(viol >= tier_rank[sids[j]] - tier_rank[sids[i]])
+                    penalidades.append(viol)
     if penalidades:
         model.Minimize(sum(penalidades))
 
@@ -277,36 +410,81 @@ def gerar_treino_csp(
     solve_time = time.perf_counter() - t0
 
     status_nome = solver.StatusName(status)
+    viavel = status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
     resultado: dict = {
         "status": status_nome,
-        "viavel": status in (cp_model.OPTIMAL, cp_model.FEASIBLE),
+        "viavel": viavel,
         "nivel_aluno": nivel_aluno,
         "seed": seed,
         "solve_time": solve_time,
-        "inversoes": int(round(solver.ObjectiveValue())) if (penalidades and status in (cp_model.OPTIMAL, cp_model.FEASIBLE)) else 0,
-        "grupos": [],
-        "ordem_global": [],
+        "inversoes_totais": (
+            int(round(solver.ObjectiveValue())) if (penalidades and viavel) else 0
+        ),
+        "h_r1_aplicadas": h_r1_aplicadas,
+        "treinos": [],
     }
-    if not resultado["viavel"]:
+    if not viavel:
         return resultado
 
-    # ── Decodifica (lê slots em ordem de posição) ───────────────────────────
-    for g in grupos:
-        nivel, escopo, qtd = g["demanda"]
-        exs = []
-        for sid in g["slot_ids"]:
-            for cidx, ex in enumerate(g["pool"]):
-                if solver.Value(assign[(sid, cidx)]) == 1:
-                    exs.append(ex)
-                    break
-        resultado["grupos"].append({
-            "demanda": g["demanda"],
-            "exercicios": exs,
-            "pool_size": len(g["pool"]),
-            "h_t4_aplicado": nivel == "subregiao" and qtd == 1,
-        })
-        resultado["ordem_global"].extend(exs)
+    # ── Decodifica por treino ───────────────────────────────────────────────
+    for grupos_t in treinos:
+        treino_dict = {"grupos": [], "ordem_global": []}
+        for g in grupos_t:
+            nivel, escopo, qtd = g["demanda"]
+            exs = []
+            for sid in g["slot_ids"]:
+                for cidx, ex in enumerate(g["pool"]):
+                    if solver.Value(assign[(sid, cidx)]) == 1:
+                        exs.append(ex)
+                        break
+            treino_dict["grupos"].append({
+                "demanda": g["demanda"],
+                "exercicios": exs,
+                "pool_size": len(g["pool"]),
+                "h_t4_aplicado": nivel == "subregiao" and qtd == 1,
+                "h_t4_aplicado_efetivamente": g.get("h_t4_aplicado_efetivamente", False),
+            })
+            treino_dict["ordem_global"].extend(exs)
+        resultado["treinos"].append(treino_dict)
     return resultado
+
+
+def gerar_treino_csp(
+    demandas: list[tuple[str, str, int]],
+    banco: list[Exercicio],
+    nivel_aluno: int,
+    seed: int = 0,
+) -> dict:
+    """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
+
+    Devolve dict no formato antigo (chaves `grupos`, `ordem_global`,
+    `inversoes` top-level). H-R1 vai disparar se a demanda atender o
+    min_slots — pode mudar o resultado vs Fatia 1.
+    """
+    rotina = gerar_rotina_csp([demandas], banco, nivel_aluno, seed)
+    if not rotina["viavel"]:
+        return {
+            "status": rotina["status"],
+            "viavel": False,
+            "nivel_aluno": nivel_aluno,
+            "seed": seed,
+            "solve_time": rotina["solve_time"],
+            "inversoes": 0,
+            "grupos": [],
+            "ordem_global": [],
+        }
+    t0 = rotina["treinos"][0]
+    return {
+        "status": rotina["status"],
+        "viavel": True,
+        "nivel_aluno": nivel_aluno,
+        "seed": seed,
+        "solve_time": rotina["solve_time"],
+        "inversoes": rotina["inversoes_totais"],
+        "grupos": t0["grupos"],
+        "ordem_global": t0["ordem_global"],
+        "h_r1_aplicadas": rotina["h_r1_aplicadas"],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -316,22 +494,29 @@ def gerar_treino_csp(
 def _tier_ordem_ok(resultado: dict) -> bool:
     """True se, em todo grupo, o tier é não-crescente na ordem dos slots."""
     for g in resultado["grupos"]:
-        ranks = [TIER_RANK[derivar_tier_heuristico(e)] for e in g["exercicios"]]
+        ranks = [_tier_rank(e) for e in g["exercicios"]]
         if any(ranks[k] < ranks[k + 1] for k in range(len(ranks) - 1)):
             return False
     return True
 
 
 def _vagas_unicas_nao_acessorio(resultado: dict) -> tuple[bool, list[str]]:
-    """Confere H-T4: toda vaga única de subregião tem tier != Acessório."""
+    """Confere H-T4: toda vaga única de subregião com pool não-Acessório
+    disponível tem tier != Acessório. Se o pool inteiro for Acessório
+    (degradação aceita), a vaga é ignorada na validação."""
     ok = True
     detalhes = []
     for g in resultado["grupos"]:
         if not g["h_t4_aplicado"]:
             continue
         nivel, escopo, qtd = g["demanda"]
+        if not g.get("h_t4_aplicado_efetivamente", False):
+            # Degradação graceful: pool inteiro Acessório, vaga aceita Acessório.
+            for e in g["exercicios"]:
+                detalhes.append(f"{escopo}={e.tier} (pool 100% Acessório, OK)")
+            continue
         for e in g["exercicios"]:
-            t = derivar_tier_heuristico(e)
+            t = e.tier
             detalhes.append(f"{escopo}={t}")
             if t == TIER_ACESSORIO:
                 ok = False
@@ -352,10 +537,15 @@ def imprimir_resultado(resultado: dict, titulo: str = "") -> None:
     for g in resultado["grupos"]:
         nivel, escopo, qtd = g["demanda"]
         for k, ex in enumerate(g["exercicios"]):
-            tier = derivar_tier_heuristico(ex)
+            tier = ex.tier or "?"
             marca = ""
             if g["h_t4_aplicado"] and k == 0:
-                marca = "   <- vaga única OK" if tier != TIER_ACESSORIO else "   <- ⚠ vaga única ACESSÓRIO"
+                if not g.get("h_t4_aplicado_efetivamente", False):
+                    marca = "   <- vaga única (degraded: pool 100% Acessório)"
+                elif tier != TIER_ACESSORIO:
+                    marca = "   <- vaga única OK"
+                else:
+                    marca = "   <- ⚠ vaga única ACESSÓRIO"
             print(f"{i}. [{tier:<13}] {ex.nome:<30} ({escopo}){marca}")
             i += 1
 
@@ -367,7 +557,61 @@ def imprimir_resultado(resultado: dict, titulo: str = "") -> None:
     print(f"  Vagas únicas != Acessório?  {'SIM' if ht4_ok else 'NÃO'}"
           + (f" ({', '.join(ht4_det)})" if ht4_det else " (nenhuma vaga única)"))
     print(f"  Inversões de tier (S-T1): {resultado['inversoes']}")
+    h_r1 = resultado.get("h_r1_aplicadas", [])
+    if h_r1:
+        print(f"  H-R1 (cobertura cross-treino):")
+        for a in h_r1:
+            if a.get("degraded"):
+                print(f"    ⚠ {a['subregiao']}/{a['eixo']}: degraded "
+                      f"({a.get('motivo','sem candidato')})")
+            else:
+                print(f"    ✓ {a['subregiao']}/{a['eixo']}: "
+                      f"{a['n_termos']} candidatos em {a['n_slots']} slots")
     print(f"  Tempo de solving: {resultado['solve_time']:.4f}s")
+    print()
+
+
+def imprimir_rotina_resultado(rotina: dict, titulo: str = "") -> None:
+    """Imprime uma ROTINA (N treinos) com saída humana + validação."""
+    cab = f"=== {titulo} ===" if titulo else "=== Rotina ==="
+    print(cab)
+    if not rotina["viavel"]:
+        print(f"  INVIÁVEL (status={rotina['status']}) — pool insuficiente.")
+        print()
+        return
+    for t_idx, treino in enumerate(rotina["treinos"], start=1):
+        print(f"--- Treino {t_idx} ---")
+        i = 1
+        for g in treino["grupos"]:
+            nivel, escopo, qtd = g["demanda"]
+            for k, ex in enumerate(g["exercicios"]):
+                tier = ex.tier or "?"
+                marca = ""
+                if g["h_t4_aplicado"] and k == 0:
+                    if not g.get("h_t4_aplicado_efetivamente", False):
+                        marca = "   <- vaga única (degraded: pool 100% Acessório)"
+                    elif tier != TIER_ACESSORIO:
+                        marca = "   <- vaga única OK"
+                    else:
+                        marca = "   <- ⚠ vaga única ACESSÓRIO"
+                print(f"  {i}. [{tier:<13}] {ex.nome:<30} ({escopo}){marca}")
+                i += 1
+    print()
+    print("Validação:")
+    print(f"  Inversões totais (S-T1 cross-treino): {rotina['inversoes_totais']}")
+    h_r1 = rotina.get("h_r1_aplicadas", [])
+    if h_r1:
+        print(f"  H-R1 (cobertura cross-treino):")
+        for a in h_r1:
+            if a.get("degraded"):
+                print(f"    ⚠ {a['subregiao']}/{a['eixo']}: degraded "
+                      f"({a.get('motivo','sem candidato')})")
+            else:
+                print(f"    ✓ {a['subregiao']}/{a['eixo']}: "
+                      f"{a['n_termos']} candidatos em {a['n_slots']} slots")
+    else:
+        print("  H-R1: nenhuma regra ativa (subregiões com < min_slots)")
+    print(f"  Tempo de solving: {rotina['solve_time']:.4f}s")
     print()
 
 
@@ -393,6 +637,12 @@ DEMANDAS_B: list[tuple[str, str, int]] = [
 
 
 def _main() -> None:
+    # Garante que stdout aceite acentos/setas no Windows (cp1252 default quebra).
+    import sys
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except AttributeError:
+        pass
     banco = carregar_banco_ativo()
     inativos_esperados = {"Box Jump", "Air Bike Sprint", "Air Bike Steady"}
     nomes_no_pool = {e.nome for e in banco}
@@ -428,6 +678,58 @@ def _main() -> None:
     nomes_b = [e.nome for g in rb["grupos"] for e in g["exercicios"]]
     print(f">> Cadeira Extensora presente? "
           f"{'SIM' if any('Extensora' in n for n in nomes_b) else 'NÃO'}")
+    print()
+
+    # ── Config C — graceful degradation H-T4 em vaga única de core ──────────
+    print("#" * 70)
+    print("# Config C — core_isometrico em vaga única (graceful degradation H-T4)")
+    print("# Pool 100% Acessório pós-curadoria Parte 1: vaga única DEVE aceitar")
+    print("# Acessório em vez de virar INFEASIBLE.")
+    print("#" * 70)
+    print()
+    DEMANDAS_C = [("subregiao", "core_isometrico", 1)]
+    rc = gerar_treino_csp(DEMANDAS_C, banco, nivel_aluno=3, seed=42)
+    imprimir_resultado(rc, "Rotina (Config C, nível 3, seed=42)")
+    print(f">> Viável? {'SIM' if rc['viavel'] else 'NÃO'}")
+    if rc["viavel"]:
+        ex = rc["ordem_global"][0]
+        print(f">> Exercício escolhido: {ex.nome} (tier={ex.tier!r})")
+        print(f">> H-T4 aplicado efetivamente? "
+              f"{rc['grupos'][0].get('h_t4_aplicado_efetivamente')} "
+              f"(esperado False — pool 100% Acessório).")
+    print()
+
+    # ── Config D — rotina de 2 treinos: exercita H-R1 cross-treino ──────────
+    print("#" * 70)
+    print("# Config D — ROTINA 2 treinos × costas(1) cada. Total 2 slots de")
+    print("# costas na rotina inteira (1 em cada treino). H-R1 deve forçar")
+    print("# vertical+horizontal compostos distribuídos cross-treino.")
+    print("#" * 70)
+    print()
+    DEMANDAS_D_T1 = [("subregiao", "costas", 1), ("subregiao", "peito", 1)]
+    DEMANDAS_D_T2 = [("subregiao", "costas", 1), ("subregiao", "peito", 1)]
+    rd = gerar_rotina_csp(
+        [DEMANDAS_D_T1, DEMANDAS_D_T2],
+        banco, nivel_aluno=3, seed=42,
+    )
+    imprimir_rotina_resultado(rd, "Rotina D — 2 treinos × costas(1)+peito(1)")
+    # Validação manual: cobertura cross-treino de costas
+    todos_costas = [
+        ex for tr in rd["treinos"] for g in tr["grupos"]
+        for ex in g["exercicios"] if ex.subregiao == "costas"
+    ]
+    has_puxada = any(e.padrao == "puxadas" and e.purpose == "compound" for e in todos_costas)
+    has_remada = any(e.padrao == "remadas" and e.purpose == "compound" for e in todos_costas)
+    print(f">> Cobertura costas cross-treino: vertical={'SIM' if has_puxada else 'NÃO'}, "
+          f"horizontal={'SIM' if has_remada else 'NÃO'}")
+    # Validação AllDifferent cross-treino
+    todos_nomes = [
+        ex.nome for tr in rd["treinos"] for g in tr["grupos"]
+        for ex in g["exercicios"]
+    ]
+    print(f">> AllDifferent cross-treino? "
+          f"{'SIM' if len(set(todos_nomes)) == len(todos_nomes) else 'NÃO (repetiu!)'} "
+          f"({len(todos_nomes)} ex no total)")
     print()
 
     # ── Bônus — Config A no nível 1, mostrando encolhimento de pool ──────────

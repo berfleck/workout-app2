@@ -21,20 +21,21 @@
 
 **H-T1. Mesma família refinada não repete**
 - Origem: Etapa 6 Fase 3, já existe no app atual
-- Dado: `familia_estrita`
+- Dado: `familia_estrita` → **operacionalmente `variacao_de`** (predicado `cand.variacao_de == outro.variacao_de` com ambos não-vazios, [gerador_treino.py:2158](../../gerador_treino.py#L2158)). Pai+filho NÃO bloqueado intra (decisão histórica preservada na Fatia 2 P2).
 
 **H-T2. Variante pontual não atravessa famílias na mesma subregião**
 - Origem: Etapa 6 Fase 3, já existe
-- Dado: `variante_pontual`
+- Dado: `variante_pontual` (boolean)
 
 **H-T3. Lateralidade contextual em costas**
 - Origem: Etapa 6 Fase 3, já existe
-- Dado: `lateralidade`, subregião = `costas`
+- Dado: `lateralidade` → **operacionalmente coluna `unilateral`** (valores `bilateral`/`unilateral`). Subregiões hard via `SUBREGIOES_LATERALIDADE_HARD = frozenset({"costas"})` em [pesos_proximidade.py:44](../../pesos_proximidade.py#L44) (fonte canônica única entre gerador antigo e CSP).
 
 **H-T4. Vaga única na subregião ⇒ exercício composto/principal**
 - Origem: Conceito 7
-- Dado: `tier`
+- Dado: `tier` (curado manualmente, Fatia 2 P1)
 - Justificativa clínica: *"Se for pra deixar 1 exercício de coxa, esse único quase nunca seria Cadeira Extensora."*
+- **Graceful degradation** (Fatia 2 P2): se o pool da subregião for 100% Acessório (caso `core_isometrico` / `core_dinamico` pós-curadoria, e `perna_posterior` no nível 1), H-T4 pula a constraint em vez de inviabilizar. Resultado marca `h_t4_aplicado_efetivamente=False` pra UI sinalizar ao usuário.
 
 ### Escopo ROTINA (across treinos)
 
@@ -45,7 +46,9 @@
   - Peito: ≥1 horizontal composto se ≥2 slots
   - Perna anterior: ≥1 bilateral composto + ≥1 unilateral composto se ≥2 slots
 - Princípio geral: cobertura de variedade só "conta" quando o exercício é composto. Isolados são extras.
-- Dado: `plano_corporal`, `lateralidade`, `tier`/composto
+- Dado: `padrao`, `unilateral`, `purpose` — **"composto" = `purpose == "compound"`** (decisão fechada na Fatia 2 P2). Centralidade clínica curada (`tier`) é ortogonal: Apoio (compound+Intermediário) cobre eixo horizontal, Hip Thrust (isolation+Principal) NÃO cobre como composto biomecânico.
+- **Slot conta pra subregião X se**: demanda é `("subregiao", "X", qtd)` OU `("padrao", "Y", qtd)` onde Y mapeia 1:1 pra X via `PADRAO_PARA_SUBREGIAO`. Demandas com mapping 1:N (padrões CORE refinados) ou nivel `regiao` não contam — slot sem subregião determinística pré-solver.
+- **Graceful degradation** (Fatia 2 P2): se um eixo não tem candidato no pool (caso real: nível 1 + perna_anterior, todos os afundos têm `cx > 2` → filtrados por H-P1), o eixo é pulado e marcado `degraded=True` no resultado. Resolve o conflito H-P1 vs H-R1 sem regredir pra soft. Decisão de Bernardo durante a Fatia 2 P2.
 - **Importante**: solver não trata nenhuma subregião como "primeira". Ordem de processamento é justamente o que gera vieses (achado central do handoff). Todos os slots da rotina negociam simultaneamente.
 
 ### Escopo PERFIL DE ALUNO
@@ -226,11 +229,20 @@ Pesos base e valores dos moduladores na tabela são **chutes iniciais**. A calib
 
 ### Colunas já existentes no XLSX (verificar uso correto no novo motor)
 
-`familia_estrita`, `variante_pontual`, `lateralidade`, `pegada`, `plano_corporal`, `equipamento_grupo`, `padrao`, `regiao`, `subregiao`, `complexidade`, `demanda_core`, `demanda_grip`, `nome_exercicio`, mapa de recrutamento muscular existente
+| Coluna do XLSX | Conceito do catálogo | Consumido por |
+|---|---|---|
+| `variacao_de` | `familia_estrita` (conceito) | H-T1, futuras S-R3/S-H1 família |
+| `variante_pontual` | `variante_pontual` | H-T2 |
+| `unilateral` (valores `bilateral`/`unilateral`) | `lateralidade` | H-T3, H-R1 (perna_anterior) |
+| `pegada`, `plano_corporal`, `equipamento_grupo` | mesmos nomes | S-B1, S-T4, S-R1 (futuras) |
+| `padrao`, `regiao`, `subregiao`, `complexidade` | hierarquia + filtros | H-P1, H-R1, todas as demandas |
+| `demanda_core`, `demanda_grip` | mesmos nomes | S-B2 (futura) |
+| `purpose` (`compound`/`isolation`/`stability`/`explosive`) | "composto" do H-R1 | H-R1 |
+| `tier` (Principal/Intermediário/Acessório) | `tier` — curado na Fatia 2 P1 | H-T4, S-T1 (e futuras H-P2/S-T2/S-T3/S-R3/S-H1) |
+| `ativo` (boolean) | filtro operacional | descarte pré-solver |
 
 ### Colunas a cadastrar (derivadas das constraints)
 
-- **`tier`** — Principal / Intermediário / Acessório. Necessária pra H-T4, H-P2, S-T1, S-T2, S-T3, S-R3, S-H1. **Funde com o roadmap de centralidade de 2026-05-18.**
 - **`estabilidade_externa`** — máquina / livre. Necessária pra S-B3, S-T2.
 - **`demanda_lombar`** — 0-3. Necessária pra S-B2. Modelo igual ao `demanda_core`.
 
@@ -257,4 +269,4 @@ Documentados na sessão 2026-05-21 em resposta à pergunta de Bernardo *"a lógi
 
 ---
 
-*Última atualização: 2026-05-21 (criação inicial, sessão de brainstorming pós-IAs e entrevista de perfil de aluno).*
+*Última atualização: 2026-05-23 (Fatia 2 Parte 2 — Seções 1 e 4 ganharam correspondência conceito↔coluna pra H-T1, H-T3, H-T4, H-R1, e a graceful degradation de H-T4 e H-R1 foi documentada como decisão clínica fechada).*
