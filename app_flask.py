@@ -445,6 +445,23 @@ def _peso_aderencia_csp(aluno_obj):
     return _PESO_ADERENCIA_POR_PERFIL.get((aluno_obj.get("aderencia") or "media").strip(), 0)
 
 
+# Fatia 4.B (2026-05-24) — S-B1 distância funcional intra-bloco.
+# Peso int passado ao CSP quando o usuário liga "evitar agonistas" na UI.
+# Chute inicial conservador: 10 = dominante o bastante pra eliminar pares
+# agonistas no smoke (23.4% → 0% em 20 runs com demanda 6 slots) sem ser
+# desproporcional vs S-T1 (rank_max=3, viol max por par = 2).
+_PESO_EVITAR_AGONISTAS_DEFAULT = 10
+
+
+def _peso_evitar_agonistas_csp(cfg_r):
+    """Peso int do S-B1 derivado do flag `evitar_agonistas` da cfg do form.
+    True → _PESO_EVITAR_AGONISTAS_DEFAULT; False/ausente → 0 (sem efeito).
+    """
+    if not cfg_r or not cfg_r.get("evitar_agonistas"):
+        return 0
+    return _PESO_EVITAR_AGONISTAS_DEFAULT
+
+
 def _cfg_antiga_pra_demandas_csp(cfg_r):
     """Converte cfg do gerador antigo em demandas CSP `(nivel, escopo, qtd)`.
 
@@ -1964,6 +1981,8 @@ def treino_regerar(t):
     aluno_obj = next((a for a in carregar_alunos() if a["id"] == aluno_id_sel), None) if aluno_id_sel else None
     nivel = _nivel_aluno_csp(aluno_obj)
     peso_aderencia = _peso_aderencia_csp(aluno_obj)
+    # Fatia 4.B: extrai flag evitar_agonistas da cfg (UI antiga)
+    peso_evitar_agon = _peso_evitar_agonistas_csp(cfg_r)
 
     if demandas_csp:
         resultado = gerar_treino_csp(
@@ -1971,6 +1990,7 @@ def treino_regerar(t):
             seed=random.randint(0, 2**31 - 1),
             variedade=ConfigVariedade(),
             peso_aderencia=peso_aderencia,
+            peso_evitar_agonistas=peso_evitar_agon,
         )
         nome_custom = cfg_r.get("nome_custom", "")
         tipo_label = nome_custom or sessoes_ativas[t].tipo

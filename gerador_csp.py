@@ -33,6 +33,7 @@ from gerador_treino import (
     Exercicio,
     carregar_banco,
     PADRAO_PARA_SUBREGIAO,
+    GRUPO_MUSCULAR_PADRAO,  # Fatia 4.B: agrupamento push/pull/quad/... pro S-B1
     XLSX_PATH,
 )
 # H-T3 reusa a configuração canônica de subregiões com lateralidade hard.
@@ -73,6 +74,25 @@ TIER_RANK: dict[str, int] = {
 # só estrutural + tier-order de blocos. S-B1/S-B4 entram em 4.B/4.C.
 
 TAMANHO_MAX_BLOCO: int = 3  # 4.C torna parâmetro vindo da UI
+
+
+# ---------------------------------------------------------------------------
+# Fatia 4.B (2026-05-24) — S-B1 (distância funcional intra-bloco)
+# ---------------------------------------------------------------------------
+#
+# Codificação dos grupos musculares funcionais (push/pull/quad/...) usada
+# em S-B1 pra detectar pares agonistas (mesmo grupo) no mesmo bloco.
+# Cada grupo único de GRUPO_MUSCULAR_PADRAO recebe um int único.
+# Padrão sem grupo definido → código fallback (não colide com grupos reais).
+
+_GRUPOS_UNICOS = sorted(set(GRUPO_MUSCULAR_PADRAO.values()))
+GRUPO_FUNC_CODE: dict[str, int] = {g: i for i, g in enumerate(_GRUPOS_UNICOS, start=1)}
+_GRUPO_OUTRO_CODE = 0  # fallback: padrão sem grupo conhecido (par "outro+outro" não conta como agonista — favorável)
+
+
+def _grupo_code_do_ex(ex: Exercicio) -> int:
+    """Código int do grupo funcional do exercício. Padrão não mapeado → 0."""
+    return GRUPO_FUNC_CODE.get(GRUPO_MUSCULAR_PADRAO.get(ex.padrao, ""), _GRUPO_OUTRO_CODE)
 
 
 def _tier_rank(exercicio: Exercicio) -> int:
@@ -284,11 +304,12 @@ def _construir_modelo(
     banco: list[Exercicio],
     nivel_aluno: int,
     peso_aderencia: int = 0,
+    peso_evitar_agonistas: int = 0,
 ) -> dict:
     """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
-    penalidades de S-T1 e Aderência ao Tier) MAS sem chamar `Minimize`.
-    Caller decide se minimiza (Phase 1 / modo legado) ou adiciona bound +
-    enumera (Phase 2 da Frente B / Fatia 3).
+    penalidades de S-T1, Aderência ao Tier e S-B1 distância funcional)
+    MAS sem chamar `Minimize`. Caller decide se minimiza (Phase 1 / modo
+    legado) ou adiciona bound + enumera (Phase 2 da Frente B / Fatia 3).
 
     `peso_aderencia` (Frente D Fatia 3, 2026-05-24): modulação da dimensão
     "Aderência ao Tier" do vetor de perfil do aluno. 0 (default) = sem
@@ -299,12 +320,20 @@ def _construir_modelo(
     qualquer tier escolhido). Resolve o achado #1 da Frente C (slots de
     padrão único caindo em Acessório por sorteio).
 
+    `peso_evitar_agonistas` (Fatia 4.B, 2026-05-24): S-B1 distância
+    funcional intra-bloco. 0 (default) = sem efeito (preserva 4.A). >0
+    adiciona penalty fixo por par no MESMO BLOCO com MESMO GRUPO
+    funcional (push/pull/quad/...). Solver minimiza → motor evita parear
+    agonistas. Antagonistas (push+pull) e cross-region (upper+lower)
+    saem sem penalty, então naturalmente preferidos.
+
     Devolve dict com:
       - model: CpModel sem objetivo definido
       - assign: dict[(sid, cidx)] -> BoolVar
       - slots_globais, treinos, grupo_por_idx: metadados pra decodificação
       - h_r1_aplicadas: lista de aplicações H-R1 com flag degraded
-      - penalidades: list[IntVar] de S-T1 + Aderência (quando peso > 0).
+      - penalidades: list[IntVar] de S-T1 + Aderência (quando peso > 0)
+        + S-B1 (quando peso_evitar_agonistas > 0).
         Caller decide se vira `Minimize(sum(penalidades))` (legacy + Phase 1)
         ou IntVar de soma + bound `<= optimal + slack` (Phase 2).
     """
@@ -389,6 +418,23 @@ def _construir_modelo(
     for vars_do_nome in por_nome.values():
         if len(vars_do_nome) > 1:
             model.AddAtMostOne(vars_do_nome)
+
+    # ── Fatia 4.B: grupo_func[s] IntVar derivado do ex escolhido ────────────
+    # grupo_func[s] = sum_c (assign[s,c] * GRUPO_CODE[pool[c].padrao]).
+    # AddExactlyOne já força sum(assign[s,c])=1, então grupo_func[s] = code
+    # do grupo do ex escolhido. Usado em S-B1 pra detectar pares agonistas.
+    # Criado SEMPRE (mesmo com peso_evitar_agonistas=0) porque é leve e
+    # serve de gancho pra futuras constraints; CP-SAT simplifica IntVars
+    # não referenciadas no objetivo.
+    max_grupo_code = max(GRUPO_FUNC_CODE.values())
+    grupo_func: dict[int, cp_model.IntVar] = {}
+    for s in slots_globais:
+        pool = grupo_por_idx[(s["t_idx"], s["di"])]["pool"]
+        codes = [_grupo_code_do_ex(ex) for ex in pool]
+        lo, hi = (min(codes), max(codes)) if codes else (0, 0)
+        gf = model.NewIntVar(lo, hi, f"grupo_t{s['t_idx']}_s{s['sid']}")
+        model.Add(gf == sum(assign[(s["sid"], c)] * codes[c] for c in range(len(pool))))
+        grupo_func[s["sid"]] = gf
 
     # ── H-T1 / H-T2 / H-T3 (HARD intra-treino): aplicam por t_idx ──────────
     for t_idx, grupos_t in enumerate(treinos):
@@ -552,6 +598,33 @@ def _construir_modelo(
                 ).OnlyEnforceIf(gt)
                 penalidades.append(viol)
 
+                # ── Fatia 4.B: S-B1 (distância funcional intra-bloco) ─────
+                # same_bloco = NOT(lt OR gt). Reusa lt/gt já criados pra S-T1.
+                # Penalty se same_bloco AND same_grupo (par agonista no
+                # mesmo bloco). Quando peso=0, NÃO cria as vars (preserva
+                # 4.A byte-a-byte).
+                if peso_evitar_agonistas > 0:
+                    same_bloco = model.NewBoolVar(f"sb_{s1}_{s2}")
+                    # same_bloco + lt + gt == 1 (exatamente um dos três é true)
+                    model.Add(same_bloco + lt + gt == 1)
+
+                    same_grupo = model.NewBoolVar(f"sg_{s1}_{s2}")
+                    model.Add(
+                        grupo_func[s1] == grupo_func[s2]
+                    ).OnlyEnforceIf(same_grupo)
+                    model.Add(
+                        grupo_func[s1] != grupo_func[s2]
+                    ).OnlyEnforceIf(same_grupo.Not())
+
+                    # AND lógico: ambos true → ativa penalty.
+                    viol_sb1 = model.NewIntVar(
+                        0, peso_evitar_agonistas, f"sb1_{s1}_{s2}",
+                    )
+                    model.Add(viol_sb1 >= peso_evitar_agonistas).OnlyEnforceIf(
+                        [same_bloco, same_grupo],
+                    )
+                    penalidades.append(viol_sb1)
+
     # ── Aderência ao Tier (SOFT, Frente D Fatia 3): por slot ────────────────
     # `aderencia_pen[s] = (rank_max - tier_rank[s]) * peso_aderencia`
     # Slot com Principal (rank=3): pen = 0. Acessório (rank=1): pen = 2*peso.
@@ -578,6 +651,9 @@ def _construir_modelo(
         # blocos da solução (via solver.Value(bloco_idx[s])).
         "bloco_idx": bloco_idx,
         "slots_por_treino": dict(slots_por_treino),
+        # Fatia 4.B: grupo funcional do ex escolhido (gancho pra futuras
+        # constraints baseadas em grupo).
+        "grupo_func": grupo_func,
     }
 
 
@@ -692,6 +768,7 @@ def gerar_rotina_csp(
     seed: int = 0,
     variedade: Optional[ConfigVariedade] = None,
     peso_aderencia: int = 0,
+    peso_evitar_agonistas: int = 0,
 ) -> dict:
     """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
     negociam no mesmo modelo — necessário pra H-R1 cross-treino.
@@ -718,10 +795,12 @@ def gerar_rotina_csp(
     """
     if variedade is None:
         return _resolver_legacy(
-            demandas_por_treino, banco, nivel_aluno, seed, peso_aderencia,
+            demandas_por_treino, banco, nivel_aluno, seed,
+            peso_aderencia, peso_evitar_agonistas,
         )
     return _resolver_com_variedade(
-        demandas_por_treino, banco, nivel_aluno, seed, variedade, peso_aderencia,
+        demandas_por_treino, banco, nivel_aluno, seed, variedade,
+        peso_aderencia, peso_evitar_agonistas,
     )
 
 
@@ -731,12 +810,14 @@ def _resolver_legacy(
     nivel_aluno: int,
     seed: int,
     peso_aderencia: int = 0,
+    peso_evitar_agonistas: int = 0,
 ) -> dict:
     """Branch legado: 1 solve com Minimize → 1 solução determinística por
     seed. Preserva byte-a-byte o comportamento da Fatia 2 P2 quando
-    `peso_aderencia == 0`."""
+    `peso_aderencia == 0` E `peso_evitar_agonistas == 0`."""
     md = _construir_modelo(
-        demandas_por_treino, banco, nivel_aluno, peso_aderencia,
+        demandas_por_treino, banco, nivel_aluno,
+        peso_aderencia, peso_evitar_agonistas,
     )
     if md["penalidades"]:
         md["model"].Minimize(sum(md["penalidades"]))
@@ -788,6 +869,7 @@ def _resolver_com_variedade(
     seed: int,
     variedade: ConfigVariedade,
     peso_aderencia: int = 0,
+    peso_evitar_agonistas: int = 0,
 ) -> dict:
     """Branch variedade (Frente B Fatia 3): 2 fases.
 
@@ -811,7 +893,8 @@ def _resolver_com_variedade(
     """
     # ── Phase 1: descobre o ótimo ───────────────────────────────────────────
     md1 = _construir_modelo(
-        demandas_por_treino, banco, nivel_aluno, peso_aderencia,
+        demandas_por_treino, banco, nivel_aluno,
+        peso_aderencia, peso_evitar_agonistas,
     )
     if md1["penalidades"]:
         md1["model"].Minimize(sum(md1["penalidades"]))
@@ -847,7 +930,8 @@ def _resolver_com_variedade(
     # IntVar `var_total` criado AQUI (não no helper) porque só esta fase
     # precisa de bound `<= optimal + slack` + leitura via callback.
     md2 = _construir_modelo(
-        demandas_por_treino, banco, nivel_aluno, peso_aderencia,
+        demandas_por_treino, banco, nivel_aluno,
+        peso_aderencia, peso_evitar_agonistas,
     )
     var_total: Optional[cp_model.IntVar] = None
     if md2["penalidades"]:
@@ -883,7 +967,8 @@ def _resolver_com_variedade(
         # Inesperado: Phase 1 viável mas Phase 2 não enumerou nada.
         # Fallback pro modo legado (não bloqueia o caller).
         return _resolver_legacy(
-            demandas_por_treino, banco, nivel_aluno, seed, peso_aderencia,
+            demandas_por_treino, banco, nivel_aluno, seed,
+            peso_aderencia, peso_evitar_agonistas,
         ) | {
             "variedade": _meta_variedade(variedade, n=0, dist=None, opt=optimal,
                                          lim=False, t1=time_p1, t2=time_p2),
@@ -995,6 +1080,7 @@ def gerar_treino_csp(
     seed: int = 0,
     variedade: Optional[ConfigVariedade] = None,
     peso_aderencia: int = 0,
+    peso_evitar_agonistas: int = 0,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
@@ -1008,10 +1094,16 @@ def gerar_treino_csp(
 
     `peso_aderencia` (Frente D Fatia 3): modulação da dimensão "Aderência
     ao Tier" do perfil do aluno. 0 (default) = sem efeito.
+
+    `peso_evitar_agonistas` (Fatia 4.B): S-B1 distância funcional. 0
+    (default) = sem efeito (preserva 4.A). >0 penaliza pares no mesmo
+    bloco com mesmo grupo funcional (push/pull/quad/...).
     """
     rotina = gerar_rotina_csp(
         [demandas], banco, nivel_aluno, seed,
-        variedade=variedade, peso_aderencia=peso_aderencia,
+        variedade=variedade,
+        peso_aderencia=peso_aderencia,
+        peso_evitar_agonistas=peso_evitar_agonistas,
     )
     if not rotina["viavel"]:
         out = {
