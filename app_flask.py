@@ -17,7 +17,7 @@ from gerador_treino import (
     ANCORAS_POR_REGIAO, ANCORAS_POR_SUBREGIAO,
     Exercicio, Sessao, SuperSerie,
 )
-from gerador_csp import ConfigVariedade, gerar_treino_csp
+from gerador_csp import ConfigVariedade, gerar_treino_csp, _familia_cross
 from gerar_imagem import gerar_png
 from database import (
     init_db, migrar_json_para_sqlite,
@@ -356,7 +356,7 @@ def _label_bloco_csp(i):
             return out
 
 
-def _resultado_csp_pra_sessao(resultado, tipo_label):
+def _resultado_csp_pra_sessao(resultado, tipo_label, escopo_labels=None):
     """Converte o dict de saída de `gerar_treino_csp` em `Sessao`.
 
     Pós-Fatia 4.A (2026-05-24): consome `resultado["blocos"]` (lista de
@@ -370,8 +370,15 @@ def _resultado_csp_pra_sessao(resultado, tipo_label):
     página /decisoes usa esse marker pra detectar treinos do motor novo
     e mostrar mensagem em vez de timeline vazio.
 
-    Avisos: cada eixo H-R1 marcado `degraded=True` vira aviso
-    `tipo="h_r1_degradado"` em `Sessao.avisos`.
+    Avisos:
+      - cada eixo H-R1 marcado `degraded=True` vira aviso `h_r1_degradado`.
+      - cada nome em `resultado["relaxados"]` (Fatia 4.E) vira aviso
+        `familia_repetida` (paridade com o motor antigo, formato igual
+        consumido pelo template `_avisos_modal.html`).
+
+    `escopo_labels` (Fatia 4.E, opcional): dict `{nome_ex: escopo_label_str}`
+    pra enriquecer o aviso de família com o escopo da demanda. Sem mapping,
+    aviso usa a subregião do ex como fallback humano-legível.
     """
     blocos: list[SuperSerie] = []
     blocos_motor = resultado.get("blocos")
@@ -401,6 +408,33 @@ def _resultado_csp_pra_sessao(resultado, tipo_label):
                 "subregiao": a.get("subregiao"),
                 "eixo": a.get("eixo"),
                 "motivo": a.get("motivo", "pool sem candidato"),
+            })
+
+    # Fatia 4.E: propaga relaxados pra Sessao.relaxados + avisos.
+    relaxados_nomes = list(resultado.get("relaxados") or [])
+    if relaxados_nomes:
+        s.relaxados = list(relaxados_nomes)
+        # Resolve ex (pra pegar familia + subregiao) percorrendo blocos.
+        ex_por_nome: dict[str, Exercicio] = {}
+        for bloco in blocos:
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                if ex is not None:
+                    ex_por_nome[ex.nome] = ex
+        labels = escopo_labels or {}
+        for nome_rel in relaxados_nomes:
+            ex_rel = ex_por_nome.get(nome_rel)
+            familia = (
+                ex_rel.variacao_de if (ex_rel and ex_rel.variacao_de)
+                else nome_rel
+            )
+            escopo_label = labels.get(nome_rel) or (
+                ex_rel.subregiao if ex_rel else ""
+            )
+            s.avisos.append({
+                "tipo": "familia_repetida",
+                "exercicio": nome_rel,
+                "familia": familia,
+                "escopo_label": escopo_label,
             })
     return s
 
@@ -1965,13 +1999,15 @@ def treino_regerar(t):
     (`gerador_csp.gerar_treino_csp` + `ConfigVariedade()`).
 
     Features do gerador antigo que SÃO IGNORADAS aqui (motor novo ainda
-    não cobre — ver handoff_fatia_3_frente_c.txt): relaxar_familia,
-    cargas_config, lateralidade_por_padrao (mas split squat_bi/squat_uni
-    continua via `_expandir_demanda_csp`).
+    não cobre): cargas_config, lateralidade_por_padrao (mas split
+    squat_bi/squat_uni continua via `_expandir_demanda_csp`).
 
     Features já cobertas pelo CSP: tamanho_bloco (4.C), evitar_agonistas
     (4.B), exercicios_travados (4.D — travados bypassam H-P1/H-T4/AllDiff
-    cross-treino e participam de S-T1/S-B1/S-B4/Aderência).
+    cross-treino e participam de S-T1/S-B1/S-B4/Aderência),
+    relaxar_familia (4.E — `familias_proibidas` pré-filtra pools; toggle
+    OFF + inviável = sessão mantida; toggle ON + inviável estrito = retry
+    sem o filtro + ex relaxados ganham aviso `familia_repetida` e badge ↻).
 
     Saída: blocos estruturados pelo motor (Fatia 4.A+), labels A/B/C…
     """
@@ -1984,20 +2020,23 @@ def treino_regerar(t):
         for bloco in sessoes_ativas[t].blocos:
             for ex in [bloco.ex1, bloco.ex2, bloco.ex3]:
                 if ex and ex.padrao: contagem[ex.padrao] = contagem.get(ex.padrao, 0) + 1
+        # Default relaxar_familia=True pra paridade total com UI default ON
+        # quando a rotina é importada/legada (sem cfg gravada).
         cfg_r = {"padroes": list(contagem.keys()), "exercicios_por_padrao": contagem,
                  "max_complexidade": 5, "tamanho_bloco": 2, "equipamentos_bloqueados": [],
-                 "exercicios_travados": [], "demandas": None}
+                 "exercicios_travados": [], "demandas": None,
+                 "relaxar_familia": True}
 
-    # Bloqueio cross-treino: filtra nomes + famílias dos outros treinos do
-    # banco antes de mandar pro CSP (CSP só faz AllDifferent dentro da
-    # rotina que recebe; aqui mandamos só 1 treino).
+    # Bloqueio cross-treino: motor recebe `familias_proibidas` (substitui
+    # o filtro upstream da Frente C, mais coerente com o paradigma
+    # declarativo — Fatia 4.E). Adapter ainda filtra NOMES dos outros
+    # treinos via banco_regen (não há ainda H- pra AllDifferent cross
+    # entre rotinas separadas no motor; aqui mandamos só 1 treino).
     exs_outros = [ex for i, s in enumerate(sessoes_ativas) if i != t
                   for bloco in s.blocos for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex]
     nomes_outros = {ex.nome for ex in exs_outros}
-    pais_dos_outros = {ex.variacao_de for ex in exs_outros if ex.variacao_de}
-    banco_regen = [e for e in banco if e.nome not in nomes_outros
-                   and e.nome not in pais_dos_outros
-                   and (e.variacao_de is None or e.variacao_de not in nomes_outros)]
+    familias_outros = {_familia_cross(ex) for ex in exs_outros}
+    banco_regen = [e for e in banco if e.nome not in nomes_outros]
 
     # Fatia 4.D: travados bypassam o filtro cross-treino (decisão do
     # personal supera regra automática). Adiciona travados de volta ao
@@ -2019,6 +2058,10 @@ def treino_regerar(t):
     peso_evitar_agon = _peso_evitar_agonistas_csp(cfg_r)
     # Fatia 4.C: extrai tamanho_bloco da cfg (UI antiga, 1/2/3)
     tam_pref, peso_tam = _tamanho_e_peso_bloco_csp(cfg_r)
+    # Fatia 4.E: toggle "Relaxar família se necessário" (UI default ON).
+    # Default True quando ausente (paridade com UI default + cfg legada
+    # sem o campo).
+    relax_fam = bool(cfg_r.get("relaxar_familia", True))
 
     if demandas_csp:
         resultado = gerar_treino_csp(
@@ -2030,6 +2073,8 @@ def treino_regerar(t):
             tamanho_preferido=tam_pref,
             peso_tamanho_bloco=peso_tam,
             travados=travados_cfg or None,
+            familias_proibidas=familias_outros or None,
+            relaxar_familia=relax_fam,
         )
         nome_custom = cfg_r.get("nome_custom", "")
         tipo_label = nome_custom or sessoes_ativas[t].tipo

@@ -19,8 +19,8 @@ Pós-instituição da disciplina de merge (seção abaixo): branches mergeadas
 em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 
 ```
-main  ← inclui Fatias 1-4.C + Frentes B/C/D
- └─ fatia-4d-exercicios-travados  ✅ ← atual (a mergear em main)
+main  ← inclui Fatias 1-4.D + Frentes B/C/D
+ └─ fatia-4e-relaxar-familia  ✅ ← atual (a mergear em main)
 ```
 
 ---
@@ -39,6 +39,7 @@ main  ← inclui Fatias 1-4.C + Frentes B/C/D
 | Fatia 4.B | S-B1 distância funcional + evitar_agonistas | `logs/mvp_fatia_4b_sb1_pareamento.md` |
 | Fatia 4.C | S-B4 tamanho preferido + tamanho_bloco da UI | `logs/mvp_fatia_4c_sb4_tamanho.md` |
 | Fatia 4.D | exercicios_travados (pool-por-slot, bypass H-P1/H-T4/AllDiff cross) | `logs/mvp_fatia_4d_exercicios_travados.md` |
+| Fatia 4.E | relaxar_familia (familias_proibidas motor-side + retry 2 fases) | `logs/mvp_fatia_4e_relaxar_familia.md` |
 
 ---
 
@@ -50,7 +51,7 @@ Pré-requisito: nenhum. Podem entrar em qualquer ordem ou paralelo.
 
 - **✅ exercicios_travados** (Fatia 4.D) — pool-por-slot + bypass H-P1/H-T4/AllDifferent cross-treino entre travados. Travados participam de S-T1/S-B1/S-B4/Aderência. Adapter `treino_regerar` lê `cfg_r["exercicios_travados"]` e garante travado em `banco_regen`. Ver `logs/mvp_fatia_4d_exercicios_travados.md`.
 - **⬜ cargas_config** — nova hard **H-cargas** (filtro de pool por aluno baseado em config de carga, análoga a H-P1). Adapter lê `cfg_r["cargas_config"]`.
-- **⬜ relaxar_familia** — toggle pra desativar H-T1 sob inviabilidade (graceful como H-T4/H-R1, OU soft com peso alto).
+- **✅ relaxar_familia** (Fatia 4.E) — `familias_proibidas` motor-side substitui filtro upstream do adapter (norte Seção 5: coerência declarativa); `gerar_rotina_csp` faz retry 2 fases quando estrito inviável + toggle ON. Travado bypassa filtro (princípio 4.D). UI default ON, badge ↻ via `Sessao.relaxados` + aviso `familia_repetida` no modal — zero código novo na UI. Ver `logs/mvp_fatia_4e_relaxar_familia.md`.
 
 ### Bloco 2 — Frente E.0 (harness comparativo CSP × antigo)
 

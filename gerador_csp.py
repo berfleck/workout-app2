@@ -96,6 +96,87 @@ def _grupo_code_do_ex(ex: Exercicio) -> int:
     return GRUPO_FUNC_CODE.get(GRUPO_MUSCULAR_PADRAO.get(ex.padrao, ""), _GRUPO_OUTRO_CODE)
 
 
+# ---------------------------------------------------------------------------
+# Fatia 4.E (2026-05-24) — relaxar_familia (bloqueio cross-treino de família)
+# ---------------------------------------------------------------------------
+#
+# Identidade de família CROSS-treino (mais agressiva que H-T1 intra). Pra
+# bloqueio entre treinos da rotina, "pai+filho" conta como mesma família —
+# diferente do predicado de H-T1 intra que só agrupa filhos do mesmo pai
+# (`variacao_de` de ambos não-vazios e iguais).
+#
+# Definição: `_familia_cross(ex)` = `ex.variacao_de or ex.nome`. Dois ex
+# são "mesma família cross" sse `_familia_cross(a) == _familia_cross(b)`.
+# Cobre os 3 casos do filtro pré-existente do adapter (Frente C):
+#   (i)   ambos têm o mesmo variacao_de  → mesmo pai
+#   (ii)  um é pai (variacao_de vazio) do outro (variacao_de == nome do pai)
+#   (iii) caso simétrico de (ii)
+#
+# Quando `relaxar_familia=False` (estrito), `familias_proibidas` pré-filtra
+# pool_slot dos slots non-travados (mesma técnica usada em 4.D pra
+# `nomes_travados`). Quando True e estrito é inviável, retry sem o filtro;
+# `_identificar_relaxados_por_familia` marca os ex cuja família original
+# estava no set proibido (pulando travados — decisão deliberada do user).
+
+def _familia_cross(ex: Exercicio) -> str:
+    """Identificador de família pra bloqueio CROSS-treino. Pai concentra
+    filhos: ex.variacao_de quando filho, ex.nome quando pai (variacao_de
+    vazio). Sempre não-vazio — exercício sempre tem nome."""
+    return ex.variacao_de or ex.nome
+
+
+# ---------------------------------------------------------------------------
+# Fatia 4.E cargas (2026-05-24) — H-cargas par-a-par no bloco
+# ---------------------------------------------------------------------------
+#
+# Filtro de carga acumulada no bloco. Réplica do `_DIMS_CARGA` /
+# `_bloqueio_cargas` do motor antigo (gerador_treino.py:1186-1211).
+# Modelagem par-a-par dentro do bloco — NÃO cumulativa por bloco
+# (decisão clínica fechada).
+#
+# Para cada par (a, b) no mesmo bloco e cada dim d com threshold[d] > 0:
+#   bloqueia se carga_d(a) >= 1 AND carga_d(b) >= 1 AND (sum) >= threshold[d]
+#
+# Mapeia: nome da dim no `cargas_config` (chave do dict) → atributo do
+# `Exercicio`. Mantemos o atributo `demanda_core` (não `carga_core`) por
+# retrocompat com o banco existente.
+
+_DIMS_CARGA_CSP: tuple[tuple[str, str], ...] = (
+    ("grip", "carga_grip"),
+    ("lombar", "carga_lombar"),
+    ("core", "demanda_core"),
+)
+
+
+def _cargas_config_ativo(cargas_config: Optional[dict[str, int]]) -> bool:
+    """True quando ao menos 1 dim tem threshold > 0. Pula constraint inteira
+    quando todos zeros — preserva 4.D byte-a-byte."""
+    if not cargas_config:
+        return False
+    for dim, _ in _DIMS_CARGA_CSP:
+        thr = cargas_config.get(dim, 0)
+        if thr and thr > 0:
+            return True
+    return False
+
+
+def _viola_carga_par(
+    ex_a: Exercicio, ex_b: Exercicio, cargas_config: dict[str, int]
+) -> Optional[tuple[str, int, int]]:
+    """Predicado: retorna `(dim, soma, threshold)` da PRIMEIRA dim violada
+    ou None se par compatível. Espelha `gerador_treino._bloqueio_cargas`
+    com leitura de motivo para decoding de aviso pós-solve."""
+    for dim, attr in _DIMS_CARGA_CSP:
+        thr = cargas_config.get(dim, 0) or 0
+        if thr <= 0:
+            continue
+        va = getattr(ex_a, attr, 0) or 0
+        vb = getattr(ex_b, attr, 0) or 0
+        if va >= 1 and vb >= 1 and (va + vb) >= thr:
+            return (dim, va + vb, thr)
+    return None
+
+
 def _tier_rank(exercicio: Exercicio) -> int:
     """Rank numérico do tier curado. Default 1 (= Acessório) se vazio.
 
@@ -309,6 +390,9 @@ def _construir_modelo(
     tamanho_preferido: int = 2,
     peso_tamanho_bloco: int = 0,
     travados_por_treino: Optional[dict[int, list[Exercicio]]] = None,
+    familias_proibidas: Optional[set[str]] = None,
+    cargas_config: Optional[dict[str, int]] = None,
+    peso_cargas_off: int = 1000,
 ) -> dict:
     """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
     penalidades de S-T1, Aderência ao Tier, S-B1 distância funcional
@@ -338,6 +422,40 @@ def _construir_modelo(
     preferido por bloco EM USO (vazios não contam). Equilibra trade-off
     da 4.B (S-B1 ativo empurra motor pra blocos solo) dando incentivo
     positivo a blocos com tamanho desejado pelo user.
+
+    `familias_proibidas` (Fatia 4.E, 2026-05-24): set de identificadores
+    `_familia_cross(ex)` de exercícios que NÃO podem aparecer (hard
+    cross-treino). Pré-filtra `pool_slot` dos slots non-travados — slot
+    travado bypassa (decisão deliberada do user supera regra automática,
+    igual 4.D). Em /regerar, adapter calcula este set a partir dos ex já
+    nos outros treinos da rotina. Default None = sem filtro extra (preserva
+    4.D byte-a-byte). Quando o caller quer "relaxar família se
+    necessário", `gerar_rotina_csp` faz 2 chamadas: 1ª com este set, 2ª
+    sem caso 1ª seja inviável (caller marca os relaxados).
+
+    `cargas_config` + `peso_cargas_off` (Fatia 4.E cargas, 2026-05-24): H-cargas
+    par-a-par dentro do bloco. `cargas_config` é dict `{"grip", "lombar",
+    "core"} → threshold int`. Pra cada par (a,b) NO MESMO BLOCO e cada dim d
+    com `thr[d] > 0`: bloqueia se `carga_d(a) >= 1 AND carga_d(b) >= 1 AND
+    carga_d(a) + carga_d(b) >= thr[d]`. Réplica fiel do antigo
+    (`gerador_treino._bloqueio_cargas`), não é cumulativa por bloco.
+
+    **Graceful degradation por bloco**: BoolVar `cargas_off_b[b]` por bloco
+    (default False) é forçada a True quando o solver não consegue evitar par
+    violador dentro do bloco. Objetivo: `peso_cargas_off * sum(cargas_off_b)`
+    (default peso=1000) — solver só desliga quando inviável. Caller decodifica
+    `cargas_off_por_bloco` por treino e gera avisos `relaxado_carga` analíticos
+    pós-solve (mirror de `gerador_treino:1469-1516`).
+
+    **Travados ENTRAM nos pares** (divergência intencional do antigo).
+    Travado tem `pool_slot=[ex]` (Fatia 4.D), então par travado+non-travado
+    violador força non-travado a mudar — "travado nunca some" preservado
+    naturalmente sem precisar de bypass extra.
+
+    `cargas_config=None` ou `{}` ou todas dims em 0 = constraint inteira
+    pulada (preserva 4.D byte-a-byte). `peso_cargas_off` é parametrizável
+    pra harness de calibração — manter alto pra garantir prioridade do
+    filtro sobre softs equivalentes.
 
     `travados_por_treino` (Fatia 4.D, 2026-05-24): dict `{t_idx: [Exercicio]}`
     de exercícios fixados pelo personal. Decisão clínica: travado é
@@ -382,6 +500,10 @@ def _construir_modelo(
         for ex in travs:
             nomes_travados.add(ex.nome)
 
+    # Fatia 4.E: famílias proibidas pré-filtram pools dos slots non-travados.
+    # Slot travado bypassa (igual 4.D — decisão do user supera regra).
+    fams_proibidas: set[str] = set(familias_proibidas or [])
+
     demandas_finais_por_treino: list[list[tuple[str, str, int]]] = []
     travados_por_slot_meta: dict[tuple[int, int, int], Exercicio] = {}
     for t_idx, demandas_orig in enumerate(demandas_por_treino):
@@ -423,8 +545,12 @@ def _construir_modelo(
             pool_default = _pool_da_demanda(banco_nivel, nivel, escopo)
             # Filtra nomes travados do pool default (slot non-travado nunca
             # repete um nome que está travado em algum slot da rotina).
+            # Fatia 4.E: também filtra famílias proibidas (cross-treino hard
+            # quando set não-vazio). `_familia_cross` cobre pai+filho.
             pool_default_sem_travados = [
-                e for e in pool_default if e.nome not in nomes_travados
+                e for e in pool_default
+                if e.nome not in nomes_travados
+                and _familia_cross(e) not in fams_proibidas
             ]
             g = {
                 "t_idx": t_idx, "di": di,
@@ -499,6 +625,12 @@ def _construir_modelo(
             bvars.append(b)
         if bvars:
             model.AddExactlyOne(bvars)
+        else:
+            # Pool vazio (filtro extremo — ex: familias_proibidas da 4.E
+            # esvaziou o pool e não há travado pra este slot). Força
+            # inviabilidade trivial — gerar_rotina_csp lida com retry
+            # via `relaxar_familia` se aplicável.
+            model.AddBoolOr([])
 
     # ── AllDifferent global (por nome do exercício) — cross-treino.
     # Mantém comportamento do gerador antigo (nomes_exatos_globais).
@@ -770,6 +902,80 @@ def _construir_modelo(
                 model.Add(pen_b == peso_tamanho_bloco * desvio_b)
                 penalidades.append(pen_b)
 
+    # ── H-cargas (Fatia 4.E cargas): par-a-par dentro do bloco ──────────────
+    # Pra cada par (s1, s2) no mesmo treino e par de candidatos (c1, c2)
+    # violador em alguma dimensão, e cada bloco possível b do treino:
+    #   assign[s1,c1] + assign[s2,c2] + X[s1,b] + X[s2,b] - 3 <= cargas_off_b[b]
+    # Linearização do AND (4 BoolVars): quando os 4 são True (lado esquerdo=1),
+    # força `cargas_off_b[b] = 1`. Quando ≤3 True (lado esquerdo ≤ 0),
+    # restrição trivial (cargas_off_b livre = 0 por padrão pelo objetivo).
+    #
+    # Default: `cargas_off_b[b]` = 0 (filtro ativo). Solver desliga (=1) só
+    # quando inviável satisfazer todos os pares; penalty `peso_cargas_off`
+    # (default 1000) no objetivo garante isso.
+    #
+    # Travados ENTRAM nos pares: ex_travado tem pool_slot=[ex_travado] (4.D),
+    # então par travado+non-travado violador força non-travado a mudar.
+    # Travado vs travado (mesmo treino, ambos pool de 1): só relevante se
+    # estiverem no mesmo bloco — aí cargas_off_b vira True (decisão do user
+    # supera regra automática, comportamento esperado).
+    #
+    # Pré-processamento (out-of-loop): identificar pares violadores
+    # `pares_violadores_por_treino[t_idx]` = list[(s1, c1, s2, c2, motivo)].
+    # Motivo = (dim, soma, threshold) da PRIMEIRA dim violada — usado pra
+    # gerar aviso pós-solve. Evita produto cartesiano repetido dentro do
+    # add-constraint loop.
+    cargas_off_b: dict[tuple[int, int], cp_model.IntVar] = {}
+    pares_violadores_por_treino: dict[int, list[tuple]] = {}
+    cargas_ativo = _cargas_config_ativo(cargas_config)
+    if cargas_ativo:
+        for t_idx, sids_t in slots_por_treino.items():
+            max_b = len(sids_t)
+            pares_violadores: list[tuple] = []
+
+            # Detecta pares (s1, s2, c1, c2, motivo) violadores no treino.
+            for ai in range(len(sids_t)):
+                for bj in range(ai + 1, len(sids_t)):
+                    s1 = sids_t[ai]
+                    s2 = sids_t[bj]
+                    pool1 = slot_por_sid[s1]["pool_slot"]
+                    pool2 = slot_por_sid[s2]["pool_slot"]
+                    for c1, ex_a in enumerate(pool1):
+                        for c2, ex_b in enumerate(pool2):
+                            motivo = _viola_carga_par(ex_a, ex_b, cargas_config)
+                            if motivo is None:
+                                continue
+                            pares_violadores.append((s1, c1, s2, c2, motivo))
+            pares_violadores_por_treino[t_idx] = pares_violadores
+
+            if not pares_violadores:
+                continue  # nenhum par violador no treino: não cria cargas_off_b
+
+            # Cria cargas_off_b por bloco do treino.
+            for b in range(max_b):
+                v = model.NewBoolVar(f"cargas_off_t{t_idx}_b{b}")
+                cargas_off_b[(t_idx, b)] = v
+
+            # Adiciona restrição por par violador × bloco.
+            for s1, c1, s2, c2, _motivo in pares_violadores:
+                for b in range(max_b):
+                    model.Add(
+                        assign[(s1, c1)]
+                        + assign[(s2, c2)]
+                        + slot_to_bloco_vars[s1][b]
+                        + slot_to_bloco_vars[s2][b]
+                        - 3
+                        <= cargas_off_b[(t_idx, b)]
+                    )
+
+            # Penalty no objetivo: peso_cargas_off * sum(cargas_off_b).
+            for b in range(max_b):
+                pen_carga = model.NewIntVar(
+                    0, peso_cargas_off, f"cargas_pen_t{t_idx}_b{b}",
+                )
+                model.Add(pen_carga == peso_cargas_off * cargas_off_b[(t_idx, b)])
+                penalidades.append(pen_carga)
+
     # ── Aderência ao Tier (SOFT, Frente D Fatia 3): por slot ────────────────
     # `aderencia_pen[s] = (rank_max - tier_rank[s]) * peso_aderencia`
     # Slot com Principal (rank=3): pen = 0. Acessório (rank=1): pen = 2*peso.
@@ -803,6 +1009,19 @@ def _construir_modelo(
         # `travado`). Caller usa em _decode_solucao pra resolver o ex
         # escolhido pelo cidx (pool por slot ≠ pool por grupo).
         "slot_por_sid": slot_por_sid,
+        # Fatia 4.E cargas: BoolVar `cargas_off_b[(t_idx, b)]` indicando
+        # quando o filtro foi desligado naquele bloco (graceful degradation).
+        # Caller decode lê via `solver.Value(...)` pra gerar avisos
+        # `relaxado_carga` analíticos pós-solve. Dict vazio quando
+        # cargas_config inativo (preserva 4.D byte-a-byte).
+        "cargas_off_b": cargas_off_b,
+        # Lista por treino de (s1, c1, s2, c2, motivo) violadores — usada
+        # pelo decoder pra emitir aviso `relaxado_carga` quando bloco
+        # desligado contém pares violadores efetivamente atribuídos.
+        "pares_violadores_por_treino": pares_violadores_por_treino,
+        # Reflete `cargas_config` recebido — caller usa pra decidir se gera
+        # avisos pós-solve.
+        "cargas_config": cargas_config,
     }
 
 
@@ -873,6 +1092,82 @@ def _decode_solucao(
     return out
 
 
+def _avisos_carga_por_treino(
+    sid_to_cidx: dict[int, int],
+    sid_to_bloco: dict[int, int],
+    cargas_off_por_tb: dict[tuple[int, int], int],
+    pares_violadores_por_treino: dict[int, list[tuple]],
+    slot_por_sid: dict[int, dict],
+    n_treinos: int,
+) -> dict[int, list[dict]]:
+    """Decodifica avisos `relaxado_carga` a partir da solução.
+
+    Para cada treino, percorre `pares_violadores_por_treino[t]` e verifica
+    se o par está EFETIVAMENTE atribuído (cidx correto em ambos slots) E
+    no mesmo bloco efetivo. Se sim, e o bloco tem `cargas_off_b=True`,
+    emite aviso espelhando o formato do antigo (`gerador_treino:1505-1516`):
+
+        {
+            "tipo": "relaxado_carga",
+            "bloco_idx": int (1-based no log do antigo? aqui 0-based,
+                consistente com `Sessao.blocos`),
+            "exercicio": str  (nome do ex_a — primeiro do par),
+            "par_bloqueado": str (nome do ex_b — segundo),
+            "dimensao": str,
+            "soma": int,
+            "threshold": int,
+        }
+
+    O `bloco_idx` retornado é o `bloco_idx` LÓGICO (0..max_b-1) do treino.
+    Decoder consumidor pode remapear pra 0..N_blocos_usados-1 pra alinhar
+    com `Sessao.blocos` (ordem cronológica) se quiser.
+
+    Dedup por `(bloco_efetivo, frozenset({ex_a, ex_b}))` — múltiplos motivos
+    de dim no mesmo par viram 1 aviso só (primeiro motivo wins, igual antigo).
+
+    Retorna `{t_idx: [avisos]}` apenas pros treinos com avisos.
+    """
+    out: dict[int, list[dict]] = {}
+    for t_idx in range(n_treinos):
+        pares = pares_violadores_por_treino.get(t_idx, [])
+        if not pares:
+            continue
+        avisos: list[dict] = []
+        emitidos: set[tuple] = set()
+        for s1, c1, s2, c2, motivo in pares:
+            if sid_to_cidx.get(s1) != c1:
+                continue
+            if sid_to_cidx.get(s2) != c2:
+                continue
+            b1 = sid_to_bloco.get(s1)
+            b2 = sid_to_bloco.get(s2)
+            if b1 is None or b2 is None or b1 != b2:
+                continue  # par caiu em blocos diferentes — sem violação
+            b = b1
+            if cargas_off_por_tb.get((t_idx, b), 0) != 1:
+                continue  # filtro não foi desligado nesse bloco (não deveria
+                          # acontecer se constraint correta, mas defensivo)
+            ex_a = slot_por_sid[s1]["pool_slot"][c1]
+            ex_b = slot_por_sid[s2]["pool_slot"][c2]
+            key = (b, frozenset({ex_a.nome, ex_b.nome}))
+            if key in emitidos:
+                continue
+            emitidos.add(key)
+            dim, soma, thr = motivo
+            avisos.append({
+                "tipo": "relaxado_carga",
+                "bloco_idx": b,
+                "exercicio": ex_a.nome,
+                "par_bloqueado": ex_b.nome,
+                "dimensao": dim,
+                "soma": soma,
+                "threshold": thr,
+            })
+        if avisos:
+            out[t_idx] = avisos
+    return out
+
+
 class _SolucoesCollector(cp_model.CpSolverSolutionCallback):
     """Callback que coleta todas as soluções enumeradas até `max_solucoes`.
 
@@ -887,6 +1182,7 @@ class _SolucoesCollector(cp_model.CpSolverSolutionCallback):
         var_total_penalidade: Optional[cp_model.IntVar],
         max_solucoes: int,
         bloco_idx: Optional[dict[int, cp_model.IntVar]] = None,
+        cargas_off_b: Optional[dict[tuple[int, int], cp_model.IntVar]] = None,
     ) -> None:
         super().__init__()
         self._assign_por_sid: dict[int, list[tuple[int, object]]] = defaultdict(list)
@@ -895,9 +1191,12 @@ class _SolucoesCollector(cp_model.CpSolverSolutionCallback):
         self._var_total = var_total_penalidade
         self._max = max_solucoes
         self._bloco_idx = bloco_idx  # Fatia 4.A: capturado por solução
+        self._cargas_off_b = cargas_off_b or {}  # Fatia 4.E cargas
         self.solucoes: list[dict[int, int]] = []
         self.inversoes: list[int] = []
         self.blocos: list[dict[int, int]] = []  # Fatia 4.A: sid → bloco_idx
+        # Fatia 4.E cargas: por solução, mapa (t_idx, b) → 0/1.
+        self.cargas_off: list[dict[tuple[int, int], int]] = []
 
     def on_solution_callback(self) -> None:
         sol: dict[int, int] = {}
@@ -914,6 +1213,14 @@ class _SolucoesCollector(cp_model.CpSolverSolutionCallback):
             self.blocos.append({sid: int(self.Value(v)) for sid, v in self._bloco_idx.items()})
         else:
             self.blocos.append({})
+        # Fatia 4.E cargas: extrai cargas_off_b por (t_idx, b) pra decoder
+        # gerar avisos `relaxado_carga`.
+        if self._cargas_off_b:
+            self.cargas_off.append({
+                tb: int(self.Value(v)) for tb, v in self._cargas_off_b.items()
+            })
+        else:
+            self.cargas_off.append({})
         if len(self.solucoes) >= self._max:
             self.StopSearch()
 
@@ -921,6 +1228,40 @@ class _SolucoesCollector(cp_model.CpSolverSolutionCallback):
 # ---------------------------------------------------------------------------
 # Engine CP-SAT — rotina inteira (N treinos negociados no mesmo modelo)
 # ---------------------------------------------------------------------------
+
+def _identificar_relaxados_por_familia(
+    rotina: dict,
+    familias_originais: set[str],
+    travados_por_treino: Optional[dict[int, list[Exercicio]]],
+) -> dict[int, list[str]]:
+    """Pra cada treino da rotina viável, identifica os ex cuja família
+    estava no set proibido pré-relax. Esses são os "relaxados" que vão
+    receber badge ↻ na UI e gerar aviso `familia_repetida`.
+
+    Travados são pulados — travado é decisão deliberada do user (princípio
+    da 4.D), não conta como "relaxamento de regra automática".
+
+    Retorna `{t_idx: [nome_ex, ...]}` apenas pros treinos que tiveram
+    pelo menos 1 relaxado.
+    """
+    travados_set: set[tuple[int, str]] = set()
+    for t_idx, exs in (travados_por_treino or {}).items():
+        for ex in exs:
+            travados_set.add((t_idx, ex.nome))
+
+    out: dict[int, list[str]] = {}
+    for t_idx, treino in enumerate(rotina.get("treinos", [])):
+        nomes_rel: list[str] = []
+        for grupo in treino["grupos"]:
+            for ex in grupo["exercicios"]:
+                if (t_idx, ex.nome) in travados_set:
+                    continue
+                if _familia_cross(ex) in familias_originais:
+                    nomes_rel.append(ex.nome)
+        if nomes_rel:
+            out[t_idx] = nomes_rel
+    return out
+
 
 def gerar_rotina_csp(
     demandas_por_treino: list[list[tuple[str, str, int]]],
@@ -933,6 +1274,10 @@ def gerar_rotina_csp(
     tamanho_preferido: int = 2,
     peso_tamanho_bloco: int = 0,
     travados_por_treino: Optional[dict[int, list[Exercicio]]] = None,
+    familias_proibidas: Optional[set[str]] = None,
+    relaxar_familia: bool = False,
+    cargas_config: Optional[dict[str, int]] = None,
+    peso_cargas_off: int = 1000,
 ) -> dict:
     """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
     negociam no mesmo modelo — necessário pra H-R1 cross-treino.
@@ -948,6 +1293,21 @@ def gerar_rotina_csp(
     byte-a-byte Frente B). >0 adiciona penalty por slot proporcional a
     `(rank_max - rank_slot) * peso` — ver `_construir_modelo`.
 
+    `familias_proibidas` (Fatia 4.E, 2026-05-24): set de identificadores
+    `_familia_cross(ex)` que não podem aparecer (hard cross-treino, pré-
+    filtra pools dos slots non-travados). Quando o adapter de /regerar
+    chama este motor pra regerar 1 treino, calcula este set a partir
+    dos ex já nos OUTROS treinos da rotina — substitui o filtro extra-
+    solver da Frente C. None ou vazio = preserva 4.D byte-a-byte.
+
+    `relaxar_familia` (Fatia 4.E, 2026-05-24): quando True E o solve com
+    `familias_proibidas` é inviável, refaz o solve com `familias_proibidas
+    = set()` (relaxa). Identifica os ex relaxados via
+    `_identificar_relaxados_por_familia` e expõe em `relaxados_por_treino`
+    do retorno (caller propaga pra `Sessao.relaxados` + gera aviso
+    `familia_repetida`). Default False = comportamento estrito (motor
+    devolve inviável quando family hard não passa, igual pré-4.E).
+
     Retorna dict com:
       - top-level: `viavel`, `status`, `nivel_aluno`, `seed`, `solve_time`,
         `inversoes_totais` (soma cross-treino de S-T1).
@@ -956,20 +1316,66 @@ def gerar_rotina_csp(
       - `variedade` (só quando ConfigVariedade ativa): metadados da
         enumeração (n_solucoes, distancia_escolhida, optimal_value,
         enumeracao_limitada, tempo por fase).
+      - `relaxados_por_treino` (Fatia 4.E): dict `{t_idx: [nome, ...]}`
+        dos ex relaxados (vazio quando relax não foi acionado).
+      - `relax_ativado` (Fatia 4.E): True só quando 1ª tentativa estrita
+        falhou E relaxar_familia=True E 2ª tentativa relaxada teve sucesso.
+      - `avisos_carga_por_treino` (Fatia 4.E cargas): dict `{t_idx: [aviso]}`
+        de avisos `relaxado_carga` emitidos pós-solve (apenas treinos com
+        ao menos 1 bloco com filtro desligado). Vazio quando cargas_config
+        inativo ou nenhum bloco precisou desligar.
+
+    `cargas_config` + `peso_cargas_off` (Fatia 4.E cargas, 2026-05-24):
+    H-cargas par-a-par no bloco (réplica do filtro antigo). Ver docstring
+    de `_construir_modelo`. None / dict vazio / todas dims 0 = constraint
+    inteira pulada (preserva 4.D byte-a-byte).
     """
-    if variedade is None:
-        return _resolver_legacy(
-            demandas_por_treino, banco, nivel_aluno, seed,
+    def _resolver(fams_arg: Optional[set[str]]) -> dict:
+        if variedade is None:
+            return _resolver_legacy(
+                demandas_por_treino, banco, nivel_aluno, seed,
+                peso_aderencia, peso_evitar_agonistas,
+                tamanho_preferido, peso_tamanho_bloco,
+                travados_por_treino,
+                familias_proibidas=fams_arg,
+                cargas_config=cargas_config,
+                peso_cargas_off=peso_cargas_off,
+            )
+        return _resolver_com_variedade(
+            demandas_por_treino, banco, nivel_aluno, seed, variedade,
             peso_aderencia, peso_evitar_agonistas,
             tamanho_preferido, peso_tamanho_bloco,
             travados_por_treino,
+            familias_proibidas=fams_arg,
+            cargas_config=cargas_config,
+            peso_cargas_off=peso_cargas_off,
         )
-    return _resolver_com_variedade(
-        demandas_por_treino, banco, nivel_aluno, seed, variedade,
-        peso_aderencia, peso_evitar_agonistas,
-        tamanho_preferido, peso_tamanho_bloco,
-        travados_por_treino,
+
+    fams_originais = set(familias_proibidas or [])
+
+    # 1ª passagem: estrito (com familias_proibidas se houver).
+    rotina = _resolver(fams_originais if fams_originais else None)
+
+    # Não precisa relax: viável OR sem famílias pra proibir OR toggle off.
+    if rotina["viavel"] or not fams_originais or not relaxar_familia:
+        rotina["relaxados_por_treino"] = {}
+        rotina["relax_ativado"] = False
+        return rotina
+
+    # 2ª passagem: relax. Refaz sem o filtro de família.
+    rotina_relax = _resolver(None)
+    if not rotina_relax["viavel"]:
+        # Mesmo relaxado, inviável — devolve a 1ª (também inviável).
+        rotina["relaxados_por_treino"] = {}
+        rotina["relax_ativado"] = False
+        return rotina
+
+    relaxados = _identificar_relaxados_por_familia(
+        rotina_relax, fams_originais, travados_por_treino
     )
+    rotina_relax["relaxados_por_treino"] = relaxados
+    rotina_relax["relax_ativado"] = True
+    return rotina_relax
 
 
 def _resolver_legacy(
@@ -982,6 +1388,9 @@ def _resolver_legacy(
     tamanho_preferido: int = 2,
     peso_tamanho_bloco: int = 0,
     travados_por_treino: Optional[dict[int, list[Exercicio]]] = None,
+    familias_proibidas: Optional[set[str]] = None,
+    cargas_config: Optional[dict[str, int]] = None,
+    peso_cargas_off: int = 1000,
 ) -> dict:
     """Branch legado: 1 solve com Minimize → 1 solução determinística por
     seed. Preserva byte-a-byte o comportamento da Fatia 2 P2 quando
@@ -992,6 +1401,9 @@ def _resolver_legacy(
         peso_aderencia, peso_evitar_agonistas,
         tamanho_preferido, peso_tamanho_bloco,
         travados_por_treino=travados_por_treino,
+        familias_proibidas=familias_proibidas,
+        cargas_config=cargas_config,
+        peso_cargas_off=peso_cargas_off,
     )
     if md["penalidades"]:
         md["model"].Minimize(sum(md["penalidades"]))
@@ -1017,6 +1429,7 @@ def _resolver_legacy(
         ),
         "h_r1_aplicadas": md["h_r1_aplicadas"],
         "treinos": [],
+        "avisos_carga_por_treino": {},
     }
     if not viavel:
         return resultado
@@ -1036,6 +1449,15 @@ def _resolver_legacy(
         md["treinos"], sid_to_cidx, sid_to_bloco,
         slot_por_sid=md["slot_por_sid"],
     )
+    # Fatia 4.E cargas: decodifica avisos `relaxado_carga` pós-solve.
+    cargas_off_por_tb: dict[tuple[int, int], int] = {
+        tb: int(solver.Value(v)) for tb, v in md["cargas_off_b"].items()
+    }
+    resultado["avisos_carga_por_treino"] = _avisos_carga_por_treino(
+        sid_to_cidx, sid_to_bloco, cargas_off_por_tb,
+        md["pares_violadores_por_treino"], md["slot_por_sid"],
+        n_treinos=len(md["treinos"]),
+    )
     return resultado
 
 
@@ -1050,6 +1472,9 @@ def _resolver_com_variedade(
     tamanho_preferido: int = 2,
     peso_tamanho_bloco: int = 0,
     travados_por_treino: Optional[dict[int, list[Exercicio]]] = None,
+    familias_proibidas: Optional[set[str]] = None,
+    cargas_config: Optional[dict[str, int]] = None,
+    peso_cargas_off: int = 1000,
 ) -> dict:
     """Branch variedade (Frente B Fatia 3): 2 fases.
 
@@ -1077,6 +1502,9 @@ def _resolver_com_variedade(
         peso_aderencia, peso_evitar_agonistas,
         tamanho_preferido, peso_tamanho_bloco,
         travados_por_treino=travados_por_treino,
+        familias_proibidas=familias_proibidas,
+        cargas_config=cargas_config,
+        peso_cargas_off=peso_cargas_off,
     )
     if md1["penalidades"]:
         md1["model"].Minimize(sum(md1["penalidades"]))
@@ -1099,6 +1527,7 @@ def _resolver_com_variedade(
             "inversoes_totais": 0,
             "h_r1_aplicadas": md1["h_r1_aplicadas"],
             "treinos": [],
+            "avisos_carga_por_treino": {},
             "variedade": _meta_variedade(variedade, n=0, dist=None, opt=None,
                                          lim=False, t1=time_p1, t2=0.0),
         }
@@ -1116,10 +1545,23 @@ def _resolver_com_variedade(
         peso_aderencia, peso_evitar_agonistas,
         tamanho_preferido, peso_tamanho_bloco,
         travados_por_treino=travados_por_treino,
+        familias_proibidas=familias_proibidas,
+        cargas_config=cargas_config,
+        peso_cargas_off=peso_cargas_off,
     )
     var_total: Optional[cp_model.IntVar] = None
     if md2["penalidades"]:
-        teto = max(TIER_RANK.values()) * len(md2["penalidades"])
+        # Fatia 4.E cargas: teto agora precisa incluir peso_cargas_off por
+        # bloco (pode ser muito maior que rank_max * len). Usa upper bound
+        # do número de termos × maior peso possível por termo.
+        teto_por_termo = max(
+            max(TIER_RANK.values()),
+            peso_cargas_off if cargas_config else 0,
+            peso_evitar_agonistas,
+            peso_aderencia * max(TIER_RANK.values()) if peso_aderencia else 0,
+            peso_tamanho_bloco * TAMANHO_MAX_BLOCO if peso_tamanho_bloco else 0,
+        )
+        teto = max(1, teto_por_termo) * len(md2["penalidades"])
         var_total = md2["model"].NewIntVar(0, teto, "var_total")
         md2["model"].Add(var_total == sum(md2["penalidades"]))
         md2["model"].Add(var_total <= optimal + variedade.slack)
@@ -1127,6 +1569,7 @@ def _resolver_com_variedade(
     collector = _SolucoesCollector(
         md2["assign"], var_total, variedade.max_solucoes,
         bloco_idx=md2["bloco_idx"],  # Fatia 4.A: captura blocos por solução
+        cargas_off_b=md2["cargas_off_b"],  # Fatia 4.E cargas
     )
     solver2 = cp_model.CpSolver()
     solver2.parameters.random_seed = seed
@@ -1155,6 +1598,9 @@ def _resolver_com_variedade(
             peso_aderencia, peso_evitar_agonistas,
             tamanho_preferido, peso_tamanho_bloco,
             travados_por_treino,
+            familias_proibidas=familias_proibidas,
+            cargas_config=cargas_config,
+            peso_cargas_off=peso_cargas_off,
         ) | {
             "variedade": _meta_variedade(variedade, n=0, dist=None, opt=optimal,
                                          lim=False, t1=time_p1, t2=time_p2),
@@ -1206,6 +1652,14 @@ def _resolver_com_variedade(
     chosen_dist = distancias[chosen_idx]
     chosen_hamming = hamming[chosen_idx]
     chosen_blocos = collector.blocos[chosen_idx]  # Fatia 4.A
+    chosen_cargas_off = collector.cargas_off[chosen_idx]  # Fatia 4.E cargas
+
+    # Fatia 4.E cargas: decodifica avisos `relaxado_carga` pós-solve.
+    avisos_carga = _avisos_carga_por_treino(
+        chosen_sol, chosen_blocos, chosen_cargas_off,
+        md2["pares_violadores_por_treino"], md2["slot_por_sid"],
+        n_treinos=len(md2["treinos"]),
+    )
 
     return {
         "status": solver1.StatusName(status1),
@@ -1219,6 +1673,7 @@ def _resolver_com_variedade(
             md2["treinos"], chosen_sol, chosen_blocos,
             slot_por_sid=md2["slot_por_sid"],
         ),
+        "avisos_carga_por_treino": avisos_carga,
         "variedade": _meta_variedade(
             variedade,
             n=len(collector.solucoes),
@@ -1274,6 +1729,10 @@ def gerar_treino_csp(
     tamanho_preferido: int = 2,
     peso_tamanho_bloco: int = 0,
     travados: Optional[list[Exercicio]] = None,
+    familias_proibidas: Optional[set[str]] = None,
+    relaxar_familia: bool = False,
+    cargas_config: Optional[dict[str, int]] = None,
+    peso_cargas_off: int = 1000,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
@@ -1298,6 +1757,22 @@ def gerar_treino_csp(
 
     `travados` (Fatia 4.D): lista de exercícios fixados pelo personal
     para este treino. None ou lista vazia preserva comportamento pré-4.D.
+
+    `familias_proibidas` (Fatia 4.E): set de identificadores
+    `_familia_cross(ex)` que NÃO podem aparecer (bloqueio hard cross-treino
+    quando o adapter chama este wrapper pra regerar 1 treino isolado).
+    None ou vazio preserva comportamento pré-4.E.
+
+    `relaxar_familia` (Fatia 4.E): quando True E o solve estrito for
+    inviável, motor refaz sem o filtro de família. Retorna chave
+    `relaxados: list[str]` com nomes dos ex que violaram a regra original
+    (caller propaga pra `Sessao.relaxados` + gera aviso `familia_repetida`).
+
+    `cargas_config` + `peso_cargas_off` (Fatia 4.E cargas): H-cargas
+    par-a-par no bloco. Dict `{"grip"/"lombar"/"core" → threshold int}`.
+    Retorna chave `avisos_carga: list[dict]` com avisos `relaxado_carga`
+    deste treino (vazio quando nenhum bloco precisou desligar o filtro).
+    None ou dict vazio preserva comportamento pré-4.E cargas (filtro OFF).
     """
     travados_por_treino_arg = {0: list(travados)} if travados else None
     rotina = gerar_rotina_csp(
@@ -1308,6 +1783,10 @@ def gerar_treino_csp(
         tamanho_preferido=tamanho_preferido,
         peso_tamanho_bloco=peso_tamanho_bloco,
         travados_por_treino=travados_por_treino_arg,
+        familias_proibidas=familias_proibidas,
+        relaxar_familia=relaxar_familia,
+        cargas_config=cargas_config,
+        peso_cargas_off=peso_cargas_off,
     )
     if not rotina["viavel"]:
         out = {
@@ -1336,6 +1815,9 @@ def gerar_treino_csp(
         # Fatia 4.A: propaga blocos pra o adapter consumir.
         "blocos": t0.get("blocos", []),
         "h_r1_aplicadas": rotina["h_r1_aplicadas"],
+        # Fatia 4.E: lista de nomes relaxados deste treino (treino_idx=0).
+        "relaxados": rotina.get("relaxados_por_treino", {}).get(0, []),
+        "relax_ativado": rotina.get("relax_ativado", False),
     }
     if "variedade" in rotina:
         out["variedade"] = rotina["variedade"]
