@@ -1965,13 +1965,15 @@ def treino_regerar(t):
     (`gerador_csp.gerar_treino_csp` + `ConfigVariedade()`).
 
     Features do gerador antigo que SÃO IGNORADAS aqui (motor novo ainda
-    não cobre — ver handoff_fatia_3_frente_c.txt): tamanho_bloco,
-    evitar_agonistas, relaxar_familia, cargas_config, exercicios_travados,
-    lateralidade_por_padrao (mas split squat_bi/squat_uni continua via
-    `_expandir_demanda_csp`).
+    não cobre — ver handoff_fatia_3_frente_c.txt): relaxar_familia,
+    cargas_config, lateralidade_por_padrao (mas split squat_bi/squat_uni
+    continua via `_expandir_demanda_csp`).
 
-    Saída: lista linear de blocos solo (labels A/B/C…). Pareamento real
-    de blocos fica pra Fatia 4 (S-B do catálogo).
+    Features já cobertas pelo CSP: tamanho_bloco (4.C), evitar_agonistas
+    (4.B), exercicios_travados (4.D — travados bypassam H-P1/H-T4/AllDiff
+    cross-treino e participam de S-T1/S-B1/S-B4/Aderência).
+
+    Saída: blocos estruturados pelo motor (Fatia 4.A+), labels A/B/C…
     """
     global sessoes_ativas
     if t >= len(sessoes_ativas): return "Treino não encontrado", 404
@@ -1997,6 +1999,16 @@ def treino_regerar(t):
                    and e.nome not in pais_dos_outros
                    and (e.variacao_de is None or e.variacao_de not in nomes_outros)]
 
+    # Fatia 4.D: travados bypassam o filtro cross-treino (decisão do
+    # personal supera regra automática). Adiciona travados de volta ao
+    # banco_regen se foram filtrados.
+    travados_cfg = list(cfg_r.get("exercicios_travados") or [])
+    if travados_cfg:
+        nomes_no_banco_regen = {e.nome for e in banco_regen}
+        for ex_trav in travados_cfg:
+            if ex_trav.nome not in nomes_no_banco_regen:
+                banco_regen.append(ex_trav)
+
     # Mapeia cfg antiga → demandas CSP + nível do aluno via session.
     demandas_csp = _cfg_antiga_pra_demandas_csp(cfg_r)
     aluno_id_sel = session.get("aluno_id") or (edicao_hub.get("aluno_id") if edicao_hub else None)
@@ -2017,6 +2029,7 @@ def treino_regerar(t):
             peso_evitar_agonistas=peso_evitar_agon,
             tamanho_preferido=tam_pref,
             peso_tamanho_bloco=peso_tam,
+            travados=travados_cfg or None,
         )
         nome_custom = cfg_r.get("nome_custom", "")
         tipo_label = nome_custom or sessoes_ativas[t].tipo

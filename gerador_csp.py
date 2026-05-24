@@ -35,6 +35,7 @@ from gerador_treino import (
     PADRAO_PARA_SUBREGIAO,
     GRUPO_MUSCULAR_PADRAO,  # Fatia 4.B: agrupamento push/pull/quad/... pro S-B1
     XLSX_PATH,
+    _padroes_de_escopo,  # Fatia 4.D: expande escopo de demanda → padrões cobertos
 )
 # H-T3 reusa a configuração canônica de subregiões com lateralidade hard.
 from pesos_proximidade import SUBREGIOES_LATERALIDADE_HARD
@@ -307,6 +308,7 @@ def _construir_modelo(
     peso_evitar_agonistas: int = 0,
     tamanho_preferido: int = 2,
     peso_tamanho_bloco: int = 0,
+    travados_por_treino: Optional[dict[int, list[Exercicio]]] = None,
 ) -> dict:
     """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
     penalidades de S-T1, Aderência ao Tier, S-B1 distância funcional
@@ -337,6 +339,22 @@ def _construir_modelo(
     da 4.B (S-B1 ativo empurra motor pra blocos solo) dando incentivo
     positivo a blocos com tamanho desejado pelo user.
 
+    `travados_por_treino` (Fatia 4.D, 2026-05-24): dict `{t_idx: [Exercicio]}`
+    de exercícios fixados pelo personal. Decisão clínica: travado é
+    deliberação do user e supera regras automáticas. Cada travado tenta
+    consumir uma vaga da PRIMEIRA demanda do treino cujo escopo cobre o
+    padrão do travado (mesma lógica do motor antigo); sem demanda
+    compatível, vira demanda virtual extra `("padrao", ex.padrao, 1)` —
+    treino sai com N+1 exercícios. Slot do travado tem pool de 1
+    elemento (o próprio travado), participa de TODAS as constraints
+    soft (S-T1, S-B1, S-B4, Aderência) e das hard intra-treino (H-T1/T2/T3
+    aplicam se relevante; H-T4 bypassa pra slots travados pois travado
+    supera regra "vaga única ≠ Acessório"). Travados bypassam:
+    H-P1 (complexidade do nível), AllDifferent global cross-treino entre
+    travados (mesmo travado pode aparecer em treinos diferentes — análogo
+    ao antigo). Nomes travados são REMOVIDOS dos pools dos slots
+    non-travados, garantindo unicidade sem conflito.
+
     Devolve dict com:
       - model: CpModel sem objetivo definido
       - assign: dict[(sid, cidx)] -> BoolVar
@@ -352,22 +370,81 @@ def _construir_modelo(
 
     model = cp_model.CpModel()
 
+    # ── Fatia 4.D: pré-processamento de travados ────────────────────────────
+    # Pra cada travado, identifica primeira demanda compatível (cujo escopo
+    # cobre `ex.padrao`); sem compatível, cria demanda virtual extra.
+    # Resultado: `demandas_finais_por_treino` (originais + virtuais) +
+    # `travados_por_slot_meta` que mapeia (t_idx, di, pos) -> Exercicio
+    # pra reservar o slot daquele travado.
+    travados_por_treino = travados_por_treino or {}
+    nomes_travados: set[str] = set()
+    for travs in travados_por_treino.values():
+        for ex in travs:
+            nomes_travados.add(ex.nome)
+
+    demandas_finais_por_treino: list[list[tuple[str, str, int]]] = []
+    travados_por_slot_meta: dict[tuple[int, int, int], Exercicio] = {}
+    for t_idx, demandas_orig in enumerate(demandas_por_treino):
+        travados_t = list(travados_por_treino.get(t_idx, []))
+        demandas_t = list(demandas_orig)
+        reservados: dict[int, int] = defaultdict(int)
+        for ex in travados_t:
+            encaixou = False
+            for di, (nv, esc, qt) in enumerate(demandas_t):
+                # Só considera demandas originais (não as virtuais que já adicionamos)
+                if di >= len(demandas_orig):
+                    continue
+                if reservados[di] >= qt:
+                    continue
+                padroes_cobertos = set(_padroes_de_escopo(nv, esc))
+                if ex.padrao in padroes_cobertos:
+                    pos = reservados[di]
+                    travados_por_slot_meta[(t_idx, di, pos)] = ex
+                    reservados[di] += 1
+                    encaixou = True
+                    break
+            if not encaixou:
+                # Demanda virtual extra (nivel padrao, qtd 1)
+                di_extra = len(demandas_t)
+                demandas_t.append(("padrao", ex.padrao, 1))
+                travados_por_slot_meta[(t_idx, di_extra, 0)] = ex
+        demandas_finais_por_treino.append(demandas_t)
+
     # ── Monta treinos → grupos → slots (sid_global único cross-treino) ──────
+    # Pool POR SLOT (Fatia 4.D): slot travado tem pool de 1 elemento (o
+    # próprio travado); slot non-travado tem pool default da demanda menos
+    # nomes que estão travados em qualquer treino (evita conflito de
+    # unicidade entre slot travado e slot non-travado com mesma opção).
     treinos: list[list[dict]] = []
     slots_globais: list[dict] = []
-    for t_idx, demandas in enumerate(demandas_por_treino):
+    for t_idx, demandas in enumerate(demandas_finais_por_treino):
         grupos_t: list[dict] = []
         for di, (nivel, escopo, qtd) in enumerate(demandas):
-            pool = _pool_da_demanda(banco_nivel, nivel, escopo)
+            pool_default = _pool_da_demanda(banco_nivel, nivel, escopo)
+            # Filtra nomes travados do pool default (slot non-travado nunca
+            # repete um nome que está travado em algum slot da rotina).
+            pool_default_sem_travados = [
+                e for e in pool_default if e.nome not in nomes_travados
+            ]
             g = {
                 "t_idx": t_idx, "di": di,
                 "demanda": (nivel, escopo, qtd),
-                "pool": pool, "slot_ids": [],
+                "pool": pool_default,  # default original, usado por H-T4 (não dispara em travados)
+                "slot_ids": [],
             }
             grupos_t.append(g)
-            for _pos in range(qtd):
+            for pos in range(qtd):
                 sid = len(slots_globais)
-                slots_globais.append({"sid": sid, "t_idx": t_idx, "di": di})
+                ex_travado = travados_por_slot_meta.get((t_idx, di, pos))
+                if ex_travado is not None:
+                    pool_slot = [ex_travado]
+                else:
+                    pool_slot = pool_default_sem_travados
+                slots_globais.append({
+                    "sid": sid, "t_idx": t_idx, "di": di,
+                    "pool_slot": pool_slot,
+                    "travado": ex_travado is not None,
+                })
                 g["slot_ids"].append(sid)
         treinos.append(grupos_t)
 
@@ -375,6 +452,8 @@ def _construir_modelo(
     grupo_por_idx: dict[tuple[int, int], dict] = {
         (g["t_idx"], g["di"]): g for grupos_t in treinos for g in grupos_t
     }
+    # Lookup slot por sid pra uso nas constraints (pool_slot, travado flag).
+    slot_por_sid: dict[int, dict] = {s["sid"]: s for s in slots_globais}
 
     # ── Fatia 4.A: variáveis estruturais de bloco por treino ────────────────
     # X[(t, sid, b)] BoolVar = "slot sid está no bloco b do treino t".
@@ -407,9 +486,12 @@ def _construir_modelo(
             )
 
     # ── assign[(sid, cidx)] + AddExactlyOne por slot ────────────────────────
+    # Fatia 4.D: pool agora é por-slot (s["pool_slot"]) — travado tem pool
+    # de 1 (só ele); non-travado tem pool default da demanda menos nomes
+    # travados em qualquer slot da rotina.
     assign: dict[tuple[int, int], cp_model.IntVar] = {}
     for s in slots_globais:
-        pool = grupo_por_idx[(s["t_idx"], s["di"])]["pool"]
+        pool = s["pool_slot"]
         bvars = []
         for cidx in range(len(pool)):
             b = model.NewBoolVar(f"a_t{s['t_idx']}_s{s['sid']}_c{cidx}")
@@ -420,9 +502,14 @@ def _construir_modelo(
 
     # ── AllDifferent global (por nome do exercício) — cross-treino.
     # Mantém comportamento do gerador antigo (nomes_exatos_globais).
+    # Fatia 4.D: slots travados BYPASSAM AllDifferent — mesmo travado pode
+    # aparecer em treinos diferentes. Garantido sem conflito porque nomes
+    # travados já foram removidos dos pools dos slots non-travados.
     por_nome: dict[str, list] = defaultdict(list)
     for s in slots_globais:
-        pool = grupo_por_idx[(s["t_idx"], s["di"])]["pool"]
+        if s["travado"]:
+            continue
+        pool = s["pool_slot"]
         for cidx, ex in enumerate(pool):
             por_nome[ex.nome].append(assign[(s["sid"], cidx)])
     for vars_do_nome in por_nome.values():
@@ -439,7 +526,7 @@ def _construir_modelo(
     max_grupo_code = max(GRUPO_FUNC_CODE.values())
     grupo_func: dict[int, cp_model.IntVar] = {}
     for s in slots_globais:
-        pool = grupo_por_idx[(s["t_idx"], s["di"])]["pool"]
+        pool = s["pool_slot"]
         codes = [_grupo_code_do_ex(ex) for ex in pool]
         lo, hi = (min(codes), max(codes)) if codes else (0, 0)
         gf = model.NewIntVar(lo, hi, f"grupo_t{s['t_idx']}_s{s['sid']}")
@@ -454,7 +541,7 @@ def _construir_modelo(
         # `cand.variacao_de == outro.variacao_de` ambos não-vazios.
         por_familia: dict[str, list] = defaultdict(list)
         for s in slots_do_treino:
-            pool = grupo_por_idx[(t_idx, s["di"])]["pool"]
+            pool = s["pool_slot"]
             for cidx, ex in enumerate(pool):
                 if ex.variacao_de:
                     por_familia[ex.variacao_de].append(assign[(s["sid"], cidx)])
@@ -465,7 +552,7 @@ def _construir_modelo(
         # H-T2: variante_pontual cross-família same-subregião.
         vp_por_subregiao: dict[str, list] = defaultdict(list)
         for s in slots_do_treino:
-            pool = grupo_por_idx[(t_idx, s["di"])]["pool"]
+            pool = s["pool_slot"]
             for cidx, ex in enumerate(pool):
                 if ex.variante_pontual:
                     vp_por_subregiao[ex.subregiao].append(
@@ -482,7 +569,7 @@ def _construir_modelo(
         # H-T3: lateralidade contextual (costas).
         uni_por_subregiao: dict[str, list] = defaultdict(list)
         for s in slots_do_treino:
-            pool = grupo_por_idx[(t_idx, s["di"])]["pool"]
+            pool = s["pool_slot"]
             for cidx, ex in enumerate(pool):
                 if (
                     ex.unilateral == "unilateral"
@@ -496,7 +583,7 @@ def _construir_modelo(
     # ── tier_rank por slot (IntVar = soma assign × rank) — usado por S-T1 ───
     tier_rank: dict[int, cp_model.IntVar] = {}
     for s in slots_globais:
-        pool = grupo_por_idx[(s["t_idx"], s["di"])]["pool"]
+        pool = s["pool_slot"]
         ranks = [_tier_rank(ex) for ex in pool]
         lo, hi = (min(ranks), max(ranks)) if ranks else (0, 0)
         tr = model.NewIntVar(lo, hi, f"tier_t{s['t_idx']}_s{s['sid']}")
@@ -504,13 +591,18 @@ def _construir_modelo(
         tier_rank[s["sid"]] = tr
 
     # ── H-T4 (HARD, graceful degradation): por grupo, scoped ao treino ──────
+    # Fatia 4.D: travado supera H-T4 — slots travados não recebem a
+    # constraint (decisão deliberada do user > regra automática).
     for grupos_t in treinos:
         for g in grupos_t:
             nivel, escopo, qtd = g["demanda"]
             if nivel == "subregiao" and qtd == 1:
+                sid = g["slot_ids"][0]
+                if slot_por_sid[sid]["travado"]:
+                    g["h_t4_aplicado_efetivamente"] = False
+                    continue
                 tem_nao_acessorio = any(ex.tier != TIER_ACESSORIO for ex in g["pool"])
                 if tem_nao_acessorio:
-                    sid = g["slot_ids"][0]
                     for cidx, ex in enumerate(g["pool"]):
                         if ex.tier == TIER_ACESSORIO:
                             model.Add(assign[(sid, cidx)] == 0)
@@ -543,8 +635,8 @@ def _construir_modelo(
         for label, predicado in regra["eixos"]:
             termos = []
             for sid in sids_da_sub:
-                slot_info = next(s for s in slots_globais if s["sid"] == sid)
-                pool = grupo_por_idx[(slot_info["t_idx"], slot_info["di"])]["pool"]
+                slot_info = slot_por_sid[sid]
+                pool = slot_info["pool_slot"]
                 for cidx, ex in enumerate(pool):
                     if predicado(ex):
                         termos.append(assign[(sid, cidx)])
@@ -707,6 +799,10 @@ def _construir_modelo(
         # Fatia 4.B: grupo funcional do ex escolhido (gancho pra futuras
         # constraints baseadas em grupo).
         "grupo_func": grupo_func,
+        # Fatia 4.D: lookup slot por sid (inclui pool_slot por slot + flag
+        # `travado`). Caller usa em _decode_solucao pra resolver o ex
+        # escolhido pelo cidx (pool por slot ≠ pool por grupo).
+        "slot_por_sid": slot_por_sid,
     }
 
 
@@ -714,6 +810,7 @@ def _decode_solucao(
     treinos: list[list[dict]],
     sid_to_cidx: dict[int, int],
     sid_to_bloco: Optional[dict[int, int]] = None,
+    slot_por_sid: Optional[dict[int, dict]] = None,
 ) -> list[dict]:
     """Decodifica `{sid -> cidx}` (+ opcional `{sid -> bloco_idx}` da
     Fatia 4.A) na estrutura de saída `list[dict]` que `gerar_rotina_csp`
@@ -727,14 +824,25 @@ def _decode_solucao(
     blocos em ordem de bloco_idx) por retrocompat de callers antigos.
     Quando `sid_to_bloco is None` (não deveria acontecer pós-4.A), bloco_idx
     derivado por slot_id (cada slot vira seu próprio bloco).
+
+    `slot_por_sid` (Fatia 4.D): quando presente, o ex escolhido é resolvido
+    via pool_slot do slot (necessário pra slots travados, cujo pool difere
+    do pool default da demanda). Quando None, cai no comportamento pré-4.D
+    (usa g["pool"]) — preserva callers antigos sem travados.
     """
     out = []
     for grupos_t in treinos:
         treino_dict: dict = {"grupos": [], "ordem_global": [], "blocos": []}
         slots_do_treino: list[int] = []
+
+        def _ex_do_slot(sid: int, g: dict) -> Exercicio:
+            if slot_por_sid is not None:
+                return slot_por_sid[sid]["pool_slot"][sid_to_cidx[sid]]
+            return g["pool"][sid_to_cidx[sid]]
+
         for g in grupos_t:
             nivel, _escopo, qtd = g["demanda"]
-            exs = [g["pool"][sid_to_cidx[sid]] for sid in g["slot_ids"]]
+            exs = [_ex_do_slot(sid, g) for sid in g["slot_ids"]]
             treino_dict["grupos"].append({
                 "demanda": g["demanda"],
                 "exercicios": exs,
@@ -753,7 +861,7 @@ def _decode_solucao(
         sid_to_ex: dict[int, Exercicio] = {}
         for g in grupos_t:
             for sid in g["slot_ids"]:
-                sid_to_ex[sid] = g["pool"][sid_to_cidx[sid]]
+                sid_to_ex[sid] = _ex_do_slot(sid, g)
         for b in sorted(blocos_dict.keys()):
             sids_bloco = blocos_dict[b]
             treino_dict["blocos"].append([sid_to_ex[sid] for sid in sids_bloco])
@@ -824,6 +932,7 @@ def gerar_rotina_csp(
     peso_evitar_agonistas: int = 0,
     tamanho_preferido: int = 2,
     peso_tamanho_bloco: int = 0,
+    travados_por_treino: Optional[dict[int, list[Exercicio]]] = None,
 ) -> dict:
     """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
     negociam no mesmo modelo — necessário pra H-R1 cross-treino.
@@ -853,11 +962,13 @@ def gerar_rotina_csp(
             demandas_por_treino, banco, nivel_aluno, seed,
             peso_aderencia, peso_evitar_agonistas,
             tamanho_preferido, peso_tamanho_bloco,
+            travados_por_treino,
         )
     return _resolver_com_variedade(
         demandas_por_treino, banco, nivel_aluno, seed, variedade,
         peso_aderencia, peso_evitar_agonistas,
         tamanho_preferido, peso_tamanho_bloco,
+        travados_por_treino,
     )
 
 
@@ -870,6 +981,7 @@ def _resolver_legacy(
     peso_evitar_agonistas: int = 0,
     tamanho_preferido: int = 2,
     peso_tamanho_bloco: int = 0,
+    travados_por_treino: Optional[dict[int, list[Exercicio]]] = None,
 ) -> dict:
     """Branch legado: 1 solve com Minimize → 1 solução determinística por
     seed. Preserva byte-a-byte o comportamento da Fatia 2 P2 quando
@@ -879,6 +991,7 @@ def _resolver_legacy(
         demandas_por_treino, banco, nivel_aluno,
         peso_aderencia, peso_evitar_agonistas,
         tamanho_preferido, peso_tamanho_bloco,
+        travados_por_treino=travados_por_treino,
     )
     if md["penalidades"]:
         md["model"].Minimize(sum(md["penalidades"]))
@@ -910,7 +1023,7 @@ def _resolver_legacy(
 
     sid_to_cidx: dict[int, int] = {}
     for s in md["slots_globais"]:
-        pool = md["grupo_por_idx"][(s["t_idx"], s["di"])]["pool"]
+        pool = s["pool_slot"]
         for cidx in range(len(pool)):
             if solver.Value(md["assign"][(s["sid"], cidx)]) == 1:
                 sid_to_cidx[s["sid"]] = cidx
@@ -919,7 +1032,10 @@ def _resolver_legacy(
     sid_to_bloco: dict[int, int] = {
         sid: int(solver.Value(v)) for sid, v in md["bloco_idx"].items()
     }
-    resultado["treinos"] = _decode_solucao(md["treinos"], sid_to_cidx, sid_to_bloco)
+    resultado["treinos"] = _decode_solucao(
+        md["treinos"], sid_to_cidx, sid_to_bloco,
+        slot_por_sid=md["slot_por_sid"],
+    )
     return resultado
 
 
@@ -933,6 +1049,7 @@ def _resolver_com_variedade(
     peso_evitar_agonistas: int = 0,
     tamanho_preferido: int = 2,
     peso_tamanho_bloco: int = 0,
+    travados_por_treino: Optional[dict[int, list[Exercicio]]] = None,
 ) -> dict:
     """Branch variedade (Frente B Fatia 3): 2 fases.
 
@@ -959,6 +1076,7 @@ def _resolver_com_variedade(
         demandas_por_treino, banco, nivel_aluno,
         peso_aderencia, peso_evitar_agonistas,
         tamanho_preferido, peso_tamanho_bloco,
+        travados_por_treino=travados_por_treino,
     )
     if md1["penalidades"]:
         md1["model"].Minimize(sum(md1["penalidades"]))
@@ -997,6 +1115,7 @@ def _resolver_com_variedade(
         demandas_por_treino, banco, nivel_aluno,
         peso_aderencia, peso_evitar_agonistas,
         tamanho_preferido, peso_tamanho_bloco,
+        travados_por_treino=travados_por_treino,
     )
     var_total: Optional[cp_model.IntVar] = None
     if md2["penalidades"]:
@@ -1035,6 +1154,7 @@ def _resolver_com_variedade(
             demandas_por_treino, banco, nivel_aluno, seed,
             peso_aderencia, peso_evitar_agonistas,
             tamanho_preferido, peso_tamanho_bloco,
+            travados_por_treino,
         ) | {
             "variedade": _meta_variedade(variedade, n=0, dist=None, opt=optimal,
                                          lim=False, t1=time_p1, t2=time_p2),
@@ -1050,11 +1170,12 @@ def _resolver_com_variedade(
     # `alpha_tier == 0` (default) zera H → comportamento Frente 1 puro.
     if variedade.alpha_tier > 0 and collector.solucoes:
         ref_sol = collector.solucoes[0]
-        # Tier rank por slot na referência (consulta pool via grupo_por_idx).
+        # Tier rank por slot na referência (consulta pool por slot — pós-4.D
+        # respeita pool_slot do travado).
         ref_tier_rank: dict[int, int] = {}
         for sid, cidx_ref in ref_sol.items():
-            slot_info = next(s for s in md2["slots_globais"] if s["sid"] == sid)
-            pool = md2["grupo_por_idx"][(slot_info["t_idx"], slot_info["di"])]["pool"]
+            slot_info = md2["slot_por_sid"][sid]
+            pool = slot_info["pool_slot"]
             ref_tier_rank[sid] = _tier_rank(pool[cidx_ref])
         hamming = []
         for sol_k in collector.solucoes:
@@ -1094,7 +1215,10 @@ def _resolver_com_variedade(
         "solve_time": time_p1 + time_p2,
         "inversoes_totais": chosen_inv,
         "h_r1_aplicadas": md2["h_r1_aplicadas"],
-        "treinos": _decode_solucao(md2["treinos"], chosen_sol, chosen_blocos),
+        "treinos": _decode_solucao(
+            md2["treinos"], chosen_sol, chosen_blocos,
+            slot_por_sid=md2["slot_por_sid"],
+        ),
         "variedade": _meta_variedade(
             variedade,
             n=len(collector.solucoes),
@@ -1149,6 +1273,7 @@ def gerar_treino_csp(
     peso_evitar_agonistas: int = 0,
     tamanho_preferido: int = 2,
     peso_tamanho_bloco: int = 0,
+    travados: Optional[list[Exercicio]] = None,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
@@ -1170,7 +1295,11 @@ def gerar_treino_csp(
     `tamanho_preferido` + `peso_tamanho_bloco` (Fatia 4.C): S-B4 tamanho
     preferido. peso=0 (default) sem efeito; peso>0 penaliza desvio do
     tamanho preferido por bloco em uso.
+
+    `travados` (Fatia 4.D): lista de exercícios fixados pelo personal
+    para este treino. None ou lista vazia preserva comportamento pré-4.D.
     """
+    travados_por_treino_arg = {0: list(travados)} if travados else None
     rotina = gerar_rotina_csp(
         [demandas], banco, nivel_aluno, seed,
         variedade=variedade,
@@ -1178,6 +1307,7 @@ def gerar_treino_csp(
         peso_evitar_agonistas=peso_evitar_agonistas,
         tamanho_preferido=tamanho_preferido,
         peso_tamanho_bloco=peso_tamanho_bloco,
+        travados_por_treino=travados_por_treino_arg,
     )
     if not rotina["viavel"]:
         out = {

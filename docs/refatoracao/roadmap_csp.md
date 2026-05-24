@@ -15,21 +15,13 @@ linha de "o que entregou" + 1 linha de "próximo bloqueio se houver".
 
 ## Estado das branches (2026-05-24)
 
-Todas empilhadas; nenhuma em `main` ainda. Merge final consolidado.
+Pós-instituição da disciplina de merge (seção abaixo): branches mergeadas
+em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 
 ```
-main
- └─ fatia-2-parte-2  ✅
-     └─ frente-c-integracao-ui  ✅
-         └─ frente-d-vetor-perfil  ✅
-             └─ fatia-4a-blocos-estrutural  ✅
-                 └─ fatia-4b-sb1-pareamento  ✅
-                     └─ fatia-4c-sb4-tamanho  ✅  ← atual
-                         └─ chore-orientacao-refator  ← este commit
+main  ← inclui Fatias 1-4.C + Frentes B/C/D
+ └─ fatia-4d-exercicios-travados  ✅ ← atual (a mergear em main)
 ```
-
-Pendência: decidir momento de merge consolidado pra `main` (depende de
-quão maduras as frentes ficam pós-uso real do Bernardo).
 
 ---
 
@@ -46,6 +38,7 @@ quão maduras as frentes ficam pós-uso real do Bernardo).
 | Fatia 4.A | Blocos estruturais (X[s,b] + bloco_idx) | `logs/mvp_fatia_4a_blocos_estrutural.md` |
 | Fatia 4.B | S-B1 distância funcional + evitar_agonistas | `logs/mvp_fatia_4b_sb1_pareamento.md` |
 | Fatia 4.C | S-B4 tamanho preferido + tamanho_bloco da UI | `logs/mvp_fatia_4c_sb4_tamanho.md` |
+| Fatia 4.D | exercicios_travados (pool-por-slot, bypass H-P1/H-T4/AllDiff cross) | `logs/mvp_fatia_4d_exercicios_travados.md` |
 
 ---
 
@@ -55,7 +48,7 @@ quão maduras as frentes ficam pós-uso real do Bernardo).
 
 Pré-requisito: nenhum. Podem entrar em qualquer ordem ou paralelo.
 
-- **⬜ exercicios_travados** — `model.Add(assign[slot, cidx_fixo] == 1)` pra slots travados pelo user na UI. Adapter lê `cfg_r["exercicios_travados"]`.
+- **✅ exercicios_travados** (Fatia 4.D) — pool-por-slot + bypass H-P1/H-T4/AllDifferent cross-treino entre travados. Travados participam de S-T1/S-B1/S-B4/Aderência. Adapter `treino_regerar` lê `cfg_r["exercicios_travados"]` e garante travado em `banco_regen`. Ver `logs/mvp_fatia_4d_exercicios_travados.md`.
 - **⬜ cargas_config** — nova hard **H-cargas** (filtro de pool por aluno baseado em config de carga, análoga a H-P1). Adapter lê `cfg_r["cargas_config"]`.
 - **⬜ relaxar_familia** — toggle pra desativar H-T1 sob inviabilidade (graceful como H-T4/H-R1, OU soft com peso alto).
 
