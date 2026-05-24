@@ -4,29 +4,35 @@ App para personal trainer gerar, editar e exportar sessões de treino. Roda loca
 
 ## ⚠️ Refator declarativo em andamento (decisão 2026-05-19)
 
-Refator estrutural do gerador iniciado em 2026-05-19. Paradigma novo: declarativo (CSP/ILP via CP-SAT do OR-Tools), substituindo o algoritmo greedy sequencial das Etapas 1-7 do antigo `guia_refatoracao_v4.md` (arquivado em `docs/refatoracao/arquivo/era_v4_greedy_incremental/`).
+Refator estrutural do gerador. Paradigma novo: declarativo (CSP/ILP via CP-SAT do OR-Tools), substituindo o algoritmo greedy sequencial das Etapas 1-7 do antigo `guia_refatoracao_v4.md` (arquivado em `docs/refatoracao/arquivo/era_v4_greedy_incremental/`).
 
-**Fontes de verdade (ler nesta ordem antes de qualquer mudança no gerador, banco ou rotas):**
+### Leitura obrigatória antes de QUALQUER trabalho no refator (motor CSP, banco, ou rotas do gerador)
 
-1. `docs/refatoracao/handoff_2026-05-19_decisao_refator.md`
-2. `docs/refatoracao/principios_clinicos.md`
-3. `docs/refatoracao/catalogo_constraints.md`
+**Na ordem:**
 
-`docs/refatoracao/README.md` tem o mapa completo.
+1. **`docs/refatoracao/norte.md`** — princípios e anti-padrões. *Por que* o app existe e *como* decidimos design. **Anti-padrão clássico documentado na Seção 7**: recomendar caminho "mais simples / menos código / sem regressão" sem checar se reintroduz problema da Seção 3. Releia Seção 5 antes de propor trade-offs.
+2. **`docs/refatoracao/roadmap_csp.md`** — *o quê e quando*. Lista priorizada de TODO o escopo restante até estado-alvo, com status e dependências. Atualizado a cada fatia/frente fechada.
+3. **`docs/refatoracao/catalogo_constraints.md`** — especificação executável das constraints (H-* hard + S-* soft). Lida quando for tocar motor especificamente.
+4. **`docs/refatoracao/handoff_template.md`** — template do prompt inicial de sessão. Bernardo usa pra abrir sessões focadas; lê em caso de dúvida sobre escopo desta sessão.
 
-**Estado atual do fluxo (passos 1-5):** princípios + catálogo fechados (passos 1-2). Próximo passo é a Fatia 1 do MVP — spike de viabilidade do CP-SAT em `gerador_csp.py` paralelo ao gerador antigo. Detalhes na seção "Update 2026-05-21" do handoff.
+Docs complementares (carregar quando relevante):
+- `docs/refatoracao/principios_clinicos.md` — base clínica (vetor de perfil, etc).
+- `docs/refatoracao/handoff_2026-05-19_decisao_refator.md` — decisão estrutural histórica.
+- `docs/refatoracao/logs/mvp_fatia_*.md` — logs por fatia/frente; última fatia fechada tem o contexto mais imediato.
+- `docs/refatoracao/README.md` — mapa do diretório.
 
-**Se o usuário trouxer viés ou edge case novo:** NÃO patchar `gerador_treino.py` (antigo). Avaliar se cabe como constraint no novo catálogo ou se é caso pro spike resolver. O gerador antigo vive até o MVP estar maduro o suficiente pra substituir.
+### Regras operacionais (extraídas do norte.md)
 
-## Refatoração em andamento
+- **NÃO patchar `gerador_treino.py` (antigo)** quando aparecer viés ou edge case novo. Avaliar se cabe como constraint no catálogo novo. Antigo vive até ser substituído (Frente E.1); não recebe features novas.
+- **NÃO derivar frequência clínica de tamanho de pool** (anti-padrão mais recorrente — Seção 4 do norte). Centralidade vem de tag curada (`tier`), não emerge do banco.
+- **NÃO recomendar caminho greedy / pós-processo** que mantém problema arquitetural do antigo (princípio fundador do refator — Seção 3 do norte). Quando trade-off aparecer, releia Seção 5.
 
-Estamos em refatoração estrutural do gerador. Paradigma novo é declarativo (CSP/ILP). Fonte de verdade operacional: os 3 documentos listados na seção acima + `docs/refatoracao/README.md`.
+### Documentação de sessões
 
-Antes de qualquer mudança em `gerador_treino.py` (antigo), `gerador_csp.py` (novo, em construção), banco de exercícios, ou rotas que toquem o motor de geração: ler os docs e identificar em qual passo do fluxo de 5 etapas o trabalho atual se encaixa.
+Logs novos do refator vão em `docs/refatoracao/logs/` (ex: `mvp_fatia_4d_relaxar_familia.md`). Atualizar `roadmap_csp.md` no mesmo commit (marcar item como ✅, adicionar pendências descobertas).
 
-**Documentação de sessões**: criar `docs/refatoracao/logs/` (vazio agora — o `logs/` antigo foi movido pra `arquivo/era_v4_greedy_incremental/`). Logs novos do MVP devem entrar lá conforme as Fatias avançam (ex: `docs/refatoracao/logs/mvp_fatia_1.md`).
+### Documentos de apoio histórico
 
-**Documentos de apoio histórico**:
 - `docs/refatoracao/arquivo/era_v4_greedy_incremental/` — todo o conhecimento da era greedy (guia v4, dimensões, memória, logs etapa_2 a etapa_6). Consultar para CONTEXTO ("por que decisão X foi tomada?"), nunca para planejar implementação nova.
 - `docs/refatoracao/arquivo/` (raiz) — documentos pré-v4 arquivados antes.
 
