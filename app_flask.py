@@ -359,8 +359,11 @@ def _label_bloco_csp(i):
 def _resultado_csp_pra_sessao(resultado, tipo_label):
     """Converte o dict de saída de `gerar_treino_csp` em `Sessao`.
 
-    Frente C MVP: cada exercício vira 1 SuperSerie solo (labels A, B, C…).
-    Pareamento clínico fica pra Fatia 4 (S-B do catálogo).
+    Pós-Fatia 4.A (2026-05-24): consome `resultado["blocos"]` (lista de
+    listas de Exercicio, estruturada pelo motor) em vez de fabricar
+    SuperSeries solo a partir de `ordem_global`. Cada bloco do motor vira
+    1 SuperSerie com até 3 ex (ex1/ex2/ex3). Fallback retrocompat: se
+    `blocos` ausente (caller antigo), cai pra `ordem_global` 1-por-bloco.
 
     Marca cada Exercicio com `rationale={"gerador": "csp"}` via
     `dataclasses.replace` — não muta as instâncias do banco global. A
@@ -368,14 +371,25 @@ def _resultado_csp_pra_sessao(resultado, tipo_label):
     e mostrar mensagem em vez de timeline vazio.
 
     Avisos: cada eixo H-R1 marcado `degraded=True` vira aviso
-    `tipo="h_r1_degradado"` em `Sessao.avisos`. Render no modal fica
-    pra Checkpoint 4 (template `_avisos_modal.html`).
+    `tipo="h_r1_degradado"` em `Sessao.avisos`.
     """
-    blocos = []
-    for i, ex in enumerate(resultado.get("ordem_global", [])):
-        ex_marker = _dc_replace(ex, rationale={"gerador": "csp"})
-        blocos.append(SuperSerie(label=_label_bloco_csp(i),
-                                 ex1=ex_marker, ex2=None, ex3=None))
+    blocos: list[SuperSerie] = []
+    blocos_motor = resultado.get("blocos")
+    if blocos_motor is not None:
+        # Fatia 4.A: blocos estruturados pelo motor.
+        for i, bloco_exs in enumerate(blocos_motor):
+            exs_marker = [_dc_replace(ex, rationale={"gerador": "csp"}) for ex in bloco_exs]
+            ex1 = exs_marker[0] if len(exs_marker) > 0 else None
+            ex2 = exs_marker[1] if len(exs_marker) > 1 else None
+            ex3 = exs_marker[2] if len(exs_marker) > 2 else None
+            blocos.append(SuperSerie(label=_label_bloco_csp(i),
+                                     ex1=ex1, ex2=ex2, ex3=ex3))
+    else:
+        # Retrocompat: caller antigo (pré-4.A) — 1 ex por bloco solo.
+        for i, ex in enumerate(resultado.get("ordem_global", [])):
+            ex_marker = _dc_replace(ex, rationale={"gerador": "csp"})
+            blocos.append(SuperSerie(label=_label_bloco_csp(i),
+                                     ex1=ex_marker, ex2=None, ex3=None))
 
     s = Sessao(tipo=tipo_label, blocos=blocos)
     s.relaxados = []

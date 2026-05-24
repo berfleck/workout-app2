@@ -56,6 +56,25 @@ TIER_RANK: dict[str, int] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Fatia 4.A (2026-05-24) — modelagem estrutural de blocos no CSP
+# ---------------------------------------------------------------------------
+#
+# Slots de um treino são agrupados em BLOCOS (superseries). Cada bloco tem
+# entre 1 e TAMANHO_MAX_BLOCO slots. Bloco solo (tamanho=1) sempre permitido
+# (caso natural quando há 1 slot OR Centralidade Alta + Aderência Alta no
+# H-P2 do catálogo, quando essa hard entrar).
+#
+# Reformulação de S-T1: ordem de blocos (não de slots) respeita tier alto
+# antes. Forma par-a-par equivalente: pra pares (s1, s2) no mesmo treino,
+# se bloco_idx[s1] < bloco_idx[s2] e tier_rank[s1] < tier_rank[s2], viol.
+#
+# Sem soft de pareamento (S-B's) na 4.A — motor agrupa "livre" satisfazendo
+# só estrutural + tier-order de blocos. S-B1/S-B4 entram em 4.B/4.C.
+
+TAMANHO_MAX_BLOCO: int = 3  # 4.C torna parâmetro vindo da UI
+
+
 def _tier_rank(exercicio: Exercicio) -> int:
     """Rank numérico do tier curado. Default 1 (= Acessório) se vazio.
 
@@ -318,6 +337,36 @@ def _construir_modelo(
         (g["t_idx"], g["di"]): g for grupos_t in treinos for g in grupos_t
     }
 
+    # ── Fatia 4.A: variáveis estruturais de bloco por treino ────────────────
+    # X[(t, sid, b)] BoolVar = "slot sid está no bloco b do treino t".
+    # bloco_idx[sid] IntVar = bloco do slot (derivado de X via soma ponderada).
+    # max_blocos_t = n_slots_t (limite trivial: cada slot pode virar solo).
+    slot_to_bloco_vars: dict[int, dict[int, cp_model.IntVar]] = {}
+    bloco_idx: dict[int, cp_model.IntVar] = {}
+    slots_por_treino: dict[int, list[int]] = defaultdict(list)
+    for s in slots_globais:
+        slots_por_treino[s["t_idx"]].append(s["sid"])
+
+    for t_idx, sids_t in slots_por_treino.items():
+        max_b = len(sids_t)  # bloco solo sempre permitido
+        for sid in sids_t:
+            vars_b = {}
+            for b in range(max_b):
+                v = model.NewBoolVar(f"x_t{t_idx}_s{sid}_b{b}")
+                vars_b[b] = v
+            slot_to_bloco_vars[sid] = vars_b
+            model.AddExactlyOne(vars_b.values())
+            # bloco_idx[sid] = sum(b * X[sid, b])
+            bidx = model.NewIntVar(0, max_b - 1, f"bidx_t{t_idx}_s{sid}")
+            model.Add(bidx == sum(b * vars_b[b] for b in range(max_b)))
+            bloco_idx[sid] = bidx
+
+        # Constraint de tamanho: por bloco b do treino, soma dos X <= TAMANHO_MAX_BLOCO.
+        for b in range(max_b):
+            model.Add(
+                sum(slot_to_bloco_vars[sid][b] for sid in sids_t) <= TAMANHO_MAX_BLOCO
+            )
+
     # ── assign[(sid, cidx)] + AddExactlyOne por slot ────────────────────────
     assign: dict[tuple[int, int], cp_model.IntVar] = {}
     for s in slots_globais:
@@ -460,22 +509,48 @@ def _construir_modelo(
                     "motivo": "pool sem candidato (provavelmente filtrado por H-P1)",
                 })
 
-    # ── S-T1 (SOFT): inversões de tier-order dentro de cada grupo ───────────
-    # Lista de IntVars `viol` — caller decide se vira `Minimize(sum(viol))`
-    # (legacy + Phase 1) ou se vira IntVar de soma `var_total` + bound
-    # `<= optimal + slack` (Phase 2 da variedade). Modelar a soma fora deste
-    # helper preserva BYTE-A-BYTE o código antigo no branch legacy — sem
-    # IntVar extra muda a ordem de busca do CP-SAT.
+    # ── S-T1 (SOFT, Fatia 4.A reformulada): tier-order por BLOCO no treino ──
+    # Antes (pré-4.A): pares (i,j) dentro de cada grupo de demanda, ordem dos
+    # slots na lista. Agora: pares (s1, s2) no mesmo treino, ordem definida
+    # por bloco_idx[s] (variável de decisão). Equivalente clinicamente a
+    # "tier máximo do bloco vem antes" — se todo slot de tier alto está em
+    # bloco com idx menor que slots de tier baixo, soma = 0.
+    #
+    # Forma par-a-par: pra cada par (s1, s2) no mesmo treino com s1 < s2
+    # (ordem de sid pra evitar duplicar pares), cria:
+    #   lt = bloco_idx[s1] < bloco_idx[s2]   (BoolVar via OnlyEnforceIf)
+    #   gt = bloco_idx[s1] > bloco_idx[s2]
+    #   viol IntVar [0, rank_max]:
+    #     >= tier_rank[s2] - tier_rank[s1]  se lt
+    #     >= tier_rank[s1] - tier_rank[s2]  se gt
+    # Pares no mesmo bloco (lt=0, gt=0) não geram viol.
     rank_max = max(TIER_RANK.values())
     penalidades = []
-    for grupos_t in treinos:
-        for g in grupos_t:
-            sids = g["slot_ids"]
-            for i in range(len(sids)):
-                for j in range(i + 1, len(sids)):
-                    viol = model.NewIntVar(0, rank_max, f"viol_{sids[i]}_{sids[j]}")
-                    model.Add(viol >= tier_rank[sids[j]] - tier_rank[sids[i]])
-                    penalidades.append(viol)
+    for t_idx, sids_t in slots_por_treino.items():
+        for i in range(len(sids_t)):
+            for j in range(i + 1, len(sids_t)):
+                s1, s2 = sids_t[i], sids_t[j]
+                lt = model.NewBoolVar(f"lt_{s1}_{s2}")
+                gt = model.NewBoolVar(f"gt_{s1}_{s2}")
+                # bloco_idx[s1] - bloco_idx[s2] < 0   sse  lt
+                model.Add(bloco_idx[s1] - bloco_idx[s2] <= -1).OnlyEnforceIf(lt)
+                model.Add(bloco_idx[s1] - bloco_idx[s2] >= 0).OnlyEnforceIf(lt.Not())
+                # bloco_idx[s1] - bloco_idx[s2] > 0   sse  gt
+                model.Add(bloco_idx[s1] - bloco_idx[s2] >= 1).OnlyEnforceIf(gt)
+                model.Add(bloco_idx[s1] - bloco_idx[s2] <= 0).OnlyEnforceIf(gt.Not())
+                # lt + gt <= 1 (não podem ser ambos true)
+                model.Add(lt + gt <= 1)
+
+                viol = model.NewIntVar(0, rank_max, f"viol_{s1}_{s2}")
+                # se lt (s1 antes de s2): penaliza tier[s2] > tier[s1]
+                model.Add(
+                    viol >= tier_rank[s2] - tier_rank[s1]
+                ).OnlyEnforceIf(lt)
+                # se gt (s2 antes de s1): penaliza tier[s1] > tier[s2]
+                model.Add(
+                    viol >= tier_rank[s1] - tier_rank[s2]
+                ).OnlyEnforceIf(gt)
+                penalidades.append(viol)
 
     # ── Aderência ao Tier (SOFT, Frente D Fatia 3): por slot ────────────────
     # `aderencia_pen[s] = (rank_max - tier_rank[s]) * peso_aderencia`
@@ -499,19 +574,35 @@ def _construir_modelo(
         "grupo_por_idx": grupo_por_idx,
         "h_r1_aplicadas": h_r1_aplicadas,
         "penalidades": penalidades,
+        # Fatia 4.A: vars estruturais de bloco — caller usa pra decodificar
+        # blocos da solução (via solver.Value(bloco_idx[s])).
+        "bloco_idx": bloco_idx,
+        "slots_por_treino": dict(slots_por_treino),
     }
 
 
-def _decode_solucao(treinos: list[list[dict]], sid_to_cidx: dict[int, int]) -> list[dict]:
-    """Decodifica `{sid -> cidx}` na estrutura de saída `list[dict]` que
-    `gerar_rotina_csp` devolve em `resultado['treinos']`.
+def _decode_solucao(
+    treinos: list[list[dict]],
+    sid_to_cidx: dict[int, int],
+    sid_to_bloco: Optional[dict[int, int]] = None,
+) -> list[dict]:
+    """Decodifica `{sid -> cidx}` (+ opcional `{sid -> bloco_idx}` da
+    Fatia 4.A) na estrutura de saída `list[dict]` que `gerar_rotina_csp`
+    devolve em `resultado['treinos']`.
 
-    Compartilhado entre o branch legacy (extrai sid_to_cidx do solver) e
-    o branch variedade (extrai do callback). Garante mesma forma de saída.
+    Compartilhado entre o branch legacy (extrai do solver) e o branch
+    variedade (extrai do callback). Garante mesma forma de saída.
+
+    Pós-4.A, cada treino ganha chave nova `blocos: list[list[Exercicio]]`
+    (estruturado pelo motor). `ordem_global` continua existindo (concat dos
+    blocos em ordem de bloco_idx) por retrocompat de callers antigos.
+    Quando `sid_to_bloco is None` (não deveria acontecer pós-4.A), bloco_idx
+    derivado por slot_id (cada slot vira seu próprio bloco).
     """
     out = []
     for grupos_t in treinos:
-        treino_dict: dict = {"grupos": [], "ordem_global": []}
+        treino_dict: dict = {"grupos": [], "ordem_global": [], "blocos": []}
+        slots_do_treino: list[int] = []
         for g in grupos_t:
             nivel, _escopo, qtd = g["demanda"]
             exs = [g["pool"][sid_to_cidx[sid]] for sid in g["slot_ids"]]
@@ -522,7 +613,25 @@ def _decode_solucao(treinos: list[list[dict]], sid_to_cidx: dict[int, int]) -> l
                 "h_t4_aplicado": nivel == "subregiao" and qtd == 1,
                 "h_t4_aplicado_efetivamente": g.get("h_t4_aplicado_efetivamente", False),
             })
-            treino_dict["ordem_global"].extend(exs)
+            slots_do_treino.extend(g["slot_ids"])
+
+        # Agrupa slots por bloco_idx, ordena por idx asc.
+        blocos_dict: dict[int, list[int]] = defaultdict(list)
+        for sid in slots_do_treino:
+            b = sid_to_bloco[sid] if sid_to_bloco is not None else sid
+            blocos_dict[b].append(sid)
+        # Mapa sid → exercício pra lookup
+        sid_to_ex: dict[int, Exercicio] = {}
+        for g in grupos_t:
+            for sid in g["slot_ids"]:
+                sid_to_ex[sid] = g["pool"][sid_to_cidx[sid]]
+        for b in sorted(blocos_dict.keys()):
+            sids_bloco = blocos_dict[b]
+            treino_dict["blocos"].append([sid_to_ex[sid] for sid in sids_bloco])
+
+        # ordem_global = concatenação dos blocos em ordem.
+        for bloco_exs in treino_dict["blocos"]:
+            treino_dict["ordem_global"].extend(bloco_exs)
         out.append(treino_dict)
     return out
 
@@ -540,6 +649,7 @@ class _SolucoesCollector(cp_model.CpSolverSolutionCallback):
         assign: dict[tuple[int, int], cp_model.IntVar],
         var_total_penalidade: Optional[cp_model.IntVar],
         max_solucoes: int,
+        bloco_idx: Optional[dict[int, cp_model.IntVar]] = None,
     ) -> None:
         super().__init__()
         self._assign_por_sid: dict[int, list[tuple[int, object]]] = defaultdict(list)
@@ -547,8 +657,10 @@ class _SolucoesCollector(cp_model.CpSolverSolutionCallback):
             self._assign_por_sid[sid].append((cidx, v))
         self._var_total = var_total_penalidade
         self._max = max_solucoes
+        self._bloco_idx = bloco_idx  # Fatia 4.A: capturado por solução
         self.solucoes: list[dict[int, int]] = []
         self.inversoes: list[int] = []
+        self.blocos: list[dict[int, int]] = []  # Fatia 4.A: sid → bloco_idx
 
     def on_solution_callback(self) -> None:
         sol: dict[int, int] = {}
@@ -560,6 +672,11 @@ class _SolucoesCollector(cp_model.CpSolverSolutionCallback):
         self.solucoes.append(sol)
         inv = int(self.Value(self._var_total)) if self._var_total is not None else 0
         self.inversoes.append(inv)
+        # Fatia 4.A: extrai bloco_idx por slot pra estruturação na decode.
+        if self._bloco_idx is not None:
+            self.blocos.append({sid: int(self.Value(v)) for sid, v in self._bloco_idx.items()})
+        else:
+            self.blocos.append({})
         if len(self.solucoes) >= self._max:
             self.StopSearch()
 
@@ -656,7 +773,11 @@ def _resolver_legacy(
             if solver.Value(md["assign"][(s["sid"], cidx)]) == 1:
                 sid_to_cidx[s["sid"]] = cidx
                 break
-    resultado["treinos"] = _decode_solucao(md["treinos"], sid_to_cidx)
+    # Fatia 4.A: extrai bloco_idx por slot pro decode estruturar blocos.
+    sid_to_bloco: dict[int, int] = {
+        sid: int(solver.Value(v)) for sid, v in md["bloco_idx"].items()
+    }
+    resultado["treinos"] = _decode_solucao(md["treinos"], sid_to_cidx, sid_to_bloco)
     return resultado
 
 
@@ -737,6 +858,7 @@ def _resolver_com_variedade(
 
     collector = _SolucoesCollector(
         md2["assign"], var_total, variedade.max_solucoes,
+        bloco_idx=md2["bloco_idx"],  # Fatia 4.A: captura blocos por solução
     )
     solver2 = cp_model.CpSolver()
     solver2.parameters.random_seed = seed
@@ -811,6 +933,7 @@ def _resolver_com_variedade(
     chosen_inv = collector.inversoes[chosen_idx]
     chosen_dist = distancias[chosen_idx]
     chosen_hamming = hamming[chosen_idx]
+    chosen_blocos = collector.blocos[chosen_idx]  # Fatia 4.A
 
     return {
         "status": solver1.StatusName(status1),
@@ -820,7 +943,7 @@ def _resolver_com_variedade(
         "solve_time": time_p1 + time_p2,
         "inversoes_totais": chosen_inv,
         "h_r1_aplicadas": md2["h_r1_aplicadas"],
-        "treinos": _decode_solucao(md2["treinos"], chosen_sol),
+        "treinos": _decode_solucao(md2["treinos"], chosen_sol, chosen_blocos),
         "variedade": _meta_variedade(
             variedade,
             n=len(collector.solucoes),
@@ -914,6 +1037,8 @@ def gerar_treino_csp(
         "inversoes": rotina["inversoes_totais"],
         "grupos": t0["grupos"],
         "ordem_global": t0["ordem_global"],
+        # Fatia 4.A: propaga blocos pra o adapter consumir.
+        "blocos": t0.get("blocos", []),
         "h_r1_aplicadas": rotina["h_r1_aplicadas"],
     }
     if "variedade" in rotina:
