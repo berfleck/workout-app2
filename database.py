@@ -72,6 +72,14 @@ def init_db():
         con.commit()
     except sqlite3.OperationalError:
         pass
+    # Migração: adicionar coluna aderencia (Frente D / Fatia 3, 2026-05-24)
+    # Vetor de perfil do aluno — dimensão "Aderência ao Tier" (alta/media/baixa).
+    # Default 'media' = comportamento neutro pré-Frente D.
+    try:
+        con.execute("ALTER TABLE alunos ADD COLUMN aderencia TEXT DEFAULT 'media'")
+        con.commit()
+    except sqlite3.OperationalError:
+        pass
     con.close()
 
 
@@ -132,23 +140,24 @@ def carregar_alunos():
              "objetivo": r["objetivo"],
              "restricoes": json.loads(r["restricoes"]),
              "obs": r["obs"],
-             "rotina_ativa_id": r["rotina_ativa_id"]} for r in rows]
+             "rotina_ativa_id": r["rotina_ativa_id"],
+             "aderencia": (r["aderencia"] if "aderencia" in r.keys() else "media") or "media"} for r in rows]
 
 
-def salvar_aluno(nome, nivel, objetivo, restricoes, obs):
+def salvar_aluno(nome, nivel, objetivo, restricoes, obs, aderencia="media"):
     con = _conn()
     con.execute(
-        "INSERT INTO alunos (nome, nivel, objetivo, restricoes, obs) VALUES (?, ?, ?, ?, ?)",
-        (nome, nivel, objetivo, json.dumps(restricoes, ensure_ascii=False), obs))
+        "INSERT INTO alunos (nome, nivel, objetivo, restricoes, obs, aderencia) VALUES (?, ?, ?, ?, ?, ?)",
+        (nome, nivel, objetivo, json.dumps(restricoes, ensure_ascii=False), obs, aderencia))
     con.commit()
     con.close()
 
 
-def editar_aluno(aluno_id, nome, nivel, objetivo, restricoes, obs):
+def editar_aluno(aluno_id, nome, nivel, objetivo, restricoes, obs, aderencia="media"):
     con = _conn()
     con.execute(
-        "UPDATE alunos SET nome=?, nivel=?, objetivo=?, restricoes=?, obs=? WHERE id=?",
-        (nome, nivel, objetivo, json.dumps(restricoes, ensure_ascii=False), obs, aluno_id))
+        "UPDATE alunos SET nome=?, nivel=?, objetivo=?, restricoes=?, obs=?, aderencia=? WHERE id=?",
+        (nome, nivel, objetivo, json.dumps(restricoes, ensure_ascii=False), obs, aderencia, aluno_id))
     con.commit()
     con.close()
 
@@ -258,7 +267,8 @@ def buscar_aluno_por_nome(nome):
             "objetivo": row["objetivo"],
             "restricoes": json.loads(row["restricoes"]),
             "obs": row["obs"],
-            "rotina_ativa_id": row["rotina_ativa_id"]}
+            "rotina_ativa_id": row["rotina_ativa_id"],
+            "aderencia": (row["aderencia"] if "aderencia" in row.keys() else "media") or "media"}
 
 
 # ══════════════════════════════════════════════════════════════

@@ -407,6 +407,30 @@ def _nivel_aluno_csp(aluno_obj):
     return _NIVEL_ALUNO_PARA_CSP.get((aluno_obj.get("nivel") or "").strip(), 3)
 
 
+# Frente D Fatia 3 (2026-05-24) — vetor de perfil dim "Aderência ao Tier".
+# Mapeia label string do aluno pro peso int passado ao CSP.
+# Chute inicial conservador: media=0 = comportamento Frente B byte-a-byte
+# (slots únicos sorteados livre entre tiers). alta=2 cobre o achado #1
+# (slots de padrão único caindo em Acessório) sem matar variedade DENTRO
+# do tier — smoke do C4 mostrou 9/11 Principais distintos em 30 runs com
+# Aderência Alta em hinge(1). Iterar pra cima se calibração indicar.
+_PESO_ADERENCIA_POR_PERFIL = {
+    "alta": 2,
+    "media": 0,
+    "baixa": 0,
+}
+
+
+def _peso_aderencia_csp(aluno_obj):
+    """Peso int da dimensão Aderência ao Tier do perfil. 0 (default) =
+    comportamento Frente B. Aluno desconhecido ou aderencia ausente =
+    'media' = 0 (neutro, sem mudar nada).
+    """
+    if not aluno_obj:
+        return 0
+    return _PESO_ADERENCIA_POR_PERFIL.get((aluno_obj.get("aderencia") or "media").strip(), 0)
+
+
 def _cfg_antiga_pra_demandas_csp(cfg_r):
     """Converte cfg do gerador antigo em demandas CSP `(nivel, escopo, qtd)`.
 
@@ -1925,12 +1949,14 @@ def treino_regerar(t):
     aluno_id_sel = session.get("aluno_id") or (edicao_hub.get("aluno_id") if edicao_hub else None)
     aluno_obj = next((a for a in carregar_alunos() if a["id"] == aluno_id_sel), None) if aluno_id_sel else None
     nivel = _nivel_aluno_csp(aluno_obj)
+    peso_aderencia = _peso_aderencia_csp(aluno_obj)
 
     if demandas_csp:
         resultado = gerar_treino_csp(
             demandas_csp, banco_regen, nivel_aluno=nivel,
             seed=random.randint(0, 2**31 - 1),
             variedade=ConfigVariedade(),
+            peso_aderencia=peso_aderencia,
         )
         nome_custom = cfg_r.get("nome_custom", "")
         tipo_label = nome_custom or sessoes_ativas[t].tipo
@@ -2663,6 +2689,7 @@ def aluno_novo():
         objetivo=request.form.get("objetivo", "hipertrofia"),
         restricoes=[r.strip() for r in request.form.get("restricoes", "").split(",") if r.strip()],
         obs=request.form.get("obs", "").strip(),
+        aderencia=request.form.get("aderencia", "media"),
     )
     return _render_alunos_com_dropdown(carregar_alunos())
 
@@ -2680,6 +2707,7 @@ def aluno_editar(i):
         objetivo=request.form.get("objetivo", "hipertrofia"),
         restricoes=[r.strip() for r in request.form.get("restricoes", "").split(",") if r.strip()],
         obs=request.form.get("obs", "").strip(),
+        aderencia=request.form.get("aderencia", "media"),
     )
     return _render_alunos_com_dropdown(carregar_alunos())
 

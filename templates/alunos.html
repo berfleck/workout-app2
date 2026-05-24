@@ -29,6 +29,14 @@
                     <label>Restrições (vírgula)</label>
                     <input type="text" name="restricoes" placeholder="ex: ombro direito, joelho">
                 </div>
+                <div class="campo">
+                    <label>Aderência ao tier</label>
+                    <select name="aderencia">
+                        <option value="alta">Alta — sempre Principal</option>
+                        <option value="media" selected>Média — neutro</option>
+                        <option value="baixa">Baixa — aceita variedade</option>
+                    </select>
+                </div>
             </div>
             <div class="campo mb-3">
                 <label>Observações</label>
@@ -60,6 +68,7 @@
         <div class="aluno-card-meta">
             <b>Nível:</b> {{ aluno.get('nivel', '—') }} ·
             <b>Objetivo:</b> {{ aluno.get('objetivo', '—') }} ·
+            <b>Aderência:</b> {{ aluno.get('aderencia', 'media') }} ·
             <b>Restrições:</b> {{ aluno.get('restricoes', [])|join(', ') or '—' }}
         </div>
         {% if aluno.get('obs') %}
@@ -99,6 +108,13 @@
                     </select>
                 </div>
                 <div class="campo"><label>Restrições</label><input type="text" name="restricoes" id="edit-rest"></div>
+                <div class="campo"><label>Aderência ao tier</label>
+                    <select name="aderencia" id="edit-aderencia">
+                        <option value="alta">Alta — sempre Principal</option>
+                        <option value="media">Média — neutro</option>
+                        <option value="baixa">Baixa — aceita variedade</option>
+                    </select>
+                </div>
             </div>
             <div class="campo mb-3">
                 <label>Observações</label>
@@ -119,6 +135,7 @@ function editarAluno(i, aluno) {
     document.getElementById('edit-obj').value = aluno.objetivo || 'hipertrofia';
     document.getElementById('edit-rest').value = (aluno.restricoes || []).join(', ');
     document.getElementById('edit-obs').value = aluno.obs || '';
+    document.getElementById('edit-aderencia').value = aluno.aderencia || 'media';
     document.getElementById('form-edit-aluno').setAttribute('hx-post', '/alunos/' + i + '/editar');
     htmx.process(document.getElementById('form-edit-aluno'));
     const form = document.getElementById('edit-aluno-form');

@@ -264,18 +264,28 @@ def _construir_modelo(
     demandas_por_treino: list[list[tuple[str, str, int]]],
     banco: list[Exercicio],
     nivel_aluno: int,
+    peso_aderencia: int = 0,
 ) -> dict:
     """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
-    penalidades de S-T1) MAS sem chamar `Minimize`. Caller decide se
-    minimiza (Phase 1 / modo legado) ou adiciona bound + enumera (Phase 2
-    da Frente B / Fatia 3).
+    penalidades de S-T1 e Aderência ao Tier) MAS sem chamar `Minimize`.
+    Caller decide se minimiza (Phase 1 / modo legado) ou adiciona bound +
+    enumera (Phase 2 da Frente B / Fatia 3).
+
+    `peso_aderencia` (Frente D Fatia 3, 2026-05-24): modulação da dimensão
+    "Aderência ao Tier" do vetor de perfil do aluno. 0 (default) = sem
+    efeito (preserva byte-a-byte Frente B). >0 adiciona, por SLOT, uma
+    penalidade proporcional a `(rank_max - tier_rank[slot]) * peso`. Solver
+    minimiza tudo junto → empurra tier alto em qualquer slot, INCLUSIVE
+    slots únicos onde S-T1 sozinho não produz par (slot solo = 0 inversões
+    qualquer tier escolhido). Resolve o achado #1 da Frente C (slots de
+    padrão único caindo em Acessório por sorteio).
 
     Devolve dict com:
       - model: CpModel sem objetivo definido
       - assign: dict[(sid, cidx)] -> BoolVar
       - slots_globais, treinos, grupo_por_idx: metadados pra decodificação
       - h_r1_aplicadas: lista de aplicações H-R1 com flag degraded
-      - penalidades: list[IntVar] das inversões S-T1 (vazia se sem S-T1).
+      - penalidades: list[IntVar] de S-T1 + Aderência (quando peso > 0).
         Caller decide se vira `Minimize(sum(penalidades))` (legacy + Phase 1)
         ou IntVar de soma + bound `<= optimal + slack` (Phase 2).
     """
@@ -467,6 +477,20 @@ def _construir_modelo(
                     model.Add(viol >= tier_rank[sids[j]] - tier_rank[sids[i]])
                     penalidades.append(viol)
 
+    # ── Aderência ao Tier (SOFT, Frente D Fatia 3): por slot ────────────────
+    # `aderencia_pen[s] = (rank_max - tier_rank[s]) * peso_aderencia`
+    # Slot com Principal (rank=3): pen = 0. Acessório (rank=1): pen = 2*peso.
+    # Quando peso=0 (Média/Baixa neutras), bloco inteiro skipado — preserva
+    # byte-a-byte o comportamento da Frente B (legacy + variedade).
+    if peso_aderencia > 0:
+        for s in slots_globais:
+            ader_pen = model.NewIntVar(
+                0, rank_max * peso_aderencia,
+                f"ader_t{s['t_idx']}_s{s['sid']}",
+            )
+            model.Add(ader_pen == (rank_max - tier_rank[s["sid"]]) * peso_aderencia)
+            penalidades.append(ader_pen)
+
     return {
         "model": model,
         "assign": assign,
@@ -550,6 +574,7 @@ def gerar_rotina_csp(
     nivel_aluno: int,
     seed: int = 0,
     variedade: Optional[ConfigVariedade] = None,
+    peso_aderencia: int = 0,
 ) -> dict:
     """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
     negociam no mesmo modelo — necessário pra H-R1 cross-treino.
@@ -560,6 +585,10 @@ def gerar_rotina_csp(
     `variedade`: None preserva comportamento Fatia 2 P2 (1 solve com
     Minimize, 1 solução determinística por seed). ConfigVariedade ativa
     enumeração + softmax — ver docstring de ConfigVariedade.
+    `peso_aderencia` (Frente D Fatia 3): modulação da dimensão "Aderência
+    ao Tier" do vetor de perfil. 0 (default) = sem efeito (preserva
+    byte-a-byte Frente B). >0 adiciona penalty por slot proporcional a
+    `(rank_max - rank_slot) * peso` — ver `_construir_modelo`.
 
     Retorna dict com:
       - top-level: `viavel`, `status`, `nivel_aluno`, `seed`, `solve_time`,
@@ -571,9 +600,11 @@ def gerar_rotina_csp(
         enumeracao_limitada, tempo por fase).
     """
     if variedade is None:
-        return _resolver_legacy(demandas_por_treino, banco, nivel_aluno, seed)
+        return _resolver_legacy(
+            demandas_por_treino, banco, nivel_aluno, seed, peso_aderencia,
+        )
     return _resolver_com_variedade(
-        demandas_por_treino, banco, nivel_aluno, seed, variedade,
+        demandas_por_treino, banco, nivel_aluno, seed, variedade, peso_aderencia,
     )
 
 
@@ -582,10 +613,14 @@ def _resolver_legacy(
     banco: list[Exercicio],
     nivel_aluno: int,
     seed: int,
+    peso_aderencia: int = 0,
 ) -> dict:
     """Branch legado: 1 solve com Minimize → 1 solução determinística por
-    seed. Preserva byte-a-byte o comportamento da Fatia 2 P2."""
-    md = _construir_modelo(demandas_por_treino, banco, nivel_aluno)
+    seed. Preserva byte-a-byte o comportamento da Fatia 2 P2 quando
+    `peso_aderencia == 0`."""
+    md = _construir_modelo(
+        demandas_por_treino, banco, nivel_aluno, peso_aderencia,
+    )
     if md["penalidades"]:
         md["model"].Minimize(sum(md["penalidades"]))
 
@@ -631,11 +666,13 @@ def _resolver_com_variedade(
     nivel_aluno: int,
     seed: int,
     variedade: ConfigVariedade,
+    peso_aderencia: int = 0,
 ) -> dict:
     """Branch variedade (Frente B Fatia 3): 2 fases.
 
     Phase 1 (solver com Minimize): descobre `optimal` = valor mínimo da
-    função objetivo (nº de inversões de S-T1).
+    função objetivo (nº de inversões de S-T1 + termos de Aderência ao
+    Tier quando `peso_aderencia > 0`).
 
     Phase 2 (modelo reconstruído, sem Minimize): cria IntVar `var_total`
     = sum(penalidades), adiciona bound `var_total <= optimal + slack`,
@@ -643,9 +680,18 @@ def _resolver_com_variedade(
     `max_solucoes`. Softmax sobre as
     soluções coletadas: peso = exp(-(inversoes - optimal) / temperatura).
     Amostra uma com `random.Random(python_seed)`.
+
+    `peso_aderencia` (Frente D Fatia 3): propagado pras 2 fases via
+    `_construir_modelo`. Comportamento esperado: pra Aderência Alta,
+    Phase 1 sobe o ótimo (rotinas com Acessório em slot único agora
+    pagam penalty), e Phase 2 enumera só as soluções dentro do mesmo
+    `slack` no novo ótimo — entrega Aderência Alta de fato sem perder
+    variedade interna às opções de tier alto equivalente.
     """
     # ── Phase 1: descobre o ótimo ───────────────────────────────────────────
-    md1 = _construir_modelo(demandas_por_treino, banco, nivel_aluno)
+    md1 = _construir_modelo(
+        demandas_por_treino, banco, nivel_aluno, peso_aderencia,
+    )
     if md1["penalidades"]:
         md1["model"].Minimize(sum(md1["penalidades"]))
 
@@ -679,7 +725,9 @@ def _resolver_com_variedade(
     # ── Phase 2: enumera dentro do slack ────────────────────────────────────
     # IntVar `var_total` criado AQUI (não no helper) porque só esta fase
     # precisa de bound `<= optimal + slack` + leitura via callback.
-    md2 = _construir_modelo(demandas_por_treino, banco, nivel_aluno)
+    md2 = _construir_modelo(
+        demandas_por_treino, banco, nivel_aluno, peso_aderencia,
+    )
     var_total: Optional[cp_model.IntVar] = None
     if md2["penalidades"]:
         teto = max(TIER_RANK.values()) * len(md2["penalidades"])
@@ -712,7 +760,9 @@ def _resolver_com_variedade(
     if not collector.solucoes:
         # Inesperado: Phase 1 viável mas Phase 2 não enumerou nada.
         # Fallback pro modo legado (não bloqueia o caller).
-        return _resolver_legacy(demandas_por_treino, banco, nivel_aluno, seed) | {
+        return _resolver_legacy(
+            demandas_por_treino, banco, nivel_aluno, seed, peso_aderencia,
+        ) | {
             "variedade": _meta_variedade(variedade, n=0, dist=None, opt=optimal,
                                          lim=False, t1=time_p1, t2=time_p2),
         }
@@ -821,6 +871,7 @@ def gerar_treino_csp(
     nivel_aluno: int,
     seed: int = 0,
     variedade: Optional[ConfigVariedade] = None,
+    peso_aderencia: int = 0,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
@@ -831,9 +882,13 @@ def gerar_treino_csp(
     `variedade` é repassado pra `gerar_rotina_csp` (Frente B Fatia 3).
     Quando ativo, a saída ganha a chave `variedade` com metadados da
     enumeração.
+
+    `peso_aderencia` (Frente D Fatia 3): modulação da dimensão "Aderência
+    ao Tier" do perfil do aluno. 0 (default) = sem efeito.
     """
     rotina = gerar_rotina_csp(
-        [demandas], banco, nivel_aluno, seed, variedade=variedade,
+        [demandas], banco, nivel_aluno, seed,
+        variedade=variedade, peso_aderencia=peso_aderencia,
     )
     if not rotina["viavel"]:
         out = {
