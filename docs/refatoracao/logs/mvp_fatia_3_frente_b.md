@@ -175,8 +175,33 @@ Mais relevante pro produto: Bernardo levantou que default opt-in é inconsistent
 - **Outras hards** — H-P2 (bloco solo), H-X (restrições físicas).
 - **Outras softs** — S-T2 fadiga blocos, S-T3 demanda neural, S-T4 variedade eixos soft, S-R1/R2/R3, S-H1 histórico cross-rotina (variedade INTER-rotina, distinta da INTRA-config desta Frente B).
 
+## Adendo pós-fechamento — amostragem aleatória do CP-SAT (Caveat 1 resolvido)
+
+Após o gate verde inicial, Bernardo pediu pra resolver o Caveat 1 (`enumeracao_limitada=True` com viés de exploração). Implementado no mesmo branch (sem novo commit, mesma sessão).
+
+**Mudança**: Phase 2 agora seta `solver2.parameters.randomize_search = True` + `random_branches_ratio = 1.0`. Anteriormente, o CP-SAT visitava as 100 primeiras soluções via heurística "natural", concentrando-as numa região do espaço. Com randomização ativa, as 100 coletadas viram amostra mais espalhada das ótimas equivalentes.
+
+**Resultado empírico (30 amostras Config A com randomize ativo):**
+- Slot 0 (peito, demanda multi-slot): de 1 distinto → 6 distintos (Apoio Ajoelhado, Supino Fechado, Crucifixo, Supino Halteres, etc. se alternando)
+- Slot 2 (costas): de 1 → 10 distintos
+- Slot 5 (perna_anterior): de 1 → 8 distintos
+- Rotinas distintas totais: 19/20 (sem randomize) → 28/30 (com randomize)
+- Tempo médio: ~30ms → ~50ms (sem regressão real, ainda < 1s)
+- Inversões S-T1: continuam 0 ✓ (tier-order respeitado integralmente)
+
+**Achado clínico importante revelado pela randomização** (decisão Bernardo fechada pra Frente D, não pra Frente B):
+
+A randomização revelou que quando duas opções satisfazem igualmente as regras formais (ex: slot 0 de demanda `peito(2)` pode ser Principal ou Intermediário se slot 1 for Acessório — ambos satisfazem "tier slot 0 ≥ tier slot 1"), o sistema antigo "parecia preferir Principal" por **artefato da heurística determinística do solver**, não por regra clínica explícita.
+
+Bernardo decidiu: essa diferenciação (quando agir "rígido pro Principal" vs "aceitar variedade") **vira knob por aluno/config**, modulado pelo "Aderência ao Tier" do vetor de perfil. Catálogo Seção 3 já marca esse modulador como ⭐ ativo no MVP.
+
+**Implicação por frente:**
+- **Frente B (motor)** entrega o **baseline neutro**: máxima variedade dentro das regras formais hard. Comportamento determinístico do solver passou a ser intencional via Aderência ao Tier no perfil, não acidental via heurística.
+- **Frente D (perfil + moduladores)** adiciona o knob "Aderência ao Tier" por aluno → módulo o peso de S-T1 dinamicamente. Aluno aderência alta = penalty maior por inverter → empurra heurística pra escolher Principal mesmo entre opções formalmente equivalentes.
+- **Frente C (UI)** expõe o knob no editor de aluno/config.
+
 ## Refinamentos pós-Frente B abertos (não bloqueiam uso real)
 
-- **Refinar `enumeracao_limitada`**: cap maior, ou amostragem CP-SAT-side. Item de calibração quando começar a integração com produto.
-- **Refinar referência do Hamming**: explorar centroide ou solução com menor inv. Reabrir se calibração indicar que a aleatoriedade da 1ª enumerada bagunça a interpretação clínica.
+- **Refinar referência do Hamming**: explorar centroide ou solução com menor inv. Reabrir se calibração indicar que a aleatoriedade da 1ª enumerada bagunça a interpretação clínica. Bernardo confirmou: pro MVP, OK ("todas as escolhas são clinicamente boas").
 - **Pytest pra Frente B**: cobertura atual é zero (só smoke test manual). Adicionar testes que validem (a) `variedade=None` preserva Fatia 2 P2, (b) `ConfigVariedade()` enumera + sampla, (c) `slack` bound é respeitado, (d) `alpha_tier > 0` muda distribuição por slot, (e) `python_seed` é reprodutível. Item de qualidade — não bloqueia uso, mas evita regressões silenciosas em refator futuro.
+- **Decisão "Aderência ao Tier" como modulador de S-T1**: pertence à Frente D. Caveat conceitual: hoje (Frente B), variedade entre Principal e Intermediário equivalentes é total. Aluno "clássico" precisa do modulador da Frente D pra empurrar o motor pra Principal sempre que possível.

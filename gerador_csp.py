@@ -696,6 +696,15 @@ def _resolver_com_variedade(
     # enumerate_all_solutions exige busca single-thread (auto-imposto em
     # versões modernas, mas setamos explicitamente pra evitar warnings).
     solver2.parameters.num_search_workers = 1
+    # Amostragem aleatória do CP-SAT (decisão Bernardo, 2026-05-23):
+    # sem randomize_search + random_branches_ratio, CP-SAT visita as
+    # soluções na ordem heurística "natural" — quando há >100 ótimas e
+    # cap em max_solucoes, as 100 primeiras concentram-se numa região
+    # do espaço (viés de exploração). Ativar randomização força o solver
+    # a fazer escolhas aleatórias nos branches, espalhando as 100
+    # soluções coletadas pelo espaço total de ótimas equivalentes.
+    solver2.parameters.randomize_search = True
+    solver2.parameters.random_branches_ratio = 1.0
     t0 = time.perf_counter()
     solver2.Solve(md2["model"], collector)
     time_p2 = time.perf_counter() - t0
