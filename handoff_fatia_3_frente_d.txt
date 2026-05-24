@@ -1,0 +1,184 @@
+Handoff — Fatia 3 Frente D (vetor de perfil de aluno + moduladores)
+
+## Contexto
+
+Fatia 2 P2 + Fatia 3 Frente B + Frente C fechadas em 2026-05-23. Estado atual:
+
+- `gerador_csp.py` é uma engine CP-SAT 100% funcional, paralela ao `gerador_treino.py` antigo. Cobre 5/6 hard constraints do catálogo (H-T1/T2/T3/T4/R1 + H-P1) + S-T1 soft + ConfigVariedade (Frente B). Tempo ~50ms por rotina. Pytest 228+1 + harness 16/16 OK.
+- `gerador_treino.py` antigo (~3000 linhas, greedy) continua sendo o motor de `/gerar`. Frente B/C não tocaram nele.
+- `/treino/<t>/regerar` (Frente C, commit `ca4376e`, branch `frente-c-integracao-ui` pushed sem PR) agora usa motor CSP via adapter em `app_flask.py`. `variedade=ConfigVariedade()` default. Marker `rationale={"gerador": "csp"}` em cada ex permite a página `/decisoes` mostrar mensagem amber quando treino veio do motor novo.
+
+Frente D = última frente prevista do MVP do refator declarativo. Resolve o **vetor de perfil de aluno** (4 dimensões ortogonais definidas na entrevista clínica de 2026-05-21) e os **moduladores** que esse vetor aplica nas constraints soft. É o conserto do achado #1 mais visível da Frente C (slots únicos caindo em Acessório porque H-T4 não dispara e tier-order com 1 slot é trivial).
+
+Bernardo registrou na Frente B: comportamento determinístico do solver antigo "preferindo" Principal era **artefato da heurística**, não regra clínica. Frente B entregou variedade máxima dentro das hard. Frente D introduz o knob por aluno que empurra a heurística pra Principal quando o aluno tem **Aderência ao Tier Alta** — implementação declarativa do que antes era acidente.
+
+## Leitura preparatória (nesta ordem)
+
+1. `docs/refatoracao/logs/mvp_fatia_3_frente_c.md` — estado base do adapter UI×CSP + Achado #1 mapeado pra esta frente
+2. `docs/refatoracao/logs/mvp_fatia_3_frente_b.md` — `alpha_tier` na ConfigVariedade (modulador parcial de Aderência ao Tier que já existe; limitação: só softmax-side) + Caveat conceitual da Aderência ao Tier
+3. `docs/refatoracao/principios_clinicos.md` linhas 595-672 (seção "Vetor de perfil do aluno") — 4 dimensões ortogonais + tabela de referência (Fernanda / Turma 7h / Saúde) + decisão arquitetural (presets > sliders)
+4. `docs/refatoracao/catalogo_constraints.md` Seção 3 — tabela de moduladores + decisão MVP (4 moduladores ativos: S-T1, S-B4, S-T3, S-R2)
+5. `gerador_csp.py` — dataclass ConfigVariedade + `alpha_tier` (já existe parcialmente) + função objetivo S-T1
+6. `app_flask.py` linhas ~325-440 (adapter da Frente C: `_resultado_csp_pra_sessao`, `_nivel_aluno_csp`, `_cfg_antiga_pra_demandas_csp`) + linha ~1862 (treino_regerar reescrita)
+7. `database.py` — schema da tabela `alunos` (nivel já existe; centralidade/densidade/aderencia não)
+8. `templates/alunos.html` + `alunos_page.html` — CRUD atual de aluno (form + selects)
+
+## Decisões fechadas (não reabrir sem motivo forte)
+
+Decisões já tomadas em sessões anteriores que estruturam a Frente D:
+
+1. **Vetor de perfil tem 4 dimensões ortogonais** (principios_clinicos.md):
+   - **Nível técnico** (1/2/3) — filtra pool por complexidade (H-P1; já implementado).
+   - **Centralidade Compostos** (alta/média/baixa) — quão "estrelas" os compostos básicos são na rotina.
+   - **Densidade de Pareamento** (alta/média/baixa) — quão denso é o desenho dos blocos.
+   - **Aderência ao Tier** (alta/média/baixa) — quanto protege exercícios de tier alto contra substituição por tier baixo.
+   - Centralidade dentro da família ≡ tier alto dentro da família (fundida com Aderência ao Tier).
+
+2. **Vetor é interno, UI mostra presets nomeados** (principios_clinicos.md):
+   - Presets nomeados ("Força/hipertrofia clássico", "Metabólico em grupo", "Saúde geral", etc.) mapeiam vetores comuns. Personal escolhe 1 preset por aluno.
+   - Tweak fino disponível atrás de "personalizar" pros casos de cauda.
+   - Override por geração — flag manual sobrepõe vetor só pra essa geração; não persiste.
+
+3. **4 moduladores ativos no MVP** (catalogo_constraints.md Seção 3):
+   - S-T1 (tier-order) ← Aderência ao Tier (+++) + Centralidade Compostos (+++)
+   - S-B4 (tamanho bloco) ← Densidade de Pareamento (dominante)
+   - S-T3 (demanda neural total) ← Centralidade Compostos (+++) + Densidade Pareamento (tolera)
+   - S-R2 (frequência típica) ← Aderência ao Tier (+++)
+   - Outras 8 constraints saem com modulador = 1.0 (peso base só). Ativam um a um se dashboard mostrar necessidade.
+
+4. **Override por geração não contamina vetor persistido** — flag temporária. Arquitetura B.4 da Etapa 7 (argumento `pesos_override` em `gerar_multiplos_treinos`) é precedente.
+
+5. **Frente D NÃO precisa de TODOS os 4 moduladores no MVP** — priorizar Aderência ao Tier (resolve achado #1 visível hoje + já tem `alpha_tier` parcial pra reuso) antes de Centralidade/Densidade.
+
+6. **Densidade de Pareamento depende de S-B implementado** (catálogo Seção 2: S-B1/B2/B3/B4) — chicken-and-egg com Fatia 4. Pode entrar como modulador no MVP da Frente D mas só vai "afetar algo" depois da Fatia 4. **NÃO bloqueia** o MVP.
+
+## Pendências de curadoria
+
+Nenhuma — XLSX estável pós-Fatia 2 P1. Cadastros novos (Russian Twist + INFRAs) ainda pendentes mas não bloqueiam.
+
+## Features ausentes / limitações mapeadas (NÃO implementar todas)
+
+### Aderência ao Tier — limitação central a discutir
+
+Hoje `ConfigVariedade.alpha_tier` modula APENAS o softmax pós-coleta (Frente B Frente 2). Penaliza soluções que diferem da referência em slots de tier alto. **Não modula o peso de S-T1 no objetivo do CSP**. Implicações:
+
+- (a) Aluno Aderência Alta com `alpha_tier=2.0` reduz variedade em slots de tier alto (testado empiricamente na Frente B), mas NÃO força Principal em slots com tier-order trivial (1 slot). Achado #1 da Frente C continua existindo.
+- (b) Pra Aderência Alta REALMENTE proteger Principal contra Acessório quando ambos satisfazem tier-order, precisa de uma das 3 opções:
+  - **Opção A** — modular peso/forma de S-T1 no objetivo CSP (mais agressivo: torna inversões "caras" pra aluno aderência alta). Requer mudança no `_construir_modelo` pra aceitar peso variável.
+  - **Opção B** — endurecer pra hard quando AT=alta + slot=Principal disponível (filtro de pool específico pré-solver, similar ao H-T4 mas escopado por slot, não por subregião). Conservador, mas funciona.
+  - **Opção C** — só usar `alpha_tier` cranked up + aceitar limitação (motor entrega "preferência forte" mas não "garantia"). Mais simples, menos potente.
+  - Decisão Bernardo importante na abertura.
+
+### Tabela alunos não tem colunas pro vetor
+
+Hoje só `nivel` (string). Frente D precisa adicionar `centralidade`, `densidade`, `aderencia` (provavelmente 3 colunas string com valores `alta`/`media`/`baixa`, ou int 1/2/3 pra ordenação).
+
+### UI de presets ainda não existe
+
+CRUD atual de aluno só tem campo nivel. Frente D precisa adicionar UI de presets + override por geração no `/gerador` (e potencialmente `/regerar` se quiser override no botão).
+
+### Comparação de features cobertura
+
+| Modulador | Constraints afetadas | Já tem hook? | Esforço MVP |
+|---|---|---|---|
+| Aderência ao Tier | S-T1, S-R2 (+ invers. S-R3/S-H1) | Parcial (`alpha_tier` Frente B) | **MVP — primeiro** |
+| Centralidade Compostos | S-T1, S-T2, S-T3, S-R2 (+ S-B) | Não | Médio — depois |
+| Densidade Pareamento | S-B1/B2/B3/B4, S-T3 | Não (precisa S-B) | Adia — pós Fatia 4 |
+| Nível técnico | H-P1 | ✓ (já implementado) | Sem trabalho |
+
+## Escopo
+
+### Frente 1 (essencial) — Aderência ao Tier ponta-a-ponta
+
+Pré-requisitos:
+1. Decidir Opção A/B/C pra modulação real (AskUserQuestion logo no início).
+2. Adicionar coluna `aderencia` (string) na tabela alunos.
+3. CRUD aluno aceita o campo via form.
+4. Adapter da Frente C (`/regerar`) lê `aderencia` do aluno e traduz em valor numérico (alpha_tier, peso S-T1, ou filtro hard — conforme decisão A/B/C).
+5. Smoke test com 2 alunos contrastantes (Aderência Alta vs Baixa) regerando treino com slots únicos de padrão (hinge, abduction) — Alta deve cair em Principal, Baixa pode cair em Acessório.
+
+Decisão pendente importante (no Checkpoint 1): a UI de presets ENTRA no MVP Frente 1 ou só vem na Frente 2? Se entra: precisa CRUD aluno + select de preset + mapeamento preset → vetor. Se não entra: só campo `aderencia` cru no form de aluno.
+
+### Frente 2 (opcional, se Frente 1 fechar com folga) — Centralidade Compostos
+
+Adicionar coluna `centralidade` + UI + modulação em pelo menos 1 constraint visível (S-T3 seria mais visível clinicamente, mas S-T3 não existe ainda no CSP — só S-T1 e variedade existem). Opções:
+
+- Reuso de `alpha_tier` pra também codificar Centralidade (semântica overlap com Aderência — Centralidade Alta + Aderência Alta = `alpha_tier=2.0`, etc.). Mais simples mas perde diferenciação.
+- Knob separado no CSP pra Centralidade (novo parâmetro). Limpo mas requer mudança no motor.
+
+### Frente 3 (validação) — Gate de fechamento da Frente 1
+
+1. Smoke test: 2 alunos contrastantes (Aderência Alta = Fernanda; Aderência Baixa = Turma 7h). Mesma demanda (template Full Body). Comparar 10 regenerações de cada — Aderência Alta deve ter Principal majoritário em slots únicos de padrão; Aderência Baixa deve mostrar mix.
+2. Pytest 228+1 + harness 16/16 OK preservados (motor antigo intocado).
+3. Smoke test browser: editar aluno via UI, escolher aderencia=alta, regerar treino, verificar slots únicos.
+4. Doc no log: `docs/refatoracao/logs/mvp_fatia_3_frente_d.md`.
+5. Branch + commit + push.
+
+### Override por geração — adia pra Frente 4 ou MVP da Frente 1?
+
+Decisão Bernardo na abertura. Recomendação: NÃO no MVP Frente 1 (UI extra; semântica de "essa geração override" precisa pensar onde mostrar). Frente 1 lê só do perfil persistido.
+
+## Restrições
+
+- NÃO tocar em `gerador_treino.py` (motor antigo estável).
+- TOCAR `gerador_csp.py` SÓ se Opção A vencer (modular peso de S-T1 no objetivo). Mesmo aí, mudança cirúrgica: 1 arg novo na função, default = comportamento atual.
+- Manter Fatia 2 P2 + Frente B + Frente C verdes (pytest + harness).
+- NÃO implementar Centralidade/Densidade no MVP Frente 1 — adia até Frente 1 ser usada por um tempo.
+- NÃO commitar sem review do Bernardo. Preferência: commit + push direto em branch, sem `gh pr create`.
+- Branch nova: criar `frente-d-vetor-perfil` a partir de `frente-c-integracao-ui` (já pushed). Quando merger pra main, fazem-se as 3 juntas (P2 + Frente B + Frente C + Frente D). Confirmar com Bernardo se ele prefere branchar de `main` em vez disso (assumindo que C ainda não foi merged).
+
+## Ordem sugerida (checkpoints)
+
+**Checkpoint 1** — leitura dos docs + AskUserQuestion das decisões críticas (Opção A/B/C; UI presets dentro ou fora do MVP; override por geração agora ou depois; branch base). Apresentar plano.
+
+**Checkpoint 2** — schema: adicionar coluna `aderencia` (e talvez `centralidade`, `densidade` placeholders) na tabela alunos via migração defensiva. Test: aluno antigo carrega com defaults; aluno novo aceita o campo.
+
+**Checkpoint 3** — CRUD aluno: form em `alunos.html`/`alunos_page.html` aceita o novo campo. Database.py escreve/lê. Smoke test do CRUD via UI/HTTP.
+
+**Checkpoint 4** — modulação:
+- Opção A: editar `gerador_csp.py` (peso variável de S-T1) + adapter da Frente C lê `aderencia` e passa.
+- Opção B: adapter da Frente C filtra pool pré-solver baseado em `aderencia` + tier disponível.
+- Opção C: adapter da Frente C mapeia `aderencia` em valor de `alpha_tier` na ConfigVariedade.
+- Smoke test isolado da nova chamada antes de plugar no /regerar.
+
+**Checkpoint 5** — wiring no /regerar (e talvez /gerar se o motor antigo precisar do mesmo conceito; mas escopo MVP é só /regerar, que já é Frente C). Smoke test no browser real.
+
+**Checkpoint 6** — gate (Frente 3). Doc + commit + push.
+
+## Pontos de decisão prováveis (perguntar ao Bernardo via AskUserQuestion antes de codar)
+
+1. **Mecanismo da Aderência ao Tier**: Opção A (modular peso S-T1 no objetivo CSP) vs Opção B (filtro hard pré-solver por slot) vs Opção C (só `alpha_tier` aumentado). Critério: A é mais correto, B é mais agressivo (talvez agressivo demais), C é mais simples. Recomendação: A pra modulação semântica limpa; ou C pra MVP mais barato + iterar pra A se C não resolver achado #1.
+
+2. **UI de presets entra no MVP Frente 1 ou só Frente 2?** Recomendação: NÃO no MVP — campo `aderencia` cru com 3 opções (alta/media/baixa) no form de aluno; presets viram refinamento. Bernardo é o personal — ele consegue mapear vetor cru direto.
+
+3. **Centralidade Compostos no MVP Frente 1 ou só Frente 2?** Recomendação: NÃO — só Aderência. Centralidade tem semantic overlap (catalogo Seção 3: ambas modulam S-T1) e precisa decidir como diferenciar. Adia.
+
+4. **Override por geração no MVP ou Frente 4?** Recomendação: Frente 4. Adicionar UI no /gerador agora é distração.
+
+5. **Branch base**: criar `frente-d-vetor-perfil` a partir de `frente-c-integracao-ui` (acumula 3 frentes) ou de `main` (e tratar como independente que vai requerer rebase depois)? Recomendação: a partir de `frente-c-integracao-ui` — Frente D estende o adapter da Frente C diretamente.
+
+6. **Schema: coluna(s) novas na tabela alunos**. 3 colunas (`centralidade`, `densidade`, `aderencia`) string `'alta'`/`'media'`/`'baixa'`, ou 1 coluna JSON `vetor_perfil`? Recomendação: 3 colunas string (queryable + legível em SQLite). Pra MVP Frente 1, só `aderencia` é essencial; outras 2 ficam como placeholders.
+
+7. **Default das colunas novas** pra alunos antigos. Recomendação: `'media'` em todos (vetor neutro = comportamento atual do motor). Migração defensiva via ALTER TABLE ADD COLUMN ... DEFAULT 'media'.
+
+8. **Implementar também no /gerar (motor antigo)?** Recomendação: NÃO. Frente D MVP fica no motor CSP via /regerar. /gerar fica pra "Frente C parte 2" (substituir /gerar pelo CSP), que é uma frente separada. Não misturar.
+
+## Pontos de discussão clínica (Bernardo pode antecipar na abertura)
+
+- **Aderência Alta vs Hard de Tier**: existe diferença prática entre "Aderência Alta força Principal" (que vira hard) vs "Aderência Alta penaliza muito Acessório" (que continua soft)? Em casos onde pool de Principal está vazio ou Principal foi bloqueado por cross-treino, o que ganha? Hard = INFEASIBLE. Soft = aceita Acessório como degraded. Decisão clínica importante (cf. graceful degradation de H-T4 / H-R1).
+- **Mapeamento alta/média/baixa → numérico**: Aderência Alta = `alpha_tier=2.0`? Média = `1.0`? Baixa = `0.0`? Calibração inicial é chute. Documentar como Bernardo prefere — chute conservador (Alta=1.0, Média=0.5, Baixa=0.0) ou agressivo (Alta=3.0, Média=1.0, Baixa=0.0)?
+- **Override por geração**: hoje a UI de geração tem opções globais (n_treinos, max_complexidade, etc.). Override de vetor encaixa onde? Sub-painel? Bernardo já tem mental model?
+
+## Metodologia geral
+
+- Checkpoints com aguardo de OK do Bernardo. Igual à Frente C.
+- AskUserQuestion em todas as decisões da seção "Pontos de decisão" antes de codar.
+- Doc-first: ler logs/catálogo/rotas existentes antes de escrever código.
+- Não tocar em `gerador_treino.py`. Tocar `gerador_csp.py` SÓ se decisão A vencer.
+- Toda lógica de modulação fica em `app_flask.py` se possível (consistente com adapter da Frente C).
+- Não commitar sem review.
+- Não abrir PR — só commit + push (preferência [[feedback-workflow-branch-sem-pr]]).
+- Commit com `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` no final.
+- Sessões paralelas: usar `git add` seletivo (não `-A`) quando houver suspeita de trabalho de outra sessão no working tree (preferência [[feedback-sessoes-paralelas-git]]).
+- Servidor Flask: usar regra documentada em CLAUDE.md (checar porta 5000, matar processo, run_in_background, salvar PID em server.pid, matar ao fim).
+- Smoke test em browser real — Frente D é UI/produto + modulação clínica, screenshot/observação visual valida o que pytest não pega. Skill `verify` pode ajudar.
