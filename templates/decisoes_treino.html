@@ -356,6 +356,27 @@
         </div>
     </div>
 
+    {% if treino_csp %}
+    {# Frente C (2026-05-23) — treino veio do motor CSP novo, sem rationale
+       capturado. Mostra mensagem em vez de timeline/distribuição vazia. #}
+    <div class="dec-section">
+        <div class="dec-section-title">
+            <span class="dec-section-num">!</span>
+            Motor CSP — rationale indisponível
+        </div>
+        <div class="dec-foot" style="background: #fef3c7; border-color: #fcd34d; color: #78350f;">
+            Este treino foi (re)gerado pelo <b>motor CSP novo</b> (Frente C do MVP).
+            O motor declarativo ainda não captura rationale por slot — as decisões
+            são derivadas implicitamente das constraints do catálogo
+            (H-T1/T2/T3/T4 + H-R1 + S-T1 + ConfigVariedade), sem timeline
+            sequencial pra inspecionar.
+            <br><br>
+            Pra ver decisões detalhadas, regenere o treino pelo gerador antigo
+            ou aguarde a captura de rationale no motor novo (próximas Fatias).
+        </div>
+    </div>
+    {% else %}
+
     {# ─── Estatísticas agregadas ─── #}
     {% set _top1 = [] %}
     {% set _sorteio = [] %}
@@ -844,6 +865,8 @@
         Rejeições por carga = filtro <b>hard</b> em `pode_adicionar_ao_bloco` — candidatos eliminados
         antes do score de pareamento por violar threshold de grip/lombar/core.
     </div>
+
+    {% endif %}{# fecha treino_csp if/else (Frente C) #}
 
 </div>
 

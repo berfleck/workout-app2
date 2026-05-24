@@ -4,6 +4,7 @@ BF Treinamento — Versão Flask + HTMX (completa)
 
 from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify, session
 import os, random, json, copy, io, zipfile, unicodedata, secrets
+from dataclasses import replace as _dc_replace
 from pathlib import Path
 from datetime import datetime
 from gerador_treino import (
@@ -16,6 +17,7 @@ from gerador_treino import (
     ANCORAS_POR_REGIAO, ANCORAS_POR_SUBREGIAO,
     Exercicio, Sessao, SuperSerie,
 )
+from gerador_csp import ConfigVariedade, gerar_treino_csp
 from gerar_imagem import gerar_png
 from database import (
     init_db, migrar_json_para_sqlite,
@@ -336,6 +338,131 @@ def _dict_to_sessao(d):
     s.relaxados = list(d.get("relaxados") or [])
     s.avisos = list(d.get("avisos") or [])
     return s
+
+
+# ══════════════════════════════════════════════════════════════
+# Frente C — adapter motor CSP (gerador_csp.py) → Sessao
+# ══════════════════════════════════════════════════════════════
+
+def _label_bloco_csp(i):
+    """0 → 'A', 1 → 'B', ..., 25 → 'Z', 26 → 'AA'. Mesma convenção do
+    gerador antigo. Em /regerar com até ~10 slots nunca passa de 'J'."""
+    out = ""
+    n = i
+    while True:
+        out = chr(ord("A") + (n % 26)) + out
+        n = n // 26 - 1
+        if n < 0:
+            return out
+
+
+def _resultado_csp_pra_sessao(resultado, tipo_label):
+    """Converte o dict de saída de `gerar_treino_csp` em `Sessao`.
+
+    Frente C MVP: cada exercício vira 1 SuperSerie solo (labels A, B, C…).
+    Pareamento clínico fica pra Fatia 4 (S-B do catálogo).
+
+    Marca cada Exercicio com `rationale={"gerador": "csp"}` via
+    `dataclasses.replace` — não muta as instâncias do banco global. A
+    página /decisoes usa esse marker pra detectar treinos do motor novo
+    e mostrar mensagem em vez de timeline vazio.
+
+    Avisos: cada eixo H-R1 marcado `degraded=True` vira aviso
+    `tipo="h_r1_degradado"` em `Sessao.avisos`. Render no modal fica
+    pra Checkpoint 4 (template `_avisos_modal.html`).
+    """
+    blocos = []
+    for i, ex in enumerate(resultado.get("ordem_global", [])):
+        ex_marker = _dc_replace(ex, rationale={"gerador": "csp"})
+        blocos.append(SuperSerie(label=_label_bloco_csp(i),
+                                 ex1=ex_marker, ex2=None, ex3=None))
+
+    s = Sessao(tipo=tipo_label, blocos=blocos)
+    s.relaxados = []
+    s.avisos = []
+    for a in resultado.get("h_r1_aplicadas", []) or []:
+        if a.get("degraded"):
+            s.avisos.append({
+                "tipo": "h_r1_degradado",
+                "subregiao": a.get("subregiao"),
+                "eixo": a.get("eixo"),
+                "motivo": a.get("motivo", "pool sem candidato"),
+            })
+    return s
+
+
+_NIVEL_ALUNO_PARA_CSP = {
+    "iniciante": 1,
+    "intermediario": 2,
+    "avancado": 3,
+}
+
+
+def _nivel_aluno_csp(aluno_obj):
+    """Mapeia o `nivel` (string) do aluno pro int 1/2/3 esperado pelo CSP.
+    Default 3 (sem teto) quando aluno desconhecido ou nivel não bate.
+    """
+    if not aluno_obj:
+        return 3
+    return _NIVEL_ALUNO_PARA_CSP.get((aluno_obj.get("nivel") or "").strip(), 3)
+
+
+def _cfg_antiga_pra_demandas_csp(cfg_r):
+    """Converte cfg do gerador antigo em demandas CSP `(nivel, escopo, qtd)`.
+
+    Modo hierarquia: `cfg_r["demandas"]` já vem parsed do form em formato
+    compatível — passa direto, só expande aliases legados (`squat` agregado
+    aparece em configs antigas mas o form parser de /gerar já o substitui;
+    salvaguarda mesmo assim).
+
+    Modo template: `cfg_r["padroes"]` + `cfg_r["exercicios_por_padrao"]`
+    (EPP). Converte cada padrão+qtd em demanda `("padrao", padrao, qtd)`.
+    EPP pode ser `int` ou `dict` de lateralidade — pra dict, soma os
+    valores (CSP não tem split bi/uni nesse nível ainda).
+
+    Aliases legados de padrão (do gerador antigo, pré-Frente 4 + pré-Etapa 8):
+      - `"squat"` → split Bresenham ceil/floor em `squat_bilateral` +
+        `squat_unilateral`.
+      - `"core_isometrico"` / `"core_dinamico"` → vira demanda `subregiao`
+        (são subregiões reais no XLSX, padrões dentro delas foram refinados
+        em flexao_*). Tradeoff: H-T4 passa a disparar em vaga única
+        (clinicamente OK — vaga única de core deve ser principal/interm).
+    """
+    if cfg_r.get("demandas"):
+        out = []
+        for n, e, q in cfg_r["demandas"]:
+            out.extend(_expandir_demanda_csp(n, e, q))
+        return out
+
+    padroes = cfg_r.get("padroes") or []
+    epp = cfg_r.get("exercicios_por_padrao") or {}
+    out = []
+    for p in padroes:
+        val = epp.get(p, 0)
+        qtd = sum(val.values()) if isinstance(val, dict) else int(val or 0)
+        if qtd <= 0:
+            continue
+        out.extend(_expandir_demanda_csp("padrao", p, qtd))
+    return out
+
+
+def _expandir_demanda_csp(nivel, escopo, qtd):
+    """Devolve list de demandas CSP-friendly pra (nivel, escopo, qtd).
+    Aplica os aliases legados descritos em `_cfg_antiga_pra_demandas_csp`.
+    """
+    if nivel == "padrao" and escopo == "squat":
+        bi = (qtd + 1) // 2
+        uni = qtd // 2
+        out = []
+        if bi > 0:
+            out.append(("padrao", "squat_bilateral", bi))
+        if uni > 0:
+            out.append(("padrao", "squat_unilateral", uni))
+        return out
+    if nivel == "padrao" and escopo in ("core_isometrico", "core_dinamico"):
+        return [("subregiao", escopo, qtd)]
+    return [(nivel, escopo, qtd)]
+
 
 def _configs_to_serializable(configs):
     result = []
@@ -1660,6 +1787,15 @@ def hub_treino_decisoes(aluno_id, t):
     if configs and isinstance(configs, list) and t < len(configs):
         config_treino = configs[t]
 
+    # Frente C (2026-05-23): treino vindo do motor CSP novo não tem rationale
+    # capturado. Marker em ex.rationale={"gerador": "csp"} sinaliza isso pro
+    # template, que renderiza uma mensagem em vez de timeline vazio.
+    treino_csp = any(
+        ex and getattr(ex, "rationale", None)
+        and ex.rationale.get("gerador") == "csp"
+        for b in sessao.blocos for ex in (b.ex1, b.ex2, b.ex3)
+    )
+
     # Agrega distribuição real por demanda raiz lendo o rationale.pre_alocacao
     # de cada exercício escolhido. Devolve, por (nivel, escopo), a contagem de
     # exercícios por subregião (quando nivel="regiao") ou por padrão (quando
@@ -1713,6 +1849,7 @@ def hub_treino_decisoes(aluno_id, t):
         distribuicao_por_demanda=distribuicao_por_demanda,
         distribuicao_outros_treinos=distribuicao_outros_treinos,
         total_treinos_rotina=len(sessoes_dicts),
+        treino_csp=treino_csp,
     )
 
 
@@ -1721,8 +1858,44 @@ def treino_editar(t):
     if t >= len(sessoes_ativas): return "Treino não encontrado", 404
     return _responder_card_com_banner(t)
 
+def _regerar_motor_legacy(t, cfg_r, banco_regen):
+    """Branch legado de /treino/<t>/regerar — gerador_treino.py greedy.
+    Mantido como fallback acessível pra rollback rápido. Não chamado em
+    runtime pela rota (motor novo CSP é default). Pra reativar: trocar
+    o corpo de treino_regerar pra chamar este helper."""
+    if cfg_r.get("demandas"):
+        return gerar_sessao_por_demandas(banco_regen, demandas=cfg_r["demandas"],
+            equipamentos_bloqueados=cfg_r.get("equipamentos_bloqueados", []),
+            max_complexidade=cfg_r.get("max_complexidade", 5),
+            tamanho_bloco=cfg_r.get("tamanho_bloco", 2),
+            exercicios_travados=cfg_r.get("exercicios_travados", []),
+            evitar_agonistas=cfg_r.get("evitar_agonistas", False),
+            lateralidade_por_padrao=cfg_r.get("lateralidade_por_padrao"),
+            cargas_config=cfg_r.get("cargas_config"))
+    return gerar_sessao(banco_regen, cfg_r["padroes"],
+        exercicios_por_padrao=cfg_r["exercicios_por_padrao"],
+        equipamentos_bloqueados=cfg_r.get("equipamentos_bloqueados", []),
+        max_complexidade=cfg_r.get("max_complexidade", 5),
+        tamanho_bloco=cfg_r.get("tamanho_bloco", 2),
+        exercicios_travados=cfg_r.get("exercicios_travados", []),
+        evitar_agonistas=cfg_r.get("evitar_agonistas", False),
+        cargas_config=cfg_r.get("cargas_config"))
+
+
 @app.route("/treino/<int:t>/regerar", methods=["POST"])
 def treino_regerar(t):
+    """Frente C MVP (2026-05-23): regenera 1 treino via motor CSP novo
+    (`gerador_csp.gerar_treino_csp` + `ConfigVariedade()`).
+
+    Features do gerador antigo que SÃO IGNORADAS aqui (motor novo ainda
+    não cobre — ver handoff_fatia_3_frente_c.txt): tamanho_bloco,
+    evitar_agonistas, relaxar_familia, cargas_config, exercicios_travados,
+    lateralidade_por_padrao (mas split squat_bi/squat_uni continua via
+    `_expandir_demanda_csp`).
+
+    Saída: lista linear de blocos solo (labels A/B/C…). Pareamento real
+    de blocos fica pra Fatia 4 (S-B do catálogo).
+    """
     global sessoes_ativas
     if t >= len(sessoes_ativas): return "Treino não encontrado", 404
 
@@ -1736,7 +1909,9 @@ def treino_regerar(t):
                  "max_complexidade": 5, "tamanho_bloco": 2, "equipamentos_bloqueados": [],
                  "exercicios_travados": [], "demandas": None}
 
-    # Block exercises from other workouts
+    # Bloqueio cross-treino: filtra nomes + famílias dos outros treinos do
+    # banco antes de mandar pro CSP (CSP só faz AllDifferent dentro da
+    # rotina que recebe; aqui mandamos só 1 treino).
     exs_outros = [ex for i, s in enumerate(sessoes_ativas) if i != t
                   for bloco in s.blocos for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex]
     nomes_outros = {ex.nome for ex in exs_outros}
@@ -1745,29 +1920,36 @@ def treino_regerar(t):
                    and e.nome not in pais_dos_outros
                    and (e.variacao_de is None or e.variacao_de not in nomes_outros)]
 
-    if cfg_r.get("demandas"):
-        nova = gerar_sessao_por_demandas(banco_regen, demandas=cfg_r["demandas"],
-            equipamentos_bloqueados=cfg_r.get("equipamentos_bloqueados", []),
-            max_complexidade=cfg_r.get("max_complexidade", 5),
-            tamanho_bloco=cfg_r.get("tamanho_bloco", 2),
-            exercicios_travados=cfg_r.get("exercicios_travados", []),
-            evitar_agonistas=cfg_r.get("evitar_agonistas", False),
-            lateralidade_por_padrao=cfg_r.get("lateralidade_por_padrao"),
-            cargas_config=cfg_r.get("cargas_config"))
-    else:
-        nova = gerar_sessao(banco_regen, cfg_r["padroes"],
-            exercicios_por_padrao=cfg_r["exercicios_por_padrao"],
-            equipamentos_bloqueados=cfg_r.get("equipamentos_bloqueados", []),
-            max_complexidade=cfg_r.get("max_complexidade", 5),
-            tamanho_bloco=cfg_r.get("tamanho_bloco", 2),
-            exercicios_travados=cfg_r.get("exercicios_travados", []),
-            evitar_agonistas=cfg_r.get("evitar_agonistas", False),
-            cargas_config=cfg_r.get("cargas_config"))
+    # Mapeia cfg antiga → demandas CSP + nível do aluno via session.
+    demandas_csp = _cfg_antiga_pra_demandas_csp(cfg_r)
+    aluno_id_sel = session.get("aluno_id") or (edicao_hub.get("aluno_id") if edicao_hub else None)
+    aluno_obj = next((a for a in carregar_alunos() if a["id"] == aluno_id_sel), None) if aluno_id_sel else None
+    nivel = _nivel_aluno_csp(aluno_obj)
 
-    # Preserva o nome custom do treino se existir
-    nome_custom = cfg_r.get("nome_custom", "")
-    if nome_custom:
-        nova.tipo = nome_custom
+    if demandas_csp:
+        resultado = gerar_treino_csp(
+            demandas_csp, banco_regen, nivel_aluno=nivel,
+            seed=random.randint(0, 2**31 - 1),
+            variedade=ConfigVariedade(),
+        )
+        nome_custom = cfg_r.get("nome_custom", "")
+        tipo_label = nome_custom or sessoes_ativas[t].tipo
+        if resultado.get("viavel"):
+            nova = _resultado_csp_pra_sessao(resultado, tipo_label)
+        else:
+            # Fallback: pool insuficiente no CSP. Mantém sessão atual e
+            # devolve aviso visível no card (sem trocar nada).
+            nova = sessoes_ativas[t]
+            nova.avisos = list(nova.avisos or []) + [{
+                "tipo": "h_r1_degradado",
+                "subregiao": "(regeneração CSP)",
+                "eixo": "",
+                "motivo": f"motor CSP inviável (status={resultado.get('status')}); treino mantido",
+            }]
+    else:
+        # cfg sem demandas reconhecíveis — mantém sessão atual.
+        nova = sessoes_ativas[t]
+
     sessoes_ativas[t] = nova
     salvar_sessoes_disco()
     return render_template("_treino_card.html", sessao=nova, idx=t,

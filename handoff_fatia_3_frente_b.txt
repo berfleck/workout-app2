@@ -1,0 +1,110 @@
+Handoff — Fatia 3 Frente B (variedade/fairness no CSP)
+
+## Contexto
+
+Fatia 2 Parte 2 fechada em 2026-05-23, commit `839e05e` em branch `fatia-2-parte-2` (pushed, sem PR — preferência do Bernardo é commit/push direto sem PR formal). Estado do `gerador_csp.py` após a Parte 2: 5/6 hards do catálogo cobertas (H-T1/T2/T3/T4/R1 + H-P1) + S-T1 soft + graceful degradation em H-T4 e H-R1. Refator `gerar_treino_csp → gerar_rotina_csp` (N treinos no mesmo CpModel). Tempos 0.005–0.04s por rotina, pytest 218 verde.
+
+**Problema central a resolver na Frente B**: determinismo do solver. CP-SAT retorna a primeira solução ótima encontrada; quando o objetivo tem muitos empates (caso comum em S-T1 com inversões=0), todas as seeds devolvem a MESMA rotina. Na Fatia 2 P2 observamos 1–2 rotinas distintas em 5 seeds da Config A — variedade insuficiente pra um app que vai gerar treino N vezes por aluno.
+
+Frente B trata especificamente de **variedade INTRA-config**: mesmo aluno + mesma config + sessões diferentes → recebe rotinas diferentes. NÃO confundir com **variedade INTER-rotina** (S-H1 no catálogo), que é "rotina nova evita exercícios da rotina anterior" — frente separada, modelada parcialmente no gerador antigo via `historico_r1`/HIST D3.3.
+
+## Leitura preparatória (nesta ordem)
+
+1. `docs/refatoracao/logs/mvp_fatia_2_parte_2.md` — log da Parte 2 (estado base + decisões + achados)
+2. `gerador_csp.py` — modelo CP-SAT atual; atenção especial em `gerar_rotina_csp` (linha ~310) e o uso de `solver.parameters.random_seed`/`randomize_search` que já tentamos sem efeito
+3. `gerador_treino.py` linha 2661 (`_selecionar_cand_score_aware`) — softmax + top-K do gerador antigo, referência conceitual. NÃO copiar, só ler pra entender a forma usada pelo Bernardo.
+4. `docs/refatoracao/catalogo_constraints.md` Seções 2 (softs) e 3 (função objetivo) — Frente B mexe na função objetivo
+5. Documentação OR-Tools: `cp_model.CpSolverSolutionCallback`, `SearchForAllSolutions`, e parâmetros `enumerate_all_solutions` + `solution_pool` (verificar disponibilidade na versão instalada)
+
+## Decisões fechadas nesta sessão (não reabrir)
+
+Discussão pós-IA 1 + IA 2 (2026-05-23) sobre Frente B. As IAs misturaram variedade INTRA-config com S-H1 inter-rotina — filtramos. O que ficou:
+
+1. **Frente B = variedade INTRA-config apenas**. S-H1 (memória temporal cross-rotina) continua roadmap em frente separada.
+
+2. **Mecanismo central: top-K enumeration + softmax** (forma "(b)" do menu de implementação). CP-SAT enumera todas as soluções dentro de `objective <= optimal + slack`; Python coleta a lista, calcula score por solução e amostra com softmax. Mantém semântica do objetivo (S-T1 inversões continuam inteiros) e dá controle explícito sobre o trade-off "ótimo estrito vs variedade" via knob `slack`.
+
+3. **Perturbação ε nos coeficientes do objetivo (forma "a")** — DESCARTADA. Suja a semântica de S-T1 (inversões deixariam de ser inteiros), pode mascarar bugs em constraints futuras que dependam de comparação exata do objetivo.
+
+4. **Multi-solve com seeds diferentes (forma "c")** — DESCARTADA. Já provado ineficaz na Fatia 1 (5 seeds → 1 rotina) e na Fatia 2 P2 (5 seeds → 1–2 rotinas). CP-SAT é robusto ao seed quando há muitos empates.
+
+5. **Modulação por tier (Mecanismo 2 — refinement OPCIONAL)** — entra DEPOIS de Mecanismo 1 estar funcionando. Insight clínico da IA 2 #5 ("varia mais em Acessórios, menos em Principais"). Operacionalização: temperatura do softmax mais alta quando as soluções diferem em slots de tier baixo (Acessório), mais baixa quando diferem em slots de tier alto (Principal). Detalhe da operacionalização — Hamming ponderado por tier? Distância L1 sobre tier_rank? — fica aberta pra decisão na sessão.
+
+6. **Modulação por aluno (Aderência ao Tier do vetor de perfil)** — fica explicitamente pra **Frente D**. Não tentar na Frente B. Diferenciação clínica entre alunos requer o vetor de perfil completo modelado, que é trabalho maior.
+
+7. **Sob nenhuma circunstância patchar `gerador_treino.py` antigo** — toda lógica nova fica em `gerador_csp.py`. Convenção que vem da Fatia 1 e foi reforçada na Parte 2.
+
+## Pendências de curadoria (nenhuma)
+
+Sem ajustes de XLSX pendentes pra início desta sessão. Coluna `tier` está estável pós-Fatia 2 P2.
+
+## Escopo
+
+### Frente 1 (essencial) — Top-K enumeration + softmax pós-solver
+
+1. Substituir `solver.Solve(model)` por enumeração de soluções com `objective <= optimal + slack` via `CpSolverSolutionCallback` (ou equivalente).
+2. Estrutura nova: `gerar_rotina_csp` resolve em 2 passes — (a) `solver.Solve(model)` pra descobrir `optimal_value`; (b) adicionar `model.Add(objective_var <= optimal_value + slack)` e enumerar todas as soluções viáveis dentro disso.
+3. Cap no número de soluções enumeradas (sugestão inicial: 100, com `enumerate_all_solutions` e early stop quando atingir).
+4. Cada solução vira um dict com `{exercicios, score_total, distancia_do_otimo}`. `score_total` = `inversoes_totais` (objetivo). `distancia_do_otimo` = `objective_var - optimal_value`.
+5. Softmax sobre as soluções: peso = `exp(-distancia / T)`. Amostra com `random.choices(solucoes, weights=...)`. Seed do `random` controla reprodutibilidade.
+6. Temperatura T inicial: começar com T=1.0 e calibrar pelo gate.
+
+### Frente 2 (refinement opcional, fazer só se sobrar tempo) — Modulação por tier
+
+1. Calcular "perfil tier" da rotina ótima (tupla com tier_rank de cada slot na ordem do treino).
+2. Pra cada solução k enumerada, calcular "Hamming ponderado": soma sobre slots de `|tier_rank_otimo[s] - tier_rank_k[s]| * tier_rank_otimo[s]`.
+3. Temperatura efetiva da solução k: `T * (1 + alpha * hamming_ponderado)` — soluções que mexem em slots de tier alto ficam menos prováveis.
+4. Knob `alpha` exposto na API junto com `T` e `slack`.
+
+### Frente 3 (validação) — Gate de fechamento
+
+1. Rerodar Config A (5 seeds) e mostrar que produz N rotinas distintas (N > 2, idealmente N = 5).
+2. Rerodar Config B / Config C / Config D — não devem regredir.
+3. pytest 218 continua verde.
+4. Tempos de solving por rotina — observar se enumeração impacta (esperado: aumenta, mas deve continuar < 1s no banco atual).
+5. Sanity check clínico: rodar Config A com seed fixa diversas vezes — variedade vem da seed do `random` Python, não do CP-SAT. Mostrar que a aleatoriedade está reproduzível.
+
+## Restrições
+
+- NÃO tocar em `gerador_treino.py`. Toda lógica nova vai pra `gerador_csp.py`.
+- Manter Fatia 2 P2 verde (configs A/B/C/D + bônus continuam viáveis com as mesmas semânticas; variedade pode mudar).
+- NÃO commitar sem review do Bernardo. Preferência dele: commit + push direto em branch, sem `gh pr create`.
+- Continuar princípio declarativo: cada mecanismo é uma entrada nomeada do modelo, sem ordem de processamento.
+- `random` Python — usar `random.Random(seed)` instanciado por chamada, não o módulo global. Reprodutibilidade explícita.
+
+## Ordem sugerida (checkpoints)
+
+Checkpoint 1 — leitura + plano (apresentar antes de codar). Verificar API exata do `CpSolverSolutionCallback` na versão do OR-Tools instalada (`pip show ortools`).
+
+Checkpoint 2 — implementar enumeração + softmax em `gerar_rotina_csp`. Knobs como argumentos opcionais: `slack=0`, `T=1.0`, `max_solucoes=100`, `python_seed=None`. Default `slack=0` preserva comportamento atual (Fatia 2 P2) — variedade só ativa explicitamente.
+
+Checkpoint 3 — validar gate: Config A com `slack=1, T=1.0, max_solucoes=50, python_seed=42`. Mostrar variedade > 2 rotinas em 5 chamadas.
+
+Checkpoint 4 — implementar modulação por tier (Frente 2, opcional). Pular se Checkpoint 3 já entregou variedade suficiente.
+
+Checkpoint 5 — gate final + log + commit + push.
+
+## Pontos de decisão prováveis (perguntar ao Bernardo se aparecerem)
+
+1. **Valor inicial do slack**: 0 (só soluções ótimas), 1 (1 inversão a mais aceita), proporcional? Provavelmente começar com `slack=0` mostra que mesmo só soluções ótimas dá variedade quando enumeradas; aumentar slack se ainda for pouco.
+
+2. **Cap do `max_solucoes`**: 50? 100? 500? Performance pode degradar — checar tempos.
+
+3. **Temperatura T**: 1.0 é arbitrário. Talvez expor como `entropia_relativa` 0–1 e mapear pra T internamente, mais intuitivo pro usuário.
+
+4. **Distância entre soluções** (pra Mecanismo 2): Hamming (slots iguais ou diferentes), Hamming ponderado por tier, ou L1 sobre rank? Decisão a fechar via AskUserQuestion na sessão.
+
+5. **API pública**: knobs viram parâmetros de `gerar_rotina_csp` ou ficam em um dataclass `ConfigVariedade`? Por consistência com `ConfigPesosProximidade` do gerador antigo, dataclass é mais escalável.
+
+6. **Como expor pro usuário final**: sempre ativa com defaults, toggle on/off, ou exposição de slider de "criatividade"? Decisão de UX — provavelmente fica pra Frente C (integração com UI Flask).
+
+## Metodologia geral
+
+- Checkpoints com aguardo de OK do Bernardo.
+- AskUserQuestion em decisões estruturais (especialmente pontos 1, 4 e 5 acima).
+- Doc-first: ler logs/catálogo antes de codar; verificar API do OR-Tools antes de assumir.
+- Não patchar `gerador_treino.py` antigo.
+- Não commitar sem review.
+- Não abrir PR — só commit + push (preferência registrada na memória `feedback_workflow_branch_sem_pr.md`).
+- Commit com `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` no final.
+- Manter convenção declarativa: cada constraint/mecanismo é uma entrada nomeada do modelo, não código espalhado.

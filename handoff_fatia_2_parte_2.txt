@@ -1,0 +1,100 @@
+Handoff — MVP Fatia 2, Parte 2 (consumir tier curado + H-T1/T2/T3/R1)
+
+## Contexto
+
+Fatia 2 Parte 1 fechada em 2026-05-23 (commit 9604fa7 em main). XLSX agora tem coluna `tier` curada manualmente em 147 entradas (52 Principal / 26 Intermediário / 69 Acessório). Backup em `banco_exercicios - pre tier.xlsx`. Log da curadoria em `docs/refatoracao/logs/fatia_2_curadoria_tier.md`.
+
+Decisão de escopo da Fatia 2 (tomada antes da Parte 1):
+
+- Frente A: cadastro manual da coluna `tier` no XLSX — concluída na Parte 1
+- Frente C: adicionar H-T1, H-T2, H-T3, H-R1 ao `gerador_csp.py` — esta sessão
+
+Frentes B (variedade/fairness) e D (vetor de perfil completo) ficam pra Fatia 3+.
+
+## Leitura preparatória (nesta ordem)
+
+1. `docs/refatoracao/logs/fatia_2_curadoria_tier.md` — estado final da coluna `tier` + decisões clínicas
+2. `docs/refatoracao/logs/mvp_fatia_1.md` — modelo CP-SAT base (H-T4 + S-T1 + H-P1)
+3. `docs/refatoracao/catalogo_constraints.md` — Seção 1 (H-T1, H-T2, H-T3, H-R1 com Origem/Dado/Regra)
+4. `docs/refatoracao/principios_clinicos.md` — Conceitos 5 (cobertura de eixos, base de H-R1), 11 (variante pontual)
+5. `gerador_csp.py` — modelo atual a estender
+6. `gerador_treino.py` — função `carregar_banco` (linha ~983), dataclass `Exercicio` (linha ~883), `_compativel_intra` (referência histórica das hards intra do greedy — H-T1/T2/T3 já existiam lá)
+
+## Decisões fechadas durante/após a Parte 1 (não reabrir)
+
+- **H-T4 com graceful degradation**: H-T4 só deve disparar se existir candidato não-Acessório no pool. Se o pool inteiro for Acessório (caso atual de `core_isometrico` e `core_dinamico` pós-curadoria), permitir Acessório em vaga única. Razão: a curadoria rebaixou todo core stability pra Acessório, deixando inviável a demanda `("subregiao", "core_*", 1)` com a H-T4 atual. Solver não deve inviabilizar por falta física de pool. Implementar como parte da Frente 1 (modificação curta em H-T4 já existente em `gerador_csp.py`).
+
+- **S-T1 fica como tier-order soft (como está na Fatia 1)**. Avaliada sugestão de trocar por purpose+fadiga (replicando `ordenar_compostos_primeiro` do antigo) e recusada com argumento técnico: a S-T1 atual JÁ é soft (penalidade proporcional ao gap de tier, empates aceitos sem pena), o que captura a intenção clínica do Bernardo ("nenhuma decisão precisa de regra muito dura, variação entre rotinas é desejável"). O problema real percebido (Puxada Aberta sempre antes de Barra C/ Borracha, Apoio sempre antes de Crossover) é determinismo do solver, não da constraint — solução vem em Fatia 3+ com modelagem explícita de variedade/fairness. Trocar tier por fadiga só substituiria um determinismo por outro. Tier-rank também internaliza melhor a decisão clínica curada (Hip Thrust=Principal, Apoio=Intermediário) que fadiga sozinha perde.
+
+- **H-R1 usa purpose=compound** (não tier!=Acessório). Tier expressa centralidade clínica curada; purpose=compound expressa composição biomecânica. H-R1 do catálogo é sobre cobertura de eixos via compostos no sentido biomecânico — então é purpose. Apoio (compound + Intermediário) cobre eixo horizontal de peito como composto válido pelas duas réguas; Hip Thrust (isolation + Principal) NÃO cobre como composto biomecânico.
+
+- **H-T1 usa `variacao_de` como família refinada**. O catálogo se refere a "familia_estrita" como conceito clínico; no XLSX atual, `variacao_de` cumpre esse papel. Dois exercícios são "mesma família" se compartilham mesmo `variacao_de` OU se um é o `variacao_de` do outro. Confirmado em `gerador_treino._compativel_intra` linha 2152.
+
+- **H-T3 usa coluna `unilateral`** (não `lateralidade` — nome no XLSX é `unilateral`). Regra concreta vive em `gerador_treino._compativel_intra` (`SUBREGIOES_LATERALIDADE_HARD = frozenset({"costas"})`).
+
+- **Atualizar `catalogo_constraints.md`** ao fim da Parte 2 pra refletir essas correspondências conceito↔coluna (H-T1: `familia_estrita` → `variacao_de`; H-T3: `lateralidade` → `unilateral`; H-R1: "composto" → `purpose=compound`). Seções 1 e 4 do catálogo. Documenta a ponte sem renomear conceitos clínicos.
+
+## Pendência de curadoria do XLSX (rápida na próxima sessão)
+
+- **Nordic Curl** precisa subir de Acessório → Intermediário (decisão tomada em 2026-05-23 ao olhar Cenário 2 de S-T1). Implementar como passo rápido no início da Parte 2 (editar XLSX + atualizar contagens do log).
+
+## Escopo
+
+### Frente 1 — Wire da coluna `tier` (substitui heurística) + ajuste H-T4
+
+1. Adicionar campo `tier: str` ao dataclass `Exercicio` em `gerador_treino.py`.
+2. Popular em `carregar_banco` via `_str(row.get("tier"))`. Decidir comportamento se faltar: erro ou fallback? Sugestão: erro, já que coluna é fonte de verdade após Parte 1.
+3. Em `gerador_csp.py`: substituir `derivar_tier_heuristico(ex)` por `ex.tier` direto nas 3 ocorrências (H-T4, S-T1, validação). Manter a função heurística só como fallback se tier vier vazio, ou remover de vez (decisão durante a sessão).
+4. Ajustar H-T4 pra graceful degradation (ver "Decisões fechadas" acima): só aplica o filtro se houver candidato não-Acessório no pool. Implementação: na lógica que itera `g["pool"]` e força `assign == 0` pra Acessórios, primeiro checar se algum candidato do pool tem `tier != Acessorio`; se não tiver, pular o forçamento.
+5. Validar que as 5 rodadas da Config A continuam PASS (esperado: rotinas mudam por causa do tier curado, mas sintaxe + invariantes não regridem). Adicionar caso de teste novo: demanda `("subregiao", "core_isometrico", 1)` deve ser viável pós-ajuste de H-T4.
+
+### Frente 2 — Implementar H-T1, H-T2, H-T3, H-R1
+
+Pelo catálogo (Seção 1) + decisões fechadas acima:
+
+- H-T1: mesma família refinada não repete no treino. Dado físico: `variacao_de`. Predicado: `cand.variacao_de == outro.variacao_de` OU um é o `variacao_de` do outro. Referência: `_compativel_intra` em `gerador_treino.py:2152`.
+- H-T2: variante pontual não atravessa famílias na mesma subregião. Dado: `variante_pontual` (existe no XLSX, boolean).
+- H-T3: lateralidade contextual em costas. Dado: coluna `unilateral` + filtro `subregiao=costas`. Regra clínica concreta vive em `gerador_treino._compativel_intra` (`SUBREGIOES_LATERALIDADE_HARD = frozenset({"costas"})`) — consultar antes de implementar.
+- H-R1: cobertura de eixos via compostos em subregiões com >=2 slots. "Composto" = `purpose=compound` (decisão fechada). `plano_corporal` e `unilateral` discriminam os eixos a cobrir.
+
+H-R1 é a constraint mais ambiciosa — vale partir das outras 3 (similar à era greedy) antes de atacar H-R1, que é cross-treino e exige modelagem cuidadosa em CP-SAT.
+
+## Restrições
+
+- NÃO tocar em `gerador_treino.py` exceto pelo wire do campo `tier` (Frente 1, passos 1-2). Toda lógica nova vai pra `gerador_csp.py`.
+- Manter a Fatia 1 verde (5/5 critérios PASS continuam após mudanças, com possíveis ajustes de validação por causa do tier curado).
+- NÃO commitar sem review do Bernardo.
+- Continuar princípio declarativo: cada constraint é entrada nomeada, sem ordem de processamento.
+
+## Ordem sugerida (checkpoints)
+
+Checkpoint 1 — leitura + plano (apresentar antes de codar)
+
+Checkpoint 2 — Frente 1 (wire do tier). Antes de prosseguir, validar:
+- `gerador_treino.carregar_banco` carrega 144 ativos com tier preenchido em todos
+- `gerador_csp` rodando com tier curado dá rotinas válidas (talvez diferentes das da Fatia 1)
+
+Checkpoint 3 — H-T1 (mesma família refinada). Definir o que é "família refinada" no contexto do XLSX atual (`variacao_de`? `familia_estrita`? checar). Adicionar constraint hard no modelo CP-SAT.
+
+Checkpoint 4 — H-T2 (variante pontual cross-família same-subregião). Já tem coluna `variante_pontual` boolean.
+
+Checkpoint 5 — H-T3 (lateralidade contextual em costas). Subregião=costas, exigir bilateral ou unilateral coerente conforme catálogo.
+
+Checkpoint 6 — H-R1 (cobertura de eixos cross-treino). Pode exigir múltiplos treinos no mesmo modelo (rotina = N treinos negociados juntos). Ponto de decisão: o modelo atual resolve 1 treino — H-R1 exige extensão pra rotina.
+
+Checkpoint 7 — validação consolidada + log da Fatia 2 Parte 2 em `docs/refatoracao/logs/mvp_fatia_2_parte_2.md` + commit.
+
+## Pontos de decisão prováveis (perguntar ao Bernardo se aparecerem)
+
+1. Validação da Fatia 1: rotinas mudam por causa do tier curado. Re-baseline esperado, não regressão.
+2. H-R1 cross-treino: vai exigir refactor do modelo CP-SAT pra aceitar N treinos. Possível modelar tudo no mesmo `CpModel` ou ter 1 modelo por treino com constraint linkando via Python.
+
+(Decisões anteriores sobre "composto em H-R1", "família refinada", "S-T1 fadiga vs tier" já foram fechadas — ver seção "Decisões fechadas" no topo do handoff.)
+
+## Metodologia geral
+
+- Checkpoints com aguardo de OK
+- AskUserQuestion em decisões estruturais
+- Doc-first (consultar catálogo e princípios antes de implementar)
+- Não patchar `gerador_treino.py` antigo (exceto Frente 1)
+- Não commitar sem review

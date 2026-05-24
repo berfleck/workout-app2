@@ -1,0 +1,157 @@
+Handoff — Fatia 3 Frente C (integração do gerador_csp.py com a UI Flask)
+
+## Contexto
+
+Fatia 2 P2 + Fatia 3 Frente B fechadas em 2026-05-23, branch `fatia-2-parte-2` (3 commits novos da Frente B em cima dos commits da P2, pushed sem PR). Estado atual:
+
+- `gerador_csp.py` é uma engine CP-SAT 100% funcional, paralela ao `gerador_treino.py` antigo. Cobre 5/6 hard constraints do catálogo (H-T1/T2/T3/T4/R1 + H-P1) + S-T1 soft + ConfigVariedade (Frente B). Tempo ~50ms por rotina. Pytest 229 + harness 16/16 OK.
+- `gerador_treino.py` antigo (~3000 linhas, greedy) continua sendo o motor de TODAS as rotas Flask. Frente B não tocou nele.
+- Bernardo registrou explicitamente na Frente B: **quando a UI integrar com o gerador novo, deve ativar `variedade=ConfigVariedade()` por default** (produto espera variedade, não rotina determinística). Caveat 2 da Frente B.
+
+Frente C = primeira ponte real entre o motor novo e a UI. Escopo precisa ser CONSCIENTEMENTE MÍNIMO porque o gerador novo NÃO cobre todas as features do gerador antigo ainda (lista abaixo). Tentar substituição total nesta frente seria atropelar planejamento.
+
+## Leitura preparatória (nesta ordem)
+
+1. `docs/refatoracao/logs/mvp_fatia_3_frente_b.md` — estado base do motor novo + 2 adendos (randomize_search + pytest formal) + caveat conceitual sobre Aderência ao Tier
+2. `docs/refatoracao/logs/mvp_fatia_2_parte_2.md` — refator pra gerar_rotina_csp cross-treino, h_r1_aplicadas, h_t4_aplicado_efetivamente
+3. `gerador_csp.py` — API pública (`gerar_rotina_csp`, `gerar_treino_csp` wrapper, `ConfigVariedade` dataclass)
+4. `app_flask.py` linhas 1339-1605 (rota `/gerar`) e 1724-1774 (rota `/treino/<t>/regerar`) — pontos de integração candidatos
+5. `tests/test_csp_variedade.py` — exemplos de uso da API nova + setup de cenários
+6. `docs/refatoracao/catalogo_constraints.md` Seção 2 (softs do catálogo que o motor novo AINDA NÃO tem) + Seção 4 (modelo de dados)
+
+## Decisões fechadas (não reabrir sem motivo forte)
+
+Decisões da Frente B que afetam a Frente C:
+
+1. **Default opt-in via ConfigVariedade no motor.** Wiring da UI DEVE passar `variedade=ConfigVariedade()` por default — produto espera variedade. Sem isso, mesmo aluno + mesma config = sempre a mesma rotina. Caveat 2 da Frente B, registrado no log.
+
+2. **`python_seed=None` por default na UI** (sem reprodutibilidade explícita). Cada aperto de Gerar = nova rotina. Se um dia tiver feature "favoritar geração", aí salva o seed específico.
+
+3. **CP-SAT NÃO é determinístico** mesmo com seed fixa quando `randomize_search=True`. Não construir lógica de UI dependente de "regenerar produz a mesma rotina". Memória [[feedback-cpsat-nao-determinismo]] tem detalhes.
+
+4. **Frente D resolve "Aderência ao Tier" por aluno** — não tentar resolver na Frente C. Por enquanto, motor entrega variedade máxima dentro das regras hard; aluno "clássico" vs "variado" é trabalho da Frente D via vetor de perfil.
+
+## Pendências de curadoria
+
+Nenhuma — XLSX estável pós-Fatia 2 P1. Cadastros novos (Russian Twist + INFRAs) ainda pendentes mas não bloqueiam a Frente C.
+
+## Features ausentes no gerador_csp.py (mapeadas, NÃO implementar todas)
+
+Comparação direta com `gerador_treino.py`:
+
+| Feature | Antigo | Novo (CSP) | Implicação pra Frente C |
+|---|---|---|---|
+| Modo Hierarquia (demandas) | ✓ | ✓ | OK |
+| Modo Template | ✓ | ✗ | TEMPLATES.get(nome) → expandir pra demandas |
+| nivel_aluno (H-P1) | ✓ (via max_complexidade) | ✓ | Mapeamento de UI → nivel_aluno |
+| H-T1/T2/T3/T4/R1 hard | ✓ (parcial) | ✓ (completo) | Ganho do novo |
+| S-T1 (tier-order) | ✗ (heurística) | ✓ (soft objetivo) | Ganho do novo |
+| Variedade (ConfigVariedade) | ✗ | ✓ | Ganho do novo |
+| Pareamento de blocos (SuperSerie A/B/C com 1-3 ex) | ✓ | ✗ — sai lista linear | Decidir: solo (1 ex/bloco) vs heurística vs S-B do catálogo |
+| tamanho_bloco (UI option) | ✓ | ✗ | Esconder/ignorar quando motor novo ativo |
+| evitar_agonistas (UI option) | ✓ | ✗ | Esconder/ignorar |
+| relaxar_familia (UI option) | ✓ | parcial (H-T1 + h_r1 graceful) | Esconder/ignorar |
+| cargas_config (HIB2) | ✓ | ✗ | Esconder/ignorar |
+| exercicios_travados (fixos por treino) | ✓ | ✗ | Esconder/ignorar |
+| lateralidade squat_bi/squat_uni | ✓ | parcial (via padrao=squat_bilateral/unilateral) | Mantém — padrões refinados existem no CSP |
+| historico_r1 toggle | ✓ (score D3.3) | ✗ | Esconder/ignorar — Frente D ou separada |
+| Auto-fixar refs | ✓ | ✗ | Esconder/ignorar |
+| Rationale/explicabilidade | ✓ (3 fases) | ✗ | Página /decisoes vai dar vazio quando motor novo ativo — esconder botão ou mostrar mensagem |
+| Avisos (incompleta, familia_repetida) | ✓ | parcial (h_r1_aplicadas degraded) | Mapear h_r1 degraded pro modal de avisos |
+| Salvar no histórico | ✓ (Sessao + sessoes JSON) | precisa converter | Wrapper pra construir Sessao a partir do resultado CSP |
+
+## Escopo
+
+### Frente 1 (essencial) — Substituir UMA rota pelo motor novo
+
+Escolha recomendada: **`/treino/<t>/regerar`** (regerar 1 treino). Justificativa:
+
+- Escopo limitado (1 treino, não rotina inteira). Cross-treino do CSP (H-R1 + AllDifferent global) não dispara — simplifica.
+- Já é fluxo opt-in do usuário (ele aperta "regerar" intencionalmente). Falhas/diferenças não bloqueiam fluxo principal de geração.
+- Permite comparação visual real: gera rotina inteira com motor antigo, regenera 1 treino com motor novo, compara lado a lado.
+- Tem fallback claro: se motor novo der INFEASIBLE ou comportar estranho, usuário só não usa o botão.
+
+Implementação proposta:
+
+1. Adicionar wrapper em `app_flask.py` que converte `cfg_r` (formato antigo) em `demandas_por_treino` (formato CSP). Modo hierarquia já é mapeamento direto; modo template expande TEMPLATES[nome] em demandas equivalentes.
+
+2. Wrapper que converte resultado CSP em `Sessao` com `SuperSerie` solo (1 ex por bloco, labels A/B/C/...). Pareamento real fica pra Fatia 4.
+
+3. Mapear `h_r1_aplicadas` com `degraded=True` pra entry em `Sessao.avisos` (mesmo formato do modal de avisos existente).
+
+4. Chamar com `variedade=ConfigVariedade()` por default (resolve Caveat 2).
+
+5. Mapeamento `nivel_aluno` (CSP usa 1/2/3): a tabela `alunos` tem campo `nivel`. Quando aluno não existe ou nivel não bate, fallback `nivel_aluno=3` (sem teto efetivo de H-P1).
+
+### Frente 2 (opcional, depende do Frente 1 fechar) — Substituir rota `/gerar`
+
+Mesmo padrão da Frente 1 mas aplicado à geração principal. Maior risco: substitui o fluxo principal, qualquer regressão impacta toda a UI. **Não fazer na mesma sessão da Frente 1** — esperar uso real do botão regerar pra detectar bugs antes de avançar.
+
+Pré-condição pra Frente 2: usuário usar `/regerar` por algum tempo (sessão diferente) e confirmar que o motor novo "se comporta clinicamente bem" em rotinas reais dele.
+
+### Frente 3 (validação) — Gate de fechamento da Frente 1
+
+1. Smoke test: gerar uma rotina de 3 treinos com o motor antigo (rota `/gerar` inalterada). Regerar treino 2 com o motor novo. Comparar visualmente: nomes diferentes esperados, tier-order respeitado, constraints hard OK.
+2. Confirmar variedade: regerar o mesmo treino 5x. Confirmar que rotinas mudam (deveriam, pois `python_seed=None`).
+3. Pytest 229 + harness 16/16 OK preservados (motor antigo intocado).
+4. Smoke test do modal de avisos: criar cenário onde H-R1 degraded dispara (nível 1 + perna_anterior); confirmar que aviso aparece na UI.
+5. Performance: regerar 1 treino deve ficar <500ms (motor novo entrega ~50ms; conversão pra Sessao + render template + HTMX swap ~100ms extras).
+
+## Restrições
+
+- NÃO tocar em `gerador_treino.py` nem `gerador_csp.py` (motor está estável). Toda lógica nova vai pra `app_flask.py` (ou um módulo wrapper novo se ficar grande, tipo `gerador_csp_adapter.py`).
+- Manter Fatia 2 P2 + Frente B verde (pytest 229 + harness 16/16). Frente C não deve quebrar nada do motor.
+- NÃO implementar features ausentes do motor novo "de quebra" — cada uma é escopo próprio. Esconder/ignorar opções na UI quando motor novo ativo.
+- NÃO commitar sem review do Bernardo. Preferência: commit + push direto em branch, sem `gh pr create`.
+- Branch nova: criar `frente-c-integracao-ui` a partir de `fatia-2-parte-2`. Quando merger pra main, fazem-se as 2 juntas (P2 + Frente B + Frente C).
+
+## Ordem sugerida (checkpoints)
+
+**Checkpoint 1** — leitura dos docs + plano apresentado. Identificar qual exatamente o conjunto de features que ficam de fora (lista acima é referência, pode ter mais). Decisões críticas pra abrir via AskUserQuestion ANTES de codar (ver pontos abaixo).
+
+**Checkpoint 2** — wrapper `_resultado_csp_pra_sessao(resultado)` em `app_flask.py` (ou módulo adapter novo). Converte resultado do CSP em `Sessao` com `SuperSerie` solo + `avisos` populados a partir de `h_r1_aplicadas` degraded. Smoke test isolado (chamada direta no REPL).
+
+**Checkpoint 3** — wrapper `_cfg_antiga_pra_demandas_csp(cfg_r)` em `app_flask.py`. Mapeia modo hierarquia/template. Smoke test isolado.
+
+**Checkpoint 4** — substituir o corpo de `/treino/<t>/regerar` pelo motor novo. Manter código antigo comentado/condicional pra rollback rápido. Smoke test no browser: regerar 1 treino, ver no UI.
+
+**Checkpoint 5** — gate final (Frente 3). Documentar tudo no log + commit + push.
+
+## Pontos de decisão prováveis (perguntar ao Bernardo via AskUserQuestion antes de codar)
+
+1. **Escopo da rota.** Substituir `/treino/<t>/regerar` (recomendado), `/gerar` (mais arriscado), ou ambos com toggle `?motor=csp/legacy` na URL? Recomendação: só `/regerar` pra MVP.
+
+2. **Pareamento de blocos.** O CSP entrega lista linear; UI espera `SuperSerie A/B/C` com 1-3 ex cada. Opções:
+   - (a) Cada ex vira 1 SuperSerie solo. Visualmente: cada ex em seu bloco. Funcional, sem pareamento clínico.
+   - (b) Heurística simples: agrupa 2 ex consecutivos da lista. Visualmente: 2 ex/bloco. Sem respeitar S-B.
+   - (c) Implementar S-B1/B2 do catálogo no CSP. Escopo grande — Fatia 4.
+   Recomendação: (a) pra MVP, documentar (c) como próxima frente.
+
+3. **Modo Template.** O CSP só conhece demandas. Templates do form viram demandas via `TEMPLATES.get(nome)` (lista de padrões) + EPP (exercícios por padrão). Mapeamento direto. Bernardo tem alguma preferência (ex: ignorar templates na Frente C e só aceitar hierarquia)?
+
+4. **Features ignoradas (lista acima).** Esconder no UI quando motor novo ativo, ou só ignorar silenciosamente? Esconder requer if/else nos templates Jinja, mais código mas mais clean visualmente.
+
+5. **Mapeamento `nivel_aluno`.** Hoje a tabela `alunos` tem `nivel` como string ("iniciante", "intermediario", "avancado"?). CSP precisa de 1/2/3. Como mapear? Default quando não bate?
+
+6. **Salvar no histórico.** Hoje rotinas geradas viram entries no histórico com `sessoes JSON` (serialização de Sessao). Motor novo entrega o mesmo formato após wrapper. OK manter ou precisa de marker tipo `gerador: "csp"` pro futuro identificar?
+
+7. **Página /decisoes.** Mostra rationale do gerador antigo. CSP não tem rationale. Esconder botão quando treino veio do motor novo? Ou deixar visível com mensagem "rationale indisponível no motor novo"?
+
+8. **Branch + commits.** Criar `frente-c-integracao-ui` a partir de `fatia-2-parte-2` (recomendado, isola escopo)? Ou commitar direto em `fatia-2-parte-2`?
+
+## Pontos de discussão clínica (Bernardo já antecipou na Frente B)
+
+- "Aderência ao Tier por aluno" NÃO está na Frente C — fica pra Frente D. Pro MVP da C, motor entrega variedade máxima dentro das regras hard. Aluno que prefere "sempre o clássico" (Supino com Halteres sempre no slot 0) NÃO vai conseguir isso na Frente C — vai ver Apoio Ajoelhado, Supino Inclinado, Supino Halteres alternando. Isso é a verdade do motor — antes era artefato da heurística. Decisão Bernardo: aceitar até Frente D vir.
+
+## Metodologia geral
+
+- Checkpoints com aguardo de OK do Bernardo. Mais conservador que a Frente B porque agora toca em UI/produto real.
+- AskUserQuestion em todas as decisões da seção "Pontos de decisão" antes de codar.
+- Doc-first: ler logs/catálogo/rotas existentes antes de escrever código. Não assumir formato de Sessao ou Exercicio — conferir no código.
+- Não tocar em `gerador_treino.py` ou `gerador_csp.py`.
+- Toda lógica nova em `app_flask.py` ou módulo wrapper (`gerador_csp_adapter.py` se ficar grande).
+- Não commitar sem review.
+- Não abrir PR — só commit + push (preferência [[feedback-workflow-branch-sem-pr]]).
+- Commit com `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` no final.
+- Servidor Flask: usar regra documentada em CLAUDE.md (checar porta 5000, matar processo, run_in_background, salvar PID em server.pid, matar ao fim).
+- Smoke test em browser real — Frente C é UI/produto, screenshot/observação visual valida o que pytest não pega. Skill `verify` pode ajudar.
