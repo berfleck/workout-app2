@@ -40,6 +40,7 @@ main  ← inclui Fatias 1-4.D + Frentes B/C/D
 | Fatia 4.C | S-B4 tamanho preferido + tamanho_bloco da UI | `logs/mvp_fatia_4c_sb4_tamanho.md` |
 | Fatia 4.D | exercicios_travados (pool-por-slot, bypass H-P1/H-T4/AllDiff cross) | `logs/mvp_fatia_4d_exercicios_travados.md` |
 | Fatia 4.E | relaxar_familia (familias_proibidas motor-side + retry 2 fases) | `logs/mvp_fatia_4e_relaxar_familia.md` |
+| Fatia 4.E cargas | H-cargas par-a-par no bloco + graceful degradation por bloco | `logs/mvp_fatia_4e_cargas_config.md` |
 
 ---
 
@@ -50,7 +51,7 @@ main  ← inclui Fatias 1-4.D + Frentes B/C/D
 Pré-requisito: nenhum. Podem entrar em qualquer ordem ou paralelo.
 
 - **✅ exercicios_travados** (Fatia 4.D) — pool-por-slot + bypass H-P1/H-T4/AllDifferent cross-treino entre travados. Travados participam de S-T1/S-B1/S-B4/Aderência. Adapter `treino_regerar` lê `cfg_r["exercicios_travados"]` e garante travado em `banco_regen`. Ver `logs/mvp_fatia_4d_exercicios_travados.md`.
-- **⬜ cargas_config** — nova hard **H-cargas** (filtro de pool por aluno baseado em config de carga, análoga a H-P1). Adapter lê `cfg_r["cargas_config"]`.
+- **✅ cargas_config** (Fatia 4.E cargas) — H-cargas par-a-par dentro do bloco (réplica fiel do antigo) com graceful degradation por bloco via BoolVar `cargas_off_b[b]` + penalty no objetivo. Travados ENTRAM nos pares (divergência intencional do antigo; pool_slot de 1 garante "travado nunca some" naturalmente). Adapter lê `cfg_r["cargas_config"]`; avisos `relaxado_carga` propagados pra `Sessao.avisos`. Ver `logs/mvp_fatia_4e_cargas_config.md`.
 - **✅ relaxar_familia** (Fatia 4.E) — `familias_proibidas` motor-side substitui filtro upstream do adapter (norte Seção 5: coerência declarativa); `gerar_rotina_csp` faz retry 2 fases quando estrito inviável + toggle ON. Travado bypassa filtro (princípio 4.D). UI default ON, badge ↻ via `Sessao.relaxados` + aviso `familia_repetida` no modal — zero código novo na UI. Ver `logs/mvp_fatia_4e_relaxar_familia.md`.
 
 ### Bloco 2 — Frente E.0 (harness comparativo CSP × antigo)

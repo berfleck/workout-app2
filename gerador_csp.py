@@ -1360,6 +1360,7 @@ def gerar_rotina_csp(
     if rotina["viavel"] or not fams_originais or not relaxar_familia:
         rotina["relaxados_por_treino"] = {}
         rotina["relax_ativado"] = False
+        rotina.setdefault("avisos_carga_por_treino", {})
         return rotina
 
     # 2ª passagem: relax. Refaz sem o filtro de família.
@@ -1368,6 +1369,7 @@ def gerar_rotina_csp(
         # Mesmo relaxado, inviável — devolve a 1ª (também inviável).
         rotina["relaxados_por_treino"] = {}
         rotina["relax_ativado"] = False
+        rotina.setdefault("avisos_carga_por_treino", {})
         return rotina
 
     relaxados = _identificar_relaxados_por_familia(
@@ -1375,6 +1377,7 @@ def gerar_rotina_csp(
     )
     rotina_relax["relaxados_por_treino"] = relaxados
     rotina_relax["relax_ativado"] = True
+    rotina_relax.setdefault("avisos_carga_por_treino", {})
     return rotina_relax
 
 
@@ -1798,6 +1801,7 @@ def gerar_treino_csp(
             "inversoes": 0,
             "grupos": [],
             "ordem_global": [],
+            "avisos_carga": [],
         }
         if "variedade" in rotina:
             out["variedade"] = rotina["variedade"]
@@ -1818,6 +1822,8 @@ def gerar_treino_csp(
         # Fatia 4.E: lista de nomes relaxados deste treino (treino_idx=0).
         "relaxados": rotina.get("relaxados_por_treino", {}).get(0, []),
         "relax_ativado": rotina.get("relax_ativado", False),
+        # Fatia 4.E cargas: avisos deste treino (treino_idx=0).
+        "avisos_carga": rotina.get("avisos_carga_por_treino", {}).get(0, []),
     }
     if "variedade" in rotina:
         out["variedade"] = rotina["variedade"]

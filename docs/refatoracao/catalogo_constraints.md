@@ -63,6 +63,16 @@
 - Substitui: o `bloco_solo` manual atual no banco. Vira constraint derivada da intersecção tier do exercício × vetor do aluno.
 - Dado: `tier`, vetor do aluno
 
+### Escopo BLOCO (par/trio dentro de superset)
+
+**H-cargas. Soma de carga par-a-par dentro do bloco ≤ threshold por dimensão**
+- Origem: motor antigo (Etapa 4 / HIB2), portado pra Fatia 4.E cargas (2026-05-24)
+- Dado: `cargas_config: dict[str, int]` no perfil de geração (`{"grip", "lombar", "core"}` → threshold int), colunas `carga_grip`/`carga_lombar`/`demanda_core` no XLSX
+- Regra: pra cada par (a,b) no mesmo bloco e cada dim d com thr[d]>0: bloqueia se `carga_d(a)>=1 AND carga_d(b)>=1 AND (carga_d(a)+carga_d(b))>=thr[d]`. Não é cumulativa por bloco (decisão clínica fechada).
+- **Graceful degradation por bloco**: quando inviável, motor "desliga" filtro só pro bloco afetado (BoolVar `cargas_off_b[b]`, penalizado no objetivo com peso 1000 default). Emite aviso `relaxado_carga` por par violador no bloco. Réplica fiel do antigo (~`gerador_treino.py:1469-1516`).
+- **Travados ENTRAM nos pares** (divergência intencional do antigo). Travado tem pool_slot de 1 elemento (Fatia 4.D), então par travado+non-travado violador força non-travado a mudar — "travado nunca some" preservado naturalmente.
+- Dado adicional: `peso_cargas_off: int = 1000` (parametrizável; alto pra desligar só quando inviável).
+
 ### Escopo restrições físicas/dor (pendente)
 
 **H-X. Restrições físicas/dor sobre pool**
@@ -83,8 +93,8 @@
 
 **S-B2. Balanço de carga implícita acumulada**
 - Origem: Conceito 6
-- Função: soma de carga em core, lombar, grip e neural dentro do bloco. Penalidade cresce com a soma.
-- Dado: `demanda_core` (existe), `demanda_grip` (existe), `demanda_lombar` *(cadastrar)*, demanda neural derivada (`tier` + perfil)
+- Função: soma de carga em core, lombar, grip e neural dentro do bloco. Penalidade cresce com a soma. **Complementar à H-cargas** (hard par-a-par): S-B2 captura a fadiga cumulativa por bloco em escala soft (modulável por perfil), enquanto H-cargas é gate binário par-a-par.
+- Dado: `demanda_core` (existe), `carga_grip` (existe), `carga_lombar` (existe), demanda neural derivada (`tier` + perfil). **Nomenclatura final**: `carga_grip` / `carga_lombar` no XLSX (não `demanda_grip` / `demanda_lombar` — esse rótulo aparecia em rascunhos pré-Fatia 4.E; foi consolidado com `carga_*` na hora de portar H-cargas pro CSP).
 - Modulador: Densidade de Pareamento (alta tolera mais)
 
 **S-B3. Tolerância a fadiga prévia dentro do bloco**
@@ -236,7 +246,7 @@ Pesos base e valores dos moduladores na tabela são **chutes iniciais**. A calib
 | `unilateral` (valores `bilateral`/`unilateral`) | `lateralidade` | H-T3, H-R1 (perna_anterior) |
 | `pegada`, `plano_corporal`, `equipamento_grupo` | mesmos nomes | S-B1, S-T4, S-R1 (futuras) |
 | `padrao`, `regiao`, `subregiao`, `complexidade` | hierarquia + filtros | H-P1, H-R1, todas as demandas |
-| `demanda_core`, `demanda_grip` | mesmos nomes | S-B2 (futura) |
+| `demanda_core`, `carga_grip`, `carga_lombar` | dims de carga acumulada | H-cargas (Fatia 4.E cargas), S-B2 (futura) |
 | `purpose` (`compound`/`isolation`/`stability`/`explosive`) | "composto" do H-R1 | H-R1 |
 | `tier` (Principal/Intermediário/Acessório) | `tier` — curado na Fatia 2 P1 | H-T4, S-T1 (e futuras H-P2/S-T2/S-T3/S-R3/S-H1) |
 | `ativo` (boolean) | filtro operacional | descarte pré-solver |
@@ -244,7 +254,11 @@ Pesos base e valores dos moduladores na tabela são **chutes iniciais**. A calib
 ### Colunas a cadastrar (derivadas das constraints)
 
 - **`estabilidade_externa`** — máquina / livre. Necessária pra S-B3, S-T2.
-- **`demanda_lombar`** — 0-3. Necessária pra S-B2. Modelo igual ao `demanda_core`.
+
+*Nota*: `carga_lombar` (originalmente listada como "a cadastrar" sob o
+nome `demanda_lombar`) já existe no XLSX e está consumida pela H-cargas
+(Fatia 4.E cargas, 2026-05-24). Mantida cobertura pra futura S-B2
+sem cadastro extra.
 
 ### Coluna pendente (não cadastrar agora, marcador)
 
@@ -269,4 +283,8 @@ Documentados na sessão 2026-05-21 em resposta à pergunta de Bernardo *"a lógi
 
 ---
 
-*Última atualização: 2026-05-23 (Fatia 2 Parte 2 — Seções 1 e 4 ganharam correspondência conceito↔coluna pra H-T1, H-T3, H-T4, H-R1, e a graceful degradation de H-T4 e H-R1 foi documentada como decisão clínica fechada).*
+*Última atualização: 2026-05-24 (Fatia 4.E cargas — H-cargas adicionada
+na Seção 1 escopo BLOCO; nomenclatura de colunas consolidada com prefixo
+`carga_*` na Seção 4; nota explicativa sobre `carga_lombar` já cadastrado).*
+
+*2026-05-23 (Fatia 2 Parte 2 — Seções 1 e 4 ganharam correspondência conceito↔coluna pra H-T1, H-T3, H-T4, H-R1, e a graceful degradation de H-T4 e H-R1 foi documentada como decisão clínica fechada).*

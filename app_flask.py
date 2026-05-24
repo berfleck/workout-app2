@@ -436,6 +436,12 @@ def _resultado_csp_pra_sessao(resultado, tipo_label, escopo_labels=None):
                 "familia": familia,
                 "escopo_label": escopo_label,
             })
+
+    # Fatia 4.E cargas: propaga avisos `relaxado_carga` emitidos pelo motor
+    # quando algum bloco precisou desligar o filtro de cargas (graceful
+    # degradation). Formato igual ao do motor antigo.
+    for av in resultado.get("avisos_carga", []) or []:
+        s.avisos.append(av)
     return s
 
 
@@ -1999,15 +2005,18 @@ def treino_regerar(t):
     (`gerador_csp.gerar_treino_csp` + `ConfigVariedade()`).
 
     Features do gerador antigo que SÃO IGNORADAS aqui (motor novo ainda
-    não cobre): cargas_config, lateralidade_por_padrao (mas split
-    squat_bi/squat_uni continua via `_expandir_demanda_csp`).
+    não cobre): lateralidade_por_padrao (mas split squat_bi/squat_uni
+    continua via `_expandir_demanda_csp`).
 
     Features já cobertas pelo CSP: tamanho_bloco (4.C), evitar_agonistas
     (4.B), exercicios_travados (4.D — travados bypassam H-P1/H-T4/AllDiff
     cross-treino e participam de S-T1/S-B1/S-B4/Aderência),
     relaxar_familia (4.E — `familias_proibidas` pré-filtra pools; toggle
     OFF + inviável = sessão mantida; toggle ON + inviável estrito = retry
-    sem o filtro + ex relaxados ganham aviso `familia_repetida` e badge ↻).
+    sem o filtro + ex relaxados ganham aviso `familia_repetida` e badge ↻),
+    cargas_config (Fatia 4.E cargas — H-cargas par-a-par no bloco com
+    graceful degradation por bloco; avisos `relaxado_carga` emitidos
+    pós-solve quando filtro precisou ser desligado).
 
     Saída: blocos estruturados pelo motor (Fatia 4.A+), labels A/B/C…
     """
@@ -2062,6 +2071,9 @@ def treino_regerar(t):
     # Default True quando ausente (paridade com UI default + cfg legada
     # sem o campo).
     relax_fam = bool(cfg_r.get("relaxar_familia", True))
+    # Fatia 4.E cargas: extrai cargas_config da cfg (UI antiga).
+    # None = filtro OFF (preserva 4.D byte-a-byte).
+    cargas_cfg = cfg_r.get("cargas_config")
 
     if demandas_csp:
         resultado = gerar_treino_csp(
@@ -2075,6 +2087,7 @@ def treino_regerar(t):
             travados=travados_cfg or None,
             familias_proibidas=familias_outros or None,
             relaxar_familia=relax_fam,
+            cargas_config=cargas_cfg or None,
         )
         nome_custom = cfg_r.get("nome_custom", "")
         tipo_label = nome_custom or sessoes_ativas[t].tipo
