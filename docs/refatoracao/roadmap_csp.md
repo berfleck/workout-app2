@@ -143,3 +143,30 @@ Toda fatia/frente que fecha:
 **Não criar seções novas sem necessidade** — doc fica enxuto se entradas
 forem objetivas. Decisões finas, achados, snapshots → log da fatia
 específica em `logs/`. Aqui só status + dependência.
+
+---
+
+## Disciplina de merge (regra fixa pós-2026-05-24)
+
+Origem: até 2026-05-24 acumularam-se 7 branches empilhadas sem merge em
+`main`. Tudo era recuperável (pushed + linear) mas dava sensação de
+"verdade flutuante" — `main` desatualizada vs último estado real. Pra
+evitar isso reincidir:
+
+**Cada fatia/frente que passa no gate verde (pytest + harness + smoke)
+deve ser mergeada em `main` antes de iniciar a próxima.**
+
+Sequência ao fechar uma fatia:
+
+1. Pytest + harness + smoke verdes na branch da fatia.
+2. Doc no `logs/` + atualização do `MEMORY.md` + tick no `roadmap_csp.md`.
+3. Commit + push da branch.
+4. **Imediato após push**: `git checkout main && git merge --ff-only <branch> && git push origin main`.
+5. Deletar branch local: `git branch -d <branch>` (e opcionalmente `git push origin --delete <branch>` se quiser limpar origin).
+6. Próxima fatia sai de `main` direto.
+
+Pilha permitida: **no máximo 1 branch ativa** (a fatia em andamento).
+
+Exceção: trabalho em paralelo legítimo (ex: 3 micro-frentes do Bloco 1
+em paralelo) — aceita até 3 branches simultaneamente, mas cada uma
+mergeada em `main` assim que fechar.
