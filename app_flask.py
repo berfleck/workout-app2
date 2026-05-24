@@ -462,6 +462,28 @@ def _peso_evitar_agonistas_csp(cfg_r):
     return _PESO_EVITAR_AGONISTAS_DEFAULT
 
 
+# Fatia 4.C (2026-05-24) — S-B4 tamanho preferido do bloco.
+# tamanho_bloco da UI antiga (select 1/2/3) vira parâmetro do CSP.
+# Peso default 5: não dominante (compete com S-B1=10 sem dominar), mas
+# suficiente pra fazer motor respeitar a preferência. Smoke isolado:
+# 100% dos blocos no tamanho preferido em 15 runs por valor.
+_PESO_TAMANHO_BLOCO_DEFAULT = 5
+
+
+def _tamanho_e_peso_bloco_csp(cfg_r):
+    """Retorna (tamanho_preferido, peso) pro CSP.
+    cfg_r['tamanho_bloco'] vem da UI antiga (int 1/2/3, default 2 no parser).
+    Se cfg_r presente e tamanho_bloco válido → (tamanho, _PESO_DEFAULT).
+    Sem cfg ou tamanho ausente → (2, 0) (sem efeito, default neutro).
+    """
+    if not cfg_r:
+        return (2, 0)
+    tb = cfg_r.get("tamanho_bloco")
+    if tb not in (1, 2, 3):
+        return (2, 0)
+    return (tb, _PESO_TAMANHO_BLOCO_DEFAULT)
+
+
 def _cfg_antiga_pra_demandas_csp(cfg_r):
     """Converte cfg do gerador antigo em demandas CSP `(nivel, escopo, qtd)`.
 
@@ -1983,6 +2005,8 @@ def treino_regerar(t):
     peso_aderencia = _peso_aderencia_csp(aluno_obj)
     # Fatia 4.B: extrai flag evitar_agonistas da cfg (UI antiga)
     peso_evitar_agon = _peso_evitar_agonistas_csp(cfg_r)
+    # Fatia 4.C: extrai tamanho_bloco da cfg (UI antiga, 1/2/3)
+    tam_pref, peso_tam = _tamanho_e_peso_bloco_csp(cfg_r)
 
     if demandas_csp:
         resultado = gerar_treino_csp(
@@ -1991,6 +2015,8 @@ def treino_regerar(t):
             variedade=ConfigVariedade(),
             peso_aderencia=peso_aderencia,
             peso_evitar_agonistas=peso_evitar_agon,
+            tamanho_preferido=tam_pref,
+            peso_tamanho_bloco=peso_tam,
         )
         nome_custom = cfg_r.get("nome_custom", "")
         tipo_label = nome_custom or sessoes_ativas[t].tipo

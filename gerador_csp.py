@@ -305,11 +305,14 @@ def _construir_modelo(
     nivel_aluno: int,
     peso_aderencia: int = 0,
     peso_evitar_agonistas: int = 0,
+    tamanho_preferido: int = 2,
+    peso_tamanho_bloco: int = 0,
 ) -> dict:
     """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
-    penalidades de S-T1, Aderência ao Tier e S-B1 distância funcional)
-    MAS sem chamar `Minimize`. Caller decide se minimiza (Phase 1 / modo
-    legado) ou adiciona bound + enumera (Phase 2 da Frente B / Fatia 3).
+    penalidades de S-T1, Aderência ao Tier, S-B1 distância funcional
+    e S-B4 tamanho preferido do bloco) MAS sem chamar `Minimize`. Caller
+    decide se minimiza (Phase 1 / modo legado) ou adiciona bound +
+    enumera (Phase 2 da Frente B / Fatia 3).
 
     `peso_aderencia` (Frente D Fatia 3, 2026-05-24): modulação da dimensão
     "Aderência ao Tier" do vetor de perfil do aluno. 0 (default) = sem
@@ -326,6 +329,13 @@ def _construir_modelo(
     funcional (push/pull/quad/...). Solver minimiza → motor evita parear
     agonistas. Antagonistas (push+pull) e cross-region (upper+lower)
     saem sem penalty, então naturalmente preferidos.
+
+    `tamanho_preferido` + `peso_tamanho_bloco` (Fatia 4.C, 2026-05-24):
+    S-B4 tamanho preferido do bloco. Default tamanho=2, peso=0 (sem
+    efeito; preserva 4.B). Quando peso>0, penaliza desvio do tamanho
+    preferido por bloco EM USO (vazios não contam). Equilibra trade-off
+    da 4.B (S-B1 ativo empurra motor pra blocos solo) dando incentivo
+    positivo a blocos com tamanho desejado pelo user.
 
     Devolve dict com:
       - model: CpModel sem objetivo definido
@@ -625,6 +635,49 @@ def _construir_modelo(
                     )
                     penalidades.append(viol_sb1)
 
+    # ── S-B4 (Fatia 4.C): tamanho preferido do bloco ────────────────────────
+    # Pra cada bloco b do treino t:
+    #   tamanho_b = sum(X[(t,sid,b)] for sid)
+    #   usado_b   = (tamanho_b > 0)
+    #   desvio_b  = |tamanho_b - tamanho_preferido|  (só se usado_b; 0 vazio)
+    #   pen_b     = peso_tamanho_bloco * desvio_b
+    # Equilibra trade-off da 4.B: motor com S-B1 ativo prefere blocos solo
+    # pra evitar penalty; S-B4 dá incentivo positivo a blocos com tamanho
+    # desejado pelo user. peso=0 (default) skipa toda criação — preserva 4.B.
+    if peso_tamanho_bloco > 0:
+        for t_idx, sids_t in slots_por_treino.items():
+            max_b = len(sids_t)
+            for b in range(max_b):
+                tamanho_b = model.NewIntVar(
+                    0, TAMANHO_MAX_BLOCO, f"tam_t{t_idx}_b{b}",
+                )
+                model.Add(tamanho_b == sum(
+                    slot_to_bloco_vars[sid][b] for sid in sids_t
+                ))
+
+                usado_b = model.NewBoolVar(f"used_t{t_idx}_b{b}")
+                model.Add(tamanho_b >= 1).OnlyEnforceIf(usado_b)
+                model.Add(tamanho_b == 0).OnlyEnforceIf(usado_b.Not())
+
+                desvio_b = model.NewIntVar(
+                    0, TAMANHO_MAX_BLOCO, f"desv_t{t_idx}_b{b}",
+                )
+                # |tamanho_b - tamanho_preferido| quando usado_b; senão 0.
+                model.Add(
+                    desvio_b >= tamanho_b - tamanho_preferido
+                ).OnlyEnforceIf(usado_b)
+                model.Add(
+                    desvio_b >= tamanho_preferido - tamanho_b
+                ).OnlyEnforceIf(usado_b)
+                model.Add(desvio_b == 0).OnlyEnforceIf(usado_b.Not())
+
+                pen_b = model.NewIntVar(
+                    0, peso_tamanho_bloco * TAMANHO_MAX_BLOCO,
+                    f"sb4_t{t_idx}_b{b}",
+                )
+                model.Add(pen_b == peso_tamanho_bloco * desvio_b)
+                penalidades.append(pen_b)
+
     # ── Aderência ao Tier (SOFT, Frente D Fatia 3): por slot ────────────────
     # `aderencia_pen[s] = (rank_max - tier_rank[s]) * peso_aderencia`
     # Slot com Principal (rank=3): pen = 0. Acessório (rank=1): pen = 2*peso.
@@ -769,6 +822,8 @@ def gerar_rotina_csp(
     variedade: Optional[ConfigVariedade] = None,
     peso_aderencia: int = 0,
     peso_evitar_agonistas: int = 0,
+    tamanho_preferido: int = 2,
+    peso_tamanho_bloco: int = 0,
 ) -> dict:
     """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
     negociam no mesmo modelo — necessário pra H-R1 cross-treino.
@@ -797,10 +852,12 @@ def gerar_rotina_csp(
         return _resolver_legacy(
             demandas_por_treino, banco, nivel_aluno, seed,
             peso_aderencia, peso_evitar_agonistas,
+            tamanho_preferido, peso_tamanho_bloco,
         )
     return _resolver_com_variedade(
         demandas_por_treino, banco, nivel_aluno, seed, variedade,
         peso_aderencia, peso_evitar_agonistas,
+        tamanho_preferido, peso_tamanho_bloco,
     )
 
 
@@ -811,13 +868,17 @@ def _resolver_legacy(
     seed: int,
     peso_aderencia: int = 0,
     peso_evitar_agonistas: int = 0,
+    tamanho_preferido: int = 2,
+    peso_tamanho_bloco: int = 0,
 ) -> dict:
     """Branch legado: 1 solve com Minimize → 1 solução determinística por
     seed. Preserva byte-a-byte o comportamento da Fatia 2 P2 quando
-    `peso_aderencia == 0` E `peso_evitar_agonistas == 0`."""
+    todos os pesos opcionais (peso_aderencia, peso_evitar_agonistas,
+    peso_tamanho_bloco) == 0."""
     md = _construir_modelo(
         demandas_por_treino, banco, nivel_aluno,
         peso_aderencia, peso_evitar_agonistas,
+        tamanho_preferido, peso_tamanho_bloco,
     )
     if md["penalidades"]:
         md["model"].Minimize(sum(md["penalidades"]))
@@ -870,6 +931,8 @@ def _resolver_com_variedade(
     variedade: ConfigVariedade,
     peso_aderencia: int = 0,
     peso_evitar_agonistas: int = 0,
+    tamanho_preferido: int = 2,
+    peso_tamanho_bloco: int = 0,
 ) -> dict:
     """Branch variedade (Frente B Fatia 3): 2 fases.
 
@@ -895,6 +958,7 @@ def _resolver_com_variedade(
     md1 = _construir_modelo(
         demandas_por_treino, banco, nivel_aluno,
         peso_aderencia, peso_evitar_agonistas,
+        tamanho_preferido, peso_tamanho_bloco,
     )
     if md1["penalidades"]:
         md1["model"].Minimize(sum(md1["penalidades"]))
@@ -932,6 +996,7 @@ def _resolver_com_variedade(
     md2 = _construir_modelo(
         demandas_por_treino, banco, nivel_aluno,
         peso_aderencia, peso_evitar_agonistas,
+        tamanho_preferido, peso_tamanho_bloco,
     )
     var_total: Optional[cp_model.IntVar] = None
     if md2["penalidades"]:
@@ -969,6 +1034,7 @@ def _resolver_com_variedade(
         return _resolver_legacy(
             demandas_por_treino, banco, nivel_aluno, seed,
             peso_aderencia, peso_evitar_agonistas,
+            tamanho_preferido, peso_tamanho_bloco,
         ) | {
             "variedade": _meta_variedade(variedade, n=0, dist=None, opt=optimal,
                                          lim=False, t1=time_p1, t2=time_p2),
@@ -1081,6 +1147,8 @@ def gerar_treino_csp(
     variedade: Optional[ConfigVariedade] = None,
     peso_aderencia: int = 0,
     peso_evitar_agonistas: int = 0,
+    tamanho_preferido: int = 2,
+    peso_tamanho_bloco: int = 0,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
@@ -1098,12 +1166,18 @@ def gerar_treino_csp(
     `peso_evitar_agonistas` (Fatia 4.B): S-B1 distância funcional. 0
     (default) = sem efeito (preserva 4.A). >0 penaliza pares no mesmo
     bloco com mesmo grupo funcional (push/pull/quad/...).
+
+    `tamanho_preferido` + `peso_tamanho_bloco` (Fatia 4.C): S-B4 tamanho
+    preferido. peso=0 (default) sem efeito; peso>0 penaliza desvio do
+    tamanho preferido por bloco em uso.
     """
     rotina = gerar_rotina_csp(
         [demandas], banco, nivel_aluno, seed,
         variedade=variedade,
         peso_aderencia=peso_aderencia,
         peso_evitar_agonistas=peso_evitar_agonistas,
+        tamanho_preferido=tamanho_preferido,
+        peso_tamanho_bloco=peso_tamanho_bloco,
     )
     if not rotina["viavel"]:
         out = {
