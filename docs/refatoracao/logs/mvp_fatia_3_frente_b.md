@@ -200,8 +200,27 @@ Bernardo decidiu: essa diferenciação (quando agir "rígido pro Principal" vs "
 - **Frente D (perfil + moduladores)** adiciona o knob "Aderência ao Tier" por aluno → módulo o peso de S-T1 dinamicamente. Aluno aderência alta = penalty maior por inverter → empurra heurística pra escolher Principal mesmo entre opções formalmente equivalentes.
 - **Frente C (UI)** expõe o knob no editor de aluno/config.
 
+## Adendo 2 — pytest formal da Frente B (mesma sessão)
+
+Bernardo pediu pra escrever pytest formal antes de fechar (pra não esquecer depois). Criado `tests/test_csp_variedade.py` com 12 testes em 5 grupos:
+
+- (a) **variedade=None**: estrutural — chave `variedade` ausente, S-T1=0, H-T4 respeitado.
+- (b) **ConfigVariedade() enumera**: `n_solucoes_enumeradas > 1`, `optimal_value=0`, ≥2 rotinas distintas em 5 python_seeds, constraints hard preservadas.
+- (c) **slack bound respeitado**: `slack=0` força dist=0; `slack=2` mantém `distancia_escolhida <= 2` em 10 python_seeds + invariante `inversoes == optimal + dist`.
+- (d) **alpha_tier**: alpha=2.0 concentra mais que alpha=0.0 (freq média do tier dominante por slot); alpha_tier=0 emite `hamming_ponderado_escolhido=0`.
+- (e) **python_seed diversifica**: 20 python_seeds distintos dão ≥2 rotinas distintas.
+- Bônus: rotina cross-treino preserva AllDifferent + H-R1 cobertura.
+
+**Achado importante durante a escrita** (registrar pra não cair na armadilha): **CP-SAT NÃO é determinístico mesmo com `random_seed` fixo quando `randomize_search=True`**. Usa fontes externas (timing, threads) pra randomização interna. Duas chamadas com argumentos idênticos podem dar rotinas diferentes.
+
+Implicações:
+- NÃO escrever testes do tipo "mesma seed = mesma rotina" no branch legacy ou variedade.
+- Testes devem verificar **propriedades estruturais** (viabilidade, constraints, ranges metadata) em vez de identidade exata.
+- `python_seed` controla SÓ o softmax final, não o conjunto de soluções coletadas pelo CP-SAT. Reprodutibilidade end-to-end exigiria desligar `randomize_search`, o que reverteria o Caveat 1.
+
+12/12 testes verdes em 3 runs consecutivos. Suite total: 229 passed + 1 skipped.
+
 ## Refinamentos pós-Frente B abertos (não bloqueiam uso real)
 
 - **Refinar referência do Hamming**: explorar centroide ou solução com menor inv. Reabrir se calibração indicar que a aleatoriedade da 1ª enumerada bagunça a interpretação clínica. Bernardo confirmou: pro MVP, OK ("todas as escolhas são clinicamente boas").
-- **Pytest pra Frente B**: cobertura atual é zero (só smoke test manual). Adicionar testes que validem (a) `variedade=None` preserva Fatia 2 P2, (b) `ConfigVariedade()` enumera + sampla, (c) `slack` bound é respeitado, (d) `alpha_tier > 0` muda distribuição por slot, (e) `python_seed` é reprodutível. Item de qualidade — não bloqueia uso, mas evita regressões silenciosas em refator futuro.
 - **Decisão "Aderência ao Tier" como modulador de S-T1**: pertence à Frente D. Caveat conceitual: hoje (Frente B), variedade entre Principal e Intermediário equivalentes é total. Aluno "clássico" precisa do modulador da Frente D pra empurrar o motor pra Principal sempre que possível.
