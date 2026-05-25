@@ -19,8 +19,8 @@ Pós-instituição da disciplina de merge (seção abaixo): branches mergeadas
 em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 
 ```
-main  ← inclui Fatias 1-4.D + Frentes B/C/D
- └─ fatia-4e-relaxar-familia  ✅ ← atual (a mergear em main)
+main  ← inclui Fatias 1-4.E (Bloco 1 completo) + Frente E.0 (Bloco 2)
+ └─ frente-e0-harness-comparativo  ✅ ← atual (a mergear em main)
 ```
 
 ---
@@ -41,6 +41,7 @@ main  ← inclui Fatias 1-4.D + Frentes B/C/D
 | Fatia 4.D | exercicios_travados (pool-por-slot, bypass H-P1/H-T4/AllDiff cross) | `logs/mvp_fatia_4d_exercicios_travados.md` |
 | Fatia 4.E | relaxar_familia (familias_proibidas motor-side + retry 2 fases) | `logs/mvp_fatia_4e_relaxar_familia.md` |
 | Fatia 4.E cargas | H-cargas par-a-par no bloco + graceful degradation por bloco | `logs/mvp_fatia_4e_cargas_config.md` |
+| Frente E.0 | Harness comparativo CSP × antigo (7 métricas, relatório markdown) | `logs/frente_e0_harness_comparativo.md` |
 
 ---
 
@@ -56,17 +57,12 @@ Pré-requisito: nenhum. Podem entrar em qualquer ordem ou paralelo.
 
 ### Bloco 2 — Frente E.0 (harness comparativo CSP × antigo)
 
-Pré-requisito: Bloco 1 (3 micro-frentes) — comparação justa requer paridade.
-
-- **⬜ Frente E.0** — script harness que roda N rotinas (~100-1000) por config comum (templates Full Body, ABC, hierarquias típicas) com mesma entrada nos 2 motores. Output: relatório markdown lado-a-lado com métricas:
-  - Distribuição de tier por subregião
-  - Cobertura de eixos H-R1 (% violações)
-  - Cobertura de padrões obrigatórios (% âncoras não cumpridas)
-  - Variedade INTRA-config (distintas em N runs)
-  - Variedade INTER-rotina (overlap R-1)
-  - Distribuição entre treinos (cycling fairness)
-  - Tempo de solve médio
-- Caveat: ainda terá gaps documentados (S-B2/S-B3 não cadastrados; pareamento gradual S-B1 ainda binário). Aceitável — gate é comparação principal.
+- **✅ Frente E.0** — `tools/harness_comparativo_e0.py` standalone roda N rotinas (default 100, configurável via `--n`) por config nos dois motores com entrada normalizada e gera relatório `docs/refatoracao/relatorios/E0_<data>.md` lado-a-lado. 4 configs canônicas (Full Body 2T, ABC 3T, upper(3)×2T, perna_ant+post), 1 perfil default (nivel=3, aderencia=media) + flag opcional `--matriz` (2×2 nivel×aderência). 7 métricas (tier por subregião, cobertura H-R1, âncoras obrigatórias, variedade INTRA, overlap R-1, cycling fairness, tempo p50/p95) + % inviabilidade auxiliar. Aprovação visual; sem veredicto automático. Ver `logs/frente_e0_harness_comparativo.md`.
+- **Achados N=100 a discutir na Frente E.1**:
+  - **(BLOQUEADOR)** **Âncoras de subregião não modeladas no CSP**: quando recebe demanda `("subregiao", "ombro", 2)` o CSP cicla pelos padrões da subregião uniformemente, ignorando `ANCORAS_POR_SUBREGIAO[ombro] = [composto obrigatorio, ...]`. Resultado em ABC 3T: 100% das rotinas sem `ombro_composto` e 100% sem `biceps`. Antigo aplica âncoras via `_decompor_demanda_subregiao` (Seção 8.15.16). Provável **micro-frente pré-E.1**: adicionar constraint H-A1 (âncoras obrigatórias por subregião) ao catálogo + ao motor CSP.
+  - **Bíceps família única**: 6 variações todas `variacao_de=Rosca bíceps` → H-T1 hard intra-treino faz `biceps(2)` INFEASIBLE no CSP (antigo aceita via relax intra). Discussão E.1.
+  - **CSP ~150-200x mais lento** (Full Body 1.9s p50; ABC 6s p95 — primeiro caso na faixa de "lento"). Aceitável; otimização pós-E.1.
+  - **Wins do CSP no relatório**: H-R1 costas zera vs antigo 15% violação em Full Body 2T; overlap R-1 menor em 3/4 configs; cycling em upper(3)×2T cobre TODOS padrões T1/T2 (~50/50) onde antigo zera vários.
 
 ### Bloco 3 — Frente E.1 (substituir `/gerar`)
 
