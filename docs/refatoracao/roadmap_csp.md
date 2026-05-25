@@ -19,9 +19,10 @@ Pós-instituição da disciplina de merge (seção abaixo): branches mergeadas
 em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 
 ```
-main  ← inclui Fatias 1-4.E (Bloco 1 completo) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5) + Frente E.1 (Bloco 3)
- └─ frente-h-a0  ✅ ← atual (a mergear em main após aprovação Bernardo)
+main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5) + Frente E.1 (Bloco 3) + Micro-frente H-A0 (Bloco 4)
 ```
+
+**Nenhuma branch ativa.** Próxima frente (S-A1) sai de `main` direto.
 
 ---
 
@@ -90,6 +91,7 @@ Cada item independente; entram conforme prioridade clínica observada.
 
 **Demais refinamentos** (ordem não prioritária):
 
+- **⬜ S-A1 — distribuição entre âncoras não-obrigatórias** — soft que consome os pesos curados 3/2/1 da tabela `ANCORAS_POR_SUBREGIAO` (hoje ignorados no CSP). Achado empírico 2026-05-25 (pós-H-A0): demanda direta `ombro(2)` no CSP entrega 100% (composto + posterior_ombro) — ZERO ombro_isolado; antigo entrega 100% (composto + isolado) consumindo peso 2 vs peso 1. Mesma regressão em `perna_posterior(2)` (knee_flexion 0% no CSP vs ~48% no antigo). Decisões pré-handoff: (1) condicionado a "vagas > n_obrigatórias na subregião" pra isolar trade-off com S-B1 (Etapa 7 Fase 7.6 mostrou risco de canibalização de pesos); (2) S-B1 fora do escopo — refinamento separado; (3) validar Etapa 7-style coordinate descent antes de fechar peso. Spec executável → catálogo seção S-A1 (a criar).
 - **⬜ S-B2** — balanço de carga implícita (core + lombar + grip + neural por bloco). Exige cadastrar `demanda_lombar` no XLSX.
 - **⬜ S-B3** — fadiga prévia no bloco (máquina tolera mais que livre). Exige cadastrar `estabilidade_externa` no XLSX.
 - **⬜ Centralidade Compostos** (2ª dimensão do vetor de perfil). Depende de S-T2 ou S-T3 implementadas (não existem no CSP ainda).
