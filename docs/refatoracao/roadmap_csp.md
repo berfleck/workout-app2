@@ -64,14 +64,20 @@ Pré-requisito: nenhum. Podem entrar em qualquer ordem ou paralelo.
   - **CSP ~150-200x mais lento** (Full Body 1.9s p50; ABC 6s p95 — primeiro caso na faixa de "lento"). Aceitável; otimização pós-E.1.
   - **Wins do CSP no relatório**: H-R1 costas zera vs antigo 15% violação em Full Body 2T; overlap R-1 menor em 3/4 configs; cycling em upper(3)×2T cobre TODOS padrões T1/T2 (~50/50) onde antigo zera vários.
 
+### Bloco 2.5 — Micro-frente H-A1 (pré-requisito da E.1)
+
+Pré-requisito: Frente E.0 (concluída).
+
+- **⬜ Micro-frente H-A1** — modelar âncoras obrigatórias por subregião no motor CSP. Bug bloqueador identificado pela Frente E.0: sem H-A1, demandas nível subregião (`("subregiao", "X", qtd)`) violam padrões obrigatórios em até 100% das rotinas em treinos push-pesados (`ombro_composto` 100% violado em ABC Day A, `biceps` 100% violado em Day B, `hinge` 16% violado em Day C). Causa raiz diagnosticada (sondagem 50 runs com `peso_evitar_agonistas=0`): solver minimiza S-B1 escolhendo padrões cross-grupo (ex: `posterior_ombro` pull em treino push) em vez de respeitar âncora obrigatória do antigo. Spec executável: `catalogo_constraints.md` seção H-A1. Implementação: estender `_construir_modelo` em `gerador_csp.py` pra ler `ANCORAS_POR_SUBREGIAO` (gerador_treino.py — fonte canônica) quando demanda é nível subregião, e exigir ≥1 slot da rotina com padrão obrigatório por âncora. Graceful degradation espelha H-R1/H-T4 (pula constraint quando pool não tem candidato pós-H-P1, marca `degraded=True`). Sem mexer em UI, banco ou catálogo soft.
+
 ### Bloco 3 — Frente E.1 (substituir `/gerar`)
 
-Pré-requisito: Frente E.0 com relatório aprovado pelo Bernardo.
+Pré-requisito: Bloco 2.5 (H-A1) + Frente E.0 com relatório aprovado pelo Bernardo.
 
 - **⬜ Frente E.1** — substituir `/gerar` pelo motor CSP. Opções:
   - **Clean break** (alinha com norte.md Seção 5 "sem usuários = sem retrocompat"): remover motor antigo da rota direta. Branch git preservada conforme Seção 4 do norte.
   - **Flag de transição** (curto prazo): manter motor antigo via `?motor=legacy` ou checkbox durante período de validação clínica.
-  - Decisão pós-relatório E.0.
+  - Decisão pós-relatório E.0 + H-A1 fechada.
 
 ### Bloco 4 — Refinamentos pós-E.1 (não bloqueiam produção)
 

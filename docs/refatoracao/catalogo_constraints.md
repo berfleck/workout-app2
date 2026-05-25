@@ -51,6 +51,25 @@
 - **Graceful degradation** (Fatia 2 P2): se um eixo não tem candidato no pool (caso real: nível 1 + perna_anterior, todos os afundos têm `cx > 2` → filtrados por H-P1), o eixo é pulado e marcado `degraded=True` no resultado. Resolve o conflito H-P1 vs H-R1 sem regredir pra soft. Decisão de Bernardo durante a Fatia 2 P2.
 - **Importante**: solver não trata nenhuma subregião como "primeira". Ordem de processamento é justamente o que gera vieses (achado central do handoff). Todos os slots da rotina negociam simultaneamente.
 
+**H-A1. Âncoras obrigatórias por subregião decompõem demanda nível subregião**
+- Origem: motor antigo (`ANCORAS_POR_SUBREGIAO` em [gerador_treino.py:159-194](../../gerador_treino.py#L159-L194)) + achado da Frente E.0 (2026-05-24) — CSP não modela âncoras e viola padrão obrigatório em 100% das rotinas em casos como ABC Day A (`ombro_composto` violado 100%, `biceps` violado 100%; ver `relatorios/E0_2026-05-24.md` e `logs/frente_e0_harness_comparativo.md`).
+- Regra: quando a demanda é nível subregião (`("subregiao", "X", qtd)`), a subregião X tem entrada em `ANCORAS_POR_SUBREGIAO`, e qtd ≥ 1: pra cada âncora com `obrigatoria=True` declarada nessa subregião, exigir ≥1 slot da rotina com `padrao == âncora.padrao`. Mantém comportamento clínico do antigo declarativamente — substitui a decomposição imperativa pré-solver (`_decompor_demanda_subregiao` + `_quotas_de_subregiao`).
+- Dado: `padrao` (existe), `ANCORAS_POR_SUBREGIAO` (existe em `gerador_treino.py`) — fonte canônica única entre motores.
+- Exemplos atuais (subregiões com âncoras obrigatórias):
+  - `peito`: `empurrar_compostos` obrigatória
+  - `costas`: `remadas` + `puxadas` obrigatórias
+  - `ombro`: `ombro_composto` obrigatória
+  - `perna_anterior`: `squat_bilateral` obrigatória
+  - `perna_posterior`: `hinge` obrigatória
+  - `panturrilha`: `flexao_plantar` obrigatória
+  - `bracos`: `biceps` + `triceps` obrigatórias
+- **Causa raiz do bug observado** (Frente E.0): sem H-A1, o solver decide entre padrões da subregião por interação livre com S-B1 (evitar agonistas). Em treinos push-pesados, `("subregiao", "ombro", 2)` cai 100% em `posterior_ombro` (único padrão pull da subregião) porque minimiza penalty global de pareamento.
+- **Interação com demanda nível padrão**: H-A1 NÃO ativa quando a demanda é `("padrao", "Y", qtd)` direta — usuário explicitamente pediu o padrão Y; respeitar a escolha.
+- **Interação com cross-treino**: quando uma subregião soma ≥1 slot em treinos distintos, a obrigatoriedade vale na rotina (≥1 slot global), não por treino. Espelha `_distribuir_quotas_entre_treinos` do antigo (a distribuição fina entre treinos pode ser refinada via soft posterior, fora do escopo H-A1).
+- **Graceful degradation**: se o pool da subregião não tem candidato pra alguma âncora obrigatória após H-P1 (filtro de nível), a constraint daquela âncora é pulada e marcada `degraded=True` no resultado (mesmo padrão de H-R1 e H-T4 da Fatia 2 P2).
+- **Distribuição entre âncoras não-obrigatórias** (pesos 1/2/3 do antigo): fora do escopo H-A1. Quando importar, vira soft S-A1 separado (peso no objetivo proporcional ao peso da âncora).
+- **Resolve junto**: bug do `biceps` em ABC Day B (`bracos(2)` cai 0 biceps + 2 triceps), bug do `ombro_composto` em ABC Day A (0 nas 100 rotinas), bug do `hinge` 16% em ABC Day C.
+
 ### Escopo PERFIL DE ALUNO
 
 **H-P1. Nível técnico filtra pool por `complexidade`**
