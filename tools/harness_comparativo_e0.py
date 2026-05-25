@@ -109,6 +109,10 @@ class RunResult:
     # Rotina normalizada: list[treino][bloco][exercicio]. None se inviável.
     rotina: Optional[list[list[list[Exercicio]]]] = None
     status: str = ""
+    # Micro-frente H-A0 (só CSP): lista de aplicações com flag degraded.
+    # Antigo não tem H-A0 modelado; lista fica vazia. Usada pela métrica
+    # `degradacoes_ha0_media`.
+    h_a0_aplicadas: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -128,6 +132,18 @@ class AgregadoMotor:
     h_r1_violacoes: dict[str, float] = field(default_factory=dict)
     ancoras_violacoes: dict[tuple[str, str], float] = field(default_factory=dict)
     cycling_distribuicao: dict[str, list[int]] = field(default_factory=dict)
+    # Micro-frente H-A0 (2026-05-25): cobertura per (treino, região) de
+    # subregiões obrigatórias. Aplicável quando config tem ≥1 demanda
+    # nível regiao com âncoras declaradas. dict `{(t_idx, regiao, sub_obrig):
+    # % rotinas COM cobertura}` — alvo 100% para o motor CSP, qualquer
+    # outro valor é regressão.
+    cobertura_ha0_por_treino: dict[tuple[int, str, str], float] = field(
+        default_factory=dict
+    )
+    # Micro-frente H-A0: número médio de degradações por rotina (só CSP;
+    # antigo fica em 0). Métrica auxiliar — alto = motor está degradando
+    # H-A0 com frequência (pool/cardinalidade).
+    degradacoes_ha0_media: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +226,22 @@ def _configs_canonicas() -> list[ConfigComum]:
         demandas_por_treino=(perna_full,),
     )
 
-    return [full_body, abc, upper_x2, perna]
+    # 5) Full Body 2T — DEMANDAS NÍVEL REGIÃO (Micro-frente H-A0, 2026-05-25)
+    # Reproduz o setup do achado clínico (`tools/criar_aluno_e_rotina_teste.py`):
+    # regiao upper(3) + regiao lower(3) + regiao core(2) × 2T. Pré-H-A0:
+    # zero costas + zero squat em 16 slots. Pós-H-A0: peito+costas+ombro
+    # em cada treino de upper, perna_anterior+perna_posterior em cada lower.
+    full_body_regiao_t = (
+        ("regiao", "upper", 3),
+        ("regiao", "lower", 3),
+        ("regiao", "core", 2),
+    )
+    full_body_regiao = ConfigComum(
+        nome="Full Body 2T (região, H-A0)",
+        demandas_por_treino=(full_body_regiao_t, full_body_regiao_t),
+    )
+
+    return [full_body, abc, upper_x2, perna, full_body_regiao]
 
 
 def _perfis(matriz: bool) -> list[PerfilAluno]:
@@ -269,7 +300,8 @@ def rodar_csp(config: ConfigComum, perfil: PerfilAluno,
                          status=str(r.get("status", "INFEASIBLE")))
     rotina = [t["blocos"] for t in r["treinos"]]
     return RunResult(motor="csp", viavel=True, elapsed_ms=elapsed,
-                     rotina=rotina, status="OPTIMAL")
+                     rotina=rotina, status="OPTIMAL",
+                     h_a0_aplicadas=list(r.get("h_a0_aplicadas") or []))
 
 
 def rodar_antigo(config: ConfigComum, perfil: PerfilAluno,
@@ -501,6 +533,68 @@ def metrica_overlap_r1(
     return (total_intersect / total_slots, True)
 
 
+def metrica_cobertura_ha0_por_treino(
+    rotinas: list[list[list[list[Exercicio]]]],
+    config: ConfigComum,
+) -> dict[tuple[int, str, str], float]:
+    """% de rotinas que CUMPREM cobertura H-A0 por (treino, região, sub_obrig).
+
+    Aplicável quando config tem demanda `("regiao", R, qtd)` com R em
+    `ANCORAS_POR_REGIAO`. Para cada (treino, regiao, sub_obrig=True),
+    conta % de rotinas onde existe ao menos 1 ex com `subregiao=sub_obrig`
+    naquele treino.
+
+    Motor CSP pós-H-A0: alvo 100% para todas (treino, regiao, sub_obrig).
+    Motor antigo: distribuição natural do gerador greedy — referência pra
+    quantificar o ganho do CSP.
+    """
+    from gerador_treino import ANCORAS_POR_REGIAO
+    # Identifica (treino, regiao, sub_obrig) ativos pela config.
+    ativos: list[tuple[int, str, str]] = []
+    for t_idx, dems in enumerate(config.demandas_por_treino):
+        for nivel, escopo, _qtd in dems:
+            if nivel != "regiao" or escopo not in ANCORAS_POR_REGIAO:
+                continue
+            for ancora in ANCORAS_POR_REGIAO[escopo]:
+                if ancora.get("obrigatoria"):
+                    ativos.append((t_idx, escopo, ancora["subregiao"]))
+
+    if not ativos or not rotinas:
+        return {}
+
+    coberturas: dict[tuple[int, str, str], int] = {k: 0 for k in ativos}
+    for rotina in rotinas:
+        for (t_idx, regiao, sub) in ativos:
+            if t_idx >= len(rotina):
+                continue
+            ex_no_treino = [e for bloco in rotina[t_idx] for e in bloco]
+            tem = any(e.subregiao == sub for e in ex_no_treino)
+            if tem:
+                coberturas[(t_idx, regiao, sub)] += 1
+
+    return {k: coberturas[k] / len(rotinas) for k in ativos}
+
+
+def metrica_degradacoes_ha0_media(
+    runs_viaveis: list[RunResult],
+) -> float:
+    """Número médio de entradas H-A0 com `degraded=True` por rotina.
+
+    0 = motor não degrada (pool suficiente, sem conflito de cardinalidade).
+    >0 = motor degrada em algumas rotinas — útil pra estimar pressão em
+    configs estreitas (ex: upper(1) com 3 obrigatórias).
+
+    Só CSP. Antigo fica 0 (sem h_a0_aplicadas).
+    """
+    if not runs_viaveis:
+        return 0.0
+    total = sum(
+        sum(1 for a in r.h_a0_aplicadas if a.get("degraded"))
+        for r in runs_viaveis
+    )
+    return total / len(runs_viaveis)
+
+
 def metrica_cycling_fairness(
     rotinas: list[list[list[list[Exercicio]]]],
     config: ConfigComum,
@@ -555,6 +649,8 @@ def agregar(motor: str, runs: list[RunResult],
         h_r1 = metrica_h_r1_violacoes(rotinas, config)
         ancoras = metrica_ancoras_violacoes(rotinas, config)
         cycling = metrica_cycling_fairness(rotinas, config)
+        cobertura_ha0 = metrica_cobertura_ha0_por_treino(rotinas, config)
+        degrad_ha0 = metrica_degradacoes_ha0_media(viaveis)
     else:
         rotinas_distintas = 0
         overlap_pct = 0.0
@@ -563,6 +659,8 @@ def agregar(motor: str, runs: list[RunResult],
         h_r1 = {}
         ancoras = {}
         cycling = {}
+        cobertura_ha0 = {}
+        degrad_ha0 = 0.0
 
     return AgregadoMotor(
         motor=motor,
@@ -577,6 +675,8 @@ def agregar(motor: str, runs: list[RunResult],
         h_r1_violacoes=h_r1,
         ancoras_violacoes=ancoras,
         cycling_distribuicao=cycling,
+        cobertura_ha0_por_treino=cobertura_ha0,
+        degradacoes_ha0_media=degrad_ha0,
     )
 
 
@@ -661,6 +761,41 @@ def _render_ancoras(anc_csp: dict, anc_antigo: dict) -> list[str]:
             f"{_pct(csp) if csp is not None else '—'} | "
             f"{_pct(ant) if ant is not None else '—'} |"
         )
+    return linhas
+
+
+def _render_cobertura_ha0(
+    cob_csp: dict[tuple[int, str, str], float],
+    cob_antigo: dict[tuple[int, str, str], float],
+    degrad_csp: float,
+    degrad_antigo: float,
+) -> list[str]:
+    """Renderiza tabela H-A0: % rotinas COM cobertura por (treino, regiao, sub)
+    + linha de degradações médias.
+    """
+    keys = sorted(set(cob_csp.keys()) | set(cob_antigo.keys()))
+    if not keys:
+        return [
+            "_(config sem demanda nível região com âncoras declaradas — H-A0 não aplica)_"
+        ]
+    linhas = [
+        "| Treino | Região | Subregião obrigatória | CSP (% rotinas COM cobertura) | Antigo (% rotinas COM cobertura) |",
+        "|---|---|---|---|---|",
+    ]
+    for k in keys:
+        t_idx, regiao, sub = k
+        csp = cob_csp.get(k)
+        ant = cob_antigo.get(k)
+        linhas.append(
+            f"| T{t_idx+1} | {regiao} | {sub} | "
+            f"{_pct(csp) if csp is not None else '—'} | "
+            f"{_pct(ant) if ant is not None else '—'} |"
+        )
+    linhas.append("")
+    linhas.append(
+        f"**Degradações médias H-A0 por rotina** — CSP: {degrad_csp:.2f} | "
+        f"Antigo: {degrad_antigo:.2f} _(só CSP modela H-A0 — Antigo sempre 0)_"
+    )
     return linhas
 
 
@@ -762,6 +897,17 @@ def _render_config_secao(config: ConfigComum,
                                   agr_antigo.ancoras_violacoes))
     linhas.append("")
 
+    # H-A0 cobertura per (treino, regiao, sub_obrig) — Micro-frente H-A0 (2026-05-25).
+    linhas.append("### Cobertura H-A0 por (treino, região, subregião obrigatória)")
+    linhas.append("")
+    linhas.extend(_render_cobertura_ha0(
+        agr_csp.cobertura_ha0_por_treino,
+        agr_antigo.cobertura_ha0_por_treino,
+        agr_csp.degradacoes_ha0_media,
+        agr_antigo.degradacoes_ha0_media,
+    ))
+    linhas.append("")
+
     # Cycling
     linhas.append("### Distribuição entre treinos (cycling fairness)")
     linhas.append("")
@@ -796,6 +942,8 @@ def renderizar_relatorio(
     cabec.append("- Distribuição de tier por subregião")
     cabec.append("- Cobertura H-R1 (% violações por subregião com ≥2 slots)")
     cabec.append("- Cobertura âncoras obrigatórias (% rotinas sem padrão)")
+    cabec.append("- **Cobertura H-A0** (% rotinas com subregião obrigatória "
+                 "presente por treino, em demandas nível regiao — Micro-frente H-A0)")
     cabec.append("- Variedade INTRA-config (# distintas em N)")
     cabec.append("- Overlap R-1 (% slots iguais entre rotinas consecutivas)")
     cabec.append("- Cycling fairness (distribuição de padrão entre treinos)")

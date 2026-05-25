@@ -20,10 +20,11 @@
             {% set ancoras_sc = t.avisos | selectattr("tipo", "equalto", "ancora_sem_candidatos") | list %}
             {% set hr1_deg = t.avisos | selectattr("tipo", "equalto", "h_r1_degradado") | list %}
             {% set ha1_deg = t.avisos | selectattr("tipo", "equalto", "h_a1_degradado") | list %}
+            {% set ha0_deg = t.avisos | selectattr("tipo", "equalto", "h_a0_degradado") | list %}
             <div style="margin-top: 14px; padding-top: 12px; {% if not loop.first %}border-top: 1px solid var(--gray-200);{% endif %}">
                 {% if incompletas %}
                 <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">⚠️ Treino {{ t.treino_num }} ficou incompleto</div>
-                {% elif cargas or ancoras_nc or ancoras_sc or hr1_deg or ha1_deg %}
+                {% elif cargas or ancoras_nc or ancoras_sc or hr1_deg or ha1_deg or ha0_deg %}
                 <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">↻ Treino {{ t.treino_num }} foi gerado com restrições</div>
                 {% else %}
                 <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">↻ Treino {{ t.treino_num }} foi preenchido com flexibilizações</div>
@@ -140,6 +141,23 @@
                         {% for av in ha1_deg %}
                         <li>
                             <strong>{{ av.subregiao }}</strong>: padrão âncora <em>{{ av.padrao_obrigatorio }}</em> ficou sem candidatos
+                            ({{ av.motivo }}).
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if ha0_deg %}
+                <div style="margin-bottom: 8px;">
+                    <p style="margin: 0 0 6px 0;">
+                        <span style="display:inline-block; padding:1px 6px; background:#dbeafe; border:1px solid #93c5fd; border-radius:4px; font-size:11px; font-weight:700; color:#1e40af;">🎯</span>
+                        Cobertura por região não pôde ser garantida em {{ ha0_deg|length }} caso{{ 's' if ha0_deg|length > 1 else '' }}:
+                    </p>
+                    <ul style="margin: 4px 0 0 18px; padding: 0; list-style: disc;">
+                        {% for av in ha0_deg %}
+                        <li>
+                            Região <strong>{{ av.regiao }}</strong>: subregião obrigatória <em>{{ av.subregiao_obrigatoria }}</em> ficou sem cobertura
                             ({{ av.motivo }}).
                         </li>
                         {% endfor %}

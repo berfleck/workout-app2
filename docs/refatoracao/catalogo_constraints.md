@@ -51,6 +51,23 @@
 - **Graceful degradation** (Fatia 2 P2): se um eixo não tem candidato no pool (caso real: nível 1 + perna_anterior, todos os afundos têm `cx > 2` → filtrados por H-P1), o eixo é pulado e marcado `degraded=True` no resultado. Resolve o conflito H-P1 vs H-R1 sem regredir pra soft. Decisão de Bernardo durante a Fatia 2 P2.
 - **Importante**: solver não trata nenhuma subregião como "primeira". Ordem de processamento é justamente o que gera vieses (achado central do handoff). Todos os slots da rotina negociam simultaneamente.
 
+**H-A0. Âncoras obrigatórias por REGIÃO decompõem demanda nível região**
+- Origem: motor antigo (`ANCORAS_POR_REGIAO` em [gerador_treino.py:142-157](../../gerador_treino.py#L142-L157)) + auditoria clínica pós-Frente E.1 (2026-05-25) — `/gerar` no CSP entregou Full Body 2T com **zero exercícios de costas em 16 slots e zero squat em 6 slots de lower** quando UI mandou demanda nível região (caminho default do Full Body); ver `logs/micro_h_a0_ancoras_regiao.md` e `relatorios/E0_2026-05-25_pos_h_a0.md`. H-A1 só dispara em demanda nível subregião; demanda nível região passava sem âncora.
+- Regra: quando a demanda é nível região (`("regiao", R, qtd)`), a região R tem entrada em `ANCORAS_POR_REGIAO`, e qtd ≥ 1: pra cada subregião com `obrigatoria=True` declarada nessa região, exigir ≥1 slot **daquele treino** com `ex.subregiao == sub_obrig`. Agregação **per-treino** (decisão 4.1 do handoff H-A0 — diferente da H-A1 que é cross-treino): semântica de "treino de upper" é "cobre upper NAQUELE treino", não "alguma hora da rotina".
+- Dado: `ANCORAS_POR_REGIAO` (existe em `gerador_treino.py`, fonte canônica única entre motores), `subregiao` (existe no XLSX). Variável CSP nova: `sub_idx[s] = IntVar(0, len(subs_R)-1)` por slot de demanda região, canalizada via `assign` (mesma técnica de `grupo_func` e `tier_rank`).
+- Exemplos atuais (regiões com âncoras obrigatórias):
+  - `upper`: `peito` + `costas` + `ombro` obrigatórias (não-obrig nenhuma)
+  - `lower`: `perna_anterior` + `perna_posterior` obrigatórias; `panturrilha` não-obrig
+  - `core`: ambas (`core_dinamico` + `core_isometrico`) não-obrig → H-A0 não força nada
+- **Banimento hard de subregiões não-âncora (decisão 4.3 / Caminho A)**: subregiões em `REGIAO_PARA_SUBREGIOES[R]` mas NÃO listadas em `ANCORAS_POR_REGIAO[R]` ficam BANIDAS hard dos slots dessa demanda região (ex: `bracos` banido em `("regiao","upper",N)`, `adutores` banido em `("regiao","lower",N)`). Implementação upstream: filtro do `pool_default_sem_travados` rejeita exercícios cuja `subregiao` não está em `ANCORAS_POR_REGIAO[R]`. **Importante**: rejeição é só dentro dos slots dessa demanda região. Outras demandas na rotina (ex: `("padrao", "biceps", 1)` em paralelo) continuam livres — usuário pode pedir braços explicitamente.
+- **Interação com H-A1 via marker (decisão 4.2 / Caminho A)**: quando H-A0 obriga ≥1 slot de subregião X num treino, popula estrutura paralela `subregioes_obrigadas_ha0[(t_idx, R)] = set(subs_ativas)`. Bloco H-A1 lê essa estrutura e estende `slots_subregiao_explicita[sub]` com os `slot_ids` da demanda região correspondente — ativando H-A1 para padrões obrigatórios dessas subregiões (ex: peito ativa exigência de `empurrar_compostos`). **Apenas no caso normal** (vagas ≥ n_ativas) — em conflito de cardinalidade (vagas < n_ativas), nenhuma sub é garantida individualmente, marker não popula. `vagas_garantidas_por_sub` separado de `len(sids_lista)` no H-A1 pra detecção correta de conflito quando marker contribui.
+- **Graceful degradation**:
+  - Pool sem candidato: sub obrigatória sem nenhum exercício no pool dos slots daquele (treino, região) → constraint daquela sub PULADA, marcada `degraded=True` no resultado.
+  - Conflito de cardinalidade (`vagas < n_obrigatórias com pool viável`, ex: `("regiao","upper",1)` com 3 obrigatórias): constraint colaborativa `sum(obrig_usada) >= vagas` força N distintas. Solver decide quais. Cada uma marcada `degraded=True` com motivo `conflito_cardinalidade`.
+- **NÃO ativa em demanda nível subregião nem padrão**: aquelas são domínio de H-A1 (subregião) ou pedido explícito do usuário (padrão).
+- **NÃO modela `PROPORCAO_COMPOSTOS = 0.6`** (decisão 4.6): cobertura de compostos vem via H-A1 marker — peito → `empurrar_compostos` (composto), ombro → `ombro_composto`, etc. Se empírico mostrar que não cobre suficiente, abre frente separada (provavelmente S-A1).
+- **Resolve junto**: rotina Full Body 2T com zero costas / zero ombro / zero squat (achado 2026-05-25). Cobertura clínica per-treino garantida em `upper(3)×2T`, `lower(3)`, Full Body 2T (região).
+
 **H-A1. Âncoras obrigatórias por subregião decompõem demanda nível subregião**
 - Origem: motor antigo (`ANCORAS_POR_SUBREGIAO` em [gerador_treino.py:159-194](../../gerador_treino.py#L159-L194)) + achado da Frente E.0 (2026-05-24) — CSP não modela âncoras e viola padrão obrigatório em 100% das rotinas em casos como ABC Day A (`ombro_composto` violado 100%, `biceps` violado 100%; ver `relatorios/E0_2026-05-24.md` e `logs/frente_e0_harness_comparativo.md`).
 - Regra: quando a demanda é nível subregião (`("subregiao", "X", qtd)`), a subregião X tem entrada em `ANCORAS_POR_SUBREGIAO`, e qtd ≥ 1: pra cada âncora com `obrigatoria=True` declarada nessa subregião, exigir ≥1 slot da rotina com `padrao == âncora.padrao`. Mantém comportamento clínico do antigo declarativamente — substitui a decomposição imperativa pré-solver (`_decompor_demanda_subregiao` + `_quotas_de_subregiao`).
@@ -302,8 +319,13 @@ Documentados na sessão 2026-05-21 em resposta à pergunta de Bernardo *"a lógi
 
 ---
 
-*Última atualização: 2026-05-24 (Fatia 4.E cargas — H-cargas adicionada
-na Seção 1 escopo BLOCO; nomenclatura de colunas consolidada com prefixo
-`carga_*` na Seção 4; nota explicativa sobre `carga_lombar` já cadastrado).*
+*Última atualização: 2026-05-25 (Micro-frente H-A0 — âncoras obrigatórias
+por região per-treino + banimento upstream de subs não-âncora + marker
+para H-A1; fecha bug clínico de demanda nível região zerando costas e
+squat em rotinas Full Body via UI — auditoria 2026-05-25).*
+
+*2026-05-24 (Fatia 4.E cargas — H-cargas adicionada na Seção 1 escopo
+BLOCO; nomenclatura de colunas consolidada com prefixo `carga_*` na
+Seção 4; nota explicativa sobre `carga_lombar` já cadastrado).*
 
 *2026-05-23 (Fatia 2 Parte 2 — Seções 1 e 4 ganharam correspondência conceito↔coluna pra H-T1, H-T3, H-T4, H-R1, e a graceful degradation de H-T4 e H-R1 foi documentada como decisão clínica fechada).*

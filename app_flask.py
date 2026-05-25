@@ -412,6 +412,19 @@ def _resultado_csp_pra_sessao(resultado, tipo_label, escopo_labels=None):
                 "motivo": a.get("motivo", "pool sem candidato"),
             })
 
+    # Micro-frente H-A0 (per-treino): wrapper /regerar opera 1 treino só,
+    # então qualquer entrada `h_a0_aplicadas` veio do treino 0 do motor.
+    # Adapter `_distribuir_avisos_rotina_csp` é usado pelo /gerar (rotina
+    # inteira) e tem o roteamento por t_idx. Aqui é o caminho de 1 treino.
+    for a in resultado.get("h_a0_aplicadas", []) or []:
+        if a.get("degraded"):
+            s.avisos.append({
+                "tipo": "h_a0_degradado",
+                "regiao": a.get("regiao"),
+                "subregiao_obrigatoria": a.get("subregiao_obrigatoria"),
+                "motivo": a.get("motivo", "pool sem candidato"),
+            })
+
     # Fatia 4.E: propaga relaxados pra Sessao.relaxados + avisos.
     relaxados_nomes = list(resultado.get("relaxados") or [])
     if relaxados_nomes:
@@ -652,6 +665,9 @@ def _distribuir_avisos_rotina_csp(resultado, sessoes, demandas_por_treino):
     - `h_r1_aplicadas[degraded=True]` → aviso `h_r1_degradado` no primeiro
       treino com subregião associada (ou treino 0 como fallback defensivo).
     - `h_a1_aplicadas[degraded=True]` → aviso `h_a1_degradado` análogo.
+    - `h_a0_aplicadas[degraded=True]` → aviso `h_a0_degradado` no treino
+      apontado por `aviso["treino"]` (H-A0 é per-treino — entrada já carrega
+      `treino`; não usa o mapa subregião→treino).
     - `avisos_carga_por_treino[t]` → anexa ao treino t (já per-treino).
     - `relaxados_por_treino[t]` → popula `sessoes[t].relaxados` + gera avisos
       `familia_repetida` (paridade com motor antigo + Frente C)."""
@@ -683,6 +699,20 @@ def _distribuir_avisos_rotina_csp(resultado, sessoes, demandas_por_treino):
                 "tipo": "h_a1_degradado",
                 "subregiao": a.get("subregiao"),
                 "padrao_obrigatorio": a.get("padrao_obrigatorio"),
+                "motivo": a.get("motivo", "pool sem candidato"),
+            })
+
+    # Micro-frente H-A0 (per-treino): cada entrada já carrega `treino`.
+    # Anexa direto ao treino apontado, sem usar o mapa subregião→treino.
+    for a in resultado.get("h_a0_aplicadas", []) or []:
+        if not a.get("degraded"):
+            continue
+        idx = a.get("treino", 0)
+        if 0 <= idx < len(sessoes):
+            sessoes[idx].avisos.append({
+                "tipo": "h_a0_degradado",
+                "regiao": a.get("regiao"),
+                "subregiao_obrigatoria": a.get("subregiao_obrigatoria"),
                 "motivo": a.get("motivo", "pool sem candidato"),
             })
 

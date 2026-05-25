@@ -38,6 +38,7 @@ from gerador_treino import (
     XLSX_PATH,
     _padroes_de_escopo,  # Fatia 4.D: expande escopo de demanda → padrões cobertos
     ANCORAS_POR_SUBREGIAO,  # Micro-frente H-A1: âncoras obrigatórias por subregião
+    ANCORAS_POR_REGIAO,  # Micro-frente H-A0: âncoras obrigatórias por região
 )
 # H-T3 reusa a configuração canônica de subregiões com lateralidade hard.
 from pesos_proximidade import SUBREGIOES_LATERALIDADE_HARD
@@ -485,6 +486,10 @@ def _construir_modelo(
         n_slots, degraded, motivo?}`. `degraded=True` quando constraint foi
         pulada (pool vazio pós-H-P1) ou aplicada via constraint colaborativa
         de conflito de cardinalidade (`vagas < n_obrig_efetivo`).
+      - h_a0_aplicadas: lista de aplicações H-A0 (âncoras obrigatórias por
+        região, per-treino). Cada entrada `{treino, regiao,
+        subregiao_obrigatoria, n_slots, degraded, motivo?}`. Mesmo padrão de
+        degraded da H-A1 (pool vazio | conflito de cardinalidade).
       - penalidades: list[IntVar] de S-T1 + Aderência (quando peso > 0)
         + S-B1 (quando peso_evitar_agonistas > 0).
         Caller decide se vira `Minimize(sum(penalidades))` (legacy + Phase 1)
@@ -554,10 +559,22 @@ def _construir_modelo(
             # repete um nome que está travado em algum slot da rotina).
             # Fatia 4.E: também filtra famílias proibidas (cross-treino hard
             # quando set não-vazio). `_familia_cross` cobre pai+filho.
+            # H-A0 (decisão 4.3 / 5.1): filtro upstream de subregiões não-âncora
+            # quando demanda nível região com âncoras declaradas. Ex:
+            # `("regiao","upper",3)` rejeita `bracos` do pool (não está em
+            # ANCORAS_POR_REGIAO[upper]). Slot só pode escolher subregião
+            # âncora — branching menor, modelo mais limpo (replica H-P1 que
+            # filtra pool antes do solver).
+            subs_ancora_h_a0: set[str] = set()
+            if nivel == "regiao" and escopo in ANCORAS_POR_REGIAO:
+                subs_ancora_h_a0 = {
+                    a["subregiao"] for a in ANCORAS_POR_REGIAO[escopo]
+                }
             pool_default_sem_travados = [
                 e for e in pool_default
                 if e.nome not in nomes_travados
                 and _familia_cross(e) not in fams_proibidas
+                and (not subs_ancora_h_a0 or e.subregiao in subs_ancora_h_a0)
             ]
             g = {
                 "t_idx": t_idx, "di": di,
@@ -796,6 +813,168 @@ def _construir_modelo(
                     "motivo": "pool sem candidato (provavelmente filtrado por H-P1)",
                 })
 
+    # ── H-A0 (HARD per-treino): âncoras obrigatórias por REGIÃO ─────────────
+    # Para cada demanda `("regiao", R, qtd)` com R em ANCORAS_POR_REGIAO,
+    # agregar PER-TREINO (não cross-treino — decisão 4.1 do handoff): para
+    # cada subregião com `obrigatoria=True`, exigir ≥1 slot daquele treino
+    # com `ex.subregiao == sub_obrig`. Subregiões não declaradas em
+    # ANCORAS_POR_REGIAO[R] já foram BANIDAS upstream do pool_slot (decisão
+    # 4.3 / Caminho A / pendente 5.1).
+    #
+    # Variável CSP nova: `sub_idx[s]` IntVar canalizado por assign via soma
+    # ponderada (mesma técnica de `grupo_func` e `tier_rank`). Indexação
+    # estável: `subs_ancora_por_regiao[R] = list[str]` ordenado igual à
+    # tabela curada em ANCORAS_POR_REGIAO; sub_id = idx nessa lista.
+    #
+    # Decisões fechadas (handoff 2026-05-25, Seção 4):
+    # - 4.1 Agregação PER-TREINO (não cross-treino) — semântica de "treino
+    #   de upper" cobre upper NAQUELE treino, não na rotina inteira.
+    # - 4.2 Interação H-A0 × H-A1: marker via estrutura paralela
+    #   `subregioes_obrigadas_ha0[(t_idx, R)] = set(subs_ativas)` lida pelo
+    #   bloco H-A1 abaixo (decisão pendente 5.2 / Caminho A: reordenar).
+    # - 4.3 Rejeição de subs não-âncora HARD (Caminho A) — já feito upstream
+    #   no filtro de `pool_default_sem_travados`.
+    # - 4.4 Reuso `ANCORAS_POR_REGIAO` do gerador_treino (não duplicar).
+    # - 4.6 NÃO modelar `PROPORCAO_COMPOSTOS = 0.6` aqui — cobertura de
+    #   compostos vem via H-A1[X] que ativa por marker.
+    # - 4.8 Sufixo 0 = "âncora mais primitiva" (decide subregião antes de
+    #   H-A1 decidir padrão dentro da subregião).
+    #
+    # Graceful degradation análoga à H-A1:
+    # - Pool sem candidato: alguma sub obrigatória sem nenhum cand no pool
+    #   dos slots daquele (treino, região) → constraint daquela sub pulada,
+    #   marcada `degraded=True` no resultado.
+    # - Conflito de cardinalidade (vagas < n_obrig efetivas): constraint
+    #   colaborativa `sum(obrig_usada) >= vagas` força N distintas. Caso
+    #   `("regiao","upper",1)` com 3 obrigatórias → 1 das 3 entra; solver
+    #   decide qual (sem favorecer).
+    h_a0_aplicadas: list[dict] = []
+    subregioes_obrigadas_ha0: dict[tuple[int, str], set[str]] = {}
+    slots_demanda_regiao_por_treino: dict[tuple[int, str], list[int]] = (
+        defaultdict(list)
+    )
+    subs_ancora_por_regiao: dict[str, list[str]] = {}
+    sub_idx: dict[int, cp_model.IntVar] = {}
+
+    for grupos_t in treinos:
+        for g in grupos_t:
+            nivel, escopo, _qtd = g["demanda"]
+            if nivel != "regiao" or escopo not in ANCORAS_POR_REGIAO:
+                continue
+            subs_ancora = [a["subregiao"] for a in ANCORAS_POR_REGIAO[escopo]]
+            subs_ancora_por_regiao[escopo] = subs_ancora
+            for sid in g["slot_ids"]:
+                slots_demanda_regiao_por_treino[(g["t_idx"], escopo)].append(sid)
+                pool = slot_por_sid[sid]["pool_slot"]
+                if not pool:
+                    # Pool vazio (degenerado). sub_idx pode ser 0 fixo —
+                    # AddBoolOr([]) já força inviabilidade trivial.
+                    continue
+                # Canalização via soma ponderada: sub_idx[s] = sum(assign * sub_id).
+                # AddExactlyOne já força sum(assign[s,c]) = 1, então
+                # sub_idx[s] == subs_ancora.index(ex_escolhido.subregiao).
+                lo, hi = 0, len(subs_ancora) - 1
+                si = model.NewIntVar(
+                    lo, hi, f"sub_idx_t{g['t_idx']}_s{sid}",
+                )
+                model.Add(si == sum(
+                    assign[(sid, c)] * subs_ancora.index(ex.subregiao)
+                    for c, ex in enumerate(pool)
+                ))
+                sub_idx[sid] = si
+
+    for (t_idx, R), sids in slots_demanda_regiao_por_treino.items():
+        if not sids:
+            continue
+        subs_ancora = subs_ancora_por_regiao[R]
+        obrigatorias = [
+            a["subregiao"] for a in ANCORAS_POR_REGIAO[R] if a.get("obrigatoria")
+        ]
+        if not obrigatorias:
+            continue
+
+        # Detecta degraded-por-pool: sub obrigatória sem nenhum candidato no
+        # pool dos slots dessa (treino, região).
+        ativas: list[str] = []
+        degradadas_pool: list[str] = []
+        for sub in obrigatorias:
+            tem_candidato = any(
+                ex.subregiao == sub
+                for sid in sids
+                for ex in slot_por_sid[sid]["pool_slot"]
+            )
+            (ativas if tem_candidato else degradadas_pool).append(sub)
+
+        for sub in degradadas_pool:
+            h_a0_aplicadas.append({
+                "treino": t_idx, "regiao": R, "subregiao_obrigatoria": sub,
+                "n_slots": len(sids), "degraded": True,
+                "motivo": "pool sem candidato (provavelmente filtrado por H-P1)",
+            })
+
+        if not ativas:
+            continue
+
+        vagas = len(sids)
+        n_ativas = len(ativas)
+
+        # Estrutura paralela pra H-A1 ler (decisão 4.2 / 5.2 / Caminho A).
+        # SÓ popular no caso NORMAL (vagas >= n_ativas) — onde cada sub
+        # ativa é GARANTIDA individualmente pela constraint hard.
+        # No caso CONFLITO (vagas < n_ativas), só vagas-distintas coletivas
+        # são garantidas — não há sub específica garantida → H-A1 marker
+        # não pode forçar padrão obrigatório de cada uma (solver poderia
+        # não escolher essa sub). Marker fica vazio nesse caso e a
+        # cobertura de subregião é o que H-A0 ainda fornece.
+        if vagas >= n_ativas:
+            subregioes_obrigadas_ha0[(t_idx, R)] = set(ativas)
+        else:
+            subregioes_obrigadas_ha0[(t_idx, R)] = set()
+
+        if vagas >= n_ativas:
+            # Caso normal: 1 constraint por sub obrigatória ativa.
+            for sub in ativas:
+                sub_id_local = subs_ancora.index(sub)
+                bools = []
+                for sid in sids:
+                    b = model.NewBoolVar(f"ha0_{R}_{sub}_t{t_idx}_s{sid}")
+                    model.Add(sub_idx[sid] == sub_id_local).OnlyEnforceIf(b)
+                    model.Add(sub_idx[sid] != sub_id_local).OnlyEnforceIf(b.Not())
+                    bools.append(b)
+                model.Add(sum(bools) >= 1)
+                h_a0_aplicadas.append({
+                    "treino": t_idx, "regiao": R, "subregiao_obrigatoria": sub,
+                    "n_slots": vagas, "degraded": False,
+                })
+        else:
+            # Conflito de cardinalidade (vagas < n_obrig efetivas):
+            # constraint colaborativa "vagas subs obrigatórias DISTINTAS
+            # devem aparecer". Cria BoolVar `obrig_usada_X` reificada com
+            # `sum(slots_X) >= 1`; soma >= vagas força N obrig distintas.
+            obrig_usadas_vars = []
+            for sub in ativas:
+                sub_id_local = subs_ancora.index(sub)
+                usada = model.NewBoolVar(f"ha0_usada_{R}_{sub}_t{t_idx}")
+                bools_sub = []
+                for sid in sids:
+                    b = model.NewBoolVar(f"ha0_{R}_{sub}_t{t_idx}_s{sid}")
+                    model.Add(sub_idx[sid] == sub_id_local).OnlyEnforceIf(b)
+                    model.Add(sub_idx[sid] != sub_id_local).OnlyEnforceIf(b.Not())
+                    bools_sub.append(b)
+                model.Add(sum(bools_sub) >= 1).OnlyEnforceIf(usada)
+                model.Add(sum(bools_sub) == 0).OnlyEnforceIf(usada.Not())
+                obrig_usadas_vars.append(usada)
+            model.Add(sum(obrig_usadas_vars) >= vagas)
+            motivo_conflito = (
+                f"conflito_cardinalidade vagas={vagas}<n_obrig_efetivo={n_ativas}"
+            )
+            for sub in ativas:
+                h_a0_aplicadas.append({
+                    "treino": t_idx, "regiao": R, "subregiao_obrigatoria": sub,
+                    "n_slots": vagas, "degraded": True,
+                    "motivo": motivo_conflito,
+                })
+
     # ── H-A1 (HARD cross-treino): âncoras obrigatórias por subregião ────────
     # Para cada demanda EXPLÍCITA `("subregiao", X, qtd)` com qtd >= 1 e X em
     # ANCORAS_POR_SUBREGIAO, pra cada âncora com `obrigatoria=True`, exigir
@@ -803,8 +982,14 @@ def _construir_modelo(
     #
     # Decisões fechadas (handoff 2026-05-25):
     # - NÃO ativa em demanda nível padrão (usuário pediu o padrão; respeitar).
-    # - NÃO ativa em demanda nível regiao (slot sem subregião determinística
-    #   pré-solver — mesma regra do H-R1).
+    # - NÃO ativa em demanda nível regiao DIRETAMENTE — mas ATIVA via marker
+    #   da estrutura paralela `subregioes_obrigadas_ha0` (decisão 4.2): pra
+    #   cada (t_idx, R) com sub obrig ativa, agrega os slot_ids da demanda
+    #   região como se fossem demanda subregião. Combinado com H-A0 (que
+    #   força ≥1 slot com sub_idx==X), o slot que cumpre H-A1 (padrão
+    #   âncora de X) também cumpre H-A0 (subregião X) — interseção viável
+    #   porque PADRAO_PARA_SUBREGIAO é 1:1 pros padrões âncora obrigatórios
+    #   das subregiões de upper/lower.
     # - Cross-treino: vagas = total de slots da subregião X em TODAS as
     #   demandas explícitas da rotina (independente do treino).
     # - Conflito cardinalidade (vagas < n_obrigatorias com pool viável):
@@ -816,11 +1001,32 @@ def _construir_modelo(
     #   pulada e marcada `degraded=True` no resultado.
     h_a1_aplicadas: list[dict] = []
     slots_subregiao_explicita: dict[str, list[int]] = defaultdict(list)
+    # `vagas_por_sub` separa contagem de vagas GARANTIDAS por sub da
+    # contagem `len(slots_subregiao_explicita[sub])`. Necessário pra H-A0
+    # marker: cada (t_idx, R) adiciona TODOS os sids da demanda região à
+    # lista (porque sub_idx[sid] decide quem vira X em runtime), mas só
+    # 1 desses sids está GARANTIDO para a sub X. Detecção de conflito de
+    # cardinalidade (vagas < n_ativas) deve usar vagas garantidas reais —
+    # do contrário, demandas `("regiao","upper",3)` quebram em costas
+    # (vagas=1 garantida ≥1 marker; mas n_ativas=2 = remadas+puxadas).
+    vagas_garantidas_por_sub: dict[str, int] = defaultdict(int)
     for grupos_t in treinos:
         for g in grupos_t:
-            nivel, escopo, _qtd = g["demanda"]
+            nivel, escopo, qtd = g["demanda"]
             if nivel == "subregiao" and escopo in ANCORAS_POR_SUBREGIAO:
                 slots_subregiao_explicita[escopo].extend(g["slot_ids"])
+                vagas_garantidas_por_sub[escopo] += qtd
+
+    # Estende com os slots da demanda região cujas subregiões estão
+    # obrigadas por H-A0 (decisão 4.2 / 5.2 / Caminho A — reordenar).
+    # Marker contribui +1 vaga garantida por (t_idx, R, sub_obrig) — H-A0
+    # garante ≥1 slot daquela sub naquele treino.
+    for (t_idx, R), subs_obrig in subregioes_obrigadas_ha0.items():
+        sids_demanda_regiao = slots_demanda_regiao_por_treino.get((t_idx, R), [])
+        for sub in subs_obrig:
+            if sub in ANCORAS_POR_SUBREGIAO:
+                slots_subregiao_explicita[sub].extend(sids_demanda_regiao)
+                vagas_garantidas_por_sub[sub] += 1
 
     for sub, sids in slots_subregiao_explicita.items():
         if not sids:
@@ -858,7 +1064,11 @@ def _construir_modelo(
         if not ativas:
             continue
 
-        vagas = len(sids)
+        # Vagas garantidas = demandas subregião explícitas (qtd) + +1 por
+        # marker H-A0 (cada (t_idx, R) garante ≥1 slot da sub naquele treino).
+        # NÃO usa `len(sids)` porque marker adiciona TODOS os sids da
+        # demanda região (heterogêneos), mas só 1 deles vira de fato a sub.
+        vagas = vagas_garantidas_por_sub.get(sub, len(sids))
         n_ativas = len(ativas)
 
         if vagas >= n_ativas:
@@ -1106,6 +1316,10 @@ def _construir_modelo(
         # quando a constraint daquela âncora foi pulada por pool vazio ou
         # conflito de cardinalidade).
         "h_a1_aplicadas": h_a1_aplicadas,
+        # Micro-frente H-A0: âncoras obrigatórias por REGIÃO, agregação
+        # per-treino. Cada entrada `{treino, regiao, subregiao_obrigatoria,
+        # n_slots, degraded, motivo?}`. Mesma semântica de degraded da H-A1.
+        "h_a0_aplicadas": h_a0_aplicadas,
         "penalidades": penalidades,
         # Fatia 4.A: vars estruturais de bloco — caller usa pra decodificar
         # blocos da solução (via solver.Value(bloco_idx[s])).
@@ -1425,6 +1639,10 @@ def gerar_rotina_csp(
       - `h_a1_aplicadas`: lista de aplicações H-A1 (âncoras obrigatórias por
         subregião). Análoga a `h_r1_aplicadas` — degraded=True quando pool
         vazio (pulada) ou conflito de cardinalidade (constraint colaborativa).
+      - `h_a0_aplicadas`: lista de aplicações H-A0 (âncoras obrigatórias por
+        REGIÃO, agregação per-treino). Cada entrada `{treino, regiao,
+        subregiao_obrigatoria, n_slots, degraded, motivo?}`. Mesmo padrão de
+        graceful degradation da H-A1.
       - `variedade` (só quando ConfigVariedade ativa): metadados da
         enumeração (n_solucoes, distancia_escolhida, optimal_value,
         enumeracao_limitada, tempo por fase).
@@ -1544,6 +1762,7 @@ def _resolver_legacy(
         ),
         "h_r1_aplicadas": md["h_r1_aplicadas"],
         "h_a1_aplicadas": md["h_a1_aplicadas"],
+        "h_a0_aplicadas": md["h_a0_aplicadas"],
         "treinos": [],
         "avisos_carga_por_treino": {},
     }
@@ -1643,6 +1862,7 @@ def _resolver_com_variedade(
             "inversoes_totais": 0,
             "h_r1_aplicadas": md1["h_r1_aplicadas"],
             "h_a1_aplicadas": md1["h_a1_aplicadas"],
+            "h_a0_aplicadas": md1["h_a0_aplicadas"],
             "treinos": [],
             "avisos_carga_por_treino": {},
             "variedade": _meta_variedade(variedade, n=0, dist=None, opt=None,
@@ -1787,6 +2007,7 @@ def _resolver_com_variedade(
         "inversoes_totais": chosen_inv,
         "h_r1_aplicadas": md2["h_r1_aplicadas"],
         "h_a1_aplicadas": md2["h_a1_aplicadas"],
+        "h_a0_aplicadas": md2["h_a0_aplicadas"],
         "treinos": _decode_solucao(
             md2["treinos"], chosen_sol, chosen_blocos,
             slot_por_sid=md2["slot_por_sid"],
@@ -1918,6 +2139,7 @@ def gerar_treino_csp(
             "ordem_global": [],
             "avisos_carga": [],
             "h_a1_aplicadas": rotina.get("h_a1_aplicadas", []),
+            "h_a0_aplicadas": rotina.get("h_a0_aplicadas", []),
         }
         if "variedade" in rotina:
             out["variedade"] = rotina["variedade"]
@@ -1936,6 +2158,10 @@ def gerar_treino_csp(
         "blocos": t0.get("blocos", []),
         "h_r1_aplicadas": rotina["h_r1_aplicadas"],
         "h_a1_aplicadas": rotina.get("h_a1_aplicadas", []),
+        # Micro-frente H-A0: propaga lista filtrada pelo treino=0 (gerar_treino_csp
+        # serve a um único treino — entradas com `treino != 0` são desconsideradas
+        # naturalmente porque rotina foi construída com 1 treino).
+        "h_a0_aplicadas": rotina.get("h_a0_aplicadas", []),
         # Fatia 4.E: lista de nomes relaxados deste treino (treino_idx=0).
         "relaxados": rotina.get("relaxados_por_treino", {}).get(0, []),
         "relax_ativado": rotina.get("relax_ativado", False),

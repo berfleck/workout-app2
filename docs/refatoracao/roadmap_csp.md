@@ -13,14 +13,14 @@ linha de "o que entregou" + 1 linha de "próximo bloqueio se houver".
 
 ---
 
-## Estado das branches (2026-05-26)
+## Estado das branches (2026-05-25)
 
 Pós-instituição da disciplina de merge (seção abaixo): branches mergeadas
 em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 
 ```
-main  ← inclui Fatias 1-4.E (Bloco 1 completo) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5)
- └─ frente-e-1  ✅ ← atual (a mergear em main após aprovação Bernardo)
+main  ← inclui Fatias 1-4.E (Bloco 1 completo) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5) + Frente E.1 (Bloco 3)
+ └─ frente-h-a0  ✅ ← atual (a mergear em main após aprovação Bernardo)
 ```
 
 ---
@@ -44,6 +44,7 @@ main  ← inclui Fatias 1-4.E (Bloco 1 completo) + Frente E.0 (Bloco 2) + Micro-
 | Frente E.0 | Harness comparativo CSP × antigo (7 métricas, relatório markdown) | `logs/frente_e0_harness_comparativo.md` |
 | Micro-frente H-A1 | Âncoras obrigatórias por subregião (cross-treino, graceful degradation, constraint colaborativa em conflito de cardinalidade) | `logs/micro_h_a1_ancoras_subregiao.md` |
 | Frente E.1 | `/gerar` chamando `gerar_rotina_csp` (clean break do motor antigo); adapter rotina-inteira (`_distribuir_avisos_rotina_csp` + helpers); modal de avisos ganha clauses `h_a1_degradado` + `h_r1_degradado`; toggle R-1 wirado como `familias_proibidas` hard cross-rotina | `logs/frente_e1_substituir_gerar.md` |
+| Micro-frente H-A0 | Âncoras obrigatórias por REGIÃO (per-treino, banimento upstream de subs não-âncora, marker H-A0 → H-A1, graceful degradation pool vazio + conflito cardinalidade) | `logs/micro_h_a0_ancoras_regiao.md` |
 
 ---
 
@@ -84,8 +85,8 @@ Cada item independente; entram conforme prioridade clínica observada.
 
 **Itens prioritários** (achados de auditoria clínica 2026-05-25 — Full Body 2T com demanda nível região via UI; ver "Auditoria clínica pós-E.1" abaixo):
 
-- **⬜ H-A0 — âncoras obrigatórias por REGIÃO** — dual da H-A1 para demanda nível `regiao` (H-A1 tem subregião fixa do slot; H-A0 escolhe subregião do slot via IntVar nova `sub_idx[s]`). Reusa `ANCORAS_POR_REGIAO` (já curado em `gerador_treino.py:142`). Hoje quando UI manda `("regiao", "upper", N)` o CSP cicla pelas subregiões de upper sem garantir cobertura mínima de movimentos básicos (puxar/empurrar/composto). Achado empírico: Full Body 2T com `upper(3) + lower(3) + core(2)` gerou 16 ex sem nenhuma costas e sem nenhum squat. Decisões fechadas (handoff 2026-05-25): per-treino (não cross-treino), hard banimento de subregiões não-âncora (Caminho A), interação H-A0 × H-A1 via marker `subregiao_obrigada_por_ha0` no slot (Caminho b). Graceful degradation análoga à H-A1 (pool vazio + conflito cardinalidade). Spec executável → `handoff_2026-05-25_h_a0.md`.
-- **⬜ Gate de avaliação clínica semântica** — pré-requisito do Bloco 5. Antes de mergear cadastros completos ou desligar motor antigo, instituir prática de gerar 5-10 rotinas por config representativa (incluindo nível região da UI real), Bernardo lê como PT, e cada achado vira: (a) constraint nova no catálogo, (b) métrica nova no harness E.0, ou (c) decisão consciente de "tolerável". Saída: doc `auditorias/<data>_<config>.md` por rodada. Cobre o gap entre conformidade declarada (pytest + harness) e adequação clínica em uso real — vide anti-padrão norte Seção 7. **Caiu na E.1**: 318 testes verdes não pegaram zero-costas-zero-squat porque nenhuma métrica do harness E.0 mede cobertura semântica do repertório.
+- **✅ H-A0 — âncoras obrigatórias por REGIÃO** (2026-05-25) — dual da H-A1 pra demanda nível `regiao`. Variável CSP nova `sub_idx[s]` canalizada por `assign`. Per-treino (não cross-treino — decisão 4.1). Banimento upstream de subs não-âncora (decisão 4.3 / Caminho A). Interação H-A0 × H-A1 via marker em estrutura paralela `subregioes_obrigadas_ha0[(t_idx, R)] = set(subs)` (decisão 4.2 / 5.2 / Caminho A — reordenar). Graceful degradation pool vazio + conflito de cardinalidade (constraint colaborativa). `vagas_garantidas_por_sub` separado de `len(sids)` no H-A1 pra detecção correta de conflito quando marker contribui. Smoke do achado fechado: Full Body 2T (região) seed=42 sai com peito+costas+ombro+perna_anterior+perna_posterior em CADA treino. Métrica nova `cobertura_ha0_por_treino` no E.0 mostra CSP 100% vs antigo 40-60% pro ombro em `upper(3)×2T`. Pytest 334 (+15 novos H-A0 + 1 atualizado H-A1) + harness 16/16 + smoke E2E OK. Detalhes em `logs/micro_h_a0_ancoras_regiao.md`.
+- **⬜ Gate de avaliação clínica semântica** — pré-requisito do Bloco 5. Antes de mergear cadastros completos ou desligar motor antigo, instituir prática de gerar 5-10 rotinas por config representativa (incluindo nível região da UI real), Bernardo lê como PT, e cada achado vira: (a) constraint nova no catálogo, (b) métrica nova no harness E.0, ou (c) decisão consciente de "tolerável". Saída: doc `auditorias/<data>_<config>.md` por rodada. Cobre o gap entre conformidade declarada (pytest + harness) e adequação clínica em uso real — vide anti-padrão norte Seção 7. **Caiu na E.1**: 318 testes verdes não pegaram zero-costas-zero-squat porque nenhuma métrica do harness E.0 mede cobertura semântica do repertório. **Pós-H-A0**: métrica `cobertura_ha0_por_treino` operacionaliza essa pergunta pra demandas nível região; gate clínico permanece pra cobrir lacunas além de cobertura por sub-âncora (ordem composto→isolado, volume por região, fadiga acumulada).
 
 **Demais refinamentos** (ordem não prioritária):
 
@@ -139,8 +140,11 @@ fatia fecha com gates verdes e sensação de progresso — progresso era em
 conformidade, não em qualidade do produto.
 
 **Ações:**
-- H-A2 e gate de avaliação clínica entram como itens prioritários do
-  Bloco 4 (acima).
+- ✅ H-A0 (mesma frente — handoff `handoff_2026-05-25_h_a0.md` e log
+  `logs/micro_h_a0_ancoras_regiao.md`) fecha o achado 1 (zero costas) e
+  2 (zero squat) em 2026-05-25.
+- Gate de avaliação clínica continua como item prioritário do Bloco 4
+  (acima) — pós-H-A0 ainda cobre lacunas além de cobertura por sub-âncora.
 - Suspeitas a confirmar com mais rodadas de auditoria: distribuição de
   fadiga acumulada por treino, ordem composto→isolado no bloco, volume
   por região na rotina, acoplamento volume/intensidade emergente.

@@ -196,19 +196,30 @@ def test_demanda_padrao_nao_ativa_ha1(banco):
     assert meta is None
 
 
-# ── (g) Demanda nível regiao NÃO ativa H-A1 ─────────────────────────────
+# ── (g) Demanda nível regiao ATIVA H-A1 via marker H-A0 ─────────────────
 
-def test_demanda_regiao_nao_ativa_ha1(banco):
-    """`("regiao", "upper", 3)`: H-A1 NÃO ativa em demanda nível regiao
-    (slot sem subregião determinística pré-solver — mesma regra do H-R1)."""
+def test_demanda_regiao_ativa_ha1_via_marker_ha0(banco):
+    """Pós-Micro-frente H-A0 (Bloco 4 / 2026-05-25): demanda nível região
+    com âncora declarada em ANCORAS_POR_REGIAO ATIVA H-A0 (per-treino) e
+    H-A0 estende `slots_subregiao_explicita` com os slots da demanda região
+    pras subregiões obrigatórias — decisão 4.2 do handoff H-A0.
+
+    Resultado: H-A1 agora se aplica AOS SLOTS dessa demanda região pras
+    subregiões obrigatórias declaradas em ANCORAS_POR_REGIAO[R].
+
+    Pré-H-A0 (Bloco 2.5 original): h_a1_aplicadas vazio aqui — o que
+    explicava o bug zero-costas-zero-squat do achado clínico de 2026-05-25.
+    """
     demandas = [("regiao", "upper", 3)]
     r = gerar_treino_csp(demandas, banco, nivel_aluno=3, seed=0)
     assert r["viavel"]
-    # h_a1_aplicadas pode estar vazio OU não conter nenhuma subregião
-    # que viria SÓ da expansão da região (sem demanda subregião explícita).
     ha1 = r.get("h_a1_aplicadas", [])
-    # Nenhuma entrada — demanda é nível regiao, sem subregião explícita.
-    assert ha1 == [], f"h_a1_aplicadas deveria estar vazio, veio {ha1}"
+    subs_em_ha1 = {a["subregiao"] for a in ha1}
+    # As 3 subregiões obrigatórias de upper devem estar em h_a1_aplicadas via
+    # marker da H-A0 (peito/costas/ombro são todas obrigatorias=True).
+    assert "peito" in subs_em_ha1
+    assert "costas" in subs_em_ha1
+    assert "ombro" in subs_em_ha1
 
 
 # ── (h) Subregião sem âncoras (core_dinamico) — sem H-A1 ────────────────
