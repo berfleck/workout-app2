@@ -18,10 +18,12 @@
             {% set cargas = t.avisos | selectattr("tipo", "equalto", "relaxado_carga") | list %}
             {% set ancoras_nc = t.avisos | selectattr("tipo", "equalto", "ancora_nao_cumprida") | list %}
             {% set ancoras_sc = t.avisos | selectattr("tipo", "equalto", "ancora_sem_candidatos") | list %}
+            {% set hr1_deg = t.avisos | selectattr("tipo", "equalto", "h_r1_degradado") | list %}
+            {% set ha1_deg = t.avisos | selectattr("tipo", "equalto", "h_a1_degradado") | list %}
             <div style="margin-top: 14px; padding-top: 12px; {% if not loop.first %}border-top: 1px solid var(--gray-200);{% endif %}">
                 {% if incompletas %}
                 <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">⚠️ Treino {{ t.treino_num }} ficou incompleto</div>
-                {% elif cargas or ancoras_nc or ancoras_sc %}
+                {% elif cargas or ancoras_nc or ancoras_sc or hr1_deg or ha1_deg %}
                 <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">↻ Treino {{ t.treino_num }} foi gerado com restrições</div>
                 {% else %}
                 <div style="font-weight: 700; color: var(--gray-900); margin-bottom: 8px;">↻ Treino {{ t.treino_num }} foi preenchido com flexibilizações</div>
@@ -122,6 +124,39 @@
                         {% for av in ancoras_sc %}
                         <li>
                             <strong>{{ av.escopo_label or av.escopo }}</strong>: padrão <em>{{ av.chave or av.padrao }}</em> não tinha exercício compatível com os filtros desta rotina.
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if ha1_deg %}
+                <div style="margin-bottom: 8px;">
+                    <p style="margin: 0 0 6px 0;">
+                        <span style="display:inline-block; padding:1px 6px; background:#dbeafe; border:1px solid #93c5fd; border-radius:4px; font-size:11px; font-weight:700; color:#1e40af;">🎯</span>
+                        Âncora{{ 's' if ha1_deg|length > 1 else '' }} obrigatória{{ 's' if ha1_deg|length > 1 else '' }} não pôde ser garantida{{ 's' if ha1_deg|length > 1 else '' }}:
+                    </p>
+                    <ul style="margin: 4px 0 0 18px; padding: 0; list-style: disc;">
+                        {% for av in ha1_deg %}
+                        <li>
+                            <strong>{{ av.subregiao }}</strong>: padrão âncora <em>{{ av.padrao_obrigatorio }}</em> ficou sem candidatos
+                            ({{ av.motivo }}).
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if hr1_deg %}
+                <div style="margin-bottom: 8px;">
+                    <p style="margin: 0 0 6px 0;">
+                        <span style="display:inline-block; padding:1px 6px; background:#fee2e2; border:1px solid #fca5a5; border-radius:4px; font-size:11px; font-weight:700; color:#991b1b;">⚖️</span>
+                        Distribuição clínica de eixos não pôde ser garantida em {{ hr1_deg|length }} caso{{ 's' if hr1_deg|length > 1 else '' }}:
+                    </p>
+                    <ul style="margin: 4px 0 0 18px; padding: 0; list-style: disc;">
+                        {% for av in hr1_deg %}
+                        <li>
+                            <strong>{{ av.subregiao }}</strong>{% if av.eixo %} (eixo <em>{{ av.eixo }}</em>){% endif %}: {{ av.motivo }}.
                         </li>
                         {% endfor %}
                     </ul>

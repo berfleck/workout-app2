@@ -17,7 +17,9 @@ from gerador_treino import (
     ANCORAS_POR_REGIAO, ANCORAS_POR_SUBREGIAO,
     Exercicio, Sessao, SuperSerie,
 )
-from gerador_csp import ConfigVariedade, gerar_treino_csp, _familia_cross
+from gerador_csp import (
+    ConfigVariedade, gerar_treino_csp, gerar_rotina_csp, _familia_cross,
+)
 from gerar_imagem import gerar_png
 from database import (
     init_db, migrar_json_para_sqlite,
@@ -579,6 +581,139 @@ def _expandir_demanda_csp(nivel, escopo, qtd):
     if nivel == "padrao" and escopo in ("core_isometrico", "core_dinamico"):
         return [("subregiao", escopo, qtd)]
     return [(nivel, escopo, qtd)]
+
+
+# ── Frente E.1 (2026-05-26): adapters da rotina inteira para o /gerar ─────────
+# Helpers análogos aos de /regerar (Frente C), mas trabalham com a saída de
+# `gerar_rotina_csp` (rotina inteira, list de treinos) em vez de 1 treino.
+
+def _tipo_label_da_cfg(cfg):
+    """Deriva o `tipo` da Sessao a partir da cfg do form. Replica formato do
+    motor antigo: template → nome do template; hierarquia → "escopo(qtd) + ...";
+    padrões legados → " + ".join(padroes). Usado no fallback antes do
+    nome_custom sobrescrever."""
+    if cfg.get("modo") == "template" and cfg.get("template_nome"):
+        return cfg["template_nome"]
+    demandas = cfg.get("demandas")
+    if demandas:
+        return " + ".join(f"{e}({q})" for _, e, q in demandas)
+    padroes = cfg.get("padroes") or []
+    return " + ".join(padroes) if padroes else "Sessão"
+
+
+def _treino_dict_csp_pra_sessao(treino_dict, tipo_label):
+    """Converte um item de `resultado["treinos"]` do `gerar_rotina_csp` em
+    Sessao com blocos estruturados (Fatia 4.A). Marca cada ex com
+    rationale={"gerador": "csp"} sem mutar o banco.
+    Avisos cross-treino (h_r1/h_a1) e per-treino (relaxados, cargas) NÃO são
+    anexados aqui — vão por `_distribuir_avisos_rotina_csp` que conhece o
+    mapeamento subregião→treino."""
+    blocos: list[SuperSerie] = []
+    for i, bloco_exs in enumerate(treino_dict.get("blocos", [])):
+        exs_marker = [_dc_replace(ex, rationale={"gerador": "csp"}) for ex in bloco_exs]
+        ex1 = exs_marker[0] if len(exs_marker) > 0 else None
+        ex2 = exs_marker[1] if len(exs_marker) > 1 else None
+        ex3 = exs_marker[2] if len(exs_marker) > 2 else None
+        blocos.append(SuperSerie(label=_label_bloco_csp(i),
+                                 ex1=ex1, ex2=ex2, ex3=ex3))
+    s = Sessao(tipo=tipo_label, blocos=blocos)
+    s.relaxados = []
+    s.avisos = []
+    return s
+
+
+def _primeiro_treino_por_subregiao(demandas_por_treino):
+    """Mapa subregiao → primeiro idx de treino que tem demanda associada.
+    Usado pra rotear avisos cross-treino (h_r1/h_a1) ao treino certo —
+    evita duplicar a msg em todos os treinos da rotina.
+
+    - Demanda `("subregiao", X, _)` → X direto.
+    - Demanda `("padrao", P, _)` → pega subregiões via PADRAO_PARA_SUBREGIAO[P].
+    - Demanda `("regiao", R, _)` → pega subregiões via REGIAO_PARA_SUBREGIOES[R].
+    Primeira ocorrência wins (não sobrescreve)."""
+    primeiro: dict[str, int] = {}
+    for t, demandas in enumerate(demandas_por_treino):
+        for nivel, escopo, _q in demandas:
+            subs_alvo: list[str] = []
+            if nivel == "subregiao":
+                subs_alvo = [escopo]
+            elif nivel == "padrao":
+                subs_alvo = list(PADRAO_PARA_SUBREGIAO.get(escopo, set()))
+            elif nivel == "regiao":
+                subs_alvo = list(REGIAO_PARA_SUBREGIOES.get(escopo, []))
+            for sub in subs_alvo:
+                primeiro.setdefault(sub, t)
+    return primeiro
+
+
+def _distribuir_avisos_rotina_csp(resultado, sessoes, demandas_por_treino):
+    """Distribui avisos do dict de retorno de `gerar_rotina_csp` pelos N treinos.
+
+    - `h_r1_aplicadas[degraded=True]` → aviso `h_r1_degradado` no primeiro
+      treino com subregião associada (ou treino 0 como fallback defensivo).
+    - `h_a1_aplicadas[degraded=True]` → aviso `h_a1_degradado` análogo.
+    - `avisos_carga_por_treino[t]` → anexa ao treino t (já per-treino).
+    - `relaxados_por_treino[t]` → popula `sessoes[t].relaxados` + gera avisos
+      `familia_repetida` (paridade com motor antigo + Frente C)."""
+    mapa = _primeiro_treino_por_subregiao(demandas_por_treino)
+
+    def _idx_para_sub(sub):
+        if sub in mapa:
+            return mapa[sub]
+        return 0  # defensivo (não esperado se subregião veio do solver)
+
+    for a in resultado.get("h_r1_aplicadas", []) or []:
+        if not a.get("degraded"):
+            continue
+        idx = _idx_para_sub(a.get("subregiao"))
+        if 0 <= idx < len(sessoes):
+            sessoes[idx].avisos.append({
+                "tipo": "h_r1_degradado",
+                "subregiao": a.get("subregiao"),
+                "eixo": a.get("eixo"),
+                "motivo": a.get("motivo", "pool sem candidato"),
+            })
+
+    for a in resultado.get("h_a1_aplicadas", []) or []:
+        if not a.get("degraded"):
+            continue
+        idx = _idx_para_sub(a.get("subregiao"))
+        if 0 <= idx < len(sessoes):
+            sessoes[idx].avisos.append({
+                "tipo": "h_a1_degradado",
+                "subregiao": a.get("subregiao"),
+                "padrao_obrigatorio": a.get("padrao_obrigatorio"),
+                "motivo": a.get("motivo", "pool sem candidato"),
+            })
+
+    avisos_carga = resultado.get("avisos_carga_por_treino", {}) or {}
+    for t, avisos in avisos_carga.items():
+        if 0 <= t < len(sessoes) and avisos:
+            sessoes[t].avisos.extend(avisos)
+
+    relaxados = resultado.get("relaxados_por_treino", {}) or {}
+    for t, nomes_relax in relaxados.items():
+        if not nomes_relax or not (0 <= t < len(sessoes)):
+            continue
+        sessoes[t].relaxados = list(nomes_relax)
+        ex_por_nome: dict[str, Exercicio] = {}
+        for bloco in sessoes[t].blocos:
+            for ex in (bloco.ex1, bloco.ex2, bloco.ex3):
+                if ex is not None:
+                    ex_por_nome[ex.nome] = ex
+        for nome_rel in nomes_relax:
+            ex_rel = ex_por_nome.get(nome_rel)
+            familia = (
+                ex_rel.variacao_de if (ex_rel and ex_rel.variacao_de)
+                else nome_rel
+            )
+            escopo_label = ex_rel.subregiao if ex_rel else ""
+            sessoes[t].avisos.append({
+                "tipo": "familia_repetida",
+                "exercicio": nome_rel,
+                "familia": familia,
+                "escopo_label": escopo_label,
+            })
 
 
 def _configs_to_serializable(configs):
@@ -1737,17 +1872,109 @@ def gerar():
         if aluno_obj_db and aluno_obj_db.get("rotina_ativa_id"):
             rotina_ativa_aluno = carregar_rotina_ativa(aluno_obj_db["id"])
 
-    # Score HIST D3.3 (Etapa 7 Fase 7.4) — toggle "Evitar exercícios da rotina
-    # anterior". Quando ON e há rotina ativa, propaga R-1 pro _score_proximidade
-    # (penalty soft -50 família, peso integral). Não bloqueia banco, desencoraja
-    # via softmax; permite repetir quando inevitável.
-    historico_r1_sessoes: list[Sessao] | None = None
-    if usar_historico_r1 and rotina_ativa_aluno:
-        historico_r1_sessoes = [_dict_to_sessao(s) for s in rotina_ativa_aluno["sessoes"]]
+    # Frente E.1 (2026-05-26, clean break): /gerar passa a chamar o motor CSP
+    # SEMPRE. Motor antigo (`gerar_multiplos_treinos`) sai do caminho de
+    # execução desta rota. _regerar_motor_legacy helper continua no código
+    # como referência viva pra rollback rápido se necessário.
+    #
+    # Mapeamento direto das opções da UI antiga pros parâmetros do motor novo
+    # (espelha o que /regerar Frente C+D+4.B+4.C+4.D+4.E já faz por treino):
+    #
+    #   evitar_agon → peso_evitar_agonistas (S-B1)
+    #   tam_bloco → tamanho_preferido + peso_tamanho_bloco (S-B4)
+    #   relaxar_familia → relaxar_familia (Fatia 4.E retry 2 fases)
+    #   cargas_config → cargas_config (Fatia 4.E cargas)
+    #   exercicios_travados (por treino na cfg) → travados_por_treino
+    #   nivel/aderencia do aluno → nivel_aluno + peso_aderencia (Frente D)
+    #
+    # Toggle `usar_historico_r1` (UI) é wirado como `familias_proibidas`
+    # HARD cross-rotina (decisão fechada no handoff 2026-05-26): CSP não
+    # tem ainda S-H1 soft (Bloco 4 do roadmap), e o toggle ON faz sentido
+    # como "evitar repetir família da rotina anterior". Hard porque é a
+    # primitiva mais próxima disponível; o retry de relaxar_familia (toggle
+    # ON também) garante que se inviável, motor relaxa em vez de devolver
+    # rotina vazia. Bloqueio cross-treino existente (irmãos em
+    # substituir/adicionar) já filtrado em `banco_gerar` por NOME +
+    # variacao_de — adiciono as famílias dos irmãos ao set também pra
+    # cobertura completa (banco filtra exatos, set bloqueia variações).
+    demandas_por_treino: list[list[tuple]] = []
+    travados_por_treino: dict[int, list[Exercicio]] = {}
+    for t_idx, cfg in enumerate(all_configs):
+        demandas_csp_t = _cfg_antiga_pra_demandas_csp(cfg)
+        demandas_por_treino.append(demandas_csp_t)
+        travados_t = list(cfg.get("exercicios_travados") or [])
+        if travados_t:
+            travados_por_treino[t_idx] = travados_t
 
-    sessoes_ativas = gerar_multiplos_treinos(banco_gerar, all_configs,
-                                             relaxar_familia=relaxar_familia,
-                                             historico_r1=historico_r1_sessoes)
+    familias_proibidas: set[str] = set()
+    # (a) irmãos da rotina ativa quando substituir/adicionar (banco_gerar já
+    #     filtrou os NOMES; aqui adicionamos as famílias pra cobrir variações).
+    if ctx_acao in ("substituir", "adicionar") and ctx_aluno_id_form:
+        rotina_irmaos = carregar_rotina_ativa(ctx_aluno_id_form)
+        if rotina_irmaos:
+            for i, s_dict in enumerate(rotina_irmaos["sessoes"]):
+                if ctx_acao == "substituir" and i == ctx_treino_idx_form:
+                    continue
+                for bloco in s_dict["blocos"]:
+                    for key in ("ex1", "ex2", "ex3"):
+                        ex_d = bloco.get(key)
+                        if ex_d:
+                            familias_proibidas.add(ex_d.get("variacao_de") or ex_d["nome"])
+    # (b) toggle "Evitar exercícios da rotina anterior" — wire conforme decisão
+    #     2026-05-26 do handoff (substitui o score soft do motor antigo).
+    if usar_historico_r1 and rotina_ativa_aluno:
+        for s_dict in rotina_ativa_aluno["sessoes"]:
+            for bloco in s_dict["blocos"]:
+                for key in ("ex1", "ex2", "ex3"):
+                    ex_d = bloco.get(key)
+                    if ex_d:
+                        familias_proibidas.add(ex_d.get("variacao_de") or ex_d["nome"])
+
+    # Pesos da UI antiga (mesma calibração da Frente C/D)
+    aluno_obj_csp = next((a for a in carregar_alunos() if a["nome"] == aluno_nome), None) if aluno_nome else None
+    nivel_csp = _nivel_aluno_csp(aluno_obj_csp)
+    peso_aderencia = _peso_aderencia_csp(aluno_obj_csp)
+    peso_evitar_agon = _PESO_EVITAR_AGONISTAS_DEFAULT if evitar_agon else 0
+    tam_pref = tam_bloco if tam_bloco in (1, 2, 3) else 2
+    peso_tam = _PESO_TAMANHO_BLOCO_DEFAULT if tam_bloco in (1, 2, 3) else 0
+
+    resultado_csp = gerar_rotina_csp(
+        demandas_por_treino, banco_gerar, nivel_aluno=nivel_csp,
+        seed=random.randint(0, 2**31 - 1),
+        variedade=ConfigVariedade(),
+        peso_aderencia=peso_aderencia,
+        peso_evitar_agonistas=peso_evitar_agon,
+        tamanho_preferido=tam_pref,
+        peso_tamanho_bloco=peso_tam,
+        travados_por_treino=travados_por_treino or None,
+        familias_proibidas=familias_proibidas or None,
+        relaxar_familia=relaxar_familia,
+        cargas_config=cargas_config or None,
+    )
+
+    if resultado_csp.get("viavel"):
+        sessoes_ativas = [
+            _treino_dict_csp_pra_sessao(t_dict, _tipo_label_da_cfg(all_configs[ti]))
+            for ti, t_dict in enumerate(resultado_csp.get("treinos", []))
+        ]
+        _distribuir_avisos_rotina_csp(resultado_csp, sessoes_ativas, demandas_por_treino)
+    else:
+        # Motor CSP inviável (mesmo após retry de relaxar_familia). Devolve
+        # N treinos vazios com aviso global no treino 0 — preserva o shape
+        # de sessoes_ativas pra UI não quebrar.
+        sessoes_ativas = []
+        for ti, cfg in enumerate(all_configs):
+            s_vazia = Sessao(tipo=_tipo_label_da_cfg(cfg), blocos=[])
+            s_vazia.avisos = []
+            s_vazia.relaxados = []
+            sessoes_ativas.append(s_vazia)
+        if sessoes_ativas:
+            sessoes_ativas[0].avisos.append({
+                "tipo": "h_r1_degradado",
+                "subregiao": "(rotina inteira)",
+                "eixo": "",
+                "motivo": f"motor CSP inviável (status={resultado_csp.get('status')}); ajuste as demandas ou filtros",
+            })
 
     # Calcula avisos cedo (antes de qualquer redirect contextual) para podermos
     # stashar em session quando a rota redireciona pro HUB (substituir/adicionar/nova_rotina).

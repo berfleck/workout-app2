@@ -13,14 +13,14 @@ linha de "o que entregou" + 1 linha de "próximo bloqueio se houver".
 
 ---
 
-## Estado das branches (2026-05-25)
+## Estado das branches (2026-05-26)
 
 Pós-instituição da disciplina de merge (seção abaixo): branches mergeadas
 em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 
 ```
-main  ← inclui Fatias 1-4.E (Bloco 1 completo) + Frente E.0 (Bloco 2)
- └─ micro-h-a1  ✅ ← atual (a mergear em main após aprovação Bernardo)
+main  ← inclui Fatias 1-4.E (Bloco 1 completo) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5)
+ └─ frente-e-1  ✅ ← atual (a mergear em main após aprovação Bernardo)
 ```
 
 ---
@@ -43,6 +43,7 @@ main  ← inclui Fatias 1-4.E (Bloco 1 completo) + Frente E.0 (Bloco 2)
 | Fatia 4.E cargas | H-cargas par-a-par no bloco + graceful degradation por bloco | `logs/mvp_fatia_4e_cargas_config.md` |
 | Frente E.0 | Harness comparativo CSP × antigo (7 métricas, relatório markdown) | `logs/frente_e0_harness_comparativo.md` |
 | Micro-frente H-A1 | Âncoras obrigatórias por subregião (cross-treino, graceful degradation, constraint colaborativa em conflito de cardinalidade) | `logs/micro_h_a1_ancoras_subregiao.md` |
+| Frente E.1 | `/gerar` chamando `gerar_rotina_csp` (clean break do motor antigo); adapter rotina-inteira (`_distribuir_avisos_rotina_csp` + helpers); modal de avisos ganha clauses `h_a1_degradado` + `h_r1_degradado`; toggle R-1 wirado como `familias_proibidas` hard cross-rotina | `logs/frente_e1_substituir_gerar.md` |
 
 ---
 
@@ -75,10 +76,7 @@ Pré-requisito: Frente E.0 (concluída).
 
 Pré-requisito: Bloco 2.5 (H-A1) ✅ + Frente E.0 com relatório aprovado pelo Bernardo.
 
-- **⬜ Frente E.1** — substituir `/gerar` pelo motor CSP. Opções:
-  - **Clean break** (alinha com norte.md Seção 5 "sem usuários = sem retrocompat"): remover motor antigo da rota direta. Branch git preservada conforme Seção 4 do norte.
-  - **Flag de transição** (curto prazo): manter motor antigo via `?motor=legacy` ou checkbox durante período de validação clínica.
-  - Decisão pós-relatório E.0 + H-A1 fechada.
+- **✅ Frente E.1** — `/gerar` chama `gerar_rotina_csp` SEMPRE (2026-05-26). Clean break, sem flag de transição (decisão fechada na sessão; alinha com norte Seção 5). `_regerar_motor_legacy` helper preservado em `app_flask.py` pra rollback rápido se necessário, mas não chamado em runtime. Mapeamento direto das opções da UI antiga pros parâmetros do CSP — espelha o que `/regerar` (Frente C+D+4.B+4.C+4.D+4.E) já fazia por treino, mas pra rotina inteira. Toggle `usar_historico_r1` wirado como `familias_proibidas` hard cross-rotina (substituto temporário do score soft D3.3 do antigo; S-H1 do Bloco 4 traz o soft de volta). Modal `_avisos_modal.html` ganha 2 clauses (`h_a1_degradado` + `h_r1_degradado`) — cobre tanto E.1 quanto a Frente C que populava sem renderizar desde 2026-05-23. Smoke E2E Full Body 2T OK; pytest +21 testes (318 total); harness 16/16 OK. Bíceps família única continua NO-OP estrutural (cadastro futuro de `Rosca martelo`/`Rosca direta` resolve). Lentidão ABC 3T (~25s/rotina) inalterada — otimização fica pra Bloco 4 se UI sentir. Detalhes em `logs/frente_e1_substituir_gerar.md`.
 
 ### Bloco 4 — Refinamentos pós-E.1 (não bloqueiam produção)
 
