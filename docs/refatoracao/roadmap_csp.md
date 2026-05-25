@@ -82,6 +82,13 @@ Pré-requisito: Bloco 2.5 (H-A1) ✅ + Frente E.0 com relatório aprovado pelo B
 
 Cada item independente; entram conforme prioridade clínica observada.
 
+**Itens prioritários** (achados de auditoria clínica 2026-05-25 — Full Body 2T com demanda nível região via UI; ver "Auditoria clínica pós-E.1" abaixo):
+
+- **⬜ H-A2 — âncoras obrigatórias por REGIÃO** — extensão da H-A1 pra demanda nível `regiao`. Hoje quando UI manda `("regiao", "upper", N)` o CSP cicla pelas subregiões de upper sem garantir cobertura mínima de movimentos básicos (puxar/empurrar/composto). Achado empírico: Full Body 2T com `upper(3) + lower(3) + core(2)` gerou 16 ex sem nenhuma costas e sem nenhum squat (zero puxadas/remadas, quadríceps só via Cadeira Extensora). Modelar como "região X com qtd N ⇒ pelo menos K vagas em subregiões âncora curadas" (ex: upper ⇒ costas obrigatória; lower com N≥3 ⇒ perna_anterior com âncora composta obrigatória). Graceful degradation análoga à H-A1 (conflito de cardinalidade, pool vazio).
+- **⬜ Gate de avaliação clínica semântica** — pré-requisito do Bloco 5. Antes de mergear cadastros completos ou desligar motor antigo, instituir prática de gerar 5-10 rotinas por config representativa (incluindo nível região da UI real), Bernardo lê como PT, e cada achado vira: (a) constraint nova no catálogo, (b) métrica nova no harness E.0, ou (c) decisão consciente de "tolerável". Saída: doc `auditorias/<data>_<config>.md` por rodada. Cobre o gap entre conformidade declarada (pytest + harness) e adequação clínica em uso real — vide anti-padrão norte Seção 7. **Caiu na E.1**: 318 testes verdes não pegaram zero-costas-zero-squat porque nenhuma métrica do harness E.0 mede cobertura semântica do repertório.
+
+**Demais refinamentos** (ordem não prioritária):
+
 - **⬜ S-B2** — balanço de carga implícita (core + lombar + grip + neural por bloco). Exige cadastrar `demanda_lombar` no XLSX.
 - **⬜ S-B3** — fadiga prévia no bloco (máquina tolera mais que livre). Exige cadastrar `estabilidade_externa` no XLSX.
 - **⬜ Centralidade Compostos** (2ª dimensão do vetor de perfil). Depende de S-T2 ou S-T3 implementadas (não existem no CSP ainda).
@@ -100,9 +107,48 @@ Cada item independente; entram conforme prioridade clínica observada.
 - **⬜ H-X** — restrições físicas/dor sobre pool (filtros hard por aluno).
 - **⬜ Captura de rationale no motor CSP** — destrava UI `/decisoes` pra treinos CSP (hoje mostra mensagem amber). Análogo à Etapa 8 Explicabilidade do antigo.
 
+### Auditoria clínica pós-E.1 (registro do achado 2026-05-25)
+
+Rotina gerada via `tools/criar_aluno_e_rotina_teste.py` (seed=42, aluno
+nivel=intermediario/aderencia=media, demandas `regiao upper(3) + lower(3)
++ core(2)` em 2 treinos). CSP devolveu OPTIMAL em 0.29s, 16 ex sem
+violação de constraints declaradas.
+
+**Achados clínicos** (visão PT):
+
+1. **🔴 Zero exercícios de costas em 16 slots** — push/pull desbalanceado;
+   intermediário em Full Body 2x não deveria entrar nessa rotina.
+2. **🔴 Zero squat em 6 slots de lower** — quadríceps só via knee_extension
+   isolado.
+3. **🟡 Blocos A de abertura sem composto** — T2 abre com Side Clams
+   (fad 1 cpx 1) + Ponte Uni Caixa (fad 1 cpx 2); SNC alto na posição
+   errada da carga neural.
+
+**Diagnóstico técnico:** H-A1 (Micro-frente Bloco 2.5) só dispara em
+demanda nível subregião. Demanda nível região passa pela enumeração de
+subregiões sem âncora — CSP cicla pelo S-B1/aderência/cycling fairness
+mas nenhum desses tem semântica de "cobrir repertório básico". UI real
+manda nível região por default (Full Body), então o vazio aparece em
+uso real.
+
+**Diagnóstico metodológico:** 318 testes do pytest + 16 cenários do
+harness antigo + 7 métricas da E.0 medem **conformidade às constraints
+declaradas**, não **adequação clínica da rotina entregue**. Antipadrão
+do norte Seção 7 caiu apesar de documentado. Bloqueio nasce porque cada
+fatia fecha com gates verdes e sensação de progresso — progresso era em
+conformidade, não em qualidade do produto.
+
+**Ações:**
+- H-A2 e gate de avaliação clínica entram como itens prioritários do
+  Bloco 4 (acima).
+- Suspeitas a confirmar com mais rodadas de auditoria: distribuição de
+  fadiga acumulada por treino, ordem composto→isolado no bloco, volume
+  por região na rotina, acoplamento volume/intensidade emergente.
+
 ### Bloco 5 — Estado-alvo final
 
-Pré-requisitos: Bloco 3 (E.1) + cadastros completos no XLSX.
+Pré-requisitos: Bloco 3 (E.1) + cadastros completos no XLSX + gate de
+avaliação clínica do Bloco 4 com pelo menos 1 rodada arquivada.
 
 - **⬜ Dashboard quantitativo** (passo 5 do fluxo) — script que roda N=1000+ rotinas por config representativa, mede aderência aos princípios clínicos + variação por perfil, permite calibrar pesos com dados.
 - **⬜ Cadastros XLSX completos** — `estabilidade_externa`, `demanda_lombar`, mais o que cadastros futuros pedirem.
