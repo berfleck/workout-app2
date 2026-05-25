@@ -8,6 +8,7 @@
 #   - H-T3 (lateralidade contextual em costas) [Fatia 2 P2]
 #   - H-T4 (vaga única na subregião ⇒ tier ≠ Acessório) [Fatia 1]
 #   - H-R1 (cobertura de eixos via compostos cross-treino) [Fatia 2 P2]
+#   - H-A1 (âncoras obrigatórias por subregião) [Micro-frente H-A1, 2026-05-25]
 #   - H-P1 (nível técnico do aluno filtra pool por complexidade) [Fatia 1]
 #   - S-T1 (tier-order: tier alto antes de tier baixo na ordem do treino) [Fatia 1]
 # Filtra: ativo=True no load (gerador_treino.carregar_banco descarta).
@@ -36,6 +37,7 @@ from gerador_treino import (
     GRUPO_MUSCULAR_PADRAO,  # Fatia 4.B: agrupamento push/pull/quad/... pro S-B1
     XLSX_PATH,
     _padroes_de_escopo,  # Fatia 4.D: expande escopo de demanda → padrões cobertos
+    ANCORAS_POR_SUBREGIAO,  # Micro-frente H-A1: âncoras obrigatórias por subregião
 )
 # H-T3 reusa a configuração canônica de subregiões com lateralidade hard.
 from pesos_proximidade import SUBREGIOES_LATERALIDADE_HARD
@@ -478,6 +480,11 @@ def _construir_modelo(
       - assign: dict[(sid, cidx)] -> BoolVar
       - slots_globais, treinos, grupo_por_idx: metadados pra decodificação
       - h_r1_aplicadas: lista de aplicações H-R1 com flag degraded
+      - h_a1_aplicadas: lista de aplicações H-A1 (âncoras obrigatórias por
+        subregião). Cada entrada `{subregiao, padrao_obrigatorio, n_termos,
+        n_slots, degraded, motivo?}`. `degraded=True` quando constraint foi
+        pulada (pool vazio pós-H-P1) ou aplicada via constraint colaborativa
+        de conflito de cardinalidade (`vagas < n_obrig_efetivo`).
       - penalidades: list[IntVar] de S-T1 + Aderência (quando peso > 0)
         + S-B1 (quando peso_evitar_agonistas > 0).
         Caller decide se vira `Minimize(sum(penalidades))` (legacy + Phase 1)
@@ -789,6 +796,103 @@ def _construir_modelo(
                     "motivo": "pool sem candidato (provavelmente filtrado por H-P1)",
                 })
 
+    # ── H-A1 (HARD cross-treino): âncoras obrigatórias por subregião ────────
+    # Para cada demanda EXPLÍCITA `("subregiao", X, qtd)` com qtd >= 1 e X em
+    # ANCORAS_POR_SUBREGIAO, pra cada âncora com `obrigatoria=True`, exigir
+    # ≥1 slot da rotina (cross-treino) com `padrao == âncora.padrao`.
+    #
+    # Decisões fechadas (handoff 2026-05-25):
+    # - NÃO ativa em demanda nível padrão (usuário pediu o padrão; respeitar).
+    # - NÃO ativa em demanda nível regiao (slot sem subregião determinística
+    #   pré-solver — mesma regra do H-R1).
+    # - Cross-treino: vagas = total de slots da subregião X em TODAS as
+    #   demandas explícitas da rotina (independente do treino).
+    # - Conflito cardinalidade (vagas < n_obrigatorias com pool viável):
+    #   constraint colaborativa `sum(obrig_usada) >= vagas` força N obrigatórias
+    #   DISTINTAS a aparecer; solver decide quais. Replica o `random.sample`
+    #   do antigo (`calcular_quotas` quando vagas < n_obrig) declarativamente.
+    # - Graceful degradation por pool vazio (espelha H-R1): se nenhum candidato
+    #   da âncora obrigatória sobrar pós-H-P1, constraint daquela âncora é
+    #   pulada e marcada `degraded=True` no resultado.
+    h_a1_aplicadas: list[dict] = []
+    slots_subregiao_explicita: dict[str, list[int]] = defaultdict(list)
+    for grupos_t in treinos:
+        for g in grupos_t:
+            nivel, escopo, _qtd = g["demanda"]
+            if nivel == "subregiao" and escopo in ANCORAS_POR_SUBREGIAO:
+                slots_subregiao_explicita[escopo].extend(g["slot_ids"])
+
+    for sub, sids in slots_subregiao_explicita.items():
+        if not sids:
+            continue
+        obrigatorias = [
+            a for a in ANCORAS_POR_SUBREGIAO[sub] if a.get("obrigatoria")
+        ]
+        if not obrigatorias:
+            continue
+
+        # Coleta termos por âncora obrigatória (cross-treino).
+        termos_por_obrig: list[tuple[str, list]] = []
+        for ancora in obrigatorias:
+            pad = ancora["padrao"]
+            termos = []
+            for sid in sids:
+                pool = slot_por_sid[sid]["pool_slot"]
+                for cidx, ex in enumerate(pool):
+                    if ex.padrao == pad:
+                        termos.append(assign[(sid, cidx)])
+            termos_por_obrig.append((pad, termos))
+
+        ativas = [(p, t) for p, t in termos_por_obrig if t]
+        degradadas_pool = [p for p, t in termos_por_obrig if not t]
+
+        # Avisos de degraded-por-pool (constraint daquela âncora é pulada).
+        for pad in degradadas_pool:
+            h_a1_aplicadas.append({
+                "subregiao": sub, "padrao_obrigatorio": pad,
+                "n_termos": 0, "n_slots": len(sids),
+                "degraded": True,
+                "motivo": "pool sem candidato (provavelmente filtrado por H-P1)",
+            })
+
+        if not ativas:
+            continue
+
+        vagas = len(sids)
+        n_ativas = len(ativas)
+
+        if vagas >= n_ativas:
+            # Caso normal: 1 constraint por âncora obrigatória ativa.
+            for pad, termos in ativas:
+                model.Add(sum(termos) >= 1)
+                h_a1_aplicadas.append({
+                    "subregiao": sub, "padrao_obrigatorio": pad,
+                    "n_termos": len(termos), "n_slots": vagas,
+                    "degraded": False,
+                })
+        else:
+            # Conflito de cardinalidade (vagas < n_obrig efetivas):
+            # constraint colaborativa "vagas obrigatórias DISTINTAS devem
+            # aparecer". Cria BoolVar `obrig_usada_X` reificada com
+            # `sum(termos_X) >= 1`; soma >= vagas força N obrig distintas.
+            obrig_usadas_vars = []
+            for pad, termos in ativas:
+                usada = model.NewBoolVar(f"ha1_usada_{sub}_{pad}")
+                model.Add(sum(termos) >= 1).OnlyEnforceIf(usada)
+                model.Add(sum(termos) == 0).OnlyEnforceIf(usada.Not())
+                obrig_usadas_vars.append(usada)
+            model.Add(sum(obrig_usadas_vars) >= vagas)
+            motivo_conflito = (
+                f"conflito_cardinalidade vagas={vagas}<n_obrig_efetivo={n_ativas}"
+            )
+            for pad, termos in ativas:
+                h_a1_aplicadas.append({
+                    "subregiao": sub, "padrao_obrigatorio": pad,
+                    "n_termos": len(termos), "n_slots": vagas,
+                    "degraded": True,
+                    "motivo": motivo_conflito,
+                })
+
     # ── S-T1 (SOFT, Fatia 4.A reformulada): tier-order por BLOCO no treino ──
     # Antes (pré-4.A): pares (i,j) dentro de cada grupo de demanda, ordem dos
     # slots na lista. Agora: pares (s1, s2) no mesmo treino, ordem definida
@@ -997,6 +1101,11 @@ def _construir_modelo(
         "treinos": treinos,
         "grupo_por_idx": grupo_por_idx,
         "h_r1_aplicadas": h_r1_aplicadas,
+        # Micro-frente H-A1: lista de aplicações de âncoras obrigatórias por
+        # subregião (análoga a h_r1_aplicadas, com flag `degraded` e motivo
+        # quando a constraint daquela âncora foi pulada por pool vazio ou
+        # conflito de cardinalidade).
+        "h_a1_aplicadas": h_a1_aplicadas,
         "penalidades": penalidades,
         # Fatia 4.A: vars estruturais de bloco — caller usa pra decodificar
         # blocos da solução (via solver.Value(bloco_idx[s])).
@@ -1313,6 +1422,9 @@ def gerar_rotina_csp(
         `inversoes_totais` (soma cross-treino de S-T1).
       - `treinos: list[dict]` — cada treino tem `grupos`, `ordem_global`.
       - `h_r1_aplicadas`: lista de aplicações H-R1 (com flag degraded).
+      - `h_a1_aplicadas`: lista de aplicações H-A1 (âncoras obrigatórias por
+        subregião). Análoga a `h_r1_aplicadas` — degraded=True quando pool
+        vazio (pulada) ou conflito de cardinalidade (constraint colaborativa).
       - `variedade` (só quando ConfigVariedade ativa): metadados da
         enumeração (n_solucoes, distancia_escolhida, optimal_value,
         enumeracao_limitada, tempo por fase).
@@ -1431,6 +1543,7 @@ def _resolver_legacy(
             if (md["penalidades"] and viavel) else 0
         ),
         "h_r1_aplicadas": md["h_r1_aplicadas"],
+        "h_a1_aplicadas": md["h_a1_aplicadas"],
         "treinos": [],
         "avisos_carga_por_treino": {},
     }
@@ -1529,6 +1642,7 @@ def _resolver_com_variedade(
             "solve_time": time_p1,
             "inversoes_totais": 0,
             "h_r1_aplicadas": md1["h_r1_aplicadas"],
+            "h_a1_aplicadas": md1["h_a1_aplicadas"],
             "treinos": [],
             "avisos_carga_por_treino": {},
             "variedade": _meta_variedade(variedade, n=0, dist=None, opt=None,
@@ -1672,6 +1786,7 @@ def _resolver_com_variedade(
         "solve_time": time_p1 + time_p2,
         "inversoes_totais": chosen_inv,
         "h_r1_aplicadas": md2["h_r1_aplicadas"],
+        "h_a1_aplicadas": md2["h_a1_aplicadas"],
         "treinos": _decode_solucao(
             md2["treinos"], chosen_sol, chosen_blocos,
             slot_por_sid=md2["slot_por_sid"],
@@ -1802,6 +1917,7 @@ def gerar_treino_csp(
             "grupos": [],
             "ordem_global": [],
             "avisos_carga": [],
+            "h_a1_aplicadas": rotina.get("h_a1_aplicadas", []),
         }
         if "variedade" in rotina:
             out["variedade"] = rotina["variedade"]
@@ -1819,6 +1935,7 @@ def gerar_treino_csp(
         # Fatia 4.A: propaga blocos pra o adapter consumir.
         "blocos": t0.get("blocos", []),
         "h_r1_aplicadas": rotina["h_r1_aplicadas"],
+        "h_a1_aplicadas": rotina.get("h_a1_aplicadas", []),
         # Fatia 4.E: lista de nomes relaxados deste treino (treino_idx=0).
         "relaxados": rotina.get("relaxados_por_treino", {}).get(0, []),
         "relax_ativado": rotina.get("relax_ativado", False),

@@ -13,14 +13,14 @@ linha de "o que entregou" + 1 linha de "próximo bloqueio se houver".
 
 ---
 
-## Estado das branches (2026-05-24)
+## Estado das branches (2026-05-25)
 
 Pós-instituição da disciplina de merge (seção abaixo): branches mergeadas
 em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 
 ```
 main  ← inclui Fatias 1-4.E (Bloco 1 completo) + Frente E.0 (Bloco 2)
- └─ frente-e0-harness-comparativo  ✅ ← atual (a mergear em main)
+ └─ micro-h-a1  ✅ ← atual (a mergear em main após aprovação Bernardo)
 ```
 
 ---
@@ -42,6 +42,7 @@ main  ← inclui Fatias 1-4.E (Bloco 1 completo) + Frente E.0 (Bloco 2)
 | Fatia 4.E | relaxar_familia (familias_proibidas motor-side + retry 2 fases) | `logs/mvp_fatia_4e_relaxar_familia.md` |
 | Fatia 4.E cargas | H-cargas par-a-par no bloco + graceful degradation por bloco | `logs/mvp_fatia_4e_cargas_config.md` |
 | Frente E.0 | Harness comparativo CSP × antigo (7 métricas, relatório markdown) | `logs/frente_e0_harness_comparativo.md` |
+| Micro-frente H-A1 | Âncoras obrigatórias por subregião (cross-treino, graceful degradation, constraint colaborativa em conflito de cardinalidade) | `logs/micro_h_a1_ancoras_subregiao.md` |
 
 ---
 
@@ -68,11 +69,11 @@ Pré-requisito: nenhum. Podem entrar em qualquer ordem ou paralelo.
 
 Pré-requisito: Frente E.0 (concluída).
 
-- **⬜ Micro-frente H-A1** — modelar âncoras obrigatórias por subregião no motor CSP. Bug bloqueador identificado pela Frente E.0: sem H-A1, demandas nível subregião (`("subregiao", "X", qtd)`) violam padrões obrigatórios em até 100% das rotinas em treinos push-pesados (`ombro_composto` 100% violado em ABC Day A, `biceps` 100% violado em Day B, `hinge` 16% violado em Day C). Causa raiz diagnosticada (sondagem 50 runs com `peso_evitar_agonistas=0`): solver minimiza S-B1 escolhendo padrões cross-grupo (ex: `posterior_ombro` pull em treino push) em vez de respeitar âncora obrigatória do antigo. Spec executável: `catalogo_constraints.md` seção H-A1. Implementação: estender `_construir_modelo` em `gerador_csp.py` pra ler `ANCORAS_POR_SUBREGIAO` (gerador_treino.py — fonte canônica) quando demanda é nível subregião, e exigir ≥1 slot da rotina com padrão obrigatório por âncora. Graceful degradation espelha H-R1/H-T4 (pula constraint quando pool não tem candidato pós-H-P1, marca `degraded=True`). Sem mexer em UI, banco ou catálogo soft.
+- **✅ Micro-frente H-A1** — âncoras obrigatórias por subregião modeladas no motor CSP (2026-05-25). Constraint hard cross-treino exige `padrao == âncora.padrao` para cada `obrigatoria=True` por subregião quando demanda é `("subregiao", X, qtd)` com X em `ANCORAS_POR_SUBREGIAO`. Graceful degradation por pool vazio (espelha H-R1/H-T4). Conflito de cardinalidade (vagas < n_obrig efetivas, ex: `bracos(1)`): constraint colaborativa força N obrigatórias DISTINTAS via BoolVar reificada — replica `random.sample` do antigo declarativamente. NÃO ativa em demanda nível padrão nem regiao (decisões fechadas no handoff). Resultado: `ombro_composto` violado 100%→0% em ABC Day A; `biceps` 100%→0% em Day B; `hinge` 16%→0% em Day C; outras configs sem regressão. Wins do CSP preservados (H-R1 costas, overlap R-1). Trade-off: ABC 3T agora ~25s/rotina (era 4.8s); aceitável pra hobby app, otimização fica pra Bloco 4 se UI sentir. Pytest +13 testes novos; baseline preservado (1 teste estatístico ganhou tolerância +1.0/20 — alpha_tier perdeu sensibilidade pós-H-A1 pois slots de tier alto têm padrão agora fixo). Detalhes em `logs/micro_h_a1_ancoras_subregiao.md` + relatório `relatorios/E0_2026-05-25_pos_h_a1.md`.
 
 ### Bloco 3 — Frente E.1 (substituir `/gerar`)
 
-Pré-requisito: Bloco 2.5 (H-A1) + Frente E.0 com relatório aprovado pelo Bernardo.
+Pré-requisito: Bloco 2.5 (H-A1) ✅ + Frente E.0 com relatório aprovado pelo Bernardo.
 
 - **⬜ Frente E.1** — substituir `/gerar` pelo motor CSP. Opções:
   - **Clean break** (alinha com norte.md Seção 5 "sem usuários = sem retrocompat"): remover motor antigo da rota direta. Branch git preservada conforme Seção 4 do norte.
