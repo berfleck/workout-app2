@@ -144,6 +144,12 @@ class AgregadoMotor:
     # antigo fica em 0). Métrica auxiliar — alto = motor está degradando
     # H-A0 com frequência (pool/cardinalidade).
     degradacoes_ha0_media: float = 0.0
+    # Frente S-A1 (2026-05-25): distribuição de combinações de padrões em
+    # demandas `(subregiao, X, 2)`. `{(treino_idx, sub): Counter({combo: n})}`.
+    # Aplicável apenas quando config tem ao menos uma demanda subregião(2).
+    distribuicao_subregiao_2: dict[tuple[int, str], Counter] = field(
+        default_factory=dict
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +278,15 @@ def _peso_tam_bloco_csp() -> int:
     return 5
 
 
+# Frente S-A1 (2026-05-25): pesos calibrados em produção via
+# `app_flask._PESO_SA1_DEFAULT` e `_PESO_SA1_REPET_DEFAULT`.
+# Harness reflete o uso real do motor; bater esses valores aqui é
+# necessário pra métrica `distribuicao_subregiao_2` representar a
+# realidade pos-merge.
+_PESO_SA1_HARNESS = 12
+_PESO_SA1_REPET_HARNESS = 10
+
+
 def rodar_csp(config: ConfigComum, perfil: PerfilAluno,
               banco: list[Exercicio], seed: int) -> RunResult:
     inicio = time.perf_counter()
@@ -289,6 +304,8 @@ def rodar_csp(config: ConfigComum, perfil: PerfilAluno,
             tamanho_preferido=config.tamanho_bloco,
             peso_tamanho_bloco=_peso_tam_bloco_csp(),
             relaxar_familia=config.relaxar_familia,
+            peso_sa1=_PESO_SA1_HARNESS,
+            peso_sa1_repet=_PESO_SA1_REPET_HARNESS,
         )
     except Exception as exc:  # noqa: BLE001
         elapsed = (time.perf_counter() - inicio) * 1000.0
@@ -595,6 +612,55 @@ def metrica_degradacoes_ha0_media(
     return total / len(runs_viaveis)
 
 
+def metrica_distribuicao_subregiao_2(
+    rotinas: list[list[list[list[Exercicio]]]],
+    config: ConfigComum,
+) -> dict[tuple[int, str], Counter]:
+    """Distribuição de combinações de padrões em demandas `(subregiao, X, 2)`.
+
+    Mede o achado da Frente S-A1: ombro(2) saía 100% (composto + posterior_ombro)
+    no CSP pré-S-A1 — ZERO ombro_isolado. Pós-S-A1 espera-se voltar a (composto
+    + isolado) consumindo o peso curado 3/2/1 da `ANCORAS_POR_SUBREGIAO`.
+
+    Retorna `{(treino_idx, subregiao): Counter({combo: n_rotinas})}` onde
+    `combo = "+".join(sorted([padrao_s1, padrao_s2]))`.
+
+    Aplicável apenas quando a config tem demandas `("subregiao", X, 2)`. Em
+    demanda região ou demanda subregião com qtd != 2, não conta. Métrica
+    intencionalmente focada — sondagem mais ampla via
+    `tools/sondar_sa1_baseline.py`.
+    """
+    out: dict[tuple[int, str], Counter] = defaultdict(Counter)
+    if not rotinas:
+        return {}
+    # Pre-coleta: pra cada treino, lista de (sub, qtd) com qtd==2.
+    demandas_alvo_por_treino: dict[int, list[str]] = defaultdict(list)
+    for t_idx, dems in enumerate(config.demandas_por_treino):
+        for nv, esc, qt in dems:
+            if nv == "subregiao" and qt == 2:
+                demandas_alvo_por_treino[t_idx].append(esc)
+    if not demandas_alvo_por_treino:
+        return {}
+    for rotina in rotinas:
+        for t_idx, treino in enumerate(rotina):
+            alvos = demandas_alvo_por_treino.get(t_idx, [])
+            if not alvos:
+                continue
+            # Coleta exercícios deste treino por subregião.
+            ex_por_sub: dict[str, list[Exercicio]] = defaultdict(list)
+            for bloco in treino:
+                for ex in bloco:
+                    ex_por_sub[ex.subregiao].append(ex)
+            for sub in alvos:
+                exs = ex_por_sub.get(sub, [])
+                if len(exs) != 2:
+                    # Demanda não cumprida (raro pós-H-A1, mas defensivo).
+                    continue
+                combo = "+".join(sorted(e.padrao for e in exs))
+                out[(t_idx, sub)][combo] += 1
+    return dict(out)
+
+
 def metrica_cycling_fairness(
     rotinas: list[list[list[list[Exercicio]]]],
     config: ConfigComum,
@@ -651,6 +717,7 @@ def agregar(motor: str, runs: list[RunResult],
         cycling = metrica_cycling_fairness(rotinas, config)
         cobertura_ha0 = metrica_cobertura_ha0_por_treino(rotinas, config)
         degrad_ha0 = metrica_degradacoes_ha0_media(viaveis)
+        distrib_sub_2 = metrica_distribuicao_subregiao_2(rotinas, config)
     else:
         rotinas_distintas = 0
         overlap_pct = 0.0
@@ -661,6 +728,7 @@ def agregar(motor: str, runs: list[RunResult],
         cycling = {}
         cobertura_ha0 = {}
         degrad_ha0 = 0.0
+        distrib_sub_2 = {}
 
     return AgregadoMotor(
         motor=motor,
@@ -677,6 +745,7 @@ def agregar(motor: str, runs: list[RunResult],
         cycling_distribuicao=cycling,
         cobertura_ha0_por_treino=cobertura_ha0,
         degradacoes_ha0_media=degrad_ha0,
+        distribuicao_subregiao_2=distrib_sub_2,
     )
 
 
@@ -761,6 +830,34 @@ def _render_ancoras(anc_csp: dict, anc_antigo: dict) -> list[str]:
             f"{_pct(csp) if csp is not None else '—'} | "
             f"{_pct(ant) if ant is not None else '—'} |"
         )
+    return linhas
+
+
+def _render_distribuicao_subregiao_2(
+    csp: dict[tuple[int, str], Counter],
+    antigo: dict[tuple[int, str], Counter],
+) -> list[str]:
+    """Tabela: pra cada (treino, sub) com demanda(2), mostra combos lado a
+    lado dos 2 motores, ordenados por frequência no antigo."""
+    chaves = sorted(set(csp.keys()) | set(antigo.keys()))
+    if not chaves:
+        return ["_(config sem demandas `subregiao(X, 2)`)_"]
+    linhas = [
+        "| Treino+Sub | Motor | Combo (padrão+padrão) | % rotinas |",
+        "|---|---|---|---|",
+    ]
+    for t_idx, sub in chaves:
+        for motor, dat in (("CSP", csp.get((t_idx, sub))),
+                           ("Antigo", antigo.get((t_idx, sub)))):
+            if not dat:
+                continue
+            total = sum(dat.values())
+            for combo, qtd in sorted(dat.items(), key=lambda kv: -kv[1]):
+                pct = qtd / total
+                linhas.append(
+                    f"| T{t_idx+1} · {sub} | {motor} | `{combo}` | "
+                    f"{_pct(pct)} ({qtd}/{total}) |"
+                )
     return linhas
 
 
@@ -916,6 +1013,16 @@ def _render_config_secao(config: ConfigComum,
                                   config.n_treinos))
     linhas.append("")
 
+    # S-A1 — distribuição em demandas subregião(2). Frente S-A1 (2026-05-25).
+    if agr_csp.distribuicao_subregiao_2 or agr_antigo.distribuicao_subregiao_2:
+        linhas.append("### Distribuição em demandas subregião(2) — Frente S-A1")
+        linhas.append("")
+        linhas.extend(_render_distribuicao_subregiao_2(
+            agr_csp.distribuicao_subregiao_2,
+            agr_antigo.distribuicao_subregiao_2,
+        ))
+        linhas.append("")
+
     return "\n".join(linhas)
 
 
@@ -947,6 +1054,8 @@ def renderizar_relatorio(
     cabec.append("- Variedade INTRA-config (# distintas em N)")
     cabec.append("- Overlap R-1 (% slots iguais entre rotinas consecutivas)")
     cabec.append("- Cycling fairness (distribuição de padrão entre treinos)")
+    cabec.append("- **Distribuição em demandas subregião(2)** (% combos "
+                 "padrão+padrão — Frente S-A1, 2026-05-25)")
     cabec.append("- Tempo médio + p95 (pipeline completo)")
     cabec.append("- % inviabilidade (auxiliar)")
     cabec.append("")

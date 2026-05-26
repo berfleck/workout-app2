@@ -19,10 +19,10 @@ Pós-instituição da disciplina de merge (seção abaixo): branches mergeadas
 em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 
 ```
-main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5) + Frente E.1 (Bloco 3) + Micro-frente H-A0 (Bloco 4)
+main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5) + Frente E.1 (Bloco 3) + Micro-frente H-A0 + Frente S-A1 (Bloco 4)
 ```
 
-**Nenhuma branch ativa.** Próxima frente (S-A1) sai de `main` direto.
+**Branch ativa pra revisar/mergear**: `frente-s-a1` (aguarda aprovação Bernardo). Próxima frente sai de `main` direto após merge.
 
 ---
 
@@ -46,6 +46,7 @@ main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-
 | Micro-frente H-A1 | Âncoras obrigatórias por subregião (cross-treino, graceful degradation, constraint colaborativa em conflito de cardinalidade) | `logs/micro_h_a1_ancoras_subregiao.md` |
 | Frente E.1 | `/gerar` chamando `gerar_rotina_csp` (clean break do motor antigo); adapter rotina-inteira (`_distribuir_avisos_rotina_csp` + helpers); modal de avisos ganha clauses `h_a1_degradado` + `h_r1_degradado`; toggle R-1 wirado como `familias_proibidas` hard cross-rotina | `logs/frente_e1_substituir_gerar.md` |
 | Micro-frente H-A0 | Âncoras obrigatórias por REGIÃO (per-treino, banimento upstream de subs não-âncora, marker H-A0 → H-A1, graceful degradation pool vazio + conflito cardinalidade) | `logs/micro_h_a0_ancoras_regiao.md` |
+| Frente S-A1 | Distribuição entre âncoras não-obrigatórias (v1 linear sobre pesos curados 3/2/1 + v2 penalty padrão repetido). Resolve regressão CSP × antigo em ombro(2)/perna_posterior(2)/peito(2). Calibração peso_sa1=12 + peso_sa1_repet=10. Ativa em demanda subregião E região (via H-A0 marker). | `logs/frente_s_a1.md` |
 
 ---
 
@@ -91,7 +92,8 @@ Cada item independente; entram conforme prioridade clínica observada.
 
 **Demais refinamentos** (ordem não prioritária):
 
-- **⬜ S-A1 — distribuição entre âncoras não-obrigatórias** — soft que consome os pesos curados 3/2/1 da tabela `ANCORAS_POR_SUBREGIAO` (hoje ignorados no CSP). Achado empírico 2026-05-25 (pós-H-A0): demanda direta `ombro(2)` no CSP entrega 100% (composto + posterior_ombro) — ZERO ombro_isolado; antigo entrega 100% (composto + isolado) consumindo peso 2 vs peso 1. Mesma regressão em `perna_posterior(2)` (knee_flexion 0% no CSP vs ~48% no antigo). Decisões pré-handoff: (1) condicionado a "vagas > n_obrigatórias na subregião" pra isolar trade-off com S-B1 (Etapa 7 Fase 7.6 mostrou risco de canibalização de pesos); (2) S-B1 fora do escopo — refinamento separado; (3) validar Etapa 7-style coordinate descent antes de fechar peso. Spec executável → catálogo seção S-A1 (a criar).
+- **✅ Frente S-A1 — distribuição entre âncoras não-obrigatórias** (2026-05-25). Componente v1 (linear sobre pesos curados 3/2/1) + v2 (penalty padrão repetido na mesma demanda). Calibração: `peso_sa1=12` + `peso_sa1_repet=10`. Resolve regressão CSP × antigo: ombro(2) 100% comp+iso (era 0%), perna_post(2) 100% hinge+knee (era 0%), peito(2) 100% cmp+iso (era 55%). Ativa em demanda subregião direta (qtd>n_obrig) E em demanda região via marker H-A0 (decisão §5.2 / b). Em demanda região `lower(4)` hinge+hinge zerou (era 35% pre-S-A1, 70% com v1 sozinho). Trade-off documentado: abduction (peso 1) caiu pra 0% — comportamento correto pelo norte Seção 4. Pytest +14 (348 total). Achados bonus registrados pra frentes futuras: bug Filipe Santos (cobertura per-treino H-A1 marker), revisita peso curado abduction. Ver `logs/frente_s_a1.md`.
+- **⬜ Cobertura per-treino do H-A1 marker pós-H-A0** — achado bonus da Frente S-A1 (2026-05-25). Rotina ativa do aluno Filipe Santos (id=17, rotina `20260525_195735_bb15`) saiu com T1 sem `squat_bilateral` (apenas Recuo = `squat_unilateral`); T2 tem (Agachamento Goblet Rampa). H-A1 marker é cross-treino — garante ≥1 squat_bilateral na rotina inteira, não por treino. S-A1 NÃO resolve (squat_bilateral é obrigatória, não está em `nao_obrigatorias`). Solução prevista: espelhar H-A0 (per-treino) no H-A1 quando ativa via marker, OU refinar o marker pra agregar por (treino, padrão) em vez de só (sub).
 - **⬜ S-B2** — balanço de carga implícita (core + lombar + grip + neural por bloco). Exige cadastrar `demanda_lombar` no XLSX.
 - **⬜ S-B3** — fadiga prévia no bloco (máquina tolera mais que livre). Exige cadastrar `estabilidade_externa` no XLSX.
 - **⬜ Centralidade Compostos** (2ª dimensão do vetor de perfil). Depende de S-T2 ou S-T3 implementadas (não existem no CSP ainda).

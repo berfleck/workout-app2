@@ -396,6 +396,8 @@ def _construir_modelo(
     familias_proibidas: Optional[set[str]] = None,
     cargas_config: Optional[dict[str, int]] = None,
     peso_cargas_off: int = 1000,
+    peso_sa1: int = 0,
+    peso_sa1_repet: int = 0,
 ) -> dict:
     """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
     penalidades de S-T1, Aderência ao Tier, S-B1 distância funcional
@@ -1103,6 +1105,174 @@ def _construir_modelo(
                     "motivo": motivo_conflito,
                 })
 
+    # ── Lista compartilhada de penalidades do objetivo ──────────────────────
+    # Inicializada antes do bloco S-A1 (que pode adicionar termos) e
+    # consumida pelas seções S-T1/S-B1/S-B4/Aderência/cargas abaixo.
+    penalidades = []
+
+    # ── S-A1 (SOFT): distribuição entre âncoras NÃO-obrigatórias ────────────
+    # Consome o `peso` curado em ANCORAS_POR_SUBREGIAO (3/2/1) que H-A0/H-A1
+    # ignoram. Resolve regressão CSP vs antigo: `ombro(2)` saía 100% (composto +
+    # posterior_ombro) — ZERO `ombro_isolado` (vs antigo 100% composto + isolado);
+    # `perna_posterior(2)` saía 100% (hinge + abduction) — ZERO `knee_flexion`.
+    #
+    # Forma (decisão 5.1 do handoff S-A1, linear):
+    #   pen = (peso_max_nao_obrig(sub) - peso_da_ancora(padrão)) * peso_sa1
+    # Aplicado por SLOT × CANDIDATO. `assign[(sid, cidx)] == 0` anula custo;
+    # solver minimiza → vaga sobrando prefere padrão de peso alto.
+    #
+    # Ativação (decisões 4.1 + 5.2 do handoff S-A1):
+    #  - Caso 1 (demanda subregião EXPLÍCITA): condicionado a `qtd > n_obrig`
+    #    pra isolar trade-off com S-B1 (Etapa 7 Fase 7.6 canibalização de pesos).
+    #  - Caso 2 (demanda região via marker H-A0, decisão 5.2 / b "mais pronto"):
+    #    ativa SEMPRE pros candidatos não-obrig. Efeito "vagas-livres-only" é
+    #    automático: slot obrigatório tem assign=1 em obrig (cuja `padrao` não
+    #    está em `nao_obrigatorias`, custo skipado); slot livre que escolhe
+    #    não-obrig paga.
+    #
+    # peso_sa1=0 (default) skipa o bloco inteiro (preserva H-A0 byte-a-byte).
+    if peso_sa1 > 0:
+        sa1_dados_por_sub: dict[str, dict] = {}
+        for sub_, ancoras_ in ANCORAS_POR_SUBREGIAO.items():
+            nao_obrig_ = [a for a in ancoras_ if not a.get("obrigatoria")]
+            if not nao_obrig_:
+                continue
+            sa1_dados_por_sub[sub_] = {
+                "peso_max": max(a["peso"] for a in nao_obrig_),
+                "peso_por_padrao": {a["padrao"]: a["peso"] for a in nao_obrig_},
+                "n_obrig": sum(
+                    1 for a in ancoras_ if a.get("obrigatoria")
+                ),
+            }
+
+        # Caso 1: demanda subregião explícita. Sub fixa pre-solve; condicionar
+        # a `qtd > n_obrig` (decisão 4.1).
+        for grupos_t in treinos:
+            for g in grupos_t:
+                nv, esc, qt = g["demanda"]
+                if nv != "subregiao" or esc not in sa1_dados_por_sub:
+                    continue
+                dados = sa1_dados_por_sub[esc]
+                vagas_extras = qt - dados["n_obrig"]
+                if vagas_extras < 1:
+                    continue
+                peso_max = dados["peso_max"]
+                peso_por_padrao = dados["peso_por_padrao"]
+                for sid in g["slot_ids"]:
+                    pool = slot_por_sid[sid]["pool_slot"]
+                    for cidx, ex in enumerate(pool):
+                        if ex.padrao not in peso_por_padrao:
+                            continue
+                        custo = (peso_max - peso_por_padrao[ex.padrao]) * peso_sa1
+                        if custo <= 0:
+                            continue
+                        sa1 = model.NewIntVar(
+                            0, custo, f"sa1_sub_{esc}_{sid}_{cidx}",
+                        )
+                        model.Add(sa1 == custo * assign[(sid, cidx)])
+                        penalidades.append(sa1)
+
+        # Caso 2: demanda região (decisão 5.2 / b). Slot tem sub_idx variável;
+        # penalty atua via assign[(sid, cidx)] — se o candidato for escolhido,
+        # sua subregião e padrão são determinados, e penalty se materializa.
+        for (_t_idx, _R), sids_reg in slots_demanda_regiao_por_treino.items():
+            for sid in sids_reg:
+                pool = slot_por_sid[sid]["pool_slot"]
+                for cidx, ex in enumerate(pool):
+                    dados = sa1_dados_por_sub.get(ex.subregiao)
+                    if dados is None:
+                        continue
+                    peso = dados["peso_por_padrao"].get(ex.padrao)
+                    if peso is None:
+                        continue
+                    custo = (dados["peso_max"] - peso) * peso_sa1
+                    if custo <= 0:
+                        continue
+                    sa1 = model.NewIntVar(
+                        0, custo, f"sa1_reg_{ex.subregiao}_{sid}_{cidx}",
+                    )
+                    model.Add(sa1 == custo * assign[(sid, cidx)])
+                    penalidades.append(sa1)
+
+    # ── S-A1 v2 (SOFT): penaliza padrão repetido na mesma demanda ────────────
+    # Fecha o buraco arquitetural do S-A1 v1 (sondagem 2026-05-25):
+    #   S-A1 v1 só penaliza não-obrigatórias de peso baixo, mas o solver
+    #   pode escapar empatando com "repetir obrigatória" — `hinge+hinge`,
+    #   `composto+composto`. O componente v2 penaliza padrões iguais em
+    #   pares (slot_a, slot_b) da mesma demanda (subregião direta E região).
+    #
+    # Forma: pra cada par (s1, s2) dentro da MESMA demanda, BoolVar
+    # `same_padrao` reifica "padrão escolhido em s1 == padrão escolhido
+    # em s2". Penalty `peso_sa1_repet * same_padrao` no objetivo.
+    #
+    # Construção da BoolVar: pra cada padrão P possível no par, BoolVar
+    # `eq_P[s1,s2]` = `(sum(assign[s1, c] para c com pool[c].padrao==P) == 1
+    #                  AND sum(assign[s2, c] para c com pool[c].padrao==P) == 1)`.
+    # `same_padrao = OR(eq_P pra todo P)`. Equivalente a "existe um padrão
+    # P escolhido por ambos slots".
+    #
+    # Restrição de escopo: só aplica entre slots da MESMA demanda original
+    # (não cross-demanda no mesmo treino). Razão: 2 slots em demandas
+    # distintas (ex: `("padrao","squat",1)` + `("subregiao","perna_anterior",2)`)
+    # já são intencionalmente separados pela escolha do user; repetir
+    # padrão entre eles é decisão deles, não viés do solver.
+    #
+    # peso_sa1_repet=0 (default) skipa o bloco inteiro (preserva v1 byte-a-byte).
+    if peso_sa1_repet > 0:
+        for grupos_t in treinos:
+            for g in grupos_t:
+                sids_d = g["slot_ids"]
+                if len(sids_d) < 2:
+                    continue
+                # Coleta padrões possíveis nos pools dos slots desta demanda.
+                # Pra cada padrão P, lista de cidxs por slot.
+                padroes_por_slot: dict[int, dict[str, list[int]]] = {}
+                for sid in sids_d:
+                    pool = slot_por_sid[sid]["pool_slot"]
+                    pad_map: dict[str, list[int]] = defaultdict(list)
+                    for cidx, ex in enumerate(pool):
+                        pad_map[ex.padrao].append(cidx)
+                    padroes_por_slot[sid] = pad_map
+
+                for i in range(len(sids_d)):
+                    for j in range(i + 1, len(sids_d)):
+                        s1, s2 = sids_d[i], sids_d[j]
+                        pads_s1 = padroes_por_slot[s1]
+                        pads_s2 = padroes_por_slot[s2]
+                        # Padrões em comum entre os 2 pools.
+                        comuns = set(pads_s1.keys()) & set(pads_s2.keys())
+                        if not comuns:
+                            continue
+                        # BoolVar `same_padrao` = exists P: ambos escolheram P.
+                        eq_vars = []
+                        for pad in comuns:
+                            eq_p = model.NewBoolVar(
+                                f"sa1v2_eq_{pad}_{s1}_{s2}",
+                            )
+                            s1_em_P = sum(
+                                assign[(s1, c)] for c in pads_s1[pad]
+                            )
+                            s2_em_P = sum(
+                                assign[(s2, c)] for c in pads_s2[pad]
+                            )
+                            # eq_p ↔ (s1_em_P == 1 AND s2_em_P == 1)
+                            model.Add(s1_em_P + s2_em_P >= 2).OnlyEnforceIf(eq_p)
+                            model.Add(s1_em_P + s2_em_P <= 1).OnlyEnforceIf(eq_p.Not())
+                            eq_vars.append(eq_p)
+                        same_padrao = model.NewBoolVar(
+                            f"sa1v2_same_{s1}_{s2}",
+                        )
+                        # OR sobre todos os eq_p — same_padrao=1 se algum eq_p=1.
+                        model.AddBoolOr(eq_vars).OnlyEnforceIf(same_padrao)
+                        for eq_p in eq_vars:
+                            model.AddImplication(eq_p, same_padrao)
+                        # Penalty escalar.
+                        pen_repet = model.NewIntVar(
+                            0, peso_sa1_repet, f"sa1v2_pen_{s1}_{s2}",
+                        )
+                        model.Add(pen_repet == peso_sa1_repet * same_padrao)
+                        penalidades.append(pen_repet)
+
     # ── S-T1 (SOFT, Fatia 4.A reformulada): tier-order por BLOCO no treino ──
     # Antes (pré-4.A): pares (i,j) dentro de cada grupo de demanda, ordem dos
     # slots na lista. Agora: pares (s1, s2) no mesmo treino, ordem definida
@@ -1119,7 +1289,7 @@ def _construir_modelo(
     #     >= tier_rank[s1] - tier_rank[s2]  se gt
     # Pares no mesmo bloco (lt=0, gt=0) não geram viol.
     rank_max = max(TIER_RANK.values())
-    penalidades = []
+    # `penalidades` já inicializado acima (antes do bloco S-A1).
     for t_idx, sids_t in slots_por_treino.items():
         for i in range(len(sids_t)):
             for j in range(i + 1, len(sids_t)):
@@ -1601,6 +1771,8 @@ def gerar_rotina_csp(
     relaxar_familia: bool = False,
     cargas_config: Optional[dict[str, int]] = None,
     peso_cargas_off: int = 1000,
+    peso_sa1: int = 0,
+    peso_sa1_repet: int = 0,
 ) -> dict:
     """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
     negociam no mesmo modelo — necessário pra H-R1 cross-treino.
@@ -1670,6 +1842,8 @@ def gerar_rotina_csp(
                 familias_proibidas=fams_arg,
                 cargas_config=cargas_config,
                 peso_cargas_off=peso_cargas_off,
+                peso_sa1=peso_sa1,
+                peso_sa1_repet=peso_sa1_repet,
             )
         return _resolver_com_variedade(
             demandas_por_treino, banco, nivel_aluno, seed, variedade,
@@ -1679,6 +1853,8 @@ def gerar_rotina_csp(
             familias_proibidas=fams_arg,
             cargas_config=cargas_config,
             peso_cargas_off=peso_cargas_off,
+            peso_sa1=peso_sa1,
+            peso_sa1_repet=peso_sa1_repet,
         )
 
     fams_originais = set(familias_proibidas or [])
@@ -1724,6 +1900,8 @@ def _resolver_legacy(
     familias_proibidas: Optional[set[str]] = None,
     cargas_config: Optional[dict[str, int]] = None,
     peso_cargas_off: int = 1000,
+    peso_sa1: int = 0,
+    peso_sa1_repet: int = 0,
 ) -> dict:
     """Branch legado: 1 solve com Minimize → 1 solução determinística por
     seed. Preserva byte-a-byte o comportamento da Fatia 2 P2 quando
@@ -1737,6 +1915,8 @@ def _resolver_legacy(
         familias_proibidas=familias_proibidas,
         cargas_config=cargas_config,
         peso_cargas_off=peso_cargas_off,
+        peso_sa1=peso_sa1,
+        peso_sa1_repet=peso_sa1_repet,
     )
     if md["penalidades"]:
         md["model"].Minimize(sum(md["penalidades"]))
@@ -1810,6 +1990,8 @@ def _resolver_com_variedade(
     familias_proibidas: Optional[set[str]] = None,
     cargas_config: Optional[dict[str, int]] = None,
     peso_cargas_off: int = 1000,
+    peso_sa1: int = 0,
+    peso_sa1_repet: int = 0,
 ) -> dict:
     """Branch variedade (Frente B Fatia 3): 2 fases.
 
@@ -1840,6 +2022,8 @@ def _resolver_com_variedade(
         familias_proibidas=familias_proibidas,
         cargas_config=cargas_config,
         peso_cargas_off=peso_cargas_off,
+        peso_sa1=peso_sa1,
+        peso_sa1_repet=peso_sa1_repet,
     )
     if md1["penalidades"]:
         md1["model"].Minimize(sum(md1["penalidades"]))
@@ -1885,18 +2069,25 @@ def _resolver_com_variedade(
         familias_proibidas=familias_proibidas,
         cargas_config=cargas_config,
         peso_cargas_off=peso_cargas_off,
+        peso_sa1=peso_sa1,
+        peso_sa1_repet=peso_sa1_repet,
     )
     var_total: Optional[cp_model.IntVar] = None
     if md2["penalidades"]:
         # Fatia 4.E cargas: teto agora precisa incluir peso_cargas_off por
         # bloco (pode ser muito maior que rank_max * len). Usa upper bound
         # do número de termos × maior peso possível por termo.
+        # S-A1: termo max = (peso_max_nao_obrig - peso_min) * peso_sa1.
+        # peso_max é 2 e peso_min é 1 nas subs com não-obrig hoje → diff=1.
+        # Margem defensiva: 2 * peso_sa1.
         teto_por_termo = max(
             max(TIER_RANK.values()),
             peso_cargas_off if cargas_config else 0,
             peso_evitar_agonistas,
             peso_aderencia * max(TIER_RANK.values()) if peso_aderencia else 0,
             peso_tamanho_bloco * TAMANHO_MAX_BLOCO if peso_tamanho_bloco else 0,
+            2 * peso_sa1 if peso_sa1 else 0,
+            peso_sa1_repet,
         )
         teto = max(1, teto_por_termo) * len(md2["penalidades"])
         var_total = md2["model"].NewIntVar(0, teto, "var_total")
@@ -2072,6 +2263,8 @@ def gerar_treino_csp(
     relaxar_familia: bool = False,
     cargas_config: Optional[dict[str, int]] = None,
     peso_cargas_off: int = 1000,
+    peso_sa1: int = 0,
+    peso_sa1_repet: int = 0,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
@@ -2126,6 +2319,8 @@ def gerar_treino_csp(
         relaxar_familia=relaxar_familia,
         cargas_config=cargas_config,
         peso_cargas_off=peso_cargas_off,
+        peso_sa1=peso_sa1,
+        peso_sa1_repet=peso_sa1_repet,
     )
     if not rotina["viavel"]:
         out = {

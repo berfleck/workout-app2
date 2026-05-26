@@ -525,6 +525,23 @@ def _peso_evitar_agonistas_csp(cfg_r):
 _PESO_TAMANHO_BLOCO_DEFAULT = 5
 
 
+# Frente S-A1 (2026-05-25) — distribuição entre âncoras NÃO-obrigatórias.
+# Componente v1 (linear sobre peso curado 3/2/1 em ANCORAS_POR_SUBREGIAO):
+# peso > S-B1 (=10) é necessário pra inverter caso A vs B. Calibração 2026-05-25
+# (n=40 por subregião) mostrou peso=12 entregando 100% (composto+isolado) em
+# ombro(2) e peito(2), e 22% knee em perna_posterior(2). Pesos abaixo de 11
+# são NO-OP (S-B1 domina).
+_PESO_SA1_DEFAULT = 12
+
+# Componente v2 (penalty por padrão repetido na mesma demanda) — fecha o
+# buraco arquitetural do v1: solver pode escapar do penalty v1 escolhendo
+# `obrig + obrig` (mesmo padrão), com S-A1=0 em ambos. Calibração 2026-05-25
+# mostrou peso_sa1_repet=10 zerando hinge+hinge e composto+composto em
+# subregião direta e em demanda região lower(4). Sem v2, em demanda região
+# 55% das rotinas saíam com 2 hinges (sobrecarga lombar potencial).
+_PESO_SA1_REPET_DEFAULT = 10
+
+
 def _tamanho_e_peso_bloco_csp(cfg_r):
     """Retorna (tamanho_preferido, peso) pro CSP.
     cfg_r['tamanho_bloco'] vem da UI antiga (int 1/2/3, default 2 no parser).
@@ -1980,6 +1997,8 @@ def gerar():
         familias_proibidas=familias_proibidas or None,
         relaxar_familia=relaxar_familia,
         cargas_config=cargas_config or None,
+        peso_sa1=_PESO_SA1_DEFAULT,
+        peso_sa1_repet=_PESO_SA1_REPET_DEFAULT,
     )
 
     if resultado_csp.get("viavel"):
@@ -2345,6 +2364,8 @@ def treino_regerar(t):
             familias_proibidas=familias_outros or None,
             relaxar_familia=relax_fam,
             cargas_config=cargas_cfg or None,
+            peso_sa1=_PESO_SA1_DEFAULT,
+            peso_sa1_repet=_PESO_SA1_REPET_DEFAULT,
         )
         nome_custom = cfg_r.get("nome_custom", "")
         tipo_label = nome_custom or sessoes_ativas[t].tipo

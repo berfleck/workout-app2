@@ -119,6 +119,33 @@
 
 ## Seção 2 — Soft constraints
 
+### Escopo SUBREGIÃO (distribuição entre padrões âncora)
+
+**S-A1. Distribuição entre âncoras não-obrigatórias (com guarda anti-repetição)**
+- Origem: handoff `handoff_2026-05-25_s_a1.md` + sondagem 40 seeds 2026-05-25 (`tools/sondar_sa1_baseline.py`) — sem S-A1, `ombro(2)` no CSP saía 100% (composto + posterior_ombro) — ZERO `ombro_isolado` (vs antigo 100% composto + isolado); `perna_posterior(2)` saía 100% (hinge + abduction) — ZERO `knee_flexion` (vs antigo ~48% knee). Causa: H-A0/H-A1 ignoram os pesos curados 3/2/1 da `ANCORAS_POR_SUBREGIAO`; S-B1 (peso 10) domina a decisão entre padrões não-obrig.
+- Função: consumir o `peso` curado em `ANCORAS_POR_SUBREGIAO` que H-A0/H-A1 ignoram, e impedir que o solver escape pela repetição da própria obrigatória. **Dois componentes complementares**:
+  - **v1 (linear sobre pesos não-obrig)**: pra cada slot S × candidato C cujo `padrao` está em `nao_obrigatorias[sub]`, adiciona penalty `(peso_max_nao_obrig - peso_da_ancora) * peso_sa1 * assign[S,C]`. Solver minimiza → vaga sobrando prefere padrão de peso alto (ex: ombro_isolado peso 2 > posterior_ombro peso 1).
+  - **v2 (penalty por padrão repetido na mesma demanda)**: pra cada par (s_i, s_j) na MESMA demanda original, BoolVar `same_padrao` reifica "padrão escolhido em s_i == padrão escolhido em s_j"; penalty `peso_sa1_repet * same_padrao`. Fecha buraco arquitetural do v1 (sem v2, em `perna_posterior(2)` o solver escapava 78% das vezes pra `hinge+hinge` — mesmo custo S-B1 que `hinge+knee_flexion`, S-A1=0 ambos).
+- Ativação (decisões fechadas no handoff):
+  - **v1 em demanda subregião explícita**: condicionado a `qtd > n_obrig` (isola trade-off com S-B1, decisão 4.1).
+  - **v1 em demanda região**: ativa SEMPRE (decisão 5.2 / b — "mais pronto"); penalty atua via `assign`, slot obrigatório anula custo automaticamente.
+  - **v2 em qualquer demanda**: par dentro da mesma demanda original. Cross-demanda no mesmo treino NÃO penaliza (decisão de escopo: 2 demandas distintas com mesmo padrão é decisão do user).
+- Dado: `peso` curado em `ANCORAS_POR_SUBREGIAO` (existe) + `obrigatoria=True/False`. **NÃO mexer na tabela** (decisão 4.5).
+- Forma do penalty (decisão 5.1 do handoff): linear `(peso_max - peso_ancora) * peso_sa1`. Quadrática descartada — entrega resultado clínico idêntico na config atual de pesos.
+- **Calibração** (2026-05-25, sondagem 40 seeds × 4 subregiões + smoke região):
+  - `peso_sa1 = 12` (componente v1). Mínimo 11 pra inverter S-B1 (=10) no caso ombro_iso vs posterior_ombro. Margem +1 escolhida pra robustez.
+  - `peso_sa1_repet = 10` (componente v2). Zera hinge+hinge em `perna_posterior(2)` e composto+composto em `peito(2)` sem perturbar resto.
+- **Resolve junto** (sondagem 40 seeds com peso_sa1=12 + peso_sa1_repet=10):
+  - `ombro(2)`: 100% (composto + isolado) — pré-S-A1 era 0%.
+  - `perna_posterior(2)`: 100% (hinge + knee_flexion) — pré-S-A1 era 0% knee.
+  - `peito(2)`: 100% (composto + isolado) — pré-S-A1 era 55%.
+  - `perna_anterior(2)`: 100% (bilateral + unilateral) — preservado.
+  - Demanda região `lower(4)`: hinge+hinge **0%** (era 35% sem S-A1, 70% com v1 sozinho).
+- **Trade-off documentado** (norte Seção 4 — frequência vem de tabela curada): em demanda região, **abduction (peso 1) cai pra 0%** — antes 50%. É comportamento correto: peso 1 ≪ peso 2 reflete decisão clínica de centralidade. Se Bernardo quiser que abduction apareça mais, ajustar peso curado em `ANCORAS_POR_SUBREGIAO` (não em S-A1).
+- **Achados bonus registrados na sessão** (não resolvidos por S-A1; frentes futuras):
+  - Cobertura per-treino do H-A1 marker pós-H-A0: rotina Filipe Santos 2026-05-25 saiu com T1 sem `squat_bilateral` (apenas `squat_unilateral` = Recuo). H-A1 marker é cross-treino — garante ≥1 squat_bilateral na rotina inteira, não por treino. Bernardo aceitou registrar como pendência separada.
+  - Variedade INTRA-subregião (3+ vagas mesma sub): se sub tem só 1 não-obrigatória e ≥3 vagas, v2 zera repetição entre pares, mas não há mais opção pra cumprir. Caso degenerado, sem impacto observado.
+
 ### Escopo BLOCO (par/trio dentro de superset)
 
 **S-B1. Distância funcional entre exercícios do par**

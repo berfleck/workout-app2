@@ -1,0 +1,40 @@
+{
+  "n_seeds": 40,
+  "peso_sa1": 8,
+  "subregioes": {
+    "ombro": {
+      "antigo": {
+        "ombro_composto+ombro_isolado": 40
+      },
+      "csp": {
+        "ombro_composto+posterior_ombro": 40
+      }
+    },
+    "perna_posterior": {
+      "antigo": {
+        "abduction+hinge": 21,
+        "hinge+knee_flexion": 19
+      },
+      "csp": {
+        "abduction+hinge": 40
+      }
+    },
+    "peito": {
+      "antigo": {
+        "empurrar_compostos+empurrar_isolados": 40
+      },
+      "csp": {
+        "empurrar_compostos+empurrar_compostos": 19,
+        "empurrar_compostos+empurrar_isolados": 21
+      }
+    },
+    "perna_anterior": {
+      "antigo": {
+        "squat_bilateral+squat_unilateral": 40
+      },
+      "csp": {
+        "squat_bilateral+squat_unilateral": 40
+      }
+    }
+  }
+}
