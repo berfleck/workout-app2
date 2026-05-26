@@ -1,0 +1,117 @@
+{
+  "n_seeds": 10,
+  "n_rotinas_validas": 10,
+  "n_rotinas_inviaveis": 0,
+  "rotinas_com_cobertura_completa_per_treino": 0,
+  "pct_cobertura_completa_per_treino": 0.0,
+  "por_padrao_obrigatorio": [
+    {
+      "regiao": "lower",
+      "subregiao": "perna_anterior",
+      "padrao_obrigatorio": "squat_bilateral",
+      "cross_rotina_pct": 100.0,
+      "per_treino": [
+        {
+          "treino_idx": 0,
+          "n_rotinas_com_padrao_no_treino": 6,
+          "pct": 60.0
+        },
+        {
+          "treino_idx": 1,
+          "n_rotinas_com_padrao_no_treino": 4,
+          "pct": 40.0
+        }
+      ]
+    },
+    {
+      "regiao": "lower",
+      "subregiao": "perna_posterior",
+      "padrao_obrigatorio": "hinge",
+      "cross_rotina_pct": 100.0,
+      "per_treino": [
+        {
+          "treino_idx": 0,
+          "n_rotinas_com_padrao_no_treino": 8,
+          "pct": 80.0
+        },
+        {
+          "treino_idx": 1,
+          "n_rotinas_com_padrao_no_treino": 9,
+          "pct": 90.0
+        }
+      ]
+    },
+    {
+      "regiao": "upper",
+      "subregiao": "peito",
+      "padrao_obrigatorio": "empurrar_compostos",
+      "cross_rotina_pct": 100.0,
+      "per_treino": [
+        {
+          "treino_idx": 0,
+          "n_rotinas_com_padrao_no_treino": 6,
+          "pct": 60.0
+        },
+        {
+          "treino_idx": 1,
+          "n_rotinas_com_padrao_no_treino": 4,
+          "pct": 40.0
+        }
+      ]
+    },
+    {
+      "regiao": "upper",
+      "subregiao": "costas",
+      "padrao_obrigatorio": "remadas",
+      "cross_rotina_pct": 100.0,
+      "per_treino": [
+        {
+          "treino_idx": 0,
+          "n_rotinas_com_padrao_no_treino": 5,
+          "pct": 50.0
+        },
+        {
+          "treino_idx": 1,
+          "n_rotinas_com_padrao_no_treino": 5,
+          "pct": 50.0
+        }
+      ]
+    },
+    {
+      "regiao": "upper",
+      "subregiao": "costas",
+      "padrao_obrigatorio": "puxadas",
+      "cross_rotina_pct": 100.0,
+      "per_treino": [
+        {
+          "treino_idx": 0,
+          "n_rotinas_com_padrao_no_treino": 5,
+          "pct": 50.0
+        },
+        {
+          "treino_idx": 1,
+          "n_rotinas_com_padrao_no_treino": 5,
+          "pct": 50.0
+        }
+      ]
+    },
+    {
+      "regiao": "upper",
+      "subregiao": "ombro",
+      "padrao_obrigatorio": "ombro_composto",
+      "cross_rotina_pct": 100.0,
+      "per_treino": [
+        {
+          "treino_idx": 0,
+          "n_rotinas_com_padrao_no_treino": 4,
+          "pct": 40.0
+        },
+        {
+          "treino_idx": 1,
+          "n_rotinas_com_padrao_no_treino": 7,
+          "pct": 70.0
+        }
+      ]
+    }
+  ]
+}

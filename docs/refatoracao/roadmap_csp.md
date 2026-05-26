@@ -13,16 +13,16 @@ linha de "o que entregou" + 1 linha de "próximo bloqueio se houver".
 
 ---
 
-## Estado das branches (2026-05-25)
+## Estado das branches (2026-05-26)
 
 Pós-instituição da disciplina de merge (seção abaixo): branches mergeadas
 em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 
 ```
-main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5) + Frente E.1 (Bloco 3) + Micro-frente H-A0 + Frente S-A1 (Bloco 4)
+main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5) + Frente E.1 (Bloco 3) + Micro-frente H-A0 + Frente S-A1 + Reavaliação cobertura per-treino H-A1 marker (não-frente — 2026-05-26)
 ```
 
-**Nenhuma branch ativa.** Próxima frente (cobertura per-treino do H-A1 marker — bug Filipe Santos) sai de `main` direto.
+**Nenhuma branch ativa.** Próxima frente (calibração `_PESO_ADERENCIA_POR_PERFIL` — Achado 4 da auditoria 2026-05-26) sai de `main` direto. Ver `handoff_2026-05-26_calibracao_aderencia.md`.
 
 ---
 
@@ -47,6 +47,7 @@ main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-
 | Frente E.1 | `/gerar` chamando `gerar_rotina_csp` (clean break do motor antigo); adapter rotina-inteira (`_distribuir_avisos_rotina_csp` + helpers); modal de avisos ganha clauses `h_a1_degradado` + `h_r1_degradado`; toggle R-1 wirado como `familias_proibidas` hard cross-rotina | `logs/frente_e1_substituir_gerar.md` |
 | Micro-frente H-A0 | Âncoras obrigatórias por REGIÃO (per-treino, banimento upstream de subs não-âncora, marker H-A0 → H-A1, graceful degradation pool vazio + conflito cardinalidade) | `logs/micro_h_a0_ancoras_regiao.md` |
 | Frente S-A1 | Distribuição entre âncoras não-obrigatórias (v1 linear sobre pesos curados 3/2/1 + v2 penalty padrão repetido). Resolve regressão CSP × antigo em ombro(2)/perna_posterior(2)/peito(2). Calibração peso_sa1=12 + peso_sa1_repet=10. Ativa em demanda subregião E região (via H-A0 marker). | `logs/frente_s_a1.md` |
+| Reavaliação H-A1 per-treino | Fechada como **não-frente** (2026-05-26). Diagnóstico original (handoff `handoff_2026-05-25_h_a1_per_treino.md`, deletado) era falso achado clínico. Bernardo verbalizou 3 princípios clínicos (equilíbrio cross-treino; composto antes de isolado na ROTINA; variabilidade entre treinos) que invalidam o achado: T1-uni + T2-bi em perna_anterior é variabilidade desejada, não bug. Motor pós-H-A0 + S-A1 já correto pelos princípios. Zero diff de produção; só evidência docs + ferramenta de sondagem permanente. | `logs/h_a1_per_treino_reavaliacao.md` |
 
 ---
 
@@ -122,8 +123,8 @@ Cada item independente; entram conforme prioridade clínica observada.
 
 **Demais refinamentos** (ordem não prioritária):
 
-- **✅ Frente S-A1 — distribuição entre âncoras não-obrigatórias** (2026-05-25). Componente v1 (linear sobre pesos curados 3/2/1) + v2 (penalty padrão repetido na mesma demanda). Calibração: `peso_sa1=12` + `peso_sa1_repet=10`. Resolve regressão CSP × antigo: ombro(2) 100% comp+iso (era 0%), perna_post(2) 100% hinge+knee (era 0%), peito(2) 100% cmp+iso (era 55%). Ativa em demanda subregião direta (qtd>n_obrig) E em demanda região via marker H-A0 (decisão §5.2 / b). Em demanda região `lower(4)` hinge+hinge zerou (era 35% pre-S-A1, 70% com v1 sozinho). Trade-off documentado: abduction (peso 1) caiu pra 0% — comportamento correto pelo norte Seção 4. Pytest +14 (348 total). Achados bonus registrados pra frentes futuras: bug Filipe Santos (cobertura per-treino H-A1 marker), revisita peso curado abduction. Ver `logs/frente_s_a1.md`.
-- **⬜ Cobertura per-treino do H-A1 marker pós-H-A0** — achado bonus da Frente S-A1 (2026-05-25). Rotina ativa do aluno Filipe Santos (id=17, rotina `20260525_195735_bb15`) saiu com T1 sem `squat_bilateral` (apenas Recuo = `squat_unilateral`); T2 tem (Agachamento Goblet Rampa). H-A1 marker é cross-treino — garante ≥1 squat_bilateral na rotina inteira, não por treino. S-A1 NÃO resolve (squat_bilateral é obrigatória, não está em `nao_obrigatorias`). Solução prevista: espelhar H-A0 (per-treino) no H-A1 quando ativa via marker, OU refinar o marker pra agregar por (treino, padrão) em vez de só (sub).
+- **✅ Frente S-A1 — distribuição entre âncoras não-obrigatórias** (2026-05-25). Componente v1 (linear sobre pesos curados 3/2/1) + v2 (penalty padrão repetido na mesma demanda). Calibração: `peso_sa1=12` + `peso_sa1_repet=10`. Resolve regressão CSP × antigo: ombro(2) 100% comp+iso (era 0%), perna_post(2) 100% hinge+knee (era 0%), peito(2) 100% cmp+iso (era 55%). Ativa em demanda subregião direta (qtd>n_obrig) E em demanda região via marker H-A0 (decisão §5.2 / b). Em demanda região `lower(4)` hinge+hinge zerou (era 35% pre-S-A1, 70% com v1 sozinho). Trade-off documentado: abduction (peso 1) caiu pra 0% — comportamento correto pelo norte Seção 4. Pytest +14 (348 total). Achados bonus registrados pra frentes futuras: bug Filipe Santos (cobertura per-treino H-A1 marker — **reavaliado em 2026-05-26 como falso achado, ver `logs/h_a1_per_treino_reavaliacao.md`**), revisita peso curado abduction. Ver `logs/frente_s_a1.md`.
+- **❌ Cobertura per-treino do H-A1 marker pós-H-A0** — **fechada como não-frente em 2026-05-26**. Diagnóstico original era falso achado clínico: T1-uni + T2-bi em perna_anterior é variabilidade boa, não bug. Bernardo verbalizou 3 princípios clínicos (equilíbrio cross-treino numérico; composto antes de isolado na ROTINA cross-rotina; variabilidade entre treinos) que invalidam o handoff original. Motor pós-H-A0 + S-A1 já entrega os princípios 2 e 3; princípio 1 fica como instância de S-R1 cross-treino. Ver `logs/h_a1_per_treino_reavaliacao.md`.
 - **⬜ S-B2** — balanço de carga implícita (core + lombar + grip + neural por bloco). Exige cadastrar `demanda_lombar` no XLSX.
 - **⬜ S-B3** — fadiga prévia no bloco (máquina tolera mais que livre). Exige cadastrar `estabilidade_externa` no XLSX.
 - **⬜ Centralidade Compostos** (2ª dimensão do vetor de perfil). Depende de S-T2 ou S-T3 implementadas (não existem no CSP ainda).
