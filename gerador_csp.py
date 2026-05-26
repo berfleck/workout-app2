@@ -1290,6 +1290,25 @@ def _construir_modelo(
     # Pares no mesmo bloco (lt=0, gt=0) não geram viol.
     rank_max = max(TIER_RANK.values())
     # `penalidades` já inicializado acima (antes do bloco S-A1).
+
+    # S-B1 NÃO atua intra-sub explícita (decisão clínica 2026-05-25 com
+    # Bernardo): em demanda `("subregiao", X, qtd)`, user pediu a sub
+    # explicitamente — pares dentro dela são esperados serem da mesma
+    # categoria muscular. Agonistas intra-sub não são bug. S-B1 continua
+    # atuando cross-sub no mesmo bloco. Calcula set de pares (s1, s2) que
+    # vêm da MESMA demanda subregião pra skipar penalty.
+    pares_intra_sub: set[tuple[int, int]] = set()
+    for grupos_t in treinos:
+        for g in grupos_t:
+            nv, _esc, _qt = g["demanda"]
+            if nv != "subregiao":
+                continue
+            sids_g = g["slot_ids"]
+            for i in range(len(sids_g)):
+                for j in range(i + 1, len(sids_g)):
+                    a, b = sorted((sids_g[i], sids_g[j]))
+                    pares_intra_sub.add((a, b))
+
     for t_idx, sids_t in slots_por_treino.items():
         for i in range(len(sids_t)):
             for j in range(i + 1, len(sids_t)):
@@ -1321,7 +1340,9 @@ def _construir_modelo(
                 # Penalty se same_bloco AND same_grupo (par agonista no
                 # mesmo bloco). Quando peso=0, NÃO cria as vars (preserva
                 # 4.A byte-a-byte).
-                if peso_evitar_agonistas > 0:
+                # SKIP pares intra-sub explícita (decisão 2026-05-25):
+                # user pediu a sub, agonistas dentro dela são esperados.
+                if peso_evitar_agonistas > 0 and (s1, s2) not in pares_intra_sub:
                     same_bloco = model.NewBoolVar(f"sb_{s1}_{s2}")
                     # same_bloco + lt + gt == 1 (exatamente um dos três é true)
                     model.Add(same_bloco + lt + gt == 1)

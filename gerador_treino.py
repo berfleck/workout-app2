@@ -177,7 +177,7 @@ ANCORAS_POR_SUBREGIAO: dict[str, list[dict]] = {
     "perna_posterior": [
         {"padrao": "hinge",        "peso": 3, "obrigatoria": True},
         {"padrao": "knee_flexion", "peso": 2, "obrigatoria": False},
-        {"padrao": "abduction",    "peso": 1, "obrigatoria": False},
+        {"padrao": "abduction",    "peso": 2, "obrigatoria": False},
     ],
     "panturrilha": [
         {"padrao": "flexao_plantar", "peso": 1, "obrigatoria": True},

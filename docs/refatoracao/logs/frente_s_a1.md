@@ -249,9 +249,66 @@ implementada aqui como complemento direto do S-A1.
 1. **Bug Filipe — cobertura per-treino do H-A1 marker**: aguarda frente
    nova com decisões. Espelhar H-A0 (per-treino) no H-A1 quando ativa
    via marker.
-2. **abduction (peso 1) zerou em demanda região** — design correto pelo
-   norte mas Bernardo pode querer revisitar peso curado.
-3. **Cadastros de não-obrigatórias com 3+ pesos esparsos** — caso futuro.
+2. **Cadastros de não-obrigatórias com 3+ pesos esparsos** — caso futuro.
    Hoje todas as subs com não-obrig têm gap=1 entre pesos (linear ==
    quadrática). Se algum cadastro futuro introduzir 3+ pesos esparsos,
    revisitar §5.1.
+
+## Adendo 2026-05-25 (v3) — refinamento clínico pós-feedback
+
+Bernardo questionou a regressão `abduction → 0%` em `perna_posterior(2)`
+após v1+v2 (peso 12/10). Esclareceu intuição clínica:
+
+- **`perna_posterior(2)`**: deve entregar `hinge+knee` e `hinge+abd` em
+  **proporções parecidas**. Ambos são pares válidos; user pediu a sub,
+  agonistas dentro dela são esperados. `knee+abd` não proibido mas
+  desencorajado.
+- **`ombro(2)`**: deve ser comp+iso (elevações) maioria; posterior
+  raramente, só em demanda maior ou pedido explícito.
+
+Implicação arquitetural:
+
+1. **S-B1 não deveria atuar intra-sub explícita** (revisão de escopo).
+   User pedindo `("subregiao", X, qtd)` implica aceitar pares da mesma
+   categoria.
+2. **Peso curado de `abduction` estava errado** (era 1, deveria ser 2).
+   `knee_flexion` e `abduction` são clinicamente equivalentes como
+   segunda escolha em `perna_posterior`.
+
+Mudanças aplicadas (commit subsequente em `frente-s-a1`):
+
+- `gerador_csp.py:_construir_modelo`: bloco S-B1 ganha condição
+  `(s1, s2) not in pares_intra_sub`. Set `pares_intra_sub` populado pré-loop
+  iterando demandas com `nivel == "subregiao"`.
+- `gerador_treino.py:ANCORAS_POR_SUBREGIAO[perna_posterior][abduction].peso`:
+  `1 → 2`.
+
+Sondagem n=40 pós-v3 (mesma calibração peso_sa1=12 + peso_sa1_repet=10):
+
+| Demanda | Resultado v3 | Alvo Bernardo |
+|---|---|---|
+| `ombro(2)` | 100% comp+iso | ✓ |
+| `perna_posterior(2)` | 62% hinge+knee / 38% hinge+abd | ~50/50 ✓ |
+| `peito(2)` | 100% cmp+iso | ✓ |
+| `perna_anterior(2)` | 100% bi+uni | ✓ |
+
+Testes do motor antigo afetados (peso curado abd=2 muda quotas Hamilton):
+
+- `test_quotas_de_subregiao_perna_posterior_6_3_2_1` → renomeado pra
+  `_6_paritaria`. Hamilton agora gera 2:2:2 em perna_post(6).
+- `test_perna_posterior_vagas_4_volta_para_hamilton`: aceita
+  hinge=2, knee=1, abd=1 e hinge=2, knee=2, abd=2.
+- `test_perna_posterior_6_distribui_hinge_kneeflex_abducao_3_2_1` →
+  renomeado pra `_paritaria` (frações ~0.33 cada).
+
+Testes do S-B1 afetados:
+
+- `test_peso_alto_elimina_pares_agonistas` → renomeado pra
+  `_cross_sub`. Migrado pra demanda `("regiao", "upper", 4)` onde
+  cross-sub agonistas (peito+ombro) existem.
+- `test_sb1_e_sb4_coexistem`: foco passa só pra tamanho do bloco.
+- Adicionado `test_sb1_nao_atua_intra_sub_explicita` (asserts que pares
+  agonistas DENTRO de `perna_posterior(2)` aparecem ≥5/20).
+
+Gate de fechamento pós-v3: pytest 349 (348 + 1 novo S-B1), harness 16/16
+OK preservado.

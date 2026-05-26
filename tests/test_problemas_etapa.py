@@ -113,9 +113,13 @@ def test_perna_anterior_3x3_respeita_quota_3_2(banco):
 # ----- 4: distribuição 3:2:1 em perna_posterior(6) — Etapa 3 --------------
 
 
-def test_perna_posterior_6_distribui_hinge_kneeflex_abducao_3_2_1(banco):
+def test_perna_posterior_6_distribui_hinge_kneeflex_abducao_paritaria(banco):
     """Em 100 rotinas perna_posterior(6) × 1, distribuição
-    hinge:knee_flexion:abduction deve aproximar 3:2:1."""
+    hinge:knee_flexion:abduction deve aproximar 2:2:2 (paritária).
+
+    Pesos pós-2026-05-25 (Frente S-A1): abduction subiu de 1 pra 2 —
+    knee_flexion e abduction são igualmente válidos como segunda escolha
+    depois do hinge obrigatório."""
     cont = Counter()
     for seed in range(4000, 4100):
         random.seed(seed)
@@ -126,10 +130,10 @@ def test_perna_posterior_6_distribui_hinge_kneeflex_abducao_3_2_1(banco):
     h, k, a = cont["hinge"], cont["knee_flexion"], cont["abduction"]
     total = h + k + a
     assert total > 0
-    # Razões esperadas: h/total ≈ 0.5, k/total ≈ 0.33, a/total ≈ 0.17
-    assert 0.40 <= h / total <= 0.60, f"hinge fração = {h/total:.2f}"
-    assert 0.25 <= k / total <= 0.40, f"knee_flexion fração = {k/total:.2f}"
-    assert 0.10 <= a / total <= 0.25, f"abduction fração = {a/total:.2f}"
+    # Razões esperadas pós-2026-05-25: ~0.33 cada (paritária).
+    assert 0.25 <= h / total <= 0.45, f"hinge fração = {h/total:.2f}"
+    assert 0.25 <= k / total <= 0.45, f"knee_flexion fração = {k/total:.2f}"
+    assert 0.25 <= a / total <= 0.45, f"abduction fração = {a/total:.2f}"
 
 
 # ----- 5: paridade remadas vs puxadas em costas(4) — JÁ SATISFEITO --------

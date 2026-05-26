@@ -140,8 +140,13 @@ def test_total_slots_preservado_independente_do_pref(banco):
 
 # (f) S-B1 + S-B4 coexistem
 def test_sb1_e_sb4_coexistem(banco):
-    """S-B1 (peso=10) + S-B4 (pref=2, peso=5): blocos de 2 SEM agonistas."""
-    agon_total = 0
+    """S-B1 + S-B4 coexistem: vasta maioria dos blocos no tamanho preferido.
+
+    Decisão 2026-05-25 (Frente S-A1): S-B1 NÃO atua intra-sub explícita.
+    DEMANDAS_RICA é toda intra-sub (peito/costas/perna_anterior), então
+    S-B1 intra fica desligada por design e agonistas intra-sub são
+    esperados. Foco do teste muda pra coexistência de constraints
+    de bloco (tamanho preferido honrado quando S-B1 está ativo)."""
     blocos_tam = Counter()
     for ps in range(15):
         r = gerar_rotina_csp(
@@ -153,14 +158,9 @@ def test_sb1_e_sb4_coexistem(banco):
             peso_tamanho_bloco=5,
         )
         if r["viavel"]:
-            agon_total += _conta_agonistas(r["treinos"][0]["blocos"])
             blocos_tam.update(_tamanhos(r["treinos"][0]["blocos"]))
     total = sum(blocos_tam.values())
     pct_2 = 100 * blocos_tam.get(2, 0) / total if total else 0
-    # Esperado: 0 agonistas E vasta maioria tamanho 2
-    assert agon_total <= 1, (
-        f"S-B1+S-B4: esperado ~0 agonistas; got {agon_total}/15 runs"
-    )
     assert pct_2 >= 90, (
         f"S-B1+S-B4: esperado >=90% blocos tamanho 2; got {pct_2:.1f}%"
     )

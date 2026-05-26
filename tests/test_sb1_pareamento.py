@@ -79,14 +79,22 @@ def test_peso_zero_aceita_agonistas_no_mesmo_bloco(banco):
     )
 
 
-# (b) peso>0 reduz drasticamente pares agonistas
-def test_peso_alto_elimina_pares_agonistas(banco):
-    """peso=10 deve zerar (ou quase) pares agonistas."""
+# (b) peso>0 reduz drasticamente pares agonistas CROSS-SUB
+# DECISÃO 2026-05-25 (Frente S-A1): S-B1 não atua intra-sub explícita —
+# user pediu a sub, agonistas dentro dela são esperados. Teste mede
+# agonistas em demanda nível região onde slots de subs distintas com
+# mesmo grupo funcional (peito+ombro = ambos push) podem aparecer.
+def test_peso_alto_elimina_pares_agonistas_cross_sub(banco):
+    """peso=10 zera (ou quase) pares agonistas CROSS-SUB. Em demanda
+    nível região, slots de peito e ombro (ambos push) no mesmo bloco
+    são par agonista — S-B1 evita esse pareamento.
+    """
+    demandas_regiao = [("regiao", "upper", 4)]
     pares_agon = 0
     pares_total = 0
     for python_seed in range(20):
         r = gerar_rotina_csp(
-            [DEMANDAS_RICA], banco, nivel_aluno=3,
+            [demandas_regiao], banco, nivel_aluno=3,
             seed=random.randint(0, 2**31 - 1),
             variedade=ConfigVariedade(python_seed=python_seed),
             peso_evitar_agonistas=10,
@@ -96,9 +104,32 @@ def test_peso_alto_elimina_pares_agonistas(banco):
             pares_agon += agon
             pares_total += total
     # Com peso=10, esperamos <= 1 par agonista em 20 runs (margem 5%).
-    # Smoke empírico mostrou 0/58.
     assert pares_agon <= 1, (
-        f"S-B1 ativa deveria eliminar agonistas; got {pares_agon}/{pares_total}"
+        f"S-B1 ativa deveria eliminar agonistas cross-sub; got {pares_agon}/{pares_total}"
+    )
+
+
+def test_sb1_nao_atua_intra_sub_explicita(banco):
+    """Decisão 2026-05-25: S-B1 não atua em pares dentro da MESMA demanda
+    subregião explícita — user pediu a sub e agonistas dentro dela são
+    esperados (ex: perna_posterior(2) pode entregar hinge+knee_flexion,
+    ambos hamstring/glúteo, sem penalty)."""
+    # 2 slots da mesma sub: hinge (hamstring) + knee_flexion (hamstring) = agonistas.
+    pares_agon_intra = 0
+    for python_seed in range(20):
+        r = gerar_rotina_csp(
+            [[("subregiao", "perna_posterior", 2)]], banco, nivel_aluno=3,
+            seed=random.randint(0, 2**31 - 1),
+            variedade=ConfigVariedade(python_seed=python_seed),
+            peso_evitar_agonistas=10,
+        )
+        if r["viavel"]:
+            agon, _ = _conta_pares_no_bloco_mesmo_grupo(r["treinos"][0]["blocos"])
+            pares_agon_intra += agon
+    # Mesmo com S-B1 ativo, intra-sub explícita aceita agonistas.
+    # Esperamos pares agonistas presentes (não bloqueados).
+    assert pares_agon_intra >= 5, (
+        f"S-B1 não deveria atuar intra-sub explícita; got só {pares_agon_intra}/20 pares agonistas"
     )
 
 

@@ -61,34 +61,42 @@ def _distribuicao_padroes(banco, demandas, n_seeds, peso_sa1, peso_sa1_repet=0,
 
 # ── (a) Componente v1 — pesos curados não-obrig ─────────────────────────
 
-def test_v1_zero_preserva_motor_pre_sa1(banco):
-    """peso_sa1=0 reproduz comportamento pré-S-A1 (ombro(2) → posterior)."""
-    c = _distribuicao_padroes(banco, [("subregiao", "ombro", 2)], 10, 0)
-    # Pré-S-A1: 100% ombro_composto+posterior_ombro (ZERO ombro_isolado).
-    assert c["ombro_composto+posterior_ombro"] == 10, (
-        f"peso_sa1=0 deveria preservar baseline pre-S-A1, mas saiu: {c}"
-    )
+def test_v1_zero_em_ombro_2_ainda_da_mistura(banco):
+    """peso_sa1=0: S-B1 NÃO atua intra-sub explícita (decisão 2026-05-25), então
+    sem S-A1 o motor já entrega mistura natural — comp+iso, comp+post, talvez
+    cmp+cmp. Bug pré-S-A1 (100% posterior) foi resolvido pelo ajuste do S-B1,
+    não só pelo S-A1."""
+    c = _distribuicao_padroes(banco, [("subregiao", "ombro", 2)], 20, 0)
+    # Esperado: mais de 1 combinação aparecendo (não viés único).
+    assert len(c) >= 2, f"sem S-A1 ainda deveria haver mistura: {c}"
 
 
-def test_v1_ombro_2_volta_isolado_com_peso_dominante(banco):
-    """peso_sa1=12 (>S-B1=10): ombro_isolado deve aparecer ≥80% das rotinas."""
-    c = _distribuicao_padroes(banco, [("subregiao", "ombro", 2)], 10, 12,
+def test_v1_ombro_2_iso_dominante_com_peso_curado(banco):
+    """peso_sa1=12: ombro_isolado (peso curado 2) >> posterior (peso 1).
+    Pesos curados refletem centralidade clínica: isolado é central, posterior
+    é raro/condicional (entra em demanda maior ou pedido explícito)."""
+    c = _distribuicao_padroes(banco, [("subregiao", "ombro", 2)], 20, 12,
                               peso_sa1_repet=10)
     com_isolado = sum(qtd for combo, qtd in c.items() if "ombro_isolado" in combo)
-    # Calibração 2026-05-25: alvo ≥80%; v2 evita escape pra cmp+cmp.
-    assert com_isolado >= 8, (
-        f"peso_sa1=12 + repet=10 deveria recuperar ≥80% ombro_isolado, saiu {com_isolado}/10: {c}"
+    assert com_isolado >= 16, (
+        f"ombro_isolado deveria dominar (≥80%), saiu {com_isolado}/20: {c}"
     )
 
 
-def test_v1_perna_posterior_2_volta_knee(banco):
-    """peso_sa1=12: knee_flexion deve aparecer (era 0% pré-S-A1)."""
-    c = _distribuicao_padroes(banco, [("subregiao", "perna_posterior", 2)], 10,
+def test_v1_perna_posterior_2_distribuicao_equilibrada(banco):
+    """Decisão clínica 2026-05-25: perna_post(2) deve entregar `hinge+knee` e
+    `hinge+abduction` em proporções parecidas. Ambos são pares válidos:
+    hinge+knee (agonistas hamstring) e hinge+abd (antagonistas glúteo)
+    são clinicamente equivalentes em demanda subregião explícita.
+    Calibração via peso curado de abduction = 2 (igualar knee_flexion)."""
+    c = _distribuicao_padroes(banco, [("subregiao", "perna_posterior", 2)], 20,
                               12, peso_sa1_repet=10)
     com_knee = sum(qtd for combo, qtd in c.items() if "knee_flexion" in combo)
-    assert com_knee >= 8, (
-        f"peso_sa1=12 + repet=10 deveria recuperar ≥80% knee_flexion, saiu {com_knee}/10: {c}"
-    )
+    com_abd = sum(qtd for combo, qtd in c.items() if "abduction" in combo)
+    # Ambos devem aparecer com frequência razoável (≥20% cada).
+    # Distribuição alvo é 50/50; aceitamos folga de softmax (~30-70% cada).
+    assert com_knee >= 4, f"knee_flexion deveria aparecer ≥20%: {c}"
+    assert com_abd >= 4, f"abduction deveria aparecer ≥20%: {c}"
 
 
 def test_v1_peito_2_volta_isolado(banco):

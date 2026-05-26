@@ -359,12 +359,16 @@ def test_quotas_de_subregiao_perna_anterior_3():
     assert quotas == {"squat_bilateral": 2, "squat_unilateral": 1}
 
 
-def test_quotas_de_subregiao_perna_posterior_6_3_2_1():
-    """perna_posterior(6): hinge:3 knee:2 abd:1 → Hamilton 3:2:1 exato."""
+def test_quotas_de_subregiao_perna_posterior_6_paritaria():
+    """perna_posterior(6): pesos 3:2:2 (pós-2026-05-25) → Hamilton 2:2:2.
+
+    Decisão 2026-05-25 (Frente S-A1): peso curado de abduction subiu de 1
+    pra 2, refletindo equivalência clínica com knee_flexion (ambos
+    'segunda escolha' depois do hinge obrigatório, sem hierarquia entre si)."""
     from gerador_treino import _quotas_de_subregiao
     random.seed(1)
     quotas, _ = _quotas_de_subregiao("perna_posterior", 6)
-    assert quotas == {"hinge": 3, "knee_flexion": 2, "abduction": 1}
+    assert quotas == {"hinge": 2, "knee_flexion": 2, "abduction": 2}
 
 
 def test_quotas_de_subregiao_costas_4_paritaria():
@@ -574,14 +578,17 @@ def test_perna_posterior_vagas_3_prioriza_hinge_levemente():
 
 
 def test_perna_posterior_vagas_4_volta_para_hamilton():
-    """Perna_posterior vagas≥4: sem carve-out, Hamilton normal opera."""
+    """Perna_posterior vagas≥4: sem carve-out, Hamilton normal opera.
+
+    Pesos pós-2026-05-25: 3:2:2 (abduction subiu de 1 pra 2 por correção
+    clínica — Frente S-A1)."""
     from gerador_treino import _quotas_de_subregiao
     random.seed(0)
     quotas, _ = _quotas_de_subregiao("perna_posterior", 4)
     assert quotas == {"hinge": 2, "knee_flexion": 1, "abduction": 1}
 
     quotas, _ = _quotas_de_subregiao("perna_posterior", 6)
-    assert quotas == {"hinge": 3, "knee_flexion": 2, "abduction": 1}
+    assert quotas == {"hinge": 2, "knee_flexion": 2, "abduction": 2}
 
 
 def test_peito_nao_afetado_pelos_carveouts():

@@ -132,16 +132,17 @@
   - **v2 em qualquer demanda**: par dentro da mesma demanda original. Cross-demanda no mesmo treino NÃO penaliza (decisão de escopo: 2 demandas distintas com mesmo padrão é decisão do user).
 - Dado: `peso` curado em `ANCORAS_POR_SUBREGIAO` (existe) + `obrigatoria=True/False`. **NÃO mexer na tabela** (decisão 4.5).
 - Forma do penalty (decisão 5.1 do handoff): linear `(peso_max - peso_ancora) * peso_sa1`. Quadrática descartada — entrega resultado clínico idêntico na config atual de pesos.
-- **Calibração** (2026-05-25, sondagem 40 seeds × 4 subregiões + smoke região):
-  - `peso_sa1 = 12` (componente v1). Mínimo 11 pra inverter S-B1 (=10) no caso ombro_iso vs posterior_ombro. Margem +1 escolhida pra robustez.
-  - `peso_sa1_repet = 10` (componente v2). Zera hinge+hinge em `perna_posterior(2)` e composto+composto em `peito(2)` sem perturbar resto.
-- **Resolve junto** (sondagem 40 seeds com peso_sa1=12 + peso_sa1_repet=10):
-  - `ombro(2)`: 100% (composto + isolado) — pré-S-A1 era 0%.
-  - `perna_posterior(2)`: 100% (hinge + knee_flexion) — pré-S-A1 era 0% knee.
+- **Calibração** (2026-05-25, iterativa com Bernardo):
+  - `peso_sa1 = 12` (componente v1). Pesos curados 2 (não-obrig central) ficam em vantagem sobre pesos curados 1 (não-obrig periférica) por 12 unidades de custo.
+  - `peso_sa1_repet = 10` (componente v2). Zera hinge+hinge em `perna_posterior(2)` e composto+composto em `peito(2)`.
+  - **Ajuste estrutural acompanhante**: peso curado de `abduction` em `perna_posterior` subiu de 1 pra 2 (igualou knee_flexion) — refletindo equivalência clínica das 2 não-obrig (ambas "segunda escolha" depois do hinge obrigatório). Sem essa mudança, a distribuição em `perna_posterior(2)` ficava 100% de uma combinação (`hinge+knee` ou `hinge+abd`); com pesos iguais, softmax distribui ~50/50 (sondagem n=40: 62/38 a 50/50 com folga de softmax).
+  - **S-B1 desligada intra-sub** (mudança acompanhante na S-B1): preserva sua semântica cross-sub. Razão clínica: em demanda sub explícita, user pediu a categoria — agonistas dentro dela são esperados.
+- **Resolve junto** (sondagem 40 seeds com peso_sa1=12 + peso_sa1_repet=10 + S-B1 não-intra-sub + abd peso=2):
+  - `ombro(2)`: 100% (composto + isolado) — pré-S-A1 era 0% iso.
+  - `perna_posterior(2)`: **62% hinge+knee / 38% hinge+abd** — distribuição equilibrada (alvo clínico Bernardo).
   - `peito(2)`: 100% (composto + isolado) — pré-S-A1 era 55%.
   - `perna_anterior(2)`: 100% (bilateral + unilateral) — preservado.
-  - Demanda região `lower(4)`: hinge+hinge **0%** (era 35% sem S-A1, 70% com v1 sozinho).
-- **Trade-off documentado** (norte Seção 4 — frequência vem de tabela curada): em demanda região, **abduction (peso 1) cai pra 0%** — antes 50%. É comportamento correto: peso 1 ≪ peso 2 reflete decisão clínica de centralidade. Se Bernardo quiser que abduction apareça mais, ajustar peso curado em `ANCORAS_POR_SUBREGIAO` (não em S-A1).
+  - Demanda região `lower(4)`: hinge+hinge **0%** (era 35% sem S-A1).
 - **Achados bonus registrados na sessão** (não resolvidos por S-A1; frentes futuras):
   - Cobertura per-treino do H-A1 marker pós-H-A0: rotina Filipe Santos 2026-05-25 saiu com T1 sem `squat_bilateral` (apenas `squat_unilateral` = Recuo). H-A1 marker é cross-treino — garante ≥1 squat_bilateral na rotina inteira, não por treino. Bernardo aceitou registrar como pendência separada.
   - Variedade INTRA-subregião (3+ vagas mesma sub): se sub tem só 1 não-obrigatória e ≥3 vagas, v2 zera repetição entre pares, mas não há mais opção pra cumprir. Caso degenerado, sem impacto observado.
@@ -153,6 +154,7 @@
 - Função: preferir grupos musculares distantes ou antagonistas no mesmo bloco. Penalidade cresce com proximidade muscular.
 - Dado: `padrao`, `regiao`, mapa de antagonismo
 - Modulador: Densidade de Pareamento (inversão — alta = neutro, baixa = exige distância)
+- **Escopo (decisão 2026-05-25)**: S-B1 NÃO atua em pares dentro da MESMA demanda subregião explícita (`("subregiao", X, qtd)`). User pediu a sub explicitamente — exercícios da mesma categoria muscular são esperados/aceitáveis. Atua sim cross-sub no mesmo bloco (peito+ombro = ambos push em demanda região). Razão clínica: em `perna_posterior(2)`, par `hinge+knee_flexion` é válido apesar de ambos serem hamstring; bloquear seria over-restritivo e empurrava solver pra `hinge+abduction` em 100% (eliminando variedade).
 
 **S-B2. Balanço de carga implícita acumulada**
 - Origem: Conceito 6
