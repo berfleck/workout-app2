@@ -90,6 +90,36 @@ Cada item independente; entram conforme prioridade clínica observada.
 - **✅ H-A0 — âncoras obrigatórias por REGIÃO** (2026-05-25) — dual da H-A1 pra demanda nível `regiao`. Variável CSP nova `sub_idx[s]` canalizada por `assign`. Per-treino (não cross-treino — decisão 4.1). Banimento upstream de subs não-âncora (decisão 4.3 / Caminho A). Interação H-A0 × H-A1 via marker em estrutura paralela `subregioes_obrigadas_ha0[(t_idx, R)] = set(subs)` (decisão 4.2 / 5.2 / Caminho A — reordenar). Graceful degradation pool vazio + conflito de cardinalidade (constraint colaborativa). `vagas_garantidas_por_sub` separado de `len(sids)` no H-A1 pra detecção correta de conflito quando marker contribui. Smoke do achado fechado: Full Body 2T (região) seed=42 sai com peito+costas+ombro+perna_anterior+perna_posterior em CADA treino. Métrica nova `cobertura_ha0_por_treino` no E.0 mostra CSP 100% vs antigo 40-60% pro ombro em `upper(3)×2T`. Pytest 334 (+15 novos H-A0 + 1 atualizado H-A1) + harness 16/16 + smoke E2E OK. Detalhes em `logs/micro_h_a0_ancoras_regiao.md`.
 - **⬜ Gate de avaliação clínica semântica** — pré-requisito do Bloco 5. Antes de mergear cadastros completos ou desligar motor antigo, instituir prática de gerar 5-10 rotinas por config representativa (incluindo nível região da UI real), Bernardo lê como PT, e cada achado vira: (a) constraint nova no catálogo, (b) métrica nova no harness E.0, ou (c) decisão consciente de "tolerável". Saída: doc `auditorias/<data>_<config>.md` por rodada. Cobre o gap entre conformidade declarada (pytest + harness) e adequação clínica em uso real — vide anti-padrão norte Seção 7. **Caiu na E.1**: 318 testes verdes não pegaram zero-costas-zero-squat porque nenhuma métrica do harness E.0 mede cobertura semântica do repertório. **Pós-H-A0**: métrica `cobertura_ha0_por_treino` operacionaliza essa pergunta pra demandas nível região; gate clínico permanece pra cobrir lacunas além de cobertura por sub-âncora (ordem composto→isolado, volume por região, fadiga acumulada).
 
+**Itens da auditoria 2026-05-26** (ver `auditorias/2026-05-26.md`):
+
+- **🔴 ⬜ Calibração `_PESO_ADERENCIA_POR_PERFIL`** (achado 4) — fix de
+  1 linha em `app_flask.py:486`. Atual `{alta:2, media:0, baixa:0}` tem
+  `media=baixa` (indistinguíveis) e `media=0` (ignora tier). Sugestão
+  curada: `{alta:3-4, media:1-2, baixa:0 ou negativo}`. Bloqueia uso
+  real porque `media` é default da UI. Não espera dashboard quantitativo
+  do Bloco 5 — calibração inicial sai do PT direto.
+- **🔴 ⬜ S-B5 diversidade de região INTRA-bloco** (achado 3) —
+  recupera feature perdida da migração greedy → CSP (P1-P4 do
+  `montar_blocos` antigo). Soft que premia blocos com ex1.regiao ≠
+  ex2.regiao ≠ ex3.regiao. Sem fix, supersets viram circuitos same-region
+  (4/8 blocos na rotina auditada). Fallback graceful quando demanda
+  força same-region (ex: upper(4)).
+- **⬜ S-R1 cross-treino para distribuição subregião dentro de região**
+  (achado 1) — soft que premia simetria entre treinos no split de
+  subregião dentro de uma demanda região (T1=2 ant+1 post, T2=1 ant+2
+  post). Combinar com aleatorização do tie-break Hamilton em
+  `_decompor_demanda_regiao` quando pesos das âncoras empatam. Item
+  `S-R1` listado abaixo cobria caso geral; esta é instância específica.
+- **⬜ Repensar `panturrilha.obrigatoria=False`** (achado 1, subitem) —
+  decisão clínica primeiro: panturrilha 0% em `lower(3)` é desejado?
+  Caminhos: (a) `obrigatoria=True` (quebra rotinas curtas), (b)
+  mecanismo de "acessórios opcionais" separado do Hamilton, (c) aceitar
+  status quo.
+- **⬜ S-E1 diversidade de equipamento cross-treino** (achado 2) —
+  novo eixo para padrão single-slot. Equipamento/pegada do `dimensoes_
+  proximidade.md` (era antiga) não foi reaproveitado no CSP. Calibração
+  depois de S-B5 e S-R1 entrarem (interação de pesos).
+
 **Demais refinamentos** (ordem não prioritária):
 
 - **✅ Frente S-A1 — distribuição entre âncoras não-obrigatórias** (2026-05-25). Componente v1 (linear sobre pesos curados 3/2/1) + v2 (penalty padrão repetido na mesma demanda). Calibração: `peso_sa1=12` + `peso_sa1_repet=10`. Resolve regressão CSP × antigo: ombro(2) 100% comp+iso (era 0%), perna_post(2) 100% hinge+knee (era 0%), peito(2) 100% cmp+iso (era 55%). Ativa em demanda subregião direta (qtd>n_obrig) E em demanda região via marker H-A0 (decisão §5.2 / b). Em demanda região `lower(4)` hinge+hinge zerou (era 35% pre-S-A1, 70% com v1 sozinho). Trade-off documentado: abduction (peso 1) caiu pra 0% — comportamento correto pelo norte Seção 4. Pytest +14 (348 total). Achados bonus registrados pra frentes futuras: bug Filipe Santos (cobertura per-treino H-A1 marker), revisita peso curado abduction. Ver `logs/frente_s_a1.md`.
@@ -111,6 +141,41 @@ Cada item independente; entram conforme prioridade clínica observada.
 - **⬜ H-P2** — Tier Principal + Centralidade Alta + Aderência Alta ⇒ bloco solo. Depende das 4 dimensões + S-B implementado.
 - **⬜ H-X** — restrições físicas/dor sobre pool (filtros hard por aluno).
 - **⬜ Captura de rationale no motor CSP** — destrava UI `/decisoes` pra treinos CSP (hoje mostra mensagem amber). Análogo à Etapa 8 Explicabilidade do antigo.
+
+### Auditoria clínica 2026-05-26 (Full Body 2T pós-E.1, aderência média + alta)
+
+Rotina única gerada interativamente em sessão Claude pós-clean-break E.1
+(Aluno Teste / `regiao upper(3)+lower(3)+core(2)` × 2 treinos / 2 rodadas
+de aderência: média e alta). N=1 por rodada, indicativo. Doc completo
+com sintoma/causa/caminho/status em
+`auditorias/2026-05-26.md`.
+
+**4 achados estruturais** (resumo):
+
+1. 🟡 Distribuição lower sempre 2 ant + 1 post + 0 panturrilha (ambos
+   treinos, ambas aderências) — Hamilton determinístico + ausência de
+   soft cross-treino + `panturrilha.obrigatoria=False`.
+2. 🟡 Equipamento repetido cross-treino para padrão single-slot — 2
+   supinos halteres + 2 desenv. halteres em aderência alta. INTRA não
+   dispara em single-slot; INTER cross-treino do antigo não foi
+   reaproveitado no CSP novo.
+3. 🔴 Supersets pareando exercícios da mesma região — 4/8 blocos com 2
+   exs da mesma região (2 core, 2 upper, 2 lower). Geo-diversidade P1-P4
+   do greedy antigo perdida na migração; CSP não tem constraint análoga.
+4. 🔴 `_PESO_ADERENCIA_POR_PERFIL = {alta:2, media:0, baixa:0}` —
+   `media=baixa=0` ignora tier; com default da UI (`media`), 0/16 slots
+   Principal; com `alta` força bruta, 11/16. Calibração nunca iterada
+   pós-Frente D.
+
+**Ações** (cada uma vira item ⬜ no Bloco 4 abaixo):
+- Achado 4: calibração curada de `_PESO_ADERENCIA_POR_PERFIL` (fix
+  imediato).
+- Achado 3: novo eixo S-B5 (diversidade de região intra-bloco) —
+  recupera feature perdida do greedy.
+- Achado 1: aleatorizar tie-break Hamilton + soft cross-treino S-R1
+  específico para subregião dentro de região.
+- Achado 2: novo eixo S-E1 (diversidade de equipamento cross-treino
+  dentro do mesmo padrão).
 
 ### Auditoria clínica pós-E.1 (registro do achado 2026-05-25)
 
