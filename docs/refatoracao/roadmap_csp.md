@@ -22,7 +22,7 @@ em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5) + Frente E.1 (Bloco 3) + Micro-frente H-A0 + Frente S-A1 + Reavaliação cobertura per-treino H-A1 marker (não-frente — 2026-05-26)
 ```
 
-**Nenhuma branch ativa.** Próxima frente (calibração `_PESO_ADERENCIA_POR_PERFIL` — Achado 4 da auditoria 2026-05-26) sai de `main` direto. Ver `handoff_2026-05-26_calibracao_aderencia.md`.
+**Nenhuma branch ativa.** Frente calibração `_PESO_ADERENCIA_POR_PERFIL` (Achado 4 da auditoria 2026-05-26) **descontinuada** em 2026-05-26 — ver `logs/calibracao_aderencia_descontinuada.md`. Próxima frente: **S-B5 diversidade de região INTRA-bloco** (Achado 3 da auditoria 2026-05-26). Ver `handoff_2026-05-26_sb5_diversidade_regiao_bloco.md`.
 
 ---
 
@@ -93,12 +93,20 @@ Cada item independente; entram conforme prioridade clínica observada.
 
 **Itens da auditoria 2026-05-26** (ver `auditorias/2026-05-26.md`):
 
-- **🔴 ⬜ Calibração `_PESO_ADERENCIA_POR_PERFIL`** (achado 4) — fix de
-  1 linha em `app_flask.py:486`. Atual `{alta:2, media:0, baixa:0}` tem
-  `media=baixa` (indistinguíveis) e `media=0` (ignora tier). Sugestão
-  curada: `{alta:3-4, media:1-2, baixa:0 ou negativo}`. Bloqueia uso
-  real porque `media` é default da UI. Não espera dashboard quantitativo
-  do Bloco 5 — calibração inicial sai do PT direto.
+- **❌ Calibração `_PESO_ADERENCIA_POR_PERFIL`** (achado 4) —
+  **DESCONTINUADA em 2026-05-26**. Sondagem N=20 mostrou que a fórmula
+  `(rank_max - tier_rank[s]) * peso` é binária na prática (pesos 1..10
+  produzem distribuição idêntica 68.8% PRI / 6.2% INT / 25.0% ACE);
+  diferença real só entre peso=0 (sorteio cego = bug atual) e peso≥1
+  (teto saturado). Combinar `peso` + `slack` + `T` da Frente B entrega
+  gradação suave (testado: alta 65% PRI / 71 nomes; media 55% PRI / 89
+  nomes; baixa 17% PRI / 92 nomes) MAS introduz Acessórios fora de
+  contexto no bloco A em ~10% das rotinas (Apoio Ajoelhado / Elevação
+  Frontal abrindo peito). Bernardo encerrou a frente: "prefiro regular
+  o app sem diferenciar entre nível de alunos até achar um 'treino
+  médio' adequado". Ver `logs/calibracao_aderencia_descontinuada.md`.
+  Pode ser retomada quando treino médio estiver sólido + cadastro
+  refinar PRI/INT/ACE além de saturação binária.
 - **🔴 ⬜ S-B5 diversidade de região INTRA-bloco** (achado 3) —
   recupera feature perdida da migração greedy → CSP (P1-P4 do
   `montar_blocos` antigo). Soft que premia blocos com ex1.regiao ≠

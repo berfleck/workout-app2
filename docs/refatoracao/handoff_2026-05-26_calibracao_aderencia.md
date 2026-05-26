@@ -1,3 +1,14 @@
+# ❌ DESCONTINUADO 2026-05-26 — ver `logs/calibracao_aderencia_descontinuada.md`
+
+> **NÃO USAR ESTE HANDOFF.** Frente encerrada na mesma sessão em que foi
+> aberta. Sondagem N=20 mostrou que a fórmula atual é binária (pesos
+> 1..10 idênticos); combinar `peso + slack + T` entrega gradação mas com
+> efeito colateral clínico. Bernardo decidiu parar e priorizar o "treino
+> médio" antes de diferenciar perfis. Próxima frente:
+> `handoff_2026-05-26_sb5_diversidade_regiao_bloco.md`.
+
+---
+
 # Handoff — Calibração `_PESO_ADERENCIA_POR_PERFIL` (Achado 4 da auditoria 2026-05-26)
 
 **Sessão**: próxima após fechamento da frente "cobertura per-treino do

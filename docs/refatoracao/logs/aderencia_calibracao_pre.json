@@ -1,0 +1,119 @@
+{
+  "n_seeds": 20,
+  "pesos": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "demandas_por_treino": [
+    [
+      [
+        "regiao",
+        "upper",
+        3
+      ],
+      [
+        "regiao",
+        "lower",
+        3
+      ],
+      [
+        "regiao",
+        "core",
+        2
+      ]
+    ],
+    [
+      [
+        "regiao",
+        "upper",
+        3
+      ],
+      [
+        "regiao",
+        "lower",
+        3
+      ],
+      [
+        "regiao",
+        "core",
+        2
+      ]
+    ]
+  ],
+  "nivel_aluno_csp": 2,
+  "resultado": {
+    "0": {
+      "n_seeds": 20,
+      "n_inviavel": 0,
+      "n_slots_total": 320,
+      "tier_dist": {
+        "Acessório": 198,
+        "Principal": 71,
+        "Intermediário": 51
+      },
+      "nomes_distintos": 92,
+      "principais_distintos": 27,
+      "top_nome_freq": 17,
+      "top_nome": "Cadeira Extensora"
+    },
+    "1": {
+      "n_seeds": 20,
+      "n_inviavel": 0,
+      "n_slots_total": 320,
+      "tier_dist": {
+        "Principal": 220,
+        "Acessório": 80,
+        "Intermediário": 20
+      },
+      "nomes_distintos": 61,
+      "principais_distintos": 33,
+      "top_nome_freq": 20,
+      "top_nome": "Desenv. Halteres Sentado"
+    },
+    "2": {
+      "n_seeds": 20,
+      "n_inviavel": 0,
+      "n_slots_total": 320,
+      "tier_dist": {
+        "Intermediário": 20,
+        "Principal": 220,
+        "Acessório": 80
+      },
+      "nomes_distintos": 61,
+      "principais_distintos": 34,
+      "top_nome_freq": 20,
+      "top_nome": "Desenv. Halteres Sentado"
+    },
+    "3": {
+      "n_seeds": 20,
+      "n_inviavel": 0,
+      "n_slots_total": 320,
+      "tier_dist": {
+        "Principal": 220,
+        "Intermediário": 20,
+        "Acessório": 80
+      },
+      "nomes_distintos": 59,
+      "principais_distintos": 34,
+      "top_nome_freq": 20,
+      "top_nome": "Desenv. Halteres Sentado"
+    },
+    "4": {
+      "n_seeds": 20,
+      "n_inviavel": 0,
+      "n_slots_total": 320,
+      "tier_dist": {
+        "Intermediário": 20,
+        "Principal": 220,
+        "Acessório": 80
+      },
+      "nomes_distintos": 61,
+      "principais_distintos": 34,
+      "top_nome_freq": 20,
+      "top_nome": "Desenv. Halteres Sentado"
+    }
+  }
+}
