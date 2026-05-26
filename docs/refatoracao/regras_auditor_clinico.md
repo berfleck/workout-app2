@@ -222,6 +222,21 @@ Achado pode ter `causa_raiz_sugerida` em branco se a violação é evidente mas 
 - **Perfil 4D parcial** — só `nivel` e `aderencia` no DB hoje. Centralidade e densidade pareamento ainda virão.
 - **N de auditorias = 1**. Regras vão refinar conforme mais auditorias rodarem; algumas podem ser fundidas/descartadas.
 
+## Diretrizes metodológicas para o agente (NUNCA inferir, sempre ler)
+
+Lição aprendida do Achado D RETRATADO da `auditorias/2026-05-25_pos_h_a0.md`: agente assumiu `Agachamento Goblet Rampa = squat_unilateral` baseado no nome do exercício, sem ler o campo `unilateral` do `Exercicio`. Erro factual que contaminou a auditoria e quase virou frente.
+
+**Regras invioláveis pro agente:**
+
+1. **Lateralidade (`unilateral`) vem do campo do banco, NUNCA do nome.** "Goblet" / "Uni" / "Alternado" no nome são pistas mas não fonte de verdade. Sempre `ex.unilateral`.
+2. **Padrão (`padrao`) vem do banco, NUNCA inferido por nome.** Mesma regra.
+3. **Subregião (`subregiao`) e região (`regiao`) vem do banco.**
+4. **Tier vem do banco** (coluna `tier`), não inferido por composto/isolado.
+5. **`purpose` vem do banco** (compound/isolation/stability/explosive). Não inferir.
+6. **Quando o agente não tem certeza de um campo**: registrar `"campo_X": "DESCONHECIDO"` na violação em vez de chutar. Bernardo decide se vale completar manualmente.
+
+Princípio geral: agente é leitor de tabelas curadas + executor de predicates. Não é classificador clínico. Quando o predicate exige conhecimento que não está em tabela acessível, agente flagga "regra X não pôde ser verificada porque campo Y não está disponível", não inventa veredicto.
+
 ---
 
 ## Próximos passos
