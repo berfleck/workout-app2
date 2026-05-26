@@ -22,7 +22,7 @@ em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5) + Frente E.1 (Bloco 3) + Micro-frente H-A0 + Frente S-A1 (Bloco 4)
 ```
 
-**Branch ativa pra revisar/mergear**: `frente-s-a1` (aguarda aprovação Bernardo). Próxima frente sai de `main` direto após merge.
+**Nenhuma branch ativa.** Próxima frente (cobertura per-treino do H-A1 marker — bug Filipe Santos) sai de `main` direto.
 
 ---
 
