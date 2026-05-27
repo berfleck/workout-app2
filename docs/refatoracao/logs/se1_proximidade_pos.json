@@ -1,0 +1,25 @@
+{
+  "n_seeds": 10,
+  "peso_se1_pegada": 10,
+  "peso_se1_plano": 10,
+  "peso_se1_eq": 2,
+  "configs": {
+    "Full Body 2T (regiao, aderencia=alta)": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_supinos_halteres_repetido": 0,
+      "n_desenv_halteres_repetido": 0,
+      "n_pegada_repetida": 0,
+      "n_plano_repetido": 0,
+      "n_eq_repetido": 0,
+      "pct_supinos_halteres_repetido": 0.0,
+      "pct_desenv_halteres_repetido": 0.0,
+      "pct_pegada_repetida_cross_treino": 0.0,
+      "pct_plano_repetido_cross_treino": 0.0,
+      "pct_eq_repetido_cross_treino": 0.0,
+      "tempo_p50_s": 1.6542491500731558,
+      "tempo_max_s": 1.8469696999527514,
+      "exemplos_rotinas": []
+    }
+  }
+}

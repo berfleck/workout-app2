@@ -572,6 +572,21 @@ _PESO_SB5_DEFAULT = 4
 # motor a quebrar bloco em solos. Skip estrutural em rotinas com <2 treinos.
 _PESO_SR1_DEFAULT = 4
 
+# S-E1 (2026-05-28): proximidade biomecânica cross-treino — Achado 2 da
+# auditoria 2026-05-26. Penaliza pares de slots em treinos diferentes mesma
+# subregião com match exato em pegada / plano_corporal / equipamento_grupo
+# (Seção 1.5 dimensoes_proximidade.md — referência viva). Default ON sempre,
+# sem toggle UI. Pesos calibrados via sondagem 2026-05-28 (se1_proximidade_pos.json):
+# 10/10/2 zera 5/5 métricas em Full Body 2T aderência alta (caso clínico do
+# achado) sem regredir cenário. Magnitude > peso_sb5/sr1=4 e < peso_sa1=12 —
+# entre tier-order/Aderência e distribuição entre âncoras. Proporção ~5:1
+# entre dims ALTO (pegada/plano) e BAIXO (eq) preserva semântica da Seção 1.5
+# (eq é tiebreaker, ALTO captura proximidade biomecânica forte). Skip
+# estrutural em rotinas com <2 treinos (sem cross-treino).
+_PESO_SE1_PEGADA_DEFAULT = 10
+_PESO_SE1_PLANO_DEFAULT = 10
+_PESO_SE1_EQ_DEFAULT = 2
+
 
 def _tamanho_e_peso_bloco_csp(cfg_r):
     """Retorna (tamanho_preferido, peso) pro CSP.
@@ -2032,6 +2047,9 @@ def gerar():
         peso_sa1_repet=_PESO_SA1_REPET_DEFAULT,
         peso_sb5=_PESO_SB5_DEFAULT,
         peso_sr1=_PESO_SR1_DEFAULT,
+        peso_se1_pegada=_PESO_SE1_PEGADA_DEFAULT,
+        peso_se1_plano=_PESO_SE1_PLANO_DEFAULT,
+        peso_se1_eq=_PESO_SE1_EQ_DEFAULT,
     )
 
     if resultado_csp.get("viavel"):

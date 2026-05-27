@@ -155,16 +155,26 @@ Cada item independente; entram conforme prioridade clínica observada.
   0%. Volume lower simétrico (3+3) em 100% das rotinas vs 30% pré-fix.
   Pytest 360+4=364 + harness 16/16 OK + smoke E2E confirma. Ver
   `logs/mvp_filtro_acessorias_csp.md`. **Achado 1 totalmente fechado.**
-- **⬜ S-E1 proximidade biomecânica cross-treino** (achado 2,
-  renomeado 2026-05-27) — NÃO É só equipamento. Reusa as 3 dimensões
-  já cadastradas no XLSX desde Fase 4 (pegada matriz 4×4 / plano_corporal /
-  equipamento_grupo) + lógica INTER ~0.8×INTRA do `_score_proximidade`
-  do gerador antigo. Pesos e matriz já calibrados em
-  `arquivo/era_v4_greedy_incremental/dimensoes_proximidade.md`
-  (referência viva — exceção registrada no CLAUDE.md). Escopo "mesma
-  subregião" resolve naturalmente o caso clínico do Bernardo (2026-05-27):
-  "halteres vs barra IMPORTA em supino, NÃO IMPORTA em passada". S-R1
-  acabou de entrar → S-E1 desbloqueado.
+- **✅ S-E1 proximidade biomecânica cross-treino** (achado 2,
+  2026-05-28) — Branch `frente-s-e1-proximidade-biomecanica` (aguarda
+  merge FF). 3 pesos soft (pegada=10 / plano=10 / eq=2) penalizam pares
+  cross-treino mesma-subregião com match exato. Modelagem **par-a-par
+  cross-slot** (não par × subregião como S-R1): `same_sub` BoolVar
+  reificada UMA vez por par, multiplicada no AND com `same_dim` no
+  `OnlyEnforceIf`. Sentinela por slot pra dim ausente (`BASE_VAZIA +
+  sid` único por slot → same_X false sem BoolVar de validade
+  adicional). **Achado durante leitura preparatória**: pegada já é
+  BINÁRIA no motor antigo (D2.1 fechou em constante por dim, não
+  matriz 4×4 como o handoff sugeria — docstring de
+  `gerador_treino._score_proximidade:2217`). Sondagem PRÉ × PÓS Full
+  Body 2T `aderencia=alta`: pegada/plano repetida 100% → 0%; eq
+  repetido 40% → 0%; supinos halteres repetido 10% → 0%; tempo p50
+  0.79s → 1.65s (~2x, aceitável). Pytest 364 + 6 novos = 370 +
+  harness 16/16 OK + smoke E2E Flask test client confirma
+  equipamentos distintos cross-treino em peito. `treino_regerar`
+  NÃO recebe (skip estrutural — mesmo critério da S-R1). Ver
+  `logs/mvp_se1_proximidade_biomecanica.md`. **Achado 2 totalmente
+  fechado.**
 
 **Demais refinamentos** (ordem não prioritária):
 

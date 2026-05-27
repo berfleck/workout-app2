@@ -1,0 +1,47 @@
+{
+  "n_seeds": 10,
+  "peso_se1_pegada": 0,
+  "peso_se1_plano": 0,
+  "peso_se1_eq": 0,
+  "configs": {
+    "Full Body 2T (regiao, aderencia=alta)": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_supinos_halteres_repetido": 1,
+      "n_desenv_halteres_repetido": 0,
+      "n_pegada_repetida": 10,
+      "n_plano_repetido": 10,
+      "n_eq_repetido": 4,
+      "pct_supinos_halteres_repetido": 10.0,
+      "pct_desenv_halteres_repetido": 0.0,
+      "pct_pegada_repetida_cross_treino": 100.0,
+      "pct_plano_repetido_cross_treino": 100.0,
+      "pct_eq_repetido_cross_treino": 40.0,
+      "tempo_p50_s": 0.7908168500289321,
+      "tempo_max_s": 0.8642144000623375,
+      "exemplos_rotinas": [
+        {
+          "seed": 0,
+          "pares": [
+            "T1:Lev. Terra <-> T2:Stiff Barra Smith [perna_posterior] (plano=em_pe)",
+            "T1:Supino Com Halteres <-> T2:Supino Com Barra [peito] (pegada=pronada, plano=reto)"
+          ]
+        },
+        {
+          "seed": 1,
+          "pares": [
+            "T1:Stiff Halteres <-> T2:Lev. Terra Sumô [perna_posterior] (plano=em_pe)",
+            "T1:Supino Com Halteres <-> T2:Supino Smith Inclinado [peito] (pegada=pronada)"
+          ]
+        },
+        {
+          "seed": 2,
+          "pares": [
+            "T1:Supino Com Halteres <-> T2:Supino Com Barra [peito] (pegada=pronada, plano=reto)",
+            "T1:Stiff Uni. Halteres <-> T2:Stiff Barra Livre [perna_posterior] (plano=em_pe)"
+          ]
+        }
+      ]
+    }
+  }
+}

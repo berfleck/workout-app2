@@ -208,6 +208,24 @@
 - Dado: `padrao`, `plano_corporal`, `lateralidade`
 - Importante: solver vê os N treinos simultaneamente.
 
+**S-E1. Proximidade biomecânica cross-treino**
+- Origem: Achado 2 da auditoria 2026-05-26; spec consolidada na frente S-E1 (2026-05-28).
+- Função: penaliza pares de slots em treinos diferentes mesma-subregião com match exato em `pegada` / `plano_corporal` / `equipamento_grupo`. Recupera o `_score_inter` do gerador antigo (`gerador_treino._score_proximidade`, contexto `"inter"`) com modelagem declarativa CSP, sem migrar `pesos_proximidade.py` (CSP fica independente).
+- Dado: `pegada`, `plano_corporal`, `equipamento_grupo` (cadastrados desde Fase 4 — Seção 1 da `arquivo/era_v4_greedy_incremental/dimensoes_proximidade.md`, REFERÊNCIA VIVA).
+- Modelagem (par-a-par cross-slot, escopo "mesma subregião" via reificação):
+  - Pra cada par (s1, s2) com t_idx(s1) < t_idx(s2) e `subs_possiveis(s1) ∩ subs_possiveis(s2) ≠ ∅`: cria `same_sub = (subregiao_idx[s1] == subregiao_idx[s2])` UMA vez.
+  - Pra cada dim X com `peso_se1_X > 0`: cria `same_X = (X_idx[s1] == X_idx[s2])`, e `viol_X >= peso_se1_X` quando `AND(same_sub, same_X)`.
+  - **Sentinela por slot** pra dim ausente: ex sem `X` cadastrada recebe `code = BASE_VAZIA + sid` (único por slot). Dois slots vazios em sids distintos recebem codes diferentes → `same_X` reifica false naturalmente, sem precisar BoolVar de validade. Honra `cand.X and outro.X and cand.X == outro.X` do antigo + `_SUBREGIOES_X_NA` da Seção 7 dimensoes_proximidade automaticamente (banco cadastra dim vazia em subs N/A).
+- Pesos calibrados (2026-05-28 via sondagem N=10 Full Body 2T `aderencia=alta`):
+  - `peso_se1_pegada = 10` (ALTO)
+  - `peso_se1_plano = 10` (ALTO)
+  - `peso_se1_eq = 2` (BAIXO tiebreaker — Seção 1.5 dimensoes_proximidade)
+  - Proporção 5:1 ALTO:BAIXO preserva semântica clínica. Pegada NÃO usa matriz 4×4 (D2.1 fechou em constante por dim, 2026-05-09).
+- Escopo "mesma subregião" preservado (Seção 1.5): halteres vs barra IMPORTA em supino (mesmo peito), NÃO importa em passada (perna_anterior unilateral — pegada/plano N/A via sentinela). Decisão clínica fechada na Etapa 6, não reabrir.
+- Default ON sempre, sem toggle UI (igual S-R1/S-B5/S-A1). Skip estrutural em rotinas com <2 treinos. NÃO ativa em `treino_regerar` (1 treino isolado, sem cross-treino possível — mesmo critério da S-R1).
+- **Resolve junto** (sondagem Full Body 2T região + aderência alta): pct_pegada_repetida_cross_treino 100% → 0%; pct_plano_repetido 100% → 0%; pct_eq_repetido 40% → 0%; pct_supinos_halteres_repetido 10% → 0%. Smoke E2E confirma equipamentos distintos cross-treino em peito.
+- **Não cobre**: INTRA-treino mesma-subregião (esse é escopo de S-T4, frente separada). Família estrita / lateralidade / variante_pontual cross-treino seguem cobertas por H-T1/T2/T3 + `familias_proibidas` da Frente E.1.
+
 **S-R2. Frequência típica de combinações** ⭐
 - Origem: Conceito 4
 - Função: combinações típicas (Supino + Isolado pra peito 2 vagas) com peso maior; atípicas (Apoio + Isolado) com peso menor mas permitidas.
