@@ -114,6 +114,16 @@ cross-treino (ex: peito Supino + Crucifixo em T1; Apoio + Voador
 em T2), o score INTER vai ser somatório das dimensões — naturalmente
 penaliza pares próximos.
 
+**Escopo desta frente: INTER cross-treino apenas.** O viés
+INTRA-treino mesma-subregião (verbalizado por Bernardo 2026-05-27:
+"puxada aberta fixada primeiro → remada aberta penalizada → solver
+do antigo escolhia remada neutra mesmo quando aberta+aberta era
+ideal") é coberto por **S-T4** no `catalogo_constraints.md`
+(escopo INTRA, Conceito 5), frente separada. Esta sessão NÃO
+implementa INTRA. A restrição de modelagem simétrica par-a-par
+(§7) se aplica nos dois escopos — documenta agora pra reaproveitar
+quando S-T4 for implementada.
+
 ### 3.2 Quais dimensões consumir
 
 O antigo usa 5 core + 1 narrow (Seção 1 de `dimensoes_proximidade.md`):
@@ -208,10 +218,20 @@ Estrutura provável: BoolVars `same_pegada_pair[(s1, s2)]`,
 de slots cross-treino com mesma subregião. Penalty linear sobre
 BoolVars no objetivo.
 
+**Simetria par-a-par obrigatória** (ver [[modelagem-simetrica-csp]]
++ restrição §7). BoolVars `same_X[s1, s2]` são simétricas por
+construção. NÃO modelar "s1 é referência, s2 é variante" — isso
+reintroduz o viés greedy do antigo verbalizado por Bernardo
+(puxada fixada primeiro consumia dimensões; remada sofria todas
+as penalties). Solver CP-SAT vê todos os slots de uma subregião
+simultaneamente — paradigma CSP resolve por design desde que
+modelagem não quebre simetria.
+
 **Cuidado**: matriz pegada 4×4 não é binária — precisa de IntVar
 ou de mapping específico. Olhar como o antigo fez em
 `_score_proximidade` (`gerador_treino.py` ~linha 1577 conforme
-Sessão 10 da Etapa 7).
+Sessão 10 da Etapa 7). Confirmar que o mapping é simétrico
+(matriz[i][j] == matriz[j][i]).
 
 ### 4.2 Reaproveitar `pesos_proximidade.py`?
 
@@ -330,6 +350,25 @@ ombro têm equipamentos diferentes cross-treino.
   `pegada` + `plano_corporal` + `equipamento_grupo`.
 - **NÃO introduzir modulador por Aderência ao Tier** nesta frente
   (§3.6 — fora de escopo, aguarda aderência gradual).
+- **NÃO implementar INTRA-treino mesma-subregião** (S-T4 do catálogo,
+  frente separada). Esta sessão é só INTER cross-treino. Restrição
+  de simetria (próximo bullet) se aplica em ambas — registrar agora
+  reaproveita pra quando S-T4 for implementada.
+- **Modelagem simétrica par-a-par OBRIGATÓRIA** — ver
+  [[modelagem-simetrica-csp]] e §4.1. BoolVar
+  `same_X[s1, s2] = (X[s1] == X[s2])` ligada via `OnlyEnforceIf`.
+  Penalty linear no objetivo. NÃO modelar como "slot A é referência,
+  slot B é variante" (reintroduz viés greedy verbalizado por Bernardo:
+  no antigo, puxada fixada primeiro consumia dimensões sem custo;
+  remada sofria todas as penalties → solver escolhia remada neutra
+  mesmo quando aberta+aberta era ideal). NÃO decompor em passes
+  sequenciais (escolher slot 1 primeiro, depois slot 2 já com
+  referência fixada). Solver CP-SAT vê todos os slots de uma
+  subregião simultaneamente — paradigma CSP resolve por design
+  desde que modelagem não quebre simetria. Confirmar `randomize_search=True`
+  no caminho que usa S-E1 (default no CSP atual). Considerar pytest
+  explícito de simetria: gerar com seed=N, trocar ordem dos slots
+  na demanda, resultado clínico deve ser estatisticamente equivalente.
 
 ---
 
