@@ -542,6 +542,27 @@ _PESO_SA1_DEFAULT = 12
 _PESO_SA1_REPET_DEFAULT = 10
 
 
+# S-B5 (2026-05-26) — diversidade de região INTRA-bloco.
+# Achado 3 da auditoria 2026-05-26: 4/8 blocos saíam com 2 exs da mesma
+# região (circuito do mesmo grupo). Penalty por par mesmo bloco + mesma
+# região. **Default ON sempre, sem toggle UI** — vale pra qualquer
+# rotina multi-região, não é decisão clínica caso-a-caso. Em demandas
+# single-region (upper(4) sozinha) o motor aceita pareamento same-region
+# pagando penalty — graceful degradation natural.
+#
+# Peso=4 calibrado por sondagem 2026-05-26 (N=10 × 5 configs). A 1ª
+# tentativa com peso=10 (mesma magnitude de S-B1) destruía blocos em
+# configs single-region: ABC 3T saltou de 19.6% → 61.8% de blocos solo
+# (motor preferia 2 solos a 1 par same-region — empate de custo: dupla
+# same-region = 10, dois solos = 5+5 = 10). Peso=4 fica abaixo do custo
+# de virar solo (`_PESO_TAMANHO_BLOCO_DEFAULT * desvio = 5*1 = 5`) →
+# motor PREFERE par same-region quando não há cross-region disponível, e
+# acima de S-T1 (`rank_max=3`) → mantém prioridade clínica. Em multi-
+# região o motor ainda alterna (custo cross-region = 0 < custo same-
+# region = 4). Calibração validada na sondagem pós (sb5_pos.json).
+_PESO_SB5_DEFAULT = 4
+
+
 def _tamanho_e_peso_bloco_csp(cfg_r):
     """Retorna (tamanho_preferido, peso) pro CSP.
     cfg_r['tamanho_bloco'] vem da UI antiga (int 1/2/3, default 2 no parser).
@@ -1999,6 +2020,7 @@ def gerar():
         cargas_config=cargas_config or None,
         peso_sa1=_PESO_SA1_DEFAULT,
         peso_sa1_repet=_PESO_SA1_REPET_DEFAULT,
+        peso_sb5=_PESO_SB5_DEFAULT,
     )
 
     if resultado_csp.get("viavel"):
@@ -2366,6 +2388,7 @@ def treino_regerar(t):
             cargas_config=cargas_cfg or None,
             peso_sa1=_PESO_SA1_DEFAULT,
             peso_sa1_repet=_PESO_SA1_REPET_DEFAULT,
+            peso_sb5=_PESO_SB5_DEFAULT,
         )
         nome_custom = cfg_r.get("nome_custom", "")
         tipo_label = nome_custom or sessoes_ativas[t].tipo

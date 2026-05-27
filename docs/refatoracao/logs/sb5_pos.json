@@ -1,0 +1,83 @@
+{
+  "n_seeds": 10,
+  "peso_sb5": 4,
+  "configs": {
+    "Full Body 2T (sub)": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_blocos_total": 99,
+      "n_blocos_com_2plus": 80,
+      "n_blocos_same_region": 0,
+      "n_blocos_solo": 19,
+      "pct_blocos_same_region": 0.0,
+      "pct_blocos_solo": 19.19191919191919,
+      "tempo_p50_s": 11.179739599931054,
+      "tempo_max_s": 23.107864999910817,
+      "exemplos_same_region": []
+    },
+    "ABC 3T": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_blocos_total": 123,
+      "n_blocos_com_2plus": 85,
+      "n_blocos_same_region": 65,
+      "n_blocos_solo": 38,
+      "pct_blocos_same_region": 76.47058823529412,
+      "pct_blocos_solo": 30.89430894308943,
+      "tempo_p50_s": 71.60306330013555,
+      "tempo_max_s": 673.5708498999011,
+      "exemplos_same_region": [
+        "seed=0 | T1 Bloco B: Elevação Lateral Polia [upper] + Desenv. Halteres Sentado [upper]",
+        "seed=0 | T1 Bloco C: Apoio Fechado [upper] + Crucifixo Inclinado Halteres [upper]",
+        "seed=0 | T2 Bloco B: Remada LM Aberta [upper] + Barra Fixa [upper]"
+      ]
+    },
+    "upper(3)x2T": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_blocos_total": 40,
+      "n_blocos_com_2plus": 20,
+      "n_blocos_same_region": 20,
+      "n_blocos_solo": 20,
+      "pct_blocos_same_region": 100.0,
+      "pct_blocos_solo": 50.0,
+      "tempo_p50_s": 0.21558305015787482,
+      "tempo_max_s": 0.2267068000510335,
+      "exemplos_same_region": [
+        "seed=0 | T1 Bloco B: Remada Curvada Barra [upper] + Desenv. Halteres Sentado [upper]",
+        "seed=0 | T2 Bloco A: Supino Inclinado Halteres [upper] + Barra C/ Borracha [upper]",
+        "seed=1 | T1 Bloco A: Remada Curvada Halteres [upper] + Apoio Ajoelhado [upper]"
+      ]
+    },
+    "perna_ant(3)+perna_post(3)": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_blocos_total": 30,
+      "n_blocos_com_2plus": 30,
+      "n_blocos_same_region": 30,
+      "n_blocos_solo": 0,
+      "pct_blocos_same_region": 100.0,
+      "pct_blocos_solo": 0.0,
+      "tempo_p50_s": 0.11887619993649423,
+      "tempo_max_s": 0.1497341999784112,
+      "exemplos_same_region": [
+        "seed=0 | T1 Bloco A: Agach. Lateral [lower] + Agachamento Goblet [lower]",
+        "seed=0 | T1 Bloco B: Kickback Polia [lower] + Side Clams [lower]",
+        "seed=0 | T1 Bloco C: Cadeira Extensora [lower] + Cadeira Flexora [lower]"
+      ]
+    },
+    "Full Body 2T (regiao, H-A0)": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_blocos_total": 80,
+      "n_blocos_com_2plus": 80,
+      "n_blocos_same_region": 0,
+      "n_blocos_solo": 0,
+      "pct_blocos_same_region": 0.0,
+      "pct_blocos_solo": 0.0,
+      "tempo_p50_s": 0.5266283500241116,
+      "tempo_max_s": 0.7918396000750363,
+      "exemplos_same_region": []
+    }
+  }
+}

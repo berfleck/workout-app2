@@ -13,7 +13,7 @@ linha de "o que entregou" + 1 linha de "próximo bloqueio se houver".
 
 ---
 
-## Estado das branches (2026-05-26)
+## Estado das branches (2026-05-27)
 
 Pós-instituição da disciplina de merge (seção abaixo): branches mergeadas
 em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
@@ -22,7 +22,8 @@ em `main` assim que passam no gate. Pilha empilhada anterior já consolidada.
 main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-A1 (Bloco 2.5) + Frente E.1 (Bloco 3) + Micro-frente H-A0 + Frente S-A1 + Reavaliação cobertura per-treino H-A1 marker (não-frente — 2026-05-26)
 ```
 
-**Nenhuma branch ativa.** Frente calibração `_PESO_ADERENCIA_POR_PERFIL` (Achado 4 da auditoria 2026-05-26) **descontinuada** em 2026-05-26 — ver `logs/calibracao_aderencia_descontinuada.md`. Próxima frente: **S-B5 diversidade de região INTRA-bloco** (Achado 3 da auditoria 2026-05-26). Ver `handoff_2026-05-26_sb5_diversidade_regiao_bloco.md`.
+**Branch ativa**: `sb5-diversidade-regiao-bloco` (commit + push pendentes,
+aguarda aprovação Bernardo pra merge FF — gate verde).
 
 ---
 
@@ -47,6 +48,7 @@ main  ← inclui Fatias 1-4.E (Bloco 1) + Frente E.0 (Bloco 2) + Micro-frente H-
 | Frente E.1 | `/gerar` chamando `gerar_rotina_csp` (clean break do motor antigo); adapter rotina-inteira (`_distribuir_avisos_rotina_csp` + helpers); modal de avisos ganha clauses `h_a1_degradado` + `h_r1_degradado`; toggle R-1 wirado como `familias_proibidas` hard cross-rotina | `logs/frente_e1_substituir_gerar.md` |
 | Micro-frente H-A0 | Âncoras obrigatórias por REGIÃO (per-treino, banimento upstream de subs não-âncora, marker H-A0 → H-A1, graceful degradation pool vazio + conflito cardinalidade) | `logs/micro_h_a0_ancoras_regiao.md` |
 | Frente S-A1 | Distribuição entre âncoras não-obrigatórias (v1 linear sobre pesos curados 3/2/1 + v2 penalty padrão repetido). Resolve regressão CSP × antigo em ombro(2)/perna_posterior(2)/peito(2). Calibração peso_sa1=12 + peso_sa1_repet=10. Ativa em demanda subregião E região (via H-A0 marker). | `logs/frente_s_a1.md` |
+| Frente S-B5 | Diversidade de região INTRA-bloco (achado 3 da auditoria 2026-05-26). Penalty fixo por par mesmo bloco + mesma região. Default ON sempre (peso=4). Skip estrutural em treinos single-region (otimização de tempo). Full Body 2T região: 22.5% → 0% blocos same-region. Smoke E2E confirma 0/8 (era 4/8 na auditoria N=1). Pytest +7 (357/358), harness 16/16 OK. | `logs/mvp_sb5_diversidade_regiao_bloco.md` |
 | Reavaliação H-A1 per-treino | Fechada como **não-frente** (2026-05-26). Diagnóstico original (handoff `handoff_2026-05-25_h_a1_per_treino.md`, deletado) era falso achado clínico. Bernardo verbalizou 3 princípios clínicos (equilíbrio cross-treino; composto antes de isolado na ROTINA; variabilidade entre treinos) que invalidam o achado: T1-uni + T2-bi em perna_anterior é variabilidade desejada, não bug. Motor pós-H-A0 + S-A1 já correto pelos princípios. Zero diff de produção; só evidência docs + ferramenta de sondagem permanente. | `logs/h_a1_per_treino_reavaliacao.md` |
 
 ---
@@ -107,12 +109,18 @@ Cada item independente; entram conforme prioridade clínica observada.
   médio' adequado". Ver `logs/calibracao_aderencia_descontinuada.md`.
   Pode ser retomada quando treino médio estiver sólido + cadastro
   refinar PRI/INT/ACE além de saturação binária.
-- **🔴 ⬜ S-B5 diversidade de região INTRA-bloco** (achado 3) —
-  recupera feature perdida da migração greedy → CSP (P1-P4 do
-  `montar_blocos` antigo). Soft que premia blocos com ex1.regiao ≠
-  ex2.regiao ≠ ex3.regiao. Sem fix, supersets viram circuitos same-region
-  (4/8 blocos na rotina auditada). Fallback graceful quando demanda
-  força same-region (ex: upper(4)).
+- **✅ S-B5 diversidade de região INTRA-bloco** (achado 3) —
+  CONCLUÍDA 2026-05-27 (branch `sb5-diversidade-regiao-bloco`,
+  aguarda merge FF). Penalty fixo por par mesmo bloco + mesma região.
+  Default ON sempre (peso=4, sem toggle UI). Skip estrutural em
+  treinos single-region (otimização de tempo CP-SAT). Resultado:
+  Full Body 2T (sub) 38.8% → 0%, Full Body 2T (região, achado da
+  auditoria) 22.5% → 0%. Smoke E2E `/gerar` Full Body 2T região
+  confirma **0/8 blocos same-region** vs 4/8 da rotina N=1 auditada.
+  Single-region preservado (upper(3)×2T e perna_ant+post mantêm taxa
+  de blocos solo da Fatia 4.C). ABC 3T cai pouco (-3.7pp) porque
+  Day A/B são single-region; S-B5 só atua em Day C. Pytest +7
+  (357/358), harness 16/16 OK. Ver `logs/mvp_sb5_diversidade_regiao_bloco.md`.
 - **⬜ S-R1 cross-treino para distribuição subregião dentro de região**
   (achado 1) — soft que premia simetria entre treinos no split de
   subregião dentro de uma demanda região (T1=2 ant+1 post, T2=1 ant+2

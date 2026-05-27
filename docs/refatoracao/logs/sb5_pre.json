@@ -1,0 +1,91 @@
+{
+  "n_seeds": 10,
+  "peso_sb5": 0,
+  "configs": {
+    "Full Body 2T (sub)": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_blocos_total": 88,
+      "n_blocos_com_2plus": 80,
+      "n_blocos_same_region": 31,
+      "n_blocos_solo": 8,
+      "pct_blocos_same_region": 38.75,
+      "pct_blocos_solo": 9.090909090909092,
+      "tempo_p50_s": 1.4541058499598876,
+      "tempo_max_s": 1.6185012999922037,
+      "exemplos_same_region": [
+        "seed=0 | T2 Bloco A: Supino Com Halteres [upper] + Remada Baixa Aberta [upper] + Nordic Curl [lower]",
+        "seed=0 | T2 Bloco C: Tríceps Coice Polia [upper] + Bíceps Halteres [upper]",
+        "seed=1 | T1 Bloco B: Apoio Ajoelhado [upper] + Remada Curvada Barra [upper] + Passada [lower]"
+      ]
+    },
+    "ABC 3T": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_blocos_total": 107,
+      "n_blocos_com_2plus": 86,
+      "n_blocos_same_region": 69,
+      "n_blocos_solo": 21,
+      "pct_blocos_same_region": 80.23255813953489,
+      "pct_blocos_solo": 19.626168224299064,
+      "tempo_p50_s": 8.557510249898769,
+      "tempo_max_s": 15.661089999834076,
+      "exemplos_same_region": [
+        "seed=0 | T1 Bloco A: Desenvolvimento Barra [upper] + Elevação Lateral Polia [upper]",
+        "seed=0 | T1 Bloco B: Supino Fechado [upper] + Tríceps Testa Halteres [upper]",
+        "seed=0 | T1 Bloco C: Crossover [upper] + Crucifixo Inclinado Halteres [upper]"
+      ]
+    },
+    "upper(3)x2T": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_blocos_total": 40,
+      "n_blocos_com_2plus": 20,
+      "n_blocos_same_region": 20,
+      "n_blocos_solo": 20,
+      "pct_blocos_same_region": 100.0,
+      "pct_blocos_solo": 50.0,
+      "tempo_p50_s": 0.21739575010724366,
+      "tempo_max_s": 0.22995740012265742,
+      "exemplos_same_region": [
+        "seed=0 | T1 Bloco A: Serrote [upper] + Desenv. Halteres Sentado [upper]",
+        "seed=0 | T2 Bloco B: Puxada Supinada [upper] + Desenvolvimento Barra [upper]",
+        "seed=1 | T1 Bloco B: Remada Curvada Smith [upper] + Desenv. Halteres Uni. [upper]"
+      ]
+    },
+    "perna_ant(3)+perna_post(3)": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_blocos_total": 30,
+      "n_blocos_com_2plus": 30,
+      "n_blocos_same_region": 30,
+      "n_blocos_solo": 0,
+      "pct_blocos_same_region": 100.0,
+      "pct_blocos_solo": 0.0,
+      "tempo_p50_s": 0.1220436500152573,
+      "tempo_max_s": 0.14781929994933307,
+      "exemplos_same_region": [
+        "seed=0 | T1 Bloco A: Recuo Alternado [lower] + Agachamento Goblet Rampa [lower]",
+        "seed=0 | T1 Bloco B: Nordic Curl [lower] + Desloc. Lateral c/ Band [lower]",
+        "seed=0 | T1 Bloco C: Cadeira Extensora [lower] + Ponte Alternada [lower]"
+      ]
+    },
+    "Full Body 2T (regiao, H-A0)": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_blocos_total": 80,
+      "n_blocos_com_2plus": 80,
+      "n_blocos_same_region": 18,
+      "n_blocos_solo": 0,
+      "pct_blocos_same_region": 22.5,
+      "pct_blocos_solo": 0.0,
+      "tempo_p50_s": 0.49701514991465956,
+      "tempo_max_s": 0.676158000016585,
+      "exemplos_same_region": [
+        "seed=0 | T1 Bloco A: Desenvolvimento Barra [upper] + Remada Apoiado [upper]",
+        "seed=1 | T1 Bloco A: Remada Uni Polia [upper] + Supino Smith Inclinado [upper]",
+        "seed=1 | T1 Bloco C: Abdução Polia [lower] + Ponte [lower]"
+      ]
+    }
+  }
+}

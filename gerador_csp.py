@@ -100,6 +100,27 @@ def _grupo_code_do_ex(ex: Exercicio) -> int:
 
 
 # ---------------------------------------------------------------------------
+# S-B5 (2026-05-26) — diversidade de região INTRA-bloco
+# ---------------------------------------------------------------------------
+#
+# Codificação da região do exercício (upper/lower/core/cardio + fallback)
+# usada em S-B5 pra detectar pares same-region no mesmo bloco. Recupera a
+# feature P1-P4 do `montar_blocos` greedy antigo, perdida na migração CSP.
+# Achado 3 da auditoria 2026-05-26: 4/8 blocos saíam com 2 exs da mesma
+# região (upper+upper, lower+lower, core+core), anulando o ponto do
+# superset (alternância de grupos musculares).
+
+_REGIOES_UNICAS = ["upper", "lower", "core", "cardio"]
+REGIAO_CODE: dict[str, int] = {r: i for i, r in enumerate(_REGIOES_UNICAS, start=1)}
+_REGIAO_OUTRO_CODE = 0  # fallback: ex sem região conhecida (não conta como same-region — favorável)
+
+
+def _regiao_code_do_ex(ex: Exercicio) -> int:
+    """Código int da região do exercício. Sem região mapeada → 0."""
+    return REGIAO_CODE.get(ex.regiao, _REGIAO_OUTRO_CODE)
+
+
+# ---------------------------------------------------------------------------
 # Fatia 4.E (2026-05-24) — relaxar_familia (bloqueio cross-treino de família)
 # ---------------------------------------------------------------------------
 #
@@ -398,6 +419,7 @@ def _construir_modelo(
     peso_cargas_off: int = 1000,
     peso_sa1: int = 0,
     peso_sa1_repet: int = 0,
+    peso_sb5: int = 0,
 ) -> dict:
     """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
     penalidades de S-T1, Aderência ao Tier, S-B1 distância funcional
@@ -420,6 +442,15 @@ def _construir_modelo(
     funcional (push/pull/quad/...). Solver minimiza → motor evita parear
     agonistas. Antagonistas (push+pull) e cross-region (upper+lower)
     saem sem penalty, então naturalmente preferidos.
+
+    `peso_sb5` (S-B5, 2026-05-26): diversidade de região INTRA-bloco.
+    0 (default) = sem efeito. >0 adiciona penalty fixo por par no MESMO
+    BLOCO com MESMA REGIÃO (upper/lower/core/cardio). Recupera a
+    feature P1-P4 do `montar_blocos` greedy antigo (achado 3 da auditoria
+    2026-05-26). Default ON via adapter (Bernardo: vale pra qualquer
+    rotina multi-região, sem toggle UI). Em demandas single-region (ex:
+    `upper(4)` sozinha), motor aceita pareamento same-region pagando
+    penalty — graceful degradation natural.
 
     `tamanho_preferido` + `peso_tamanho_bloco` (Fatia 4.C, 2026-05-24):
     S-B4 tamanho preferido do bloco. Default tamanho=2, peso=0 (sem
@@ -690,6 +721,19 @@ def _construir_modelo(
         gf = model.NewIntVar(lo, hi, f"grupo_t{s['t_idx']}_s{s['sid']}")
         model.Add(gf == sum(assign[(s["sid"], c)] * codes[c] for c in range(len(pool))))
         grupo_func[s["sid"]] = gf
+
+    # ── S-B5 (2026-05-26): regiao_idx[s] IntVar derivado do ex escolhido ────
+    # Mesmo pattern do grupo_func: regiao_idx[s] = sum_c (assign[s,c] *
+    # REGIAO_CODE[pool[c].regiao]). Usado em S-B5 pra detectar pares
+    # same-region. Criado SEMPRE (leve, gancho pra futuras constraints).
+    regiao_idx: dict[int, cp_model.IntVar] = {}
+    for s in slots_globais:
+        pool = s["pool_slot"]
+        codes = [_regiao_code_do_ex(ex) for ex in pool]
+        lo, hi = (min(codes), max(codes)) if codes else (0, 0)
+        ri = model.NewIntVar(lo, hi, f"regiao_t{s['t_idx']}_s{s['sid']}")
+        model.Add(ri == sum(assign[(s["sid"], c)] * codes[c] for c in range(len(pool))))
+        regiao_idx[s["sid"]] = ri
 
     # ── H-T1 / H-T2 / H-T3 (HARD intra-treino): aplicam por t_idx ──────────
     for t_idx, grupos_t in enumerate(treinos):
@@ -1309,6 +1353,25 @@ def _construir_modelo(
                     a, b = sorted((sids_g[i], sids_g[j]))
                     pares_intra_sub.add((a, b))
 
+    # S-B5 (2026-05-26): desativa em treinos onde TODOS os slots têm pool
+    # restrito a UMA ÚNICA região (treino single-region). Nessas configs
+    # o motor não pode escolher cross-region em nenhum bloco — S-B5 só
+    # penalizaria por penalizar, e CP-SAT explode o tempo enumerando
+    # soluções equivalentes na Phase 2 da variedade. Ex: ABC 3T Day A
+    # (peito+ombro+triceps, 7 slots todos `upper`) sem este fix levava
+    # ~8 minutos mediana e até 1 hora no pior caso. Com este fix volta
+    # a tempos comparáveis ao baseline.
+    # Critério: união dos pools de todos os slots do treino = singleton.
+    treinos_single_region: set[int] = set()
+    for t_idx, sids_t in slots_por_treino.items():
+        regioes_treino: set[str] = set()
+        for sid in sids_t:
+            slot = slot_por_sid[sid]
+            for ex in slot["pool_slot"]:
+                regioes_treino.add(ex.regiao)
+        if len(regioes_treino) <= 1:
+            treinos_single_region.add(t_idx)
+
     for t_idx, sids_t in slots_por_treino.items():
         for i in range(len(sids_t)):
             for j in range(i + 1, len(sids_t)):
@@ -1342,27 +1405,57 @@ def _construir_modelo(
                 # 4.A byte-a-byte).
                 # SKIP pares intra-sub explícita (decisão 2026-05-25):
                 # user pediu a sub, agonistas dentro dela são esperados.
-                if peso_evitar_agonistas > 0 and (s1, s2) not in pares_intra_sub:
+                # S-B5 (2026-05-26): mesma reformulação, com same_regiao em
+                # vez de same_grupo. Se ambos pesos>0, `same_bloco` é
+                # criado UMA vez e reusado pelos dois penalties.
+                sb1_aplica = (
+                    peso_evitar_agonistas > 0
+                    and (s1, s2) not in pares_intra_sub
+                )
+                sb5_aplica = (
+                    peso_sb5 > 0
+                    and t_idx not in treinos_single_region
+                )
+                precisa_same_bloco = sb1_aplica or sb5_aplica
+                if precisa_same_bloco:
                     same_bloco = model.NewBoolVar(f"sb_{s1}_{s2}")
                     # same_bloco + lt + gt == 1 (exatamente um dos três é true)
                     model.Add(same_bloco + lt + gt == 1)
 
-                    same_grupo = model.NewBoolVar(f"sg_{s1}_{s2}")
-                    model.Add(
-                        grupo_func[s1] == grupo_func[s2]
-                    ).OnlyEnforceIf(same_grupo)
-                    model.Add(
-                        grupo_func[s1] != grupo_func[s2]
-                    ).OnlyEnforceIf(same_grupo.Not())
+                    if sb1_aplica:
+                        same_grupo = model.NewBoolVar(f"sg_{s1}_{s2}")
+                        model.Add(
+                            grupo_func[s1] == grupo_func[s2]
+                        ).OnlyEnforceIf(same_grupo)
+                        model.Add(
+                            grupo_func[s1] != grupo_func[s2]
+                        ).OnlyEnforceIf(same_grupo.Not())
 
-                    # AND lógico: ambos true → ativa penalty.
-                    viol_sb1 = model.NewIntVar(
-                        0, peso_evitar_agonistas, f"sb1_{s1}_{s2}",
-                    )
-                    model.Add(viol_sb1 >= peso_evitar_agonistas).OnlyEnforceIf(
-                        [same_bloco, same_grupo],
-                    )
-                    penalidades.append(viol_sb1)
+                        # AND lógico: ambos true → ativa penalty.
+                        viol_sb1 = model.NewIntVar(
+                            0, peso_evitar_agonistas, f"sb1_{s1}_{s2}",
+                        )
+                        model.Add(viol_sb1 >= peso_evitar_agonistas).OnlyEnforceIf(
+                            [same_bloco, same_grupo],
+                        )
+                        penalidades.append(viol_sb1)
+
+                    if sb5_aplica:
+                        same_regiao = model.NewBoolVar(f"sr_{s1}_{s2}")
+                        model.Add(
+                            regiao_idx[s1] == regiao_idx[s2]
+                        ).OnlyEnforceIf(same_regiao)
+                        model.Add(
+                            regiao_idx[s1] != regiao_idx[s2]
+                        ).OnlyEnforceIf(same_regiao.Not())
+
+                        viol_sb5 = model.NewIntVar(
+                            0, peso_sb5, f"sb5_{s1}_{s2}",
+                        )
+                        model.Add(viol_sb5 >= peso_sb5).OnlyEnforceIf(
+                            [same_bloco, same_regiao],
+                        )
+                        penalidades.append(viol_sb5)
 
     # ── S-B4 (Fatia 4.C): tamanho preferido do bloco ────────────────────────
     # Pra cada bloco b do treino t:
@@ -1794,6 +1887,7 @@ def gerar_rotina_csp(
     peso_cargas_off: int = 1000,
     peso_sa1: int = 0,
     peso_sa1_repet: int = 0,
+    peso_sb5: int = 0,
 ) -> dict:
     """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
     negociam no mesmo modelo — necessário pra H-R1 cross-treino.
@@ -1865,6 +1959,7 @@ def gerar_rotina_csp(
                 peso_cargas_off=peso_cargas_off,
                 peso_sa1=peso_sa1,
                 peso_sa1_repet=peso_sa1_repet,
+                peso_sb5=peso_sb5,
             )
         return _resolver_com_variedade(
             demandas_por_treino, banco, nivel_aluno, seed, variedade,
@@ -1876,6 +1971,7 @@ def gerar_rotina_csp(
             peso_cargas_off=peso_cargas_off,
             peso_sa1=peso_sa1,
             peso_sa1_repet=peso_sa1_repet,
+            peso_sb5=peso_sb5,
         )
 
     fams_originais = set(familias_proibidas or [])
@@ -1923,6 +2019,7 @@ def _resolver_legacy(
     peso_cargas_off: int = 1000,
     peso_sa1: int = 0,
     peso_sa1_repet: int = 0,
+    peso_sb5: int = 0,
 ) -> dict:
     """Branch legado: 1 solve com Minimize → 1 solução determinística por
     seed. Preserva byte-a-byte o comportamento da Fatia 2 P2 quando
@@ -1938,6 +2035,7 @@ def _resolver_legacy(
         peso_cargas_off=peso_cargas_off,
         peso_sa1=peso_sa1,
         peso_sa1_repet=peso_sa1_repet,
+        peso_sb5=peso_sb5,
     )
     if md["penalidades"]:
         md["model"].Minimize(sum(md["penalidades"]))
@@ -2013,6 +2111,7 @@ def _resolver_com_variedade(
     peso_cargas_off: int = 1000,
     peso_sa1: int = 0,
     peso_sa1_repet: int = 0,
+    peso_sb5: int = 0,
 ) -> dict:
     """Branch variedade (Frente B Fatia 3): 2 fases.
 
@@ -2045,6 +2144,7 @@ def _resolver_com_variedade(
         peso_cargas_off=peso_cargas_off,
         peso_sa1=peso_sa1,
         peso_sa1_repet=peso_sa1_repet,
+        peso_sb5=peso_sb5,
     )
     if md1["penalidades"]:
         md1["model"].Minimize(sum(md1["penalidades"]))
@@ -2092,6 +2192,7 @@ def _resolver_com_variedade(
         peso_cargas_off=peso_cargas_off,
         peso_sa1=peso_sa1,
         peso_sa1_repet=peso_sa1_repet,
+        peso_sb5=peso_sb5,
     )
     var_total: Optional[cp_model.IntVar] = None
     if md2["penalidades"]:
@@ -2109,6 +2210,7 @@ def _resolver_com_variedade(
             peso_tamanho_bloco * TAMANHO_MAX_BLOCO if peso_tamanho_bloco else 0,
             2 * peso_sa1 if peso_sa1 else 0,
             peso_sa1_repet,
+            peso_sb5,
         )
         teto = max(1, teto_por_termo) * len(md2["penalidades"])
         var_total = md2["model"].NewIntVar(0, teto, "var_total")
@@ -2286,6 +2388,7 @@ def gerar_treino_csp(
     peso_cargas_off: int = 1000,
     peso_sa1: int = 0,
     peso_sa1_repet: int = 0,
+    peso_sb5: int = 0,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
@@ -2342,6 +2445,7 @@ def gerar_treino_csp(
         peso_cargas_off=peso_cargas_off,
         peso_sa1=peso_sa1,
         peso_sa1_repet=peso_sa1_repet,
+        peso_sb5=peso_sb5,
     )
     if not rotina["viavel"]:
         out = {
