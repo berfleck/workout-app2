@@ -39,6 +39,8 @@ from gerador_treino import (
     _padroes_de_escopo,  # Fatia 4.D: expande escopo de demanda → padrões cobertos
     ANCORAS_POR_SUBREGIAO,  # Micro-frente H-A1: âncoras obrigatórias por subregião
     ANCORAS_POR_REGIAO,  # Micro-frente H-A0: âncoras obrigatórias por região
+    REGIAO_PARA_SUBREGIOES,  # S-R1 (2026-05-27): cross-treino subregião dentro de região
+    SUBREGIAO_PARA_REGIAO,  # S-R1 (2026-05-27): codificação de subregiões
 )
 # H-T3 reusa a configuração canônica de subregiões com lateralidade hard.
 from pesos_proximidade import SUBREGIOES_LATERALIDADE_HARD
@@ -118,6 +120,32 @@ _REGIAO_OUTRO_CODE = 0  # fallback: ex sem região conhecida (não conta como sa
 def _regiao_code_do_ex(ex: Exercicio) -> int:
     """Código int da região do exercício. Sem região mapeada → 0."""
     return REGIAO_CODE.get(ex.regiao, _REGIAO_OUTRO_CODE)
+
+
+# ---------------------------------------------------------------------------
+# S-R1 (2026-05-27) — distribuição cross-treino de subregião dentro de região
+# ---------------------------------------------------------------------------
+#
+# Codificação de SUBREGIÃO (peito/costas/.../panturrilha/core_isometrico/...)
+# usada em S-R1 pra contar slots por subregião em cada treino com demanda
+# nivel `regiao`. Achado 1 da auditoria 2026-05-26: T1 e T2 caem no MESMO
+# split em `regiao lower(3)` por sortear independentes. S-R1 modela a
+# simetria cross-treino explicitamente no objetivo do CSP.
+#
+# Lista fechada (todas as subregiões válidas em SUBREGIAO_PARA_REGIAO) pra
+# garantir codificação estável across rotinas — diferente do `REGIAO_CODE`
+# que tem só 4 valores; aqui temos ~11. Código 0 = fallback "outra".
+
+_SUBREGIOES_UNICAS = sorted(SUBREGIAO_PARA_REGIAO.keys())
+SUBREGIAO_CODE: dict[str, int] = {
+    s: i for i, s in enumerate(_SUBREGIOES_UNICAS, start=1)
+}
+_SUBREGIAO_OUTRO_CODE = 0
+
+
+def _subregiao_code_do_ex(ex: Exercicio) -> int:
+    """Código int da subregião do exercício. Sem subregião mapeada → 0."""
+    return SUBREGIAO_CODE.get(ex.subregiao, _SUBREGIAO_OUTRO_CODE)
 
 
 # ---------------------------------------------------------------------------
@@ -420,6 +448,7 @@ def _construir_modelo(
     peso_sa1: int = 0,
     peso_sa1_repet: int = 0,
     peso_sb5: int = 0,
+    peso_sr1: int = 0,
 ) -> dict:
     """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
     penalidades de S-T1, Aderência ao Tier, S-B1 distância funcional
@@ -451,6 +480,18 @@ def _construir_modelo(
     rotina multi-região, sem toggle UI). Em demandas single-region (ex:
     `upper(4)` sozinha), motor aceita pareamento same-region pagando
     penalty — graceful degradation natural.
+
+    `peso_sr1` (S-R1, 2026-05-27): distribuição cross-treino de
+    subregião dentro de uma demanda nivel `regiao`. 0 (default) = sem
+    efeito. >0 adiciona, pra cada par de treinos (t1, t2) com demanda
+    mesma região R em ambos e cada subregião S possível em R, penalty
+    proporcional a `peso_sr1 * |count_S_t1 - count_S_t2|`. Solver
+    minimiza → motor prefere splits simétricos cross-treino (ex: T1=2
+    perna_ant + 1 perna_post ↔ T2=1 perna_ant + 2 perna_post em vez de
+    ambos no mesmo split). Achado 1 da auditoria 2026-05-26 (faceta de
+    simetria). Skip estrutural quando rotina tem <2 treinos. Default ON
+    via adapter (sem toggle UI). Não interfere em demandas nivel
+    `subregiao` ou `padrao` (não há "região" pra alternar).
 
     `tamanho_preferido` + `peso_tamanho_bloco` (Fatia 4.C, 2026-05-24):
     S-B4 tamanho preferido do bloco. Default tamanho=2, peso=0 (sem
@@ -734,6 +775,20 @@ def _construir_modelo(
         ri = model.NewIntVar(lo, hi, f"regiao_t{s['t_idx']}_s{s['sid']}")
         model.Add(ri == sum(assign[(s["sid"], c)] * codes[c] for c in range(len(pool))))
         regiao_idx[s["sid"]] = ri
+
+    # ── S-R1 (2026-05-27): subregiao_idx[s] IntVar derivado do ex escolhido ──
+    # Espelho exato do regiao_idx pra granularidade de subregião. Usado em
+    # S-R1 cross-treino pra contar slots de cada subregião em cada treino
+    # (achado 1 da auditoria 2026-05-26 — faceta de simetria T1↔T2).
+    # Criado SEMPRE (leve, gancho pra futuras constraints).
+    subregiao_idx: dict[int, cp_model.IntVar] = {}
+    for s in slots_globais:
+        pool = s["pool_slot"]
+        codes = [_subregiao_code_do_ex(ex) for ex in pool]
+        lo, hi = (min(codes), max(codes)) if codes else (0, 0)
+        si = model.NewIntVar(lo, hi, f"subreg_t{s['t_idx']}_s{s['sid']}")
+        model.Add(si == sum(assign[(s["sid"], c)] * codes[c] for c in range(len(pool))))
+        subregiao_idx[s["sid"]] = si
 
     # ── H-T1 / H-T2 / H-T3 (HARD intra-treino): aplicam por t_idx ──────────
     for t_idx, grupos_t in enumerate(treinos):
@@ -1457,6 +1512,118 @@ def _construir_modelo(
                         )
                         penalidades.append(viol_sb5)
 
+    # ── S-R1 (2026-05-27): distribuição cross-treino de subregião dentro ────
+    # de região. Achado 1 da auditoria 2026-05-26 (faceta de simetria
+    # T1↔T2): em `regiao lower(3) × 2T`, T1 e T2 caem no mesmo split
+    # 2ant+1post+0pant porque cada treino sorteia independente. S-R1 modela
+    # explicitamente no objetivo: pra cada par de treinos (t1, t2) com
+    # demanda mesma região R, penaliza splits IDÊNTICOS (T1 e T2 com a
+    # mesma contagem em TODAS as subregiões de R).
+    #
+    # Modelagem (BoolVar `splits_iguais` por par + região):
+    #   pra cada subregião S em R: count_S_t1, count_S_t2 IntVars + diff_S
+    #   same_S = (diff_S == 0)
+    #   splits_iguais = AND(same_S) sobre todas as S
+    #   penalty = peso_sr1 * splits_iguais
+    #
+    # CONTRA-INTUITIVO mas correto: minimizar `sum(|diff_t1_t2|)` (versão
+    # ingênua) empurra pra T1==T2 (espelho matemático = mesmo split), o
+    # OPOSTO do objetivo clínico. Penalizar `splits_iguais` é a forma certa
+    # — premia que pelo menos UMA subregião tenha contagem diferente entre
+    # os 2 treinos da rotina. Motor naturalmente escolhe alternância
+    # (ex.: T1=2ant+1post / T2=1ant+2post) em vez de T1==T2.
+    #
+    # Skip estrutural: rotina com <2 treinos é neutra (sem cross-treino).
+    # BoolVars criadas SÓ quando peso_sr1 > 0 (otimização — pulamos quando
+    # peso=0, mesmo pattern de outras softs).
+    if peso_sr1 > 0 and len(treinos) >= 2:
+        grupos_regiao_por_treino: dict[tuple[int, str], list[int]] = {}
+        for t_idx, grupos_t in enumerate(treinos):
+            for g in grupos_t:
+                nv, esc, _qt = g["demanda"]
+                if nv == "regiao":
+                    grupos_regiao_por_treino[(t_idx, esc)] = list(g["slot_ids"])
+
+        regiao_para_tidxs: dict[str, list[int]] = defaultdict(list)
+        for (t_idx, R), _sids in grupos_regiao_por_treino.items():
+            regiao_para_tidxs[R].append(t_idx)
+
+        for R, t_idxs in regiao_para_tidxs.items():
+            if len(t_idxs) < 2:
+                continue
+            subs_possiveis = REGIAO_PARA_SUBREGIOES.get(R, [])
+            # counts_por_t[t_idx][sub] = IntVar (qtd slots de sub em (t_idx, R)).
+            counts_por_t: dict[int, dict[str, cp_model.IntVar]] = defaultdict(dict)
+            for sub in subs_possiveis:
+                sub_code = SUBREGIAO_CODE.get(sub)
+                if sub_code is None:
+                    continue
+                for t_idx in t_idxs:
+                    sids_tR = grupos_regiao_por_treino[(t_idx, R)]
+                    if not sids_tR:
+                        continue
+                    indicators = []
+                    for sid in sids_tR:
+                        is_sub = model.NewBoolVar(
+                            f"sr1_is_{R}_{sub}_t{t_idx}_s{sid}",
+                        )
+                        model.Add(
+                            subregiao_idx[sid] == sub_code
+                        ).OnlyEnforceIf(is_sub)
+                        model.Add(
+                            subregiao_idx[sid] != sub_code
+                        ).OnlyEnforceIf(is_sub.Not())
+                        indicators.append(is_sub)
+                    count_var = model.NewIntVar(
+                        0, len(sids_tR),
+                        f"sr1_count_{R}_{sub}_t{t_idx}",
+                    )
+                    model.Add(count_var == sum(indicators))
+                    counts_por_t[t_idx][sub] = count_var
+
+            # Pares (t1, t2) com BoolVar splits_iguais.
+            t_list = sorted(t_idxs)
+            for i in range(len(t_list)):
+                for j in range(i + 1, len(t_list)):
+                    t1, t2 = t_list[i], t_list[j]
+                    subs_comuns = [
+                        s for s in subs_possiveis
+                        if s in counts_por_t[t1] and s in counts_por_t[t2]
+                    ]
+                    if not subs_comuns:
+                        continue
+                    # same_S por subregião — true sse count_S_t1 == count_S_t2.
+                    same_vars = []
+                    for sub in subs_comuns:
+                        same_S = model.NewBoolVar(
+                            f"sr1_same_{R}_{sub}_t{t1}_t{t2}",
+                        )
+                        model.Add(
+                            counts_por_t[t1][sub] == counts_por_t[t2][sub]
+                        ).OnlyEnforceIf(same_S)
+                        model.Add(
+                            counts_por_t[t1][sub] != counts_por_t[t2][sub]
+                        ).OnlyEnforceIf(same_S.Not())
+                        same_vars.append(same_S)
+
+                    # splits_iguais = AND(same_S) — true sse TODAS as subs
+                    # têm a mesma contagem em t1 e t2.
+                    splits_iguais = model.NewBoolVar(
+                        f"sr1_eq_{R}_t{t1}_t{t2}",
+                    )
+                    # Reverse implication: NOT splits_iguais → algum same_S é
+                    # False. Forward: splits_iguais → todos same_S True.
+                    model.AddBoolAnd(same_vars).OnlyEnforceIf(splits_iguais)
+                    model.AddBoolOr([v.Not() for v in same_vars]).OnlyEnforceIf(
+                        splits_iguais.Not()
+                    )
+
+                    pen = model.NewIntVar(
+                        0, peso_sr1, f"sr1_pen_{R}_t{t1}_t{t2}",
+                    )
+                    model.Add(pen == peso_sr1 * splits_iguais)
+                    penalidades.append(pen)
+
     # ── S-B4 (Fatia 4.C): tamanho preferido do bloco ────────────────────────
     # Pra cada bloco b do treino t:
     #   tamanho_b = sum(X[(t,sid,b)] for sid)
@@ -1888,6 +2055,7 @@ def gerar_rotina_csp(
     peso_sa1: int = 0,
     peso_sa1_repet: int = 0,
     peso_sb5: int = 0,
+    peso_sr1: int = 0,
 ) -> dict:
     """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
     negociam no mesmo modelo — necessário pra H-R1 cross-treino.
@@ -1960,6 +2128,7 @@ def gerar_rotina_csp(
                 peso_sa1=peso_sa1,
                 peso_sa1_repet=peso_sa1_repet,
                 peso_sb5=peso_sb5,
+                peso_sr1=peso_sr1,
             )
         return _resolver_com_variedade(
             demandas_por_treino, banco, nivel_aluno, seed, variedade,
@@ -1972,6 +2141,7 @@ def gerar_rotina_csp(
             peso_sa1=peso_sa1,
             peso_sa1_repet=peso_sa1_repet,
             peso_sb5=peso_sb5,
+            peso_sr1=peso_sr1,
         )
 
     fams_originais = set(familias_proibidas or [])
@@ -2020,6 +2190,7 @@ def _resolver_legacy(
     peso_sa1: int = 0,
     peso_sa1_repet: int = 0,
     peso_sb5: int = 0,
+    peso_sr1: int = 0,
 ) -> dict:
     """Branch legado: 1 solve com Minimize → 1 solução determinística por
     seed. Preserva byte-a-byte o comportamento da Fatia 2 P2 quando
@@ -2036,6 +2207,7 @@ def _resolver_legacy(
         peso_sa1=peso_sa1,
         peso_sa1_repet=peso_sa1_repet,
         peso_sb5=peso_sb5,
+        peso_sr1=peso_sr1,
     )
     if md["penalidades"]:
         md["model"].Minimize(sum(md["penalidades"]))
@@ -2112,6 +2284,7 @@ def _resolver_com_variedade(
     peso_sa1: int = 0,
     peso_sa1_repet: int = 0,
     peso_sb5: int = 0,
+    peso_sr1: int = 0,
 ) -> dict:
     """Branch variedade (Frente B Fatia 3): 2 fases.
 
@@ -2145,6 +2318,7 @@ def _resolver_com_variedade(
         peso_sa1=peso_sa1,
         peso_sa1_repet=peso_sa1_repet,
         peso_sb5=peso_sb5,
+        peso_sr1=peso_sr1,
     )
     if md1["penalidades"]:
         md1["model"].Minimize(sum(md1["penalidades"]))
@@ -2193,6 +2367,7 @@ def _resolver_com_variedade(
         peso_sa1=peso_sa1,
         peso_sa1_repet=peso_sa1_repet,
         peso_sb5=peso_sb5,
+        peso_sr1=peso_sr1,
     )
     var_total: Optional[cp_model.IntVar] = None
     if md2["penalidades"]:
@@ -2211,6 +2386,9 @@ def _resolver_com_variedade(
             2 * peso_sa1 if peso_sa1 else 0,
             peso_sa1_repet,
             peso_sb5,
+            # S-R1 (2026-05-27): cada par (t1, t2, R) gera 1 termo escalar
+            # 0 ou peso_sr1 (BoolVar `splits_iguais`). Max por termo = peso_sr1.
+            peso_sr1,
         )
         teto = max(1, teto_por_termo) * len(md2["penalidades"])
         var_total = md2["model"].NewIntVar(0, teto, "var_total")
@@ -2389,6 +2567,7 @@ def gerar_treino_csp(
     peso_sa1: int = 0,
     peso_sa1_repet: int = 0,
     peso_sb5: int = 0,
+    peso_sr1: int = 0,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
@@ -2446,6 +2625,7 @@ def gerar_treino_csp(
         peso_sa1=peso_sa1,
         peso_sa1_repet=peso_sa1_repet,
         peso_sb5=peso_sb5,
+        peso_sr1=peso_sr1,
     )
     if not rotina["viavel"]:
         out = {

@@ -562,6 +562,16 @@ _PESO_SA1_REPET_DEFAULT = 10
 # region = 4). Calibração validada na sondagem pós (sb5_pos.json).
 _PESO_SB5_DEFAULT = 4
 
+# S-R1 (2026-05-27): distribuição cross-treino de subregião em demanda
+# nivel `regiao` — premia simetria T1↔T2 (ex.: T1=2 perna_ant+1 perna_post ↔
+# T2=1 perna_ant+2 perna_post). Achado 1 da auditoria 2026-05-26 (faceta
+# cross-treino). Default ON sempre, sem toggle UI — vale pra qualquer rotina
+# multi-treino com demanda região. Peso calibrado via sondagem 2026-05-27
+# (`logs/sr1_pos.json`). Mesma magnitude do S-B5 (4) por design: fica entre
+# `rank_max=3` (S-T1) e `5*1=5` (S-B4) — não inverte tier-order nem força
+# motor a quebrar bloco em solos. Skip estrutural em rotinas com <2 treinos.
+_PESO_SR1_DEFAULT = 4
+
 
 def _tamanho_e_peso_bloco_csp(cfg_r):
     """Retorna (tamanho_preferido, peso) pro CSP.
@@ -2021,6 +2031,7 @@ def gerar():
         peso_sa1=_PESO_SA1_DEFAULT,
         peso_sa1_repet=_PESO_SA1_REPET_DEFAULT,
         peso_sb5=_PESO_SB5_DEFAULT,
+        peso_sr1=_PESO_SR1_DEFAULT,
     )
 
     if resultado_csp.get("viavel"):

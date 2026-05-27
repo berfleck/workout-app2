@@ -49,6 +49,7 @@ aguarda aprovação Bernardo pra merge FF — gate verde).
 | Micro-frente H-A0 | Âncoras obrigatórias por REGIÃO (per-treino, banimento upstream de subs não-âncora, marker H-A0 → H-A1, graceful degradation pool vazio + conflito cardinalidade) | `logs/micro_h_a0_ancoras_regiao.md` |
 | Frente S-A1 | Distribuição entre âncoras não-obrigatórias (v1 linear sobre pesos curados 3/2/1 + v2 penalty padrão repetido). Resolve regressão CSP × antigo em ombro(2)/perna_posterior(2)/peito(2). Calibração peso_sa1=12 + peso_sa1_repet=10. Ativa em demanda subregião E região (via H-A0 marker). | `logs/frente_s_a1.md` |
 | Frente S-B5 | Diversidade de região INTRA-bloco (achado 3 da auditoria 2026-05-26). Penalty fixo por par mesmo bloco + mesma região. Default ON sempre (peso=4). Skip estrutural em treinos single-region (otimização de tempo). Full Body 2T região: 22.5% → 0% blocos same-region. Smoke E2E confirma 0/8 (era 4/8 na auditoria N=1). Pytest +7 (357/358), harness 16/16 OK. | `logs/mvp_sb5_diversidade_regiao_bloco.md` |
+| Frente S-R1 | Distribuição cross-treino de subregião dentro de região (achado 1 parcial da auditoria 2026-05-26, faceta de simetria). `splits_iguais` BoolVar por par (t1, t2) + região, penalty `peso_sr1` quando T1==T2 em TODAS as subregiões. Default ON sempre (peso=4). Skip estrutural em rotinas <2 treinos. Full Body 2T região: 40% → 0% splits T1==T2; lower(3)×2T isolado: 60% → 0%. Correção de spec durante implementação: minimizar `sum(|diff|)` força T1==T2 (espelho matemático, oposto do objetivo); penalizar `splits_iguais` é a forma certa. Panturrilha mantém status quo (decisão clínica Bernardo). Pytest +4 (360 total + 1 skipped), harness 16/16 OK. | `logs/mvp_sr1_cross_treino.md` |
 | Reavaliação H-A1 per-treino | Fechada como **não-frente** (2026-05-26). Diagnóstico original (handoff `handoff_2026-05-25_h_a1_per_treino.md`, deletado) era falso achado clínico. Bernardo verbalizou 3 princípios clínicos (equilíbrio cross-treino; composto antes de isolado na ROTINA; variabilidade entre treinos) que invalidam o achado: T1-uni + T2-bi em perna_anterior é variabilidade desejada, não bug. Motor pós-H-A0 + S-A1 já correto pelos princípios. Zero diff de produção; só evidência docs + ferramenta de sondagem permanente. | `logs/h_a1_per_treino_reavaliacao.md` |
 
 ---
@@ -121,21 +122,36 @@ Cada item independente; entram conforme prioridade clínica observada.
   de blocos solo da Fatia 4.C). ABC 3T cai pouco (-3.7pp) porque
   Day A/B são single-region; S-B5 só atua em Day C. Pytest +7
   (357/358), harness 16/16 OK. Ver `logs/mvp_sb5_diversidade_regiao_bloco.md`.
-- **⬜ S-R1 cross-treino para distribuição subregião dentro de região**
-  (achado 1) — soft que premia simetria entre treinos no split de
-  subregião dentro de uma demanda região (T1=2 ant+1 post, T2=1 ant+2
-  post). Combinar com aleatorização do tie-break Hamilton em
-  `_decompor_demanda_regiao` quando pesos das âncoras empatam. Item
-  `S-R1` listado abaixo cobria caso geral; esta é instância específica.
-- **⬜ Repensar `panturrilha.obrigatoria=False`** (achado 1, subitem) —
-  decisão clínica primeiro: panturrilha 0% em `lower(3)` é desejado?
-  Caminhos: (a) `obrigatoria=True` (quebra rotinas curtas), (b)
-  mecanismo de "acessórios opcionais" separado do Hamilton, (c) aceitar
-  status quo.
-- **⬜ S-E1 diversidade de equipamento cross-treino** (achado 2) —
-  novo eixo para padrão single-slot. Equipamento/pegada do `dimensoes_
-  proximidade.md` (era antiga) não foi reaproveitado no CSP. Calibração
-  depois de S-B5 e S-R1 entrarem (interação de pesos).
+- **✅ S-R1 cross-treino para distribuição subregião dentro de região**
+  (achado 1, faceta de simetria) — CONCLUÍDA 2026-05-27 (branch
+  `achado-1-distribuicao-lower`, aguarda merge FF). Soft constraint nova
+  no objetivo do CSP: `splits_iguais` BoolVar por par (t1, t2) e região
+  R, true sse `count_S_t1 == count_S_t2` pra TODAS as subregiões S em R.
+  Penalty `peso_sr1 * splits_iguais` (peso=4 calibrado). Default ON sem
+  toggle UI. Skip estrutural em rotinas com <2 treinos. **Correção de
+  spec durante implementação**: spec original do handoff (minimizar
+  `sum(|diff_t1_t2|)`) é matematicamente o oposto do objetivo — força
+  T1==T2 (espelho matemático). Versão correta penaliza splits idênticos.
+  Resultado: Full Body 2T região 40% → 0% splits T1==T2; lower(3)×2T
+  isolado 60% → 0%. Smoke E2E `/gerar` confirma T1 ≠ T2 no flow real.
+  Pytest 360 + 1 skipped (+4), harness 16/16 OK. NÃO mexe em Hamilton
+  (`random.random()` já lá; auditoria N=1 não justificava). Ver
+  `logs/mvp_sr1_cross_treino.md`.
+- **🟦 `panturrilha.obrigatoria=False`** (achado 1, subitem) — **status
+  quo aceito 2026-05-27** (decisão clínica Bernardo). Sondagem N=5
+  pós-S-R1 mostra panturrilha aparece em 60-80% das rotinas Full Body
+  2T região (não 0% como reportado na auditoria N=1+1 — azar de seed).
+  Variabilidade natural via Hamilton cycling é aceitável.
+- **⬜ S-E1 proximidade biomecânica cross-treino** (achado 2,
+  renomeado 2026-05-27) — NÃO É só equipamento. Reusa as 3 dimensões
+  já cadastradas no XLSX desde Fase 4 (pegada matriz 4×4 / plano_corporal /
+  equipamento_grupo) + lógica INTER ~0.8×INTRA do `_score_proximidade`
+  do gerador antigo. Pesos e matriz já calibrados em
+  `arquivo/era_v4_greedy_incremental/dimensoes_proximidade.md`
+  (referência viva — exceção registrada no CLAUDE.md). Escopo "mesma
+  subregião" resolve naturalmente o caso clínico do Bernardo (2026-05-27):
+  "halteres vs barra IMPORTA em supino, NÃO IMPORTA em passada". S-R1
+  acabou de entrar → S-E1 desbloqueado.
 
 **Demais refinamentos** (ordem não prioritária):
 
