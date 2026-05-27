@@ -1,0 +1,649 @@
+{
+  "stage": "PRE",
+  "n_rotinas": 30,
+  "nivel_aluno": 2,
+  "pesos": {
+    "peso_aderencia": 0,
+    "peso_evitar_agonistas": 10,
+    "peso_tamanho_bloco": 5,
+    "tamanho_preferido": 2,
+    "peso_sa1": 12,
+    "peso_sa1_repet": 10,
+    "peso_sb5": 4,
+    "peso_sr1": 4,
+    "peso_se1_pegada": 10,
+    "peso_se1_plano": 10,
+    "peso_se1_eq": 2
+  },
+  "resultados": {
+    "costas_2x1T": {
+      "setup": "costas_2x1T",
+      "n_rotinas": 30,
+      "contagem": {
+        "total_pares": 30,
+        "equipamento_repetido": 14,
+        "pegada_repetida": 15
+      },
+      "pares_por_sub": {
+        "costas": 30
+      },
+      "repet_por_sub_dim": {
+        "costas": {
+          "equipamento": 14,
+          "pegada": 15
+        }
+      },
+      "tempo_p50_s": 0.031226158142089844,
+      "tempo_total_s": 0.8826694488525391,
+      "casos_pegada": [
+        {
+          "rotina": 2,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Remada LM Aberta",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 3,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Remada Neutra Trx",
+          "ex2": "Puxada Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 4,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Puxada Neutra",
+          "ex2": "Remada LM Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 9,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Puxada Unilateral Polia",
+          "ex2": "Remada Baixa Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 10,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Serrote Aberto",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 11,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Remada Apoiado",
+          "ex2": "Puxada Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 12,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Remada Baixa Neutra",
+          "ex2": "Puxada Unilateral Polia",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 13,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Puxada Neutra",
+          "ex2": "Remada Baixa Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 19,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Puxada Unilateral Polia",
+          "ex2": "Remada Baixa Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 21,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Puxada Neutra",
+          "ex2": "Remada Uni Polia",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 24,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Remada Uni Polia",
+          "ex2": "Puxada Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 25,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Serrote Aberto",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 26,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Puxada Aberta",
+          "ex2": "Remada Baixa Aberta",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 28,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Puxada Aberta",
+          "ex2": "Serrote Aberto",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 29,
+          "treino": 1,
+          "sub": "costas",
+          "ex1": "Puxada Neutra",
+          "ex2": "Remada Neutra Trx",
+          "pegada": "neutra"
+        }
+      ],
+      "casos_plano": []
+    },
+    "jose_silva_T1T2": {
+      "setup": "jose_silva_T1T2",
+      "n_rotinas": 30,
+      "contagem": {
+        "total_pares": 180,
+        "pegada_repetida": 37,
+        "equipamento_repetido": 22,
+        "plano_repetido": 19
+      },
+      "pares_por_sub": {
+        "perna_posterior": 30,
+        "peito": 30,
+        "costas": 90,
+        "perna_anterior": 30
+      },
+      "repet_por_sub_dim": {
+        "costas": {
+          "pegada": 37,
+          "equipamento": 17
+        },
+        "perna_anterior": {
+          "equipamento": 2
+        },
+        "peito": {
+          "plano": 19,
+          "equipamento": 1
+        },
+        "perna_posterior": {
+          "equipamento": 2
+        }
+      },
+      "tempo_p50_s": 3.2003374099731445,
+      "tempo_total_s": 103.40286779403687,
+      "casos_pegada": [
+        {
+          "rotina": 0,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Puxada Aberta",
+          "ex2": "Remada LM Aberta",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 1,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada Apoiado",
+          "ex2": "Pullover Halteres",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 2,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Aberta",
+          "ex2": "Remada Baixa Aberta",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 3,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Aberta",
+          "ex2": "Pulldown Braço Estendido",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 3,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Aberta",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 3,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Pulldown Braço Estendido",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 4,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Puxada Neutra",
+          "ex2": "Remada Baixa Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 4,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Puxada Neutra",
+          "ex2": "Pullover Polia",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 4,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada Baixa Neutra",
+          "ex2": "Pullover Polia",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 5,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada Baixa Neutra",
+          "ex2": "Remada LM Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 6,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Neutra",
+          "ex2": "Puxada Unilateral Polia",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 7,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Serrote Aberto",
+          "ex2": "Remada LM Aberta",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 8,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Puxada Unilateral Polia",
+          "ex2": "Remada LM Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 9,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Neutra",
+          "ex2": "Pullover Halteres",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 10,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Puxada Aberta",
+          "ex2": "Remada Baixa Aberta",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 11,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Puxada Unilateral Polia",
+          "ex2": "Remada Apoiado",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 12,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Aberta",
+          "ex2": "Serrote Aberto",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 12,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Aberta",
+          "ex2": "Puxada Aberta",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 12,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Serrote Aberto",
+          "ex2": "Puxada Aberta",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 13,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Neutra",
+          "ex2": "Puxada Unilateral Polia",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 13,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Neutra",
+          "ex2": "Remada Baixa Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 13,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Puxada Unilateral Polia",
+          "ex2": "Remada Baixa Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 14,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Aberta",
+          "ex2": "Remada Baixa Aberta",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 15,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Puxada Unilateral Polia",
+          "ex2": "Pullover Polia",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 16,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Puxada Aberta",
+          "ex2": "Remada LM Aberta",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 17,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Neutra",
+          "ex2": "Serrote",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 18,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada Baixa Aberta",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 19,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Aberta",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 20,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Barra C/ Borracha",
+          "ex2": "Pulldown Braço Estendido",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 21,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Pulldown Braço Estendido",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 22,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada Apoiado",
+          "ex2": "Puxada Neutra",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 23,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Puxada Unilateral Polia",
+          "ex2": "Remada Apoiado",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 24,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Neutra",
+          "ex2": "Remada Apoiado",
+          "pegada": "neutra"
+        },
+        {
+          "rotina": 25,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada LM Aberta",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 26,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada Baixa Aberta",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 28,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Pulldown Braço Estendido",
+          "ex2": "Barra C/ Borracha",
+          "pegada": "aberta"
+        },
+        {
+          "rotina": 29,
+          "treino": 2,
+          "sub": "costas",
+          "ex1": "Remada Uni Polia",
+          "ex2": "Remada Neutra Trx",
+          "pegada": "neutra"
+        }
+      ],
+      "casos_plano": [
+        {
+          "rotina": 1,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Apoio Ajoelhado",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 3,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Supino Com Barra",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 4,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Supino Inclinado Halteres",
+          "ex2": "Crucifixo Inclinado Halteres",
+          "plano": "inclinado"
+        },
+        {
+          "rotina": 5,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Apoio Ajoelhado",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 7,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Supino Com Barra",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 8,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Supino Com Barra",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 9,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Supino Fechado",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 11,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Apoio Fechado",
+          "ex2": "Crossover",
+          "plano": "reto"
+        },
+        {
+          "rotina": 13,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Apoio Elevado",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 14,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Supino Fechado",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 15,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Apoio Elevado",
+          "ex2": "Crossover Sentado",
+          "plano": "reto"
+        },
+        {
+          "rotina": 17,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Supino Fechado",
+          "ex2": "Crossover",
+          "plano": "reto"
+        },
+        {
+          "rotina": 19,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Apoio Elevado",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 21,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Supino Fechado",
+          "ex2": "Crossover",
+          "plano": "reto"
+        },
+        {
+          "rotina": 22,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Apoio Elevado",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 24,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Supino Fechado",
+          "ex2": "Crossover",
+          "plano": "reto"
+        },
+        {
+          "rotina": 26,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Apoio",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 27,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Apoio",
+          "ex2": "Crucifixo Halteres",
+          "plano": "reto"
+        },
+        {
+          "rotina": 28,
+          "treino": 1,
+          "sub": "peito",
+          "ex1": "Supino Com Barra",
+          "ex2": "Crossover",
+          "plano": "reto"
+        }
+      ]
+    }
+  }
+}

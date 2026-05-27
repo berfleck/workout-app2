@@ -175,6 +175,32 @@ Cada item independente; entram conforme prioridade clínica observada.
   NÃO recebe (skip estrutural — mesmo critério da S-R1). Ver
   `logs/mvp_se1_proximidade_biomecanica.md`. **Achado 2 totalmente
   fechado.**
+- **✅ S-T4 variedade INTRA dentro de subregião** (catálogo Seção 2,
+  2026-05-29) — Branch `frente-s-t4-variedade-intra` (aguarda merge
+  FF). Espelho INTRA do S-E1: 3 pesos soft (pegada=12 / plano=12 /
+  eq=3, ~1.25× S-E1 conforme hierarquia INTRA>INTER da Seção 8.9/D3.1
+  da `dimensoes_proximidade.md`) penalizam pares NO MESMO TREINO
+  mesma-subregião com match exato. Caso clínico verbalizado por
+  Bernardo durante prep da S-E1 (`costas(3)` com 3 puxadas/remadas
+  todas pegada aberta). Modelagem par-a-par (sid1<sid2 dentro do
+  mesmo treino) reusa `same_sub` reificação e os IntVars
+  `pegada_idx/plano_idx/eq_idx` (refator: construção condicional
+  `usa_se1 OR usa_st4`, IntVars compartilhados quando ambas ativas).
+  **Exceções biomecânicas curadas via banco, não código**: dim vazia
+  no XLSX (sentinela única por slot do code helper) desliga same_X
+  naturalmente — Pullover/Pulldown optam fora de pegada; Crossover
+  opta fora de plano (Bernardo edita células). Sondagem PRÉ × PÓS
+  `subregiao costas(2) × 1T`: pegada repetida 50% → 0%; eq repetido
+  47% → 0%. Sondagem Jose Silva 2T (config real): pegada repetida
+  costas 41% → 0%; plano repetido peito 63% → 0%; geral 20.6% → 0%
+  pegada. Tempo p50 jose_silva 3.20s → 3.93s (+23%). Pytest 370 + 6
+  novos = 376 + 13 snapshots + harness 16/16 OK + smoke E2E /gerar
+  confirma 3 pegadas distintas em costas(3) e 2 planos distintos em
+  peito(2). Wire ativo em `/gerar` E `/regerar` (diferente de S-E1 /
+  S-R1 — INTRA-treino faz sentido nas 2 rotas). Ver
+  `logs/mvp_st4_variedade_intra.md`. **Lacuna INTRA do refinamento
+  fechada** (S-E1+S-T4 cobrem ambas direções de proximidade
+  biomecânica).
 
 **Demais refinamentos** (ordem não prioritária):
 
@@ -189,7 +215,7 @@ Cada item independente; entram conforme prioridade clínica observada.
 - **⬜ Mapa antagonismo gradual** — refinamento de S-B1 (push+pull "leve" vs "forte" via mapa de proximidade muscular). Hoje binário.
 - **⬜ S-T2** — fadiga prévia entre blocos (peso-livre antes de máquina). Exige `estabilidade_externa`.
 - **⬜ S-T3** — demanda neural acumulada do treino. Derivada de `tier`+perfil.
-- **⬜ S-T4** — variedade de eixos dentro de subregião com múltiplos slots.
+- **✅ S-T4** (2026-05-29) — variedade de eixos dentro de subregião com múltiplos slots. Ver entrada acima.
 - **⬜ S-R1** — distribuição multi-eixo entre treinos.
 - **⬜ S-R2** — frequência típica de combinações (precisa elicitar tabela com Bernardo).
 - **⬜ S-R3** — variedade no nome dentro da rotina.

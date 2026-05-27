@@ -195,10 +195,28 @@
 - Modulador: Centralidade Compostos (+++), Densidade de Pareamento (alta tolera mais)
 - **MVP**: modulador ativo
 
-**S-T4. Variedade de eixos dentro de subregião com múltiplos slots**
-- Origem: Conceito 5 (versão soft do H-R1)
-- Função: preferir mix de planos/pegadas mesmo quando a constraint hard de cobertura está satisfeita pelo básico.
-- Dado: `plano_corporal`, `pegada`
+**S-T4. Variedade de eixos dentro de subregião com múltiplos slots** ✅ (2026-05-29)
+- Origem: Conceito 5 (versão soft do H-R1); spec consolidada na frente S-T4 (2026-05-29).
+- Função: penaliza pares de slots NO MESMO TREINO mesma-subregião com match exato em `pegada` / `plano_corporal` / `equipamento_grupo`. Recupera o `_score_intra` do gerador antigo (`gerador_treino._score_proximidade:2236`, contexto `"intra"`) com modelagem declarativa CSP. Espelho INTRA do S-E1 — pares (s1,s2) agora dentro do mesmo treino (t1==t2, sid1<sid2) em vez de cross-treino.
+- Dado: `pegada`, `plano_corporal`, `equipamento_grupo` (mesmos do S-E1).
+- Modelagem (par-a-par INTRA-treino, escopo "mesma subregião" via reificação):
+  - Pra cada par (s1, s2) com t_idx(s1) == t_idx(s2), sid1 < sid2 e `subs_possiveis(s1) ∩ subs_possiveis(s2) ≠ ∅`: cria `same_sub = (subregiao_idx[s1] == subregiao_idx[s2])` UMA vez.
+  - Pra cada dim X com `peso_st4_X > 0`: cria `same_X = (X_idx[s1] == X_idx[s2])`, e `viol_X >= peso_st4_X` quando `AND(same_sub, same_X)`.
+  - **IntVars `pegada_idx/plano_idx/eq_idx` compartilhados com S-E1**: construção condicional `(usa_se1 OR usa_st4)` — quando ambas ativas, IntVars são criados uma vez por slot e ambos blocos leem deles. Pares cross-treino (S-E1) e pares intra-treino (S-T4) são disjuntos, sem duplicação.
+  - **Sentinela por slot** pra dim ausente: idêntica à S-E1 — ex sem X cadastrada recebe `code = BASE_VAZIA + sid`. Cobre **exceções biomecânicas** sem código: Pullover/Pulldown com pegada vazia no XLSX optam fora da comparação de pegada (vertical, biomecânica distinta); Crossover com plano vazio opta fora da comparação de plano (cabo, biomecânica distinta). Decisão clínica fica no banco, não no motor.
+- Pesos calibrados (2026-05-29 via sondagem N=30 `costas(2) × 1T` + Jose Silva 2T):
+  - `peso_st4_pegada = 12` (ALTO; 1.2× S-E1=10)
+  - `peso_st4_plano = 12` (ALTO; 1.2× S-E1=10)
+  - `peso_st4_eq = 3` (BAIXO tiebreaker; 1.5× S-E1=2)
+  - Hierarquia INTRA > INTER seguindo Seção 8.9/D3.1 da `dimensoes_proximidade.md` (multiplicador ~1.25). Proporção ALTO:BAIXO ~4:1 preserva semântica.
+- Escopo "mesma subregião" preservado (mesmo da S-E1). Decisão fechada na Etapa 6 — não reabrir.
+- Default ON sempre, sem toggle UI. Wire em **`/gerar` E `/regerar`** (diferente da S-E1/S-R1: INTRA-treino faz sentido em ambas rotas, já que vive dentro do treino sendo gerado independente de N treinos na rotina).
+- **Resolve junto** (sondagem PRÉ × PÓS):
+  - `subregiao costas(2) × 1T`: pegada repetida 50% → 0%; eq repetido 47% → 0%.
+  - Jose Silva 2T (config real): pegada repetida costas 41% → 0%; plano repetido peito 63% → 0%; geral 20.6% → 0%.
+  - Smoke E2E /gerar confirma 3 pegadas distintas em costas(3), 2 planos distintos em peito(2).
+  - Tempo p50 Jose Silva 2T: 3.20s → 3.93s (+23%, aceitável).
+- **Não cobre**: cross-treino (esse é escopo de S-E1, frente separada). Família estrita / lateralidade / variante_pontual INTRA-treino seguem cobertas por H-T1/T2/T3.
 
 ### Escopo ROTINA
 
@@ -300,7 +318,7 @@ As outras 8 constraints saem com modulador = 1.0 (peso base só). Quando o dashb
 | **S-T1** tier-order ⭐ | +++ forte | — | +++ forte |
 | **S-T2** fadiga blocos | + | — | + |
 | **S-T3** demanda neural total ⭐ | +++ forte | tolera | — |
-| **S-T4** variedade eixos | — | — | — |
+| **S-T4** variedade eixos | ativa | — | — |
 | **S-R1** distribuição multi-eixo | — | — | — |
 | **S-R2** frequência típica ⭐ | + | — | +++ forte |
 | **S-R3** variedade nome | — | — | inversão |

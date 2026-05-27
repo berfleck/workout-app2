@@ -587,6 +587,22 @@ _PESO_SE1_PEGADA_DEFAULT = 10
 _PESO_SE1_PLANO_DEFAULT = 10
 _PESO_SE1_EQ_DEFAULT = 2
 
+# S-T4 (2026-05-29): proximidade biomecânica INTRA-treino mesma-sub — espelho
+# INTRA do S-E1. Penaliza pares de slots NO MESMO TREINO mesma-subregião com
+# match exato em pegada / plano_corporal / equipamento_grupo. Cobre caso
+# clínico verbalizado por Bernardo: `costas(3)` no mesmo treino com 3
+# puxadas/remadas todas pegada aberta — S-E1 não pega (cross-treino),
+# H-T1/T2/T3 hard não pega (famílias distintas). Exceções biomecânicas
+# (Pullover/Pulldown opta fora de pegada; Crossover opta fora de plano)
+# tratadas via dim vazia no XLSX (sentinela única por slot do code helper
+# desliga same_X). Pesos seguindo hierarquia INTRA > INTER (Seção 8.9/D3.1
+# dimensoes_proximidade.md): ~1.25 × S-E1. Default ON sempre, sem toggle UI.
+# Ativo em /gerar E em /regerar (intra-treino, faz sentido nas duas rotas —
+# diferente da S-E1 que precisa de N>=2 treinos).
+_PESO_ST4_PEGADA_DEFAULT = 12
+_PESO_ST4_PLANO_DEFAULT = 12
+_PESO_ST4_EQ_DEFAULT = 3
+
 
 def _tamanho_e_peso_bloco_csp(cfg_r):
     """Retorna (tamanho_preferido, peso) pro CSP.
@@ -2050,6 +2066,9 @@ def gerar():
         peso_se1_pegada=_PESO_SE1_PEGADA_DEFAULT,
         peso_se1_plano=_PESO_SE1_PLANO_DEFAULT,
         peso_se1_eq=_PESO_SE1_EQ_DEFAULT,
+        peso_st4_pegada=_PESO_ST4_PEGADA_DEFAULT,
+        peso_st4_plano=_PESO_ST4_PLANO_DEFAULT,
+        peso_st4_eq=_PESO_ST4_EQ_DEFAULT,
     )
 
     if resultado_csp.get("viavel"):
@@ -2418,6 +2437,13 @@ def treino_regerar(t):
             peso_sa1=_PESO_SA1_DEFAULT,
             peso_sa1_repet=_PESO_SA1_REPET_DEFAULT,
             peso_sb5=_PESO_SB5_DEFAULT,
+            # S-T4 (2026-05-29): INTRA-treino. Diferente de S-R1/S-E1 (que
+            # ficam fora aqui porque /regerar gera 1 treino só — cross-treino
+            # não dispara), S-T4 atua dentro do treino sendo gerado e faz
+            # sentido nesta rota também.
+            peso_st4_pegada=_PESO_ST4_PEGADA_DEFAULT,
+            peso_st4_plano=_PESO_ST4_PLANO_DEFAULT,
+            peso_st4_eq=_PESO_ST4_EQ_DEFAULT,
         )
         nome_custom = cfg_r.get("nome_custom", "")
         tipo_label = nome_custom or sessoes_ativas[t].tipo

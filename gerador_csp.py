@@ -510,6 +510,9 @@ def _construir_modelo(
     peso_se1_pegada: int = 0,
     peso_se1_plano: int = 0,
     peso_se1_eq: int = 0,
+    peso_st4_pegada: int = 0,
+    peso_st4_plano: int = 0,
+    peso_st4_eq: int = 0,
 ) -> dict:
     """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
     penalidades de S-T1, Aderência ao Tier, S-B1 distância funcional
@@ -567,6 +570,21 @@ def _construir_modelo(
     adapter (sem toggle UI). Pesos calibrados via sondagem; soma
     par-a-par no objetivo equivale ao `_score_inter` do motor antigo
     (constante por dim, não matriz 4x4 — D2.1 fechou em 2026-05-08).
+
+    `peso_st4_pegada` / `peso_st4_plano` / `peso_st4_eq` (S-T4,
+    2026-05-29): proximidade biomecânica INTRA-treino mesma-sub.
+    Espelho exato do S-E1 com predicado de pares mudando de
+    "treinos diferentes" pra "mesmo treino". 0 (default em cada) = sem
+    efeito. >0 penaliza pares de slots NO MESMO TREINO mesma-subregião
+    com match exato na dimensão. Cobre o caso clínico verbalizado por
+    Bernardo durante S-E1: `costas(3)` no mesmo treino com 3 puxadas/
+    remadas todas pegada aberta. IntVars `pegada_idx/plano_idx/eq_idx`
+    compartilhados com S-E1 (construídos quando S-E1 OR S-T4 ativos).
+    Exceções biomecânicas (Pullover/Pulldown opta fora de pegada;
+    Crossover opta fora de plano) tratadas via dim vazia no XLSX —
+    sentinela única por slot do code helper já desativa same_X. Default
+    ON via adapter (sem toggle UI). Hierarquia INTRA > INTER (Seção
+    8.9/D3.1 dimensoes_proximidade.md): peso ~1.25 × peso S-E1.
 
     `tamanho_preferido` + `peso_tamanho_bloco` (Fatia 4.C, 2026-05-24):
     S-B4 tamanho preferido do bloco. Default tamanho=2, peso=0 (sem
@@ -1732,45 +1750,59 @@ def _construir_modelo(
     # - pool(s1).subs ∩ pool(s2).subs = ∅ → same_sub sempre false, par
     #   nunca contribui (skip pra evitar BoolVars mortas).
     usa_se1 = (peso_se1_pegada > 0 or peso_se1_plano > 0 or peso_se1_eq > 0)
-    if usa_se1 and len(treinos) >= 2:
+    usa_st4 = (peso_st4_pegada > 0 or peso_st4_plano > 0 or peso_st4_eq > 0)
+
+    # IntVars de dim compartilhados entre S-E1 (cross-treino) e S-T4 (INTRA-
+    # treino). Constroem uma vez por slot quando QUALQUER das duas usa a dim
+    # (peso > 0 em S-E1 OU em S-T4). Pares cross-treino (S-E1) e pares
+    # intra-treino mesma-sub (S-T4) são disjuntos, mas leem os mesmos
+    # pegada_idx[sid] / plano_idx[sid] / eq_idx[sid]. Igual S-E1: sentinela
+    # por slot pra dim vazia (code = BASE + sid).
+    if usa_se1 or usa_st4:
         pegada_idx: dict[int, cp_model.IntVar] = {}
         plano_idx: dict[int, cp_model.IntVar] = {}
         eq_idx: dict[int, cp_model.IntVar] = {}
+        usa_dim_peg = peso_se1_pegada > 0 or peso_st4_pegada > 0
+        usa_dim_pla = peso_se1_plano > 0 or peso_st4_plano > 0
+        usa_dim_eq = peso_se1_eq > 0 or peso_st4_eq > 0
         for s in slots_globais:
             pool = s["pool_slot"]
             sid = s["sid"]
-            if peso_se1_pegada > 0:
+            if usa_dim_peg:
                 codes = [_pegada_code_do_ex(ex, sid) for ex in pool]
                 lo, hi = (min(codes), max(codes)) if codes else (0, 0)
-                pi = model.NewIntVar(lo, hi, f"se1_peg_t{s['t_idx']}_s{sid}")
+                pi = model.NewIntVar(lo, hi, f"dim_peg_t{s['t_idx']}_s{sid}")
                 model.Add(
                     pi == sum(assign[(sid, c)] * codes[c] for c in range(len(pool)))
                 )
                 pegada_idx[sid] = pi
-            if peso_se1_plano > 0:
+            if usa_dim_pla:
                 codes = [_plano_code_do_ex(ex, sid) for ex in pool]
                 lo, hi = (min(codes), max(codes)) if codes else (0, 0)
-                pli = model.NewIntVar(lo, hi, f"se1_pla_t{s['t_idx']}_s{sid}")
+                pli = model.NewIntVar(lo, hi, f"dim_pla_t{s['t_idx']}_s{sid}")
                 model.Add(
                     pli == sum(assign[(sid, c)] * codes[c] for c in range(len(pool)))
                 )
                 plano_idx[sid] = pli
-            if peso_se1_eq > 0:
+            if usa_dim_eq:
                 codes = [_equipamento_code_do_ex(ex, sid) for ex in pool]
                 lo, hi = (min(codes), max(codes)) if codes else (0, 0)
-                ei = model.NewIntVar(lo, hi, f"se1_eq_t{s['t_idx']}_s{sid}")
+                ei = model.NewIntVar(lo, hi, f"dim_eq_t{s['t_idx']}_s{sid}")
                 model.Add(
                     ei == sum(assign[(sid, c)] * codes[c] for c in range(len(pool)))
                 )
                 eq_idx[sid] = ei
 
         # Coleta subregiões possíveis por slot (cache do pool).
+        # Compartilhado com S-T4 (mesmo predicado same_sub via subregiao_idx).
         subs_possiveis_por_sid: dict[int, set[str]] = {}
         for s in slots_globais:
             subs_possiveis_por_sid[s["sid"]] = {
                 ex.subregiao for ex in s["pool_slot"] if ex.subregiao
             }
 
+    # ── S-E1 (cross-treino) — pares (sid1, sid2) com t1 < t2 ────────────────
+    if usa_se1 and len(treinos) >= 2:
         n_treinos = len(treinos)
         for t1 in range(n_treinos):
             sids_t1 = slots_por_treino.get(t1, [])
@@ -1816,6 +1848,70 @@ def _construir_modelo(
                                 [same_sub, same_dim]
                             )
                             penalidades.append(viol)
+
+    # ── S-T4 (2026-05-29): proximidade biomec INTRA-treino mesma-sub ────────
+    # Espelho exato da S-E1, com predicado dos pares mudando: pares (sid1,
+    # sid2) AGORA dentro do MESMO treino (t1 == t2), sid1 < sid2. Resto
+    # idêntico (reusa subregiao_idx + IntVars de dim).
+    #
+    # Caso clínico verbalizado por Bernardo durante S-E1 e confirmado pela
+    # auditoria 2026-05-29: `costas(3)` no mesmo treino com 3 puxadas/remadas
+    # todas com pegada aberta. S-E1 não pega (intra), H-T1/T2/T3 hard não
+    # pega (famílias diferentes). S-T4 atua exatamente aqui.
+    #
+    # Exceções biomecânicas (Pullover/Pulldown → opta fora de pegada;
+    # Crossover → opta fora de plano) NÃO precisam de código: dim vazia no
+    # XLSX → code sentinela única por slot → same_X false naturalmente.
+    # Curadoria fica no banco, não no motor.
+    #
+    # Skip estrutural: par com pool(sid1).subs ∩ pool(sid2).subs = ∅ →
+    # same_sub sempre false (não cria BoolVars mortas).
+    if usa_st4:
+        for t_idx in range(len(treinos)):
+            sids_t = slots_por_treino.get(t_idx, [])
+            for i in range(len(sids_t)):
+                sid1 = sids_t[i]
+                subs1 = subs_possiveis_por_sid[sid1]
+                for j in range(i + 1, len(sids_t)):
+                    sid2 = sids_t[j]
+                    subs2 = subs_possiveis_por_sid[sid2]
+                    if not (subs1 & subs2):
+                        continue
+                    # same_sub par INTRA — BoolVar nova (par é distinto dos
+                    # pares INTER do S-E1 porque t1==t2 vs t1<t2).
+                    same_sub = model.NewBoolVar(
+                        f"st4_samesub_{sid1}_{sid2}"
+                    )
+                    model.Add(
+                        subregiao_idx[sid1] == subregiao_idx[sid2]
+                    ).OnlyEnforceIf(same_sub)
+                    model.Add(
+                        subregiao_idx[sid1] != subregiao_idx[sid2]
+                    ).OnlyEnforceIf(same_sub.Not())
+
+                    for dim_tag, peso, idx_dict in (
+                        ("peg", peso_st4_pegada, pegada_idx),
+                        ("pla", peso_st4_plano, plano_idx),
+                        ("eq", peso_st4_eq, eq_idx),
+                    ):
+                        if peso <= 0:
+                            continue
+                        same_dim = model.NewBoolVar(
+                            f"st4_same{dim_tag}_{sid1}_{sid2}"
+                        )
+                        model.Add(
+                            idx_dict[sid1] == idx_dict[sid2]
+                        ).OnlyEnforceIf(same_dim)
+                        model.Add(
+                            idx_dict[sid1] != idx_dict[sid2]
+                        ).OnlyEnforceIf(same_dim.Not())
+                        viol = model.NewIntVar(
+                            0, peso, f"st4_pen_{dim_tag}_{sid1}_{sid2}",
+                        )
+                        model.Add(viol >= peso).OnlyEnforceIf(
+                            [same_sub, same_dim]
+                        )
+                        penalidades.append(viol)
 
     # ── S-B4 (Fatia 4.C): tamanho preferido do bloco ────────────────────────
     # Pra cada bloco b do treino t:
@@ -2252,6 +2348,9 @@ def gerar_rotina_csp(
     peso_se1_pegada: int = 0,
     peso_se1_plano: int = 0,
     peso_se1_eq: int = 0,
+    peso_st4_pegada: int = 0,
+    peso_st4_plano: int = 0,
+    peso_st4_eq: int = 0,
 ) -> dict:
     """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
     negociam no mesmo modelo — necessário pra H-R1 cross-treino.
@@ -2328,6 +2427,9 @@ def gerar_rotina_csp(
                 peso_se1_pegada=peso_se1_pegada,
                 peso_se1_plano=peso_se1_plano,
                 peso_se1_eq=peso_se1_eq,
+                peso_st4_pegada=peso_st4_pegada,
+                peso_st4_plano=peso_st4_plano,
+                peso_st4_eq=peso_st4_eq,
             )
         return _resolver_com_variedade(
             demandas_por_treino, banco, nivel_aluno, seed, variedade,
@@ -2344,6 +2446,9 @@ def gerar_rotina_csp(
             peso_se1_pegada=peso_se1_pegada,
             peso_se1_plano=peso_se1_plano,
             peso_se1_eq=peso_se1_eq,
+            peso_st4_pegada=peso_st4_pegada,
+            peso_st4_plano=peso_st4_plano,
+            peso_st4_eq=peso_st4_eq,
         )
 
     fams_originais = set(familias_proibidas or [])
@@ -2396,6 +2501,9 @@ def _resolver_legacy(
     peso_se1_pegada: int = 0,
     peso_se1_plano: int = 0,
     peso_se1_eq: int = 0,
+    peso_st4_pegada: int = 0,
+    peso_st4_plano: int = 0,
+    peso_st4_eq: int = 0,
 ) -> dict:
     """Branch legado: 1 solve com Minimize → 1 solução determinística por
     seed. Preserva byte-a-byte o comportamento da Fatia 2 P2 quando
@@ -2416,6 +2524,9 @@ def _resolver_legacy(
         peso_se1_pegada=peso_se1_pegada,
         peso_se1_plano=peso_se1_plano,
         peso_se1_eq=peso_se1_eq,
+        peso_st4_pegada=peso_st4_pegada,
+        peso_st4_plano=peso_st4_plano,
+        peso_st4_eq=peso_st4_eq,
     )
     if md["penalidades"]:
         md["model"].Minimize(sum(md["penalidades"]))
@@ -2496,6 +2607,9 @@ def _resolver_com_variedade(
     peso_se1_pegada: int = 0,
     peso_se1_plano: int = 0,
     peso_se1_eq: int = 0,
+    peso_st4_pegada: int = 0,
+    peso_st4_plano: int = 0,
+    peso_st4_eq: int = 0,
 ) -> dict:
     """Branch variedade (Frente B Fatia 3): 2 fases.
 
@@ -2533,6 +2647,9 @@ def _resolver_com_variedade(
         peso_se1_pegada=peso_se1_pegada,
         peso_se1_plano=peso_se1_plano,
         peso_se1_eq=peso_se1_eq,
+        peso_st4_pegada=peso_st4_pegada,
+        peso_st4_plano=peso_st4_plano,
+        peso_st4_eq=peso_st4_eq,
     )
     if md1["penalidades"]:
         md1["model"].Minimize(sum(md1["penalidades"]))
@@ -2585,6 +2702,9 @@ def _resolver_com_variedade(
         peso_se1_pegada=peso_se1_pegada,
         peso_se1_plano=peso_se1_plano,
         peso_se1_eq=peso_se1_eq,
+        peso_st4_pegada=peso_st4_pegada,
+        peso_st4_plano=peso_st4_plano,
+        peso_st4_eq=peso_st4_eq,
     )
     var_total: Optional[cp_model.IntVar] = None
     if md2["penalidades"]:
@@ -2612,6 +2732,11 @@ def _resolver_com_variedade(
             peso_se1_pegada,
             peso_se1_plano,
             peso_se1_eq,
+            # S-T4 (2026-05-29): pares INTRA-treino mesma-sub, mesma estrutura
+            # do S-E1 — 1 termo escalar por dim com peso > 0.
+            peso_st4_pegada,
+            peso_st4_plano,
+            peso_st4_eq,
         )
         teto = max(1, teto_por_termo) * len(md2["penalidades"])
         var_total = md2["model"].NewIntVar(0, teto, "var_total")
@@ -2794,6 +2919,9 @@ def gerar_treino_csp(
     peso_se1_pegada: int = 0,
     peso_se1_plano: int = 0,
     peso_se1_eq: int = 0,
+    peso_st4_pegada: int = 0,
+    peso_st4_plano: int = 0,
+    peso_st4_eq: int = 0,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
@@ -2855,6 +2983,9 @@ def gerar_treino_csp(
         peso_se1_pegada=peso_se1_pegada,
         peso_se1_plano=peso_se1_plano,
         peso_se1_eq=peso_se1_eq,
+        peso_st4_pegada=peso_st4_pegada,
+        peso_st4_plano=peso_st4_plano,
+        peso_st4_eq=peso_st4_eq,
     )
     if not rotina["viavel"]:
         out = {

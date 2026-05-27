@@ -1,0 +1,56 @@
+{
+  "stage": "POS",
+  "n_rotinas": 30,
+  "nivel_aluno": 2,
+  "pesos": {
+    "peso_aderencia": 0,
+    "peso_evitar_agonistas": 10,
+    "peso_tamanho_bloco": 5,
+    "tamanho_preferido": 2,
+    "peso_sa1": 12,
+    "peso_sa1_repet": 10,
+    "peso_sb5": 4,
+    "peso_sr1": 4,
+    "peso_se1_pegada": 10,
+    "peso_se1_plano": 10,
+    "peso_se1_eq": 2,
+    "peso_st4_pegada": 12,
+    "peso_st4_plano": 12,
+    "peso_st4_eq": 3
+  },
+  "resultados": {
+    "costas_2x1T": {
+      "setup": "costas_2x1T",
+      "n_rotinas": 30,
+      "contagem": {
+        "total_pares": 30
+      },
+      "pares_por_sub": {
+        "costas": 30
+      },
+      "repet_por_sub_dim": {},
+      "tempo_p50_s": 0.04187905788421631,
+      "tempo_total_s": 1.223059892654419,
+      "casos_pegada": [],
+      "casos_plano": []
+    },
+    "jose_silva_T1T2": {
+      "setup": "jose_silva_T1T2",
+      "n_rotinas": 30,
+      "contagem": {
+        "total_pares": 180
+      },
+      "pares_por_sub": {
+        "peito": 30,
+        "perna_posterior": 30,
+        "costas": 90,
+        "perna_anterior": 30
+      },
+      "repet_por_sub_dim": {},
+      "tempo_p50_s": 3.92630136013031,
+      "tempo_total_s": 120.08803296089172,
+      "casos_pegada": [],
+      "casos_plano": []
+    }
+  }
+}
