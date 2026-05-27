@@ -36,6 +36,24 @@ Logs novos do refator vão em `docs/refatoracao/logs/` (ex: `mvp_fatia_4d_relaxa
 - `docs/refatoracao/arquivo/era_v4_greedy_incremental/` — todo o conhecimento da era greedy (guia v4, dimensões, memória, logs etapa_2 a etapa_6). Consultar para CONTEXTO ("por que decisão X foi tomada?"), nunca para planejar implementação nova.
 - `docs/refatoracao/arquivo/` (raiz) — documentos pré-v4 arquivados antes.
 
+> **⚠️ Exceção crítica — `dimensoes_proximidade.md` é REFERÊNCIA VIVA da spec biomecânica.**
+>
+> Apesar de estar em `arquivo/era_v4_greedy_incremental/`, o doc
+> `dimensoes_proximidade.md` é a especificação clínica única e viva das
+> 3 dimensões biomecânicas cadastradas no `banco_exercicios.xlsx`:
+> `pegada` (matriz 4×4, peso ALTO), `plano_corporal` (peso ALTO) e
+> `equipamento_grupo` (8 níveis, peso BAIXO/tiebreaker). Os pesos, a
+> matriz e o **escopo "mesma subregião"** (que resolve naturalmente
+> "halteres vs barra IMPORTA em supino mas NÃO IMPORTA em passada")
+> foram calibrados ao longo da Etapa 6 e SOBREVIVEM no refator declarativo.
+>
+> Quando uma sessão for tocar em proximidade biomecânica
+> (constraint S-E1 do roadmap, ou qualquer soft cross-treino/INTRA de
+> equipamento/pegada/plano): **LER este doc primeiro**, reaproveitar
+> pesos e escopo. Não recalibrar do zero. A regra geral acima ("arquivo
+> nunca para planejar implementação nova") pegou este doc por engano
+> no commit `de8873b` de 2026-05-22.
+
 ## Etapa 6 Fase 3 — decisões fechadas (não reabrir sem motivo forte)
 
 > **Nota histórica (2026-05-21)**: esta seção descreve decisões tomadas durante a era do refator greedy incremental (guia v4, arquivado). Várias decisões aqui SOBREVIVEM no refator declarativo novo — especialmente os filtros hard de `familia_estrita`, `variante_pontual`, e `lateralidade` em costas, que aparecem agora como constraints H-T1, H-T2, H-T3 no `docs/refatoracao/catalogo_constraints.md`. O cadastro de dimensões e as colunas do banco também sobrevivem.
