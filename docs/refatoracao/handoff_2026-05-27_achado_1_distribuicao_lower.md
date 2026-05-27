@@ -439,8 +439,38 @@ treinos da rotina alterna a distribuição de subregião — não 100%
 
 ## 9. Pendências NÃO incluídas nesta frente
 
-- **🟡 Achado 2 da auditoria 2026-05-26** — equipamento repetido
-  cross-treino. Novo eixo S-E1. Pós-S-R1.
+- **🟡 Achado 2 da auditoria 2026-05-26** — proximidade biomecânica
+  cross-treino. Renomeada de "equipamento repetido" pra **S-E1
+  proximidade biomecânica cross-treino** após esclarecimento clínico
+  com Bernardo (2026-05-27). Pós-S-R1. **Detalhes importantes pra
+  próxima sessão:**
+
+  - **NÃO INVENTAR dimensões nem pesos do zero.** O app antigo já
+    catalogou tudo extensivamente na Etapa 6 do refator. Spec completa
+    (~700 linhas) em
+    `docs/refatoracao/arquivo/era_v4_greedy_incremental/dimensoes_proximidade.md`.
+    Leitura obrigatória antes de qualquer trabalho de modelagem.
+  - **3 dimensões biomecânicas já cadastradas no XLSX** desde a Fase 4
+    (2026-05-15): `pegada` (matriz 4×4 customizada, peso ALTO),
+    `plano_corporal` (peso ALTO), `equipamento_grupo` (8 níveis, peso
+    BAIXO/tiebreaker). Colunas existem em `banco_exercicios.xlsx`.
+  - **Escopo "mesma subregião"**: as 3 dimensões só competem entre
+    pares de exercícios com mesma subregião. Resolve naturalmente a
+    distinção clínica do Bernardo (2026-05-27): "halteres vs barra
+    IMPORTA em supino (mesma sub=peito, mudam pegada e equipamento),
+    mas NÃO IMPORTA em passada (mesma sub=perna_anterior, só muda
+    equipamento que tem peso baixo)". A regra já está modelada via
+    combinação das 3 dimensões, não por equipamento sozinho.
+  - **Trabalho da frente S-E1**: reaproveitar a lógica INTER (~0.8 ×
+    INTRA) do `_score_proximidade` do gerador antigo em
+    `gerador_treino.py`, declarando como soft cross-treino no motor
+    CSP novo. Pesos e matriz `pegada` já calibrados no doc antigo —
+    consumir, não recalibrar do zero (pode ajustar via sondagem se a
+    auditoria pedir, mas o ponto de partida é o que está documentado).
+  - **NÃO É** só equipamento. Nome "S-E1 equipamento" do roadmap
+    antecedente é enganoso — a frente real é proximidade biomecânica
+    cross-treino, escopo das 3 dimensões juntas.
+
 - **Gate de avaliação clínica semântica** (Bloco 4) — pré-requisito
   do Bloco 5. Continua aberto.
 - **S-T2/S-T3/S-T4/S-R2/S-R3/S-H1/H-P2/H-X** — frentes futuras
