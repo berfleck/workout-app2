@@ -310,28 +310,28 @@ def test_quotas_de_regiao_upper_5_paritaria():
 
 
 def test_quotas_de_regiao_lower_2_um_de_cada_essencial():
-    """lower(2): perna_ant + perna_post (obrig). Acessória panturrilha NÃO compete."""
+    """lower(2): perna_ant + perna_post (obrig).
+
+    Pós-2026-05-27 panturrilha foi removida de ANCORAS_POR_REGIAO['lower']
+    (decisão clínica). Pesos restantes 2:2 → Hamilton 2×(0.5,0.5)=(1,1).
+    """
     from gerador_treino import _quotas_de_regiao
     random.seed(1)
-    # Esse helper aplica Hamilton puro sobre TODAS as âncoras da região.
-    # O filtro pré-quotas (acessórias só em qtd > 2 × num_obrig) é
-    # responsabilidade do CALLER (_decompor_demanda_regiao). Aqui só
-    # testamos o helper puro: lower(2) com pesos 2:2:1 → 1:1:0 via Hamilton.
     quotas, _ = _quotas_de_regiao("lower", 2)
-    # 2 × (2/5, 2/5, 1/5) = (0.8, 0.8, 0.4) → floor (0,0,0); restos
-    # ordenados (perna_ant 0.8, perna_post 0.8, panturrilha 0.4); top 2.
-    # Tie-break peso_maior + ordem: perna_ant (peso 2, idx 0), perna_post
-    # (peso 2, idx 1) ganham +1 cada. Final: (1, 1, 0).
     assert quotas == {"perna_anterior": 1, "perna_posterior": 1}
 
 
-def test_quotas_de_regiao_lower_5_panturrilha_pode_aparecer():
-    """lower(5): peso 2:2:1 → Hamilton 2:2:1. Panturrilha entra."""
+def test_quotas_de_regiao_lower_5_sem_panturrilha():
+    """lower(5) pós-2026-05-27: panturrilha removida do dict.
+    Pesos 2:2 → Hamilton 5×(0.5,0.5)=(2.5,2.5) → tie-break sorteia
+    qual ganha o +1. Sum=5."""
     from gerador_treino import _quotas_de_regiao
     random.seed(1)
     quotas, _ = _quotas_de_regiao("lower", 5)
-    # 5 × (2/5, 2/5, 1/5) = (2, 2, 1) → floor (2,2,1) sum=5 ✓
-    assert quotas == {"perna_anterior": 2, "perna_posterior": 2, "panturrilha": 1}
+    assert "panturrilha" not in quotas
+    assert set(quotas.keys()) == {"perna_anterior", "perna_posterior"}
+    assert sum(quotas.values()) == 5
+    assert {quotas["perna_anterior"], quotas["perna_posterior"]} == {2, 3}
 
 
 def test_quotas_de_regiao_sem_ancoras_devolve_vazio():

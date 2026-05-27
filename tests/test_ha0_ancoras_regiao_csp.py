@@ -251,9 +251,11 @@ def test_upper_3_cobre_todas_obrigatorias(banco):
 
 
 def test_lower_3_cobre_perna_anterior_e_posterior(banco):
-    """`ANCORAS_POR_REGIAO[lower]`: perna_anterior obrig + perna_posterior
-    obrig + panturrilha NÃO obrig. lower(3) deve cobrir as 2 obrigatórias.
-    Panturrilha pode ou não aparecer."""
+    """`ANCORAS_POR_REGIAO[lower]` pós-2026-05-27: só perna_anterior +
+    perna_posterior (ambas obrig). Panturrilha removida do dict; adutores
+    nunca esteve. lower(3) deve cobrir as 2 obrigatórias. Cobertura
+    explícita do "panturrilha fora" está em test_csp_filtro_acessorias.py.
+    """
     falhas = []
     for seed in range(5):
         r = gerar_treino_csp(

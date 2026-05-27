@@ -148,7 +148,9 @@ ANCORAS_POR_REGIAO: dict[str, list[dict]] = {
     "lower": [
         {"subregiao": "perna_anterior",  "peso": 2, "obrigatoria": True},
         {"subregiao": "perna_posterior", "peso": 2, "obrigatoria": True},
-        {"subregiao": "panturrilha",     "peso": 1, "obrigatoria": False},
+        # panturrilha intencionalmente fora — decisão clínica 2026-05-27:
+        # demanda região lower nunca traz panturrilha; user pede via
+        # demanda subregião explícita. Mesmo tratamento de adutores.
     ],
     "core": [
         {"subregiao": "core_dinamico",   "peso": 1, "obrigatoria": False},

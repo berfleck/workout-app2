@@ -137,11 +137,24 @@ Cada item independente; entram conforme prioridade clínica observada.
   Pytest 360 + 1 skipped (+4), harness 16/16 OK. NÃO mexe em Hamilton
   (`random.random()` já lá; auditoria N=1 não justificava). Ver
   `logs/mvp_sr1_cross_treino.md`.
-- **🟦 `panturrilha.obrigatoria=False`** (achado 1, subitem) — **status
-  quo aceito 2026-05-27** (decisão clínica Bernardo). Sondagem N=5
-  pós-S-R1 mostra panturrilha aparece em 60-80% das rotinas Full Body
-  2T região (não 0% como reportado na auditoria N=1+1 — azar de seed).
-  Variabilidade natural via Hamilton cycling é aceitável.
+- **✅ Filtro de acessórias CSP — panturrilha fora de demanda região**
+  (achado 1, faceta panturrilha) — CONCLUÍDA 2026-05-27 (branch
+  `fix-filtro-acessorias-csp`, aguarda merge FF). Reverte o "status
+  quo aceito" inicial: sondagem N=10 em main pós-S-R1 mostrou
+  panturrilha em **70%** das rotinas Full Body 2T região, não os 60-80%
+  da sondagem N=5 anterior. Bernardo (abertura da sessão) verbalizou
+  preferência por panturrilha sempre oculta em demanda região (mesmo
+  tratamento de adutores), inclusive em demandas grandes lower(10+).
+  Caminho B-mínima: remover panturrilha de `ANCORAS_POR_REGIAO['lower']`
+  em `gerador_treino.py`. Filtro upstream `subs_ancora_h_a0` em
+  `gerador_csp.py:642-646` já bania não-declaradas — bastou removê-la
+  do dict. Sem mecanismo `min_qtd_demanda` proposto no handoff (YAGNI
+  pós-decisão clínica). Motor antigo perde panturrilha em lower(5+)
+  também (convergência intencional com CSP, norte §3). 4 testes
+  legados refatorados. **Pré-fix**: 70% rotinas com pant. **Pós-fix**:
+  0%. Volume lower simétrico (3+3) em 100% das rotinas vs 30% pré-fix.
+  Pytest 360+4=364 + harness 16/16 OK + smoke E2E confirma. Ver
+  `logs/mvp_filtro_acessorias_csp.md`. **Achado 1 totalmente fechado.**
 - **⬜ S-E1 proximidade biomecânica cross-treino** (achado 2,
   renomeado 2026-05-27) — NÃO É só equipamento. Reusa as 3 dimensões
   já cadastradas no XLSX desde Fase 4 (pegada matriz 4×4 / plano_corporal /

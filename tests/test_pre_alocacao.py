@@ -88,32 +88,32 @@ def test_decompor_lower_4_acessorias_nao_competem():
     assert qtd_por_sub == {"perna_anterior": 2, "perna_posterior": 2}
 
 
-def test_decompor_lower_5_acessoria_entra():
-    """lower(5): qtd > 2×n_obrig=4 → todas âncoras competem. Hamilton 5
-    vagas com 2:2:1 → (2, 2, 1) exato."""
+def test_decompor_lower_5_sem_panturrilha():
+    """lower(5): panturrilha removida de ANCORAS_POR_REGIAO['lower']
+    em 2026-05-27 (decisão clínica: pant só em demanda subregião
+    explícita). Hamilton 5 vagas com pesos 2:2 → (3, 2) ou (2, 3)
+    via tie-break. Sum=5."""
     random.seed(3)
     sub_dems, _ = _decompor_demanda_regiao("lower", 5)
     qtd_por_sub = {sub: qt for _, sub, qt in sub_dems}
-    assert qtd_por_sub == {"perna_anterior": 2, "perna_posterior": 2, "panturrilha": 1}
+    assert "panturrilha" not in qtd_por_sub
+    assert set(qtd_por_sub.keys()) == {"perna_anterior", "perna_posterior"}
+    assert sum(qtd_por_sub.values()) == 5
 
 
 def test_decompor_lower_6_proporcional():
-    """lower(6): pesos 2:2:1 → Hamilton 6×(2/5,2/5,1/5)=(2.4,2.4,1.2)
-    → floor (2,2,1) restante=1; tie-break sorteado entre perna_ant e
-    perna_post (ambas com mesmo resto 0.4 e mesmo peso 2) → uma delas
-    ganha o +1, panturrilha fica em 1.
+    """lower(6): pesos 2:2 (perna_ant, perna_post) pós-2026-05-27.
+    Hamilton 6×(0.5,0.5)=(3,3) exato.
 
-    NOTA: adutores NÃO está em ANCORAS_POR_REGIAO['lower'] (decisão clínica:
-    adutores entra só quando user pede explicitamente). Mudança vs Etapa 2
-    onde adutores aparecia via fallback essencial/acessório.
+    NOTA: nem panturrilha nem adutores estão em ANCORAS_POR_REGIAO['lower']
+    (decisão clínica: ambas entram só quando user pede explicitamente
+    via demanda subregião).
     """
     random.seed(4)
     sub_dems, _ = _decompor_demanda_regiao("lower", 6)
     qtd_por_sub = {sub: qt for _, sub, qt in sub_dems}
-    assert qtd_por_sub.get("panturrilha", 0) == 1
-    qa = qtd_por_sub.get("perna_anterior", 0)
-    qp = qtd_por_sub.get("perna_posterior", 0)
-    assert {qa, qp} == {2, 3}
+    assert qtd_por_sub == {"perna_anterior": 3, "perna_posterior": 3}
+    assert "panturrilha" not in qtd_por_sub
     assert "adutores" not in qtd_por_sub
 
 
@@ -173,12 +173,12 @@ def test_pre_alocar_lower_4_dois_e_dois_essenciais(banco):
 
 
 def test_pre_alocar_lower_6_proporcional(banco):
-    """lower(6) Etapa 3: pesos 2:2:1 (perna_ant, perna_post, panturrilha).
-    Hamilton 6×(2/5,2/5,1/5)=(2.4,2.4,1.2) → floor (2,2,1) restante=1;
-    tie-break ordem → perna_ant +1 = (3,2,1).
+    """lower(6) pós-2026-05-27: pesos 2:2 (perna_ant, perna_post).
+    Panturrilha removida de ANCORAS_POR_REGIAO['lower']; Hamilton
+    6×(0.5,0.5)=(3,3) exato.
 
-    Adutores NÃO entra (não está em ANCORAS_POR_REGIAO['lower']) — decisão
-    clínica da Etapa 3: adutores entra só quando user pede explicitamente.
+    Nem panturrilha nem adutores entram (decisão clínica: ambas só
+    em demanda subregião explícita).
     """
     random.seed(12)
     cfg = {"demandas": [("regiao", "lower", 6)]}
@@ -187,8 +187,8 @@ def test_pre_alocar_lower_6_proporcional(banco):
     assert len(exs) == 6
     cnt_sub = Counter(ex.subregiao for ex in exs)
     assert cnt_sub.get("perna_anterior", 0) == 3
-    assert cnt_sub.get("perna_posterior", 0) == 2
-    assert cnt_sub.get("panturrilha", 0) == 1
+    assert cnt_sub.get("perna_posterior", 0) == 3
+    assert cnt_sub.get("panturrilha", 0) == 0
     assert cnt_sub.get("adutores", 0) == 0
 
 

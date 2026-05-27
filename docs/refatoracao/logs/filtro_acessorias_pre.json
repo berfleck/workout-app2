@@ -1,0 +1,24 @@
+{
+  "n_seeds": 10,
+  "peso_sr1": 4,
+  "config_escopo": "default",
+  "configs": {
+    "Full Body 2T (regiao, achado)": {
+      "n_seeds": 10,
+      "inviaveis": 0,
+      "n_split_t1_eq_t2": 0,
+      "n_vol_lower_assim": 7,
+      "n_pant_presente": 7,
+      "pct_split_t1_eq_t2": 0.0,
+      "pct_vol_lower_assim": 70.0,
+      "pct_pant_presente": 70.0,
+      "tempo_p50_s": 0.8186681499937549,
+      "tempo_max_s": 1.0811101000290364,
+      "exemplos": [
+        "seed=0 splits_lower=[[1, 2, 0, 0], [2, 1, 0, 0]] (ant=3, post=3, pant=0)",
+        "seed=1 splits_lower=[[1, 2, 0, 0], [1, 1, 1, 0]] (ant=2, post=3, pant=1)",
+        "seed=2 splits_lower=[[2, 1, 0, 0], [1, 1, 1, 0]] (ant=3, post=2, pant=1)"
+      ]
+    }
+  }
+}
