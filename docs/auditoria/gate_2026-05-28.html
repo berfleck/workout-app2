@@ -65,13 +65,57 @@ h1 { margin-top: 0; color: var(--laranja); }
     border: 1px solid var(--borda);
 }
 .actions-sticky .status { font-size: 12.5px; color: var(--secundario); margin-left: auto; }
+.tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 56px;
+    background: var(--fundo);
+    padding: 8px 0;
+    z-index: 9;
+    border-bottom: 1px solid var(--borda);
+}
+.tab {
+    background: var(--card);
+    border: 1px solid var(--borda);
+    color: var(--texto);
+    padding: 9px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s;
+}
+.tab:hover { border-color: var(--laranja); color: var(--laranja); }
+.tab.active {
+    background: var(--laranja);
+    color: white;
+    border-color: var(--laranja);
+}
+.tab .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--laranja);
+    display: none;
+}
+.tab.active .dot { background: white; }
+.tab.has-content .dot { display: inline-block; }
 .rotina {
+    display: none;
     background: var(--card);
     border: 1px solid var(--borda);
     border-radius: 10px;
     padding: 20px 22px;
     margin-bottom: 26px;
 }
+.rotina.active { display: block; }
 .rotina h2 { margin-top: 0; }
 .rotina .seed {
     font-size: 13px;
@@ -169,14 +213,16 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
 }
 .comment-rotina textarea { min-height: 80px; }
 .cross-rotina {
+    display: none;
     background: var(--card);
     border: 1px solid var(--borda);
     border-radius: 10px;
     padding: 18px 22px;
     margin-top: 24px;
 }
+.cross-rotina.active { display: block; }
 .cross-rotina h2 { margin-top: 0; color: var(--laranja); }
-.cross-rotina textarea { min-height: 100px; }
+.cross-rotina textarea { min-height: 200px; }
 </style>
 </head>
 <body>
@@ -199,8 +245,9 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             <span class="status" id="autosave-stamp">autosave inativo</span>
         </div>
     
+    <nav class="tabs"><button class="tab" data-alvo="rotina-1"><span>Rotina 1</span><span class="dot"></span></button><button class="tab" data-alvo="rotina-2"><span>Rotina 2</span><span class="dot"></span></button><button class="tab" data-alvo="rotina-3"><span>Rotina 3</span><span class="dot"></span></button><button class="tab" data-alvo="rotina-4"><span>Rotina 4</span><span class="dot"></span></button><button class="tab" data-alvo="rotina-5"><span>Rotina 5</span><span class="dot"></span></button><button class="tab" data-alvo="cross"><span>Cross-rotina</span><span class="dot"></span></button></nav>
     
-        <section class="rotina" id="rotina-1">
+        <section class="rotina" id="rotina-1" data-pane="rotina-1">
             <h2>Rotina 1 <span class="seed">seed 1040674188</span></h2>
             
         <div class="treino">
@@ -213,23 +260,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Barra Isométrica</div>
+            <div class="ex-nome">Puxada Aberta</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">costas</span>
                 <span class="chip chip-pad">puxadas</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> aberta</span><span class="dim"><span class="dim-key">eq</span> corporal</span>
+                <span class="dim"><span class="dim-key">pegada</span> aberta</span><span class="dim"><span class="dim-key">eq</span> polia</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Recuo do Estepe</div>
+            <div class="ex-nome">Cadeira Flexora</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">squat_unilateral</span>
-                <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">eq</span> caixa</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">knee_flexion</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
             </div>
         </div>
     </div>
@@ -246,22 +293,22 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Desenvolvimento Smith</div>
+            <div class="ex-nome">Crucifixo Inclinado Halteres</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">ombro</span>
-                <span class="chip chip-pad">ombro_composto</span>
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_isolados</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> inclinado</span><span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Ponte Na Caixa</div>
+            <div class="ex-nome">Ponte Uni. Caixa</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">perna_posterior</span>
                 <span class="chip chip-pad">hinge</span>
-                <span class="chip lat-bi">bi</span>
+                <span class="chip lat-uni">uni</span>
                 <span class="dim"><span class="dim-key">plano</span> deitado</span><span class="dim"><span class="dim-key">eq</span> caixa</span>
             </div>
         </div>
@@ -279,21 +326,21 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Abdução Polia</div>
+            <div class="ex-nome">Elevação Frontal Anilha</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">abduction</span>
-                <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">eq</span> polia</span>
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_isolado</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Canoinha</div>
+            <div class="ex-nome">Crunch No Cabo</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">core_dinamico</span>
-                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip chip-pad">flexao_tronco</span>
                 <span class="chip lat-bi">bi</span>
                 
             </div>
@@ -312,22 +359,22 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Crossover</div>
+            <div class="ex-nome">Cadeira Extensora</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">peito</span>
-                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">knee_extension</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Crunch No Cabo</div>
+            <div class="ex-nome">V-Up Unilateral</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">core_dinamico</span>
-                <span class="chip chip-pad">flexao_tronco</span>
-                <span class="chip lat-bi">bi</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-uni">uni</span>
                 
             </div>
         </div>
@@ -354,23 +401,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Remada Apoiado</div>
+            <div class="ex-nome">Remada LM Neutra</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">costas</span>
                 <span class="chip chip-pad">remadas</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> apoiada</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> curvada</span><span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Recuo</div>
+            <div class="ex-nome">Passada Dos Steps</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">perna_anterior</span>
                 <span class="chip chip-pad">squat_unilateral</span>
                 <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">eq</span> caixa</span>
             </div>
         </div>
     </div>
@@ -387,23 +434,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Apoio Fechado</div>
+            <div class="ex-nome">Supino Com Barra</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">peito</span>
                 <span class="chip chip-pad">empurrar_compostos</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> corporal</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Agachamento Livre</div>
+            <div class="ex-nome">Agachamento Smith Rampa</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">perna_anterior</span>
                 <span class="chip chip-pad">squat_bilateral</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> barra</span>
+                <span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
             </div>
         </div>
     </div>
@@ -420,22 +467,22 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Side Clams</div>
+            <div class="ex-nome">Desenvolvimento Smith</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">abduction</span>
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
+                <span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Prancha Lateral</div>
+            <div class="ex-nome">Abd Bicicleta</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_isometrico</span>
-                <span class="chip chip-pad">flexao_lateral</span>
-                <span class="chip lat-uni">uni</span>
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip lat-bi">bi</span>
                 
             </div>
         </div>
@@ -453,22 +500,22 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Elevação Frontal Anilha</div>
+            <div class="ex-nome">Side Clams</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">ombro</span>
-                <span class="chip chip-pad">ombro_isolado</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">abduction</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Crunch Chão</div>
+            <div class="ex-nome">Pallof Press</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_dinamico</span>
-                <span class="chip chip-pad">flexao_tronco</span>
-                <span class="chip lat-bi">bi</span>
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">rotacao_tronco</span>
+                <span class="chip lat-uni">uni</span>
                 
             </div>
         </div>
@@ -491,7 +538,7 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
         </section>
     
-        <section class="rotina" id="rotina-2">
+        <section class="rotina" id="rotina-2" data-pane="rotina-2">
             <h2>Rotina 2 <span class="seed">seed 752055454</span></h2>
             
         <div class="treino">
@@ -504,23 +551,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Supino Com Barra</div>
+            <div class="ex-nome">Desenv. Halteres Sentado</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">peito</span>
-                <span class="chip chip-pad">empurrar_compostos</span>
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> barra</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Recuo do Estepe</div>
+            <div class="ex-nome">Leg Press</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">squat_unilateral</span>
-                <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">eq</span> caixa</span>
+                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
             </div>
         </div>
     </div>
@@ -537,23 +584,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Remada Neutra Trx</div>
+            <div class="ex-nome">Remada Curvada Halteres</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">costas</span>
                 <span class="chip chip-pad">remadas</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> suspensao</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> curvada</span><span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Nordic Curl</div>
+            <div class="ex-nome">Slide Board Lateral</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">knee_flexion</span>
-                <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> corporal</span>
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip lat-uni">uni</span>
+                
             </div>
         </div>
     </div>
@@ -570,22 +617,22 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Desenv. Landmine</div>
+            <div class="ex-nome">Abdução Polia</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">ombro</span>
-                <span class="chip chip-pad">ombro_composto</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">abduction</span>
                 <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> barra</span>
+                <span class="dim"><span class="dim-key">eq</span> polia</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Hollow Hold</div>
+            <div class="ex-nome">Prancha Lateral</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">core_isometrico</span>
-                <span class="chip chip-pad">flexao_tronco</span>
-                <span class="chip lat-bi">bi</span>
+                <span class="chip chip-pad">flexao_lateral</span>
+                <span class="chip lat-uni">uni</span>
                 
             </div>
         </div>
@@ -603,22 +650,22 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Kickback Polia</div>
+            <div class="ex-nome">Crossover Sentado</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">hinge</span>
-                <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> polia</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Dead Bug C/ Bola</div>
+            <div class="ex-nome">Infra Chão</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-sub">core_dinamico</span>
                 <span class="chip chip-pad">flexao_quadril</span>
-                <span class="chip lat-uni">uni</span>
+                <span class="chip lat-bi">bi</span>
                 
             </div>
         </div>
@@ -645,23 +692,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Pullover Halteres</div>
+            <div class="ex-nome">Supino Fechado</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">costas</span>
-                <span class="chip chip-pad">puxadas</span>
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_compostos</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">plano</span> pullover</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Agachamento Smith Rampa</div>
+            <div class="ex-nome">Lev. Terra</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     </div>
@@ -678,23 +725,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Side Clams</div>
+            <div class="ex-nome">Barra C/ Borracha</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">abduction</span>
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">puxadas</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
+                <span class="dim"><span class="dim-key">pegada</span> aberta</span><span class="dim"><span class="dim-key">eq</span> corporal</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Abd Bicicleta</div>
+            <div class="ex-nome">Agachamento Goblet Rampa</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_dinamico</span>
-                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_bilateral</span>
                 <span class="chip lat-bi">bi</span>
-                
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     </div>
@@ -711,21 +758,21 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Crossover Sentado</div>
+            <div class="ex-nome">Desenvolvimento Smith</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">peito</span>
-                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+                <span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Infra Chão</div>
+            <div class="ex-nome">Abd Bicicleta</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">core_dinamico</span>
-                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip chip-pad">flexao_tronco</span>
                 <span class="chip lat-bi">bi</span>
                 
             </div>
@@ -744,23 +791,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Elevação Frontal Halteres</div>
+            <div class="ex-nome">Side Clams</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">ombro</span>
-                <span class="chip chip-pad">ombro_isolado</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">abduction</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Cadeira Extensora</div>
+            <div class="ex-nome">Infra Alternado</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">knee_extension</span>
-                <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> maquina</span>
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-uni">uni</span>
+                
             </div>
         </div>
     </div>
@@ -782,7 +829,7 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
         </section>
     
-        <section class="rotina" id="rotina-3">
+        <section class="rotina" id="rotina-3" data-pane="rotina-3">
             <h2>Rotina 3 <span class="seed">seed 2043474389</span></h2>
             
         <div class="treino">
@@ -795,18 +842,18 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Desenvolvimento Barra</div>
+            <div class="ex-nome">Desenv. Halteres Sentado</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">ombro</span>
                 <span class="chip chip-pad">ombro_composto</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> barra</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Step Up Alt.</div>
+            <div class="ex-nome">Recuo do Estepe</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">perna_anterior</span>
                 <span class="chip chip-pad">squat_unilateral</span>
@@ -828,23 +875,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Remada Curvada Smith</div>
+            <div class="ex-nome">Remada Uni Polia</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">costas</span>
                 <span class="chip chip-pad">remadas</span>
-                <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> curvada</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> unilateral_apoiada</span><span class="dim"><span class="dim-key">eq</span> polia</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Stiff B-Stance</div>
+            <div class="ex-nome">Canoinha</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">hinge</span>
-                <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-bi">bi</span>
+                
             </div>
         </div>
     </div>
@@ -861,23 +908,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Supino Smith Inclinado</div>
+            <div class="ex-nome">Crossover Sentado</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">peito</span>
-                <span class="chip chip-pad">empurrar_compostos</span>
+                <span class="chip chip-pad">empurrar_isolados</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> inclinado</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> polia</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Prancha Lateral</div>
+            <div class="ex-nome">Cadeira Flexora</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_isometrico</span>
-                <span class="chip chip-pad">flexao_lateral</span>
-                <span class="chip lat-uni">uni</span>
-                
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">knee_flexion</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
             </div>
         </div>
     </div>
@@ -894,22 +941,22 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Side Clams</div>
+            <div class="ex-nome">Kickback Polia</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">abduction</span>
-                <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
+                <span class="chip chip-pad">hinge</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> polia</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Dead Bug</div>
+            <div class="ex-nome">Prancha Alternada</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">core_isometrico</span>
-                <span class="chip chip-pad">flexao_quadril</span>
-                <span class="chip lat-uni">uni</span>
+                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip lat-bi">bi</span>
                 
             </div>
         </div>
@@ -936,23 +983,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Barra Fixa</div>
+            <div class="ex-nome">Desenvolvimento Barra</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">costas</span>
-                <span class="chip chip-pad">puxadas</span>
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> aberta</span><span class="dim"><span class="dim-key">eq</span> corporal</span>
+                <span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Agachamento Livre</div>
+            <div class="ex-nome">Hip Thrust</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> barra</span>
+                <span class="dim"><span class="dim-key">plano</span> deitado</span><span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     </div>
@@ -969,23 +1016,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Hip Thrust</div>
+            <div class="ex-nome">Pullover Halteres</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">hinge</span>
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">puxadas</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">plano</span> deitado</span><span class="dim"><span class="dim-key">eq</span> barra</span>
+                <span class="dim"><span class="dim-key">plano</span> pullover</span><span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Infra Roll-Up</div>
+            <div class="ex-nome">Agachamento Livre</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_dinamico</span>
-                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_bilateral</span>
                 <span class="chip lat-bi">bi</span>
-                
+                <span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     </div>
@@ -1002,23 +1049,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Elevação Frontal Halteres</div>
+            <div class="ex-nome">Supino Fechado</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">ombro</span>
-                <span class="chip chip-pad">ombro_isolado</span>
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_compostos</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Cadeira Extensora</div>
+            <div class="ex-nome">Infra Alternado</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">knee_extension</span>
-                <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> maquina</span>
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-uni">uni</span>
+                
             </div>
         </div>
     </div>
@@ -1035,12 +1082,12 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Crossover</div>
+            <div class="ex-nome">Cadeira Extensora</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">peito</span>
-                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">knee_extension</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
             </div>
         </div>
     
@@ -1073,7 +1120,7 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
         </section>
     
-        <section class="rotina" id="rotina-4">
+        <section class="rotina" id="rotina-4" data-pane="rotina-4">
             <h2>Rotina 4 <span class="seed">seed 53761357</span></h2>
             
         <div class="treino">
@@ -1086,23 +1133,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Puxada Supinada</div>
+            <div class="ex-nome">Supino Smith Inclinado</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">costas</span>
-                <span class="chip chip-pad">puxadas</span>
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_compostos</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> supinada</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> inclinado</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Step Up</div>
+            <div class="ex-nome">Leg Press</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">squat_unilateral</span>
-                <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">eq</span> caixa</span>
+                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
             </div>
         </div>
     </div>
@@ -1119,23 +1166,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Supino Com Barra</div>
+            <div class="ex-nome">Remada LM Aberta</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">peito</span>
-                <span class="chip chip-pad">empurrar_compostos</span>
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">remadas</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> barra</span>
+                <span class="dim"><span class="dim-key">pegada</span> aberta</span><span class="dim"><span class="dim-key">plano</span> curvada</span><span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Agachamento Livre</div>
+            <div class="ex-nome">Good Morning</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> barra</span>
+                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     </div>
@@ -1152,20 +1199,20 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Desenvolvimento Smith</div>
+            <div class="ex-nome">Abdução Polia</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">ombro</span>
-                <span class="chip chip-pad">ombro_composto</span>
-                <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">abduction</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">eq</span> polia</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Crunch Na Bola</div>
+            <div class="ex-nome">Prancha Slideboard</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-sub">core_isometrico</span>
                 <span class="chip chip-pad">flexao_tronco</span>
                 <span class="chip lat-bi">bi</span>
                 
@@ -1185,22 +1232,22 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Kickback Polia</div>
+            <div class="ex-nome">Elevação Frontal Anilha</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">hinge</span>
-                <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_isolado</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Russian Twist</div>
+            <div class="ex-nome">Prancha Lateral</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_dinamico</span>
-                <span class="chip chip-pad">rotacao_tronco</span>
-                <span class="chip lat-bi">bi</span>
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">flexao_lateral</span>
+                <span class="chip lat-uni">uni</span>
                 
             </div>
         </div>
@@ -1227,23 +1274,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Serrote</div>
+            <div class="ex-nome">Puxada Unilateral Polia</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">costas</span>
-                <span class="chip chip-pad">remadas</span>
+                <span class="chip chip-pad">puxadas</span>
                 <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> unilateral_apoiada</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> polia</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Prancha Lateral</div>
+            <div class="ex-nome">Agachamento Goblet</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_isometrico</span>
-                <span class="chip chip-pad">flexao_lateral</span>
-                <span class="chip lat-uni">uni</span>
-                
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     </div>
@@ -1260,22 +1307,22 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Desloc. Lateral c/ Band</div>
+            <div class="ex-nome">Desenv. Landmine</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">abduction</span>
-                <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Prancha Alternada</div>
+            <div class="ex-nome">Slide Board Lateral</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_isometrico</span>
-                <span class="chip chip-pad">flexao_tronco</span>
-                <span class="chip lat-bi">bi</span>
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip lat-uni">uni</span>
                 
             </div>
         </div>
@@ -1293,23 +1340,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Crucifixo Inclinado Halteres</div>
+            <div class="ex-nome">Cadeira Flexora</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">peito</span>
-                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">knee_flexion</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> inclinado</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Cadeira Extensora</div>
+            <div class="ex-nome">Infra Roll-Up</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">knee_extension</span>
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> maquina</span>
+                
             </div>
         </div>
     </div>
@@ -1326,23 +1373,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Elevação Frontal Anilha</div>
+            <div class="ex-nome">Crucifixo Halteres</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">ombro</span>
-                <span class="chip chip-pad">ombro_isolado</span>
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_isolados</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Cadeira Flexora</div>
+            <div class="ex-nome">Prancha Feijao</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">knee_flexion</span>
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">flexao_tronco</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> maquina</span>
+                
             </div>
         </div>
     </div>
@@ -1364,7 +1411,7 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
         </section>
     
-        <section class="rotina" id="rotina-5">
+        <section class="rotina" id="rotina-5" data-pane="rotina-5">
             <h2>Rotina 5 <span class="seed">seed 1896999516</span></h2>
             
         <div class="treino">
@@ -1377,23 +1424,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Desenv. Halteres Sentado</div>
+            <div class="ex-nome">Supino Smith Inclinado</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">ombro</span>
-                <span class="chip chip-pad">ombro_composto</span>
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_compostos</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> inclinado</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Stiff B-Stance</div>
+            <div class="ex-nome">Agachamento Smith</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">hinge</span>
-                <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
             </div>
         </div>
     </div>
@@ -1410,21 +1457,21 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Barra Aberta</div>
+            <div class="ex-nome">Pulldown Braço Estendido</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">costas</span>
                 <span class="chip chip-pad">puxadas</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> aberta</span><span class="dim"><span class="dim-key">eq</span> corporal</span>
+                <span class="dim"><span class="dim-key">plano</span> pullover</span><span class="dim"><span class="dim-key">eq</span> polia</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Leg Press</div>
+            <div class="ex-nome">Cadeira Flexora</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">knee_flexion</span>
                 <span class="chip lat-bi">bi</span>
                 <span class="dim"><span class="dim-key">eq</span> maquina</span>
             </div>
@@ -1443,18 +1490,18 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Recuo C/ Barra</div>
+            <div class="ex-nome">Ponte Unilateral</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
                 <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">eq</span> barra</span>
+                <span class="dim"><span class="dim-key">plano</span> deitado</span><span class="dim"><span class="dim-key">eq</span> corporal</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Infra Suspenso</div>
+            <div class="ex-nome">Infra Roll-Up</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">core_dinamico</span>
                 <span class="chip chip-pad">flexao_quadril</span>
@@ -1476,20 +1523,20 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Crucifixo Halteres</div>
+            <div class="ex-nome">Elevação Frontal Halteres</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">peito</span>
-                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_isolado</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Prancha Bola</div>
+            <div class="ex-nome">Abd Bicicleta</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-sub">core_dinamico</span>
                 <span class="chip chip-pad">flexao_tronco</span>
                 <span class="chip lat-bi">bi</span>
                 
@@ -1518,23 +1565,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Remada Curvada Smith</div>
+            <div class="ex-nome">Desenvolvimento Barra</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">costas</span>
-                <span class="chip chip-pad">remadas</span>
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> curvada</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+                <span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Recuo do Estepe</div>
+            <div class="ex-nome">Agachamento Livre</div>
             <div class="ex-meta">
                 <span class="chip chip-sub">perna_anterior</span>
-                <span class="chip chip-pad">squat_unilateral</span>
-                <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">eq</span> caixa</span>
+                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> barra</span>
             </div>
         </div>
     </div>
@@ -1551,23 +1598,23 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Supino Smith Inclinado</div>
+            <div class="ex-nome">Remada Apoiado Ab.</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">peito</span>
-                <span class="chip chip-pad">empurrar_compostos</span>
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">remadas</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> inclinado</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+                <span class="dim"><span class="dim-key">pegada</span> aberta</span><span class="dim"><span class="dim-key">plano</span> apoiada</span><span class="dim"><span class="dim-key">eq</span> halter</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Flexão Joelhos Feijão</div>
+            <div class="ex-nome">Passada Dos Steps</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">knee_flexion</span>
-                <span class="chip lat-bi">bi</span>
-                
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">eq</span> caixa</span>
             </div>
         </div>
     </div>
@@ -1584,22 +1631,22 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Desenv. Landmine</div>
+            <div class="ex-nome">Stiff Barra Smith</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">ombro</span>
-                <span class="chip chip-pad">ombro_composto</span>
-                <span class="chip lat-uni">uni</span>
-                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> barra</span>
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Canoinha</div>
+            <div class="ex-nome">Dead Bug</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-sub">core_isometrico</span>
                 <span class="chip chip-pad">flexao_quadril</span>
-                <span class="chip lat-bi">bi</span>
+                <span class="chip lat-uni">uni</span>
                 
             </div>
         </div>
@@ -1617,20 +1664,20 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
             </div>
             <div class="bloco-exs">
         <div class="ex">
-            <div class="ex-nome">Side Clams</div>
+            <div class="ex-nome">Crossover Sentado</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">perna_posterior</span>
-                <span class="chip chip-pad">abduction</span>
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_isolados</span>
                 <span class="chip lat-bi">bi</span>
-                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> polia</span>
             </div>
         </div>
     
 
         <div class="ex">
-            <div class="ex-nome">Crunch No Cabo</div>
+            <div class="ex-nome">Prancha Alternada</div>
             <div class="ex-meta">
-                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-sub">core_isometrico</span>
                 <span class="chip chip-pad">flexao_tronco</span>
                 <span class="chip lat-bi">bi</span>
                 
@@ -1656,7 +1703,7 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
         </section>
     
     
-        <section class="cross-rotina">
+        <section class="cross-rotina" data-pane="cross">
             <h2>Padrões cross-rotina</h2>
             <label for="text-cross">Achados que aparecem em mais de uma rotina ou padrões agregados</label>
             <textarea data-key="cross" id="text-cross" placeholder="Padrões repetidos, viéses sistemáticos..."></textarea>
@@ -1739,8 +1786,55 @@ function limparTudo() {
     if (stamp) stamp.textContent = 'limpo';
 }
 
+function ativarAba(alvo) {
+    document.querySelectorAll('.tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.alvo === alvo);
+    });
+    document.querySelectorAll('[data-pane]').forEach(p => {
+        p.classList.toggle('active', p.dataset.pane === alvo);
+    });
+    localStorage.setItem(STORAGE_KEY + '__aba', alvo);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function atualizarIndicadores() {
+    // Marca aba como "tem conteúdo" quando qualquer textarea da rotina tem texto.
+    document.querySelectorAll('.tab').forEach(tab => {
+        const alvo = tab.dataset.alvo;
+        const pane = document.querySelector(`[data-pane="${alvo}"]`);
+        if (!pane) return;
+        const algumPreenchido = Array.from(
+            pane.querySelectorAll('textarea[data-key]')
+        ).some(ta => ta.value.trim() !== '');
+        tab.classList.toggle('has-content', algumPreenchido);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     carregarLocal();
+    atualizarIndicadores();
+
+    // Tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => ativarAba(tab.dataset.alvo));
+    });
+    const abaSalva = localStorage.getItem(STORAGE_KEY + '__aba');
+    if (abaSalva && document.querySelector(`[data-pane="${abaSalva}"]`)) {
+        ativarAba(abaSalva);
+    } else {
+        ativarAba('rotina-1');
+    }
+
+    // Atalhos de teclado: Ctrl+1..6 alterna entre abas
+    document.addEventListener('keydown', e => {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const tabs = document.querySelectorAll('.tab');
+        const n = parseInt(e.key);
+        if (n >= 1 && n <= tabs.length) {
+            e.preventDefault();
+            ativarAba(tabs[n - 1].dataset.alvo);
+        }
+    });
 
     document.querySelectorAll('.add-comment-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1755,12 +1849,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // autosave 1s após digitação
+    // autosave 1s após digitação + atualiza indicador
     let timer = null;
     document.addEventListener('input', e => {
         if (e.target.matches('textarea[data-key]')) {
             clearTimeout(timer);
-            timer = setTimeout(salvarLocal, 1000);
+            timer = setTimeout(() => {
+                salvarLocal();
+                atualizarIndicadores();
+            }, 1000);
         }
     });
 });

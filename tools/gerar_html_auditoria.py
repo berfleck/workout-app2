@@ -147,7 +147,7 @@ def _render_rotina(rotina_idx, seed, rotina_dict):
     )
     key = f"r{rotina_idx}.geral"
     return f'''
-        <section class="rotina" id="rotina-{rotina_idx}">
+        <section class="rotina" id="rotina-{rotina_idx}" data-pane="rotina-{rotina_idx}">
             <h2>Rotina {rotina_idx} <span class="seed">seed {seed}</span></h2>
             {treinos_html}
             <div class="comment-rotina">
@@ -219,13 +219,57 @@ h1 { margin-top: 0; color: var(--laranja); }
     border: 1px solid var(--borda);
 }
 .actions-sticky .status { font-size: 12.5px; color: var(--secundario); margin-left: auto; }
+.tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 56px;
+    background: var(--fundo);
+    padding: 8px 0;
+    z-index: 9;
+    border-bottom: 1px solid var(--borda);
+}
+.tab {
+    background: var(--card);
+    border: 1px solid var(--borda);
+    color: var(--texto);
+    padding: 9px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s;
+}
+.tab:hover { border-color: var(--laranja); color: var(--laranja); }
+.tab.active {
+    background: var(--laranja);
+    color: white;
+    border-color: var(--laranja);
+}
+.tab .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--laranja);
+    display: none;
+}
+.tab.active .dot { background: white; }
+.tab.has-content .dot { display: inline-block; }
 .rotina {
+    display: none;
     background: var(--card);
     border: 1px solid var(--borda);
     border-radius: 10px;
     padding: 20px 22px;
     margin-bottom: 26px;
 }
+.rotina.active { display: block; }
 .rotina h2 { margin-top: 0; }
 .rotina .seed {
     font-size: 13px;
@@ -323,14 +367,16 @@ textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border
 }
 .comment-rotina textarea { min-height: 80px; }
 .cross-rotina {
+    display: none;
     background: var(--card);
     border: 1px solid var(--borda);
     border-radius: 10px;
     padding: 18px 22px;
     margin-top: 24px;
 }
+.cross-rotina.active { display: block; }
 .cross-rotina h2 { margin-top: 0; color: var(--laranja); }
-.cross-rotina textarea { min-height: 100px; }
+.cross-rotina textarea { min-height: 200px; }
 """
 
 JS = """
@@ -409,8 +455,55 @@ function limparTudo() {
     if (stamp) stamp.textContent = 'limpo';
 }
 
+function ativarAba(alvo) {
+    document.querySelectorAll('.tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.alvo === alvo);
+    });
+    document.querySelectorAll('[data-pane]').forEach(p => {
+        p.classList.toggle('active', p.dataset.pane === alvo);
+    });
+    localStorage.setItem(STORAGE_KEY + '__aba', alvo);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function atualizarIndicadores() {
+    // Marca aba como "tem conteúdo" quando qualquer textarea da rotina tem texto.
+    document.querySelectorAll('.tab').forEach(tab => {
+        const alvo = tab.dataset.alvo;
+        const pane = document.querySelector(`[data-pane="${alvo}"]`);
+        if (!pane) return;
+        const algumPreenchido = Array.from(
+            pane.querySelectorAll('textarea[data-key]')
+        ).some(ta => ta.value.trim() !== '');
+        tab.classList.toggle('has-content', algumPreenchido);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     carregarLocal();
+    atualizarIndicadores();
+
+    // Tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => ativarAba(tab.dataset.alvo));
+    });
+    const abaSalva = localStorage.getItem(STORAGE_KEY + '__aba');
+    if (abaSalva && document.querySelector(`[data-pane="${abaSalva}"]`)) {
+        ativarAba(abaSalva);
+    } else {
+        ativarAba('rotina-1');
+    }
+
+    // Atalhos de teclado: Ctrl+1..6 alterna entre abas
+    document.addEventListener('keydown', e => {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const tabs = document.querySelectorAll('.tab');
+        const n = parseInt(e.key);
+        if (n >= 1 && n <= tabs.length) {
+            e.preventDefault();
+            ativarAba(tabs[n - 1].dataset.alvo);
+        }
+    });
 
     document.querySelectorAll('.add-comment-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -425,12 +518,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // autosave 1s após digitação
+    // autosave 1s após digitação + atualiza indicador
     let timer = null;
     document.addEventListener('input', e => {
         if (e.target.matches('textarea[data-key]')) {
             clearTimeout(timer);
-            timer = setTimeout(salvarLocal, 1000);
+            timer = setTimeout(() => {
+                salvarLocal();
+                atualizarIndicadores();
+            }, 1000);
         }
     });
 });
@@ -469,12 +565,24 @@ def main():
     '''
 
     cross = '''
-        <section class="cross-rotina">
+        <section class="cross-rotina" data-pane="cross">
             <h2>Padrões cross-rotina</h2>
             <label for="text-cross">Achados que aparecem em mais de uma rotina ou padrões agregados</label>
             <textarea data-key="cross" id="text-cross" placeholder="Padrões repetidos, viéses sistemáticos..."></textarea>
         </section>
     '''
+
+    tabs_html = '<nav class="tabs">'
+    for i in range(1, len(SEEDS) + 1):
+        tabs_html += (
+            f'<button class="tab" data-alvo="rotina-{i}">'
+            f'<span>Rotina {i}</span><span class="dot"></span></button>'
+        )
+    tabs_html += (
+        '<button class="tab" data-alvo="cross">'
+        '<span>Cross-rotina</span><span class="dot"></span></button>'
+    )
+    tabs_html += '</nav>'
 
     actions = '''
         <div class="actions-sticky">
@@ -501,6 +609,7 @@ def main():
     <h1>Gate clínico semântico — {DATA_AUDITORIA}</h1>
     {meta}
     {actions}
+    {tabs_html}
     {"".join(rotinas_html)}
     {cross}
 </div>
