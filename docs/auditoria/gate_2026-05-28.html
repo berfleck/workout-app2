@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gate clínico semântico — 2026-05-28</title>
+<style>
+:root {
+    --laranja: #e85d04;
+    --fundo: #f9fafb;
+    --card: #ffffff;
+    --borda: #e5e7eb;
+    --texto: #1f2937;
+    --secundario: #6b7280;
+    --uni: #d97706;
+    --bi: #2563eb;
+}
+* { box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--fundo);
+    color: var(--texto);
+    margin: 0;
+    padding: 24px;
+    line-height: 1.45;
+}
+.container { max-width: 1100px; margin: 0 auto; }
+h1 { margin-top: 0; color: var(--laranja); }
+.meta {
+    background: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    font-size: 13.5px;
+    color: var(--secundario);
+}
+.meta strong { color: var(--texto); }
+.actions-sticky {
+    position: sticky;
+    top: 0;
+    background: var(--fundo);
+    padding: 10px 0;
+    z-index: 10;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--borda);
+}
+.actions-sticky button {
+    background: var(--laranja);
+    color: white;
+    border: 0;
+    padding: 9px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+}
+.actions-sticky button:hover { opacity: 0.9; }
+.actions-sticky button.secondary {
+    background: var(--card);
+    color: var(--texto);
+    border: 1px solid var(--borda);
+}
+.actions-sticky .status { font-size: 12.5px; color: var(--secundario); margin-left: auto; }
+.rotina {
+    background: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 26px;
+}
+.rotina h2 { margin-top: 0; }
+.rotina .seed {
+    font-size: 13px;
+    color: var(--secundario);
+    font-weight: 400;
+    margin-left: 8px;
+}
+.treino { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borda); }
+.treino:first-of-type { border-top: 0; padding-top: 0; }
+.treino h3 { margin: 0 0 12px; font-size: 16px; color: var(--laranja); }
+.blocos { display: flex; flex-direction: column; gap: 14px; }
+.bloco {
+    background: var(--fundo);
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+.bloco-header { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+.bloco-label { font-weight: 600; font-size: 14px; }
+.bloco-tag {
+    font-size: 11px;
+    background: var(--borda);
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: var(--secundario);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.bloco-exs { display: flex; flex-direction: column; gap: 6px; }
+.ex {
+    background: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+.ex-nome { font-weight: 500; font-size: 14.5px; }
+.ex-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; align-items: center; }
+.chip {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: var(--borda);
+    color: var(--secundario);
+}
+.chip-sub { background: #fef3c7; color: #92400e; }
+.chip-pad { background: #e0e7ff; color: #3730a3; }
+.lat-uni { background: rgba(217, 119, 6, 0.12); color: var(--uni); font-weight: 600; }
+.lat-bi { background: rgba(37, 99, 235, 0.10); color: var(--bi); font-weight: 600; }
+.lat-na { background: var(--borda); color: var(--secundario); }
+.dim {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: #ecfdf5;
+    color: #065f46;
+}
+.dim-key { color: #047857; font-weight: 600; }
+.add-comment-btn {
+    background: none;
+    border: 1px dashed var(--borda);
+    color: var(--secundario);
+    padding: 4px 10px;
+    font-size: 12px;
+    margin-top: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.add-comment-btn:hover { background: var(--fundo); color: var(--laranja); border-color: var(--laranja); }
+.add-comment-btn.open { color: var(--laranja); border-color: var(--laranja); border-style: solid; }
+.comment-area { margin-top: 8px; transition: all 0.2s; }
+.comment-area.collapsed { display: none; }
+textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 10px 12px;
+    border: 1px solid var(--borda);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13.5px;
+    resize: vertical;
+    line-height: 1.4;
+}
+textarea:focus { outline: 2px solid var(--laranja); outline-offset: -1px; border-color: var(--laranja); }
+.comment-treino, .comment-rotina, .cross-rotina {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--borda);
+}
+.comment-treino label, .comment-rotina label, .cross-rotina label {
+    display: block;
+    font-size: 13px;
+    color: var(--secundario);
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.comment-rotina textarea { min-height: 80px; }
+.cross-rotina {
+    background: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-top: 24px;
+}
+.cross-rotina h2 { margin-top: 0; color: var(--laranja); }
+.cross-rotina textarea { min-height: 100px; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Gate clínico semântico — 2026-05-28</h1>
+    
+        <div class="meta">
+            <strong>Config:</strong> Full Body 2T região — <code>upper(3) + lower(3) + core(2)</code> × 2 treinos idênticos<br>
+            <strong>Aluno:</strong> intermediario, perfil aderência média (peso_aderencia=0). <em>H-P1 (filtro por complexidade) DESLIGADO — pool máximo, todos exercícios elegíveis.</em><br>
+            <strong>Motor:</strong> CSP pós-S-T4 (main, commit <code>abed2ab</code>)<br>
+            <strong>Pesos:</strong> S-A1=12, S-A1-repet=10, S-B5=4, S-R1=4, S-E1=10/10/2, S-T4=12/12/3, evitar_agonistas=10, tamanho_bloco=5/pref=2<br>
+            <strong>Seeds:</strong> 1040674188, 752055454, 2043474389, 53761357, 1896999516
+        </div>
+    
+    
+        <div class="actions-sticky">
+            <button onclick="copiarJson()">Copiar JSON</button>
+            <button class="secondary" onclick="baixarJson()">Baixar .json</button>
+            <button class="secondary" onclick="limparTudo()">Limpar tudo</button>
+            <span class="status" id="autosave-stamp">autosave inativo</span>
+        </div>
+    
+    
+        <section class="rotina" id="rotina-1">
+            <h2>Rotina 1 <span class="seed">seed 1040674188</span></h2>
+            
+        <div class="treino">
+            <h3>Treino 1</h3>
+            <div class="blocos">
+        <div class="bloco" data-key="r1.t1.A">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco A</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Barra Isométrica</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">puxadas</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> aberta</span><span class="dim"><span class="dim-key">eq</span> corporal</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Recuo do Estepe</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">eq</span> caixa</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r1.t1.A">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r1.t1.A">
+                <textarea data-key="r1.t1.A" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r1.t1.B">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco B</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Desenvolvimento Smith</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Ponte Na Caixa</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">plano</span> deitado</span><span class="dim"><span class="dim-key">eq</span> caixa</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r1.t1.B">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r1.t1.B">
+                <textarea data-key="r1.t1.B" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r1.t1.C">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco C</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Abdução Polia</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">abduction</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">eq</span> polia</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Canoinha</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r1.t1.C">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r1.t1.C">
+                <textarea data-key="r1.t1.C" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r1.t1.D">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco D</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Crossover</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Crunch No Cabo</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r1.t1.D">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r1.t1.D">
+                <textarea data-key="r1.t1.D" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+            <div class="comment-treino">
+                <label for="text-r1.t1.geral">Considerações do Treino 1</label>
+                <textarea data-key="r1.t1.geral" id="text-r1.t1.geral" placeholder="Achados que cruzam blocos deste treino..."></textarea>
+            </div>
+        </div>
+    
+        <div class="treino">
+            <h3>Treino 2</h3>
+            <div class="blocos">
+        <div class="bloco" data-key="r1.t2.A">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco A</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Remada Apoiado</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">remadas</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> apoiada</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Recuo</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r1.t2.A">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r1.t2.A">
+                <textarea data-key="r1.t2.A" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r1.t2.B">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco B</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Apoio Fechado</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_compostos</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> corporal</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Agachamento Livre</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> barra</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r1.t2.B">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r1.t2.B">
+                <textarea data-key="r1.t2.B" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r1.t2.C">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco C</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Side Clams</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">abduction</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Prancha Lateral</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">flexao_lateral</span>
+                <span class="chip lat-uni">uni</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r1.t2.C">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r1.t2.C">
+                <textarea data-key="r1.t2.C" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r1.t2.D">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco D</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Elevação Frontal Anilha</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_isolado</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Crunch Chão</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r1.t2.D">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r1.t2.D">
+                <textarea data-key="r1.t2.D" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+            <div class="comment-treino">
+                <label for="text-r1.t2.geral">Considerações do Treino 2</label>
+                <textarea data-key="r1.t2.geral" id="text-r1.t2.geral" placeholder="Achados que cruzam blocos deste treino..."></textarea>
+            </div>
+        </div>
+    
+            <div class="comment-rotina">
+                <label for="text-r1.geral">Considerações da Rotina 1</label>
+                <textarea data-key="r1.geral" id="text-r1.geral" placeholder="Achados que cruzam treinos desta rotina..."></textarea>
+            </div>
+        </section>
+    
+        <section class="rotina" id="rotina-2">
+            <h2>Rotina 2 <span class="seed">seed 752055454</span></h2>
+            
+        <div class="treino">
+            <h3>Treino 1</h3>
+            <div class="blocos">
+        <div class="bloco" data-key="r2.t1.A">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco A</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Supino Com Barra</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_compostos</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> barra</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Recuo do Estepe</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">eq</span> caixa</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r2.t1.A">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r2.t1.A">
+                <textarea data-key="r2.t1.A" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r2.t1.B">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco B</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Remada Neutra Trx</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">remadas</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> suspensao</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Nordic Curl</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">knee_flexion</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> corporal</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r2.t1.B">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r2.t1.B">
+                <textarea data-key="r2.t1.B" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r2.t1.C">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco C</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Desenv. Landmine</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> barra</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Hollow Hold</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r2.t1.C">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r2.t1.C">
+                <textarea data-key="r2.t1.C" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r2.t1.D">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco D</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Kickback Polia</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Dead Bug C/ Bola</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-uni">uni</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r2.t1.D">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r2.t1.D">
+                <textarea data-key="r2.t1.D" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+            <div class="comment-treino">
+                <label for="text-r2.t1.geral">Considerações do Treino 1</label>
+                <textarea data-key="r2.t1.geral" id="text-r2.t1.geral" placeholder="Achados que cruzam blocos deste treino..."></textarea>
+            </div>
+        </div>
+    
+        <div class="treino">
+            <h3>Treino 2</h3>
+            <div class="blocos">
+        <div class="bloco" data-key="r2.t2.A">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco A</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Pullover Halteres</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">puxadas</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">plano</span> pullover</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Agachamento Smith Rampa</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r2.t2.A">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r2.t2.A">
+                <textarea data-key="r2.t2.A" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r2.t2.B">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco B</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Side Clams</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">abduction</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Abd Bicicleta</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r2.t2.B">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r2.t2.B">
+                <textarea data-key="r2.t2.B" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r2.t2.C">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco C</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Crossover Sentado</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Infra Chão</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r2.t2.C">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r2.t2.C">
+                <textarea data-key="r2.t2.C" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r2.t2.D">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco D</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Elevação Frontal Halteres</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_isolado</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Cadeira Extensora</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">knee_extension</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r2.t2.D">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r2.t2.D">
+                <textarea data-key="r2.t2.D" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+            <div class="comment-treino">
+                <label for="text-r2.t2.geral">Considerações do Treino 2</label>
+                <textarea data-key="r2.t2.geral" id="text-r2.t2.geral" placeholder="Achados que cruzam blocos deste treino..."></textarea>
+            </div>
+        </div>
+    
+            <div class="comment-rotina">
+                <label for="text-r2.geral">Considerações da Rotina 2</label>
+                <textarea data-key="r2.geral" id="text-r2.geral" placeholder="Achados que cruzam treinos desta rotina..."></textarea>
+            </div>
+        </section>
+    
+        <section class="rotina" id="rotina-3">
+            <h2>Rotina 3 <span class="seed">seed 2043474389</span></h2>
+            
+        <div class="treino">
+            <h3>Treino 1</h3>
+            <div class="blocos">
+        <div class="bloco" data-key="r3.t1.A">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco A</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Desenvolvimento Barra</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> barra</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Step Up Alt.</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">eq</span> caixa</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r3.t1.A">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r3.t1.A">
+                <textarea data-key="r3.t1.A" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r3.t1.B">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco B</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Remada Curvada Smith</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">remadas</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> curvada</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Stiff B-Stance</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r3.t1.B">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r3.t1.B">
+                <textarea data-key="r3.t1.B" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r3.t1.C">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco C</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Supino Smith Inclinado</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_compostos</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> inclinado</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Prancha Lateral</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">flexao_lateral</span>
+                <span class="chip lat-uni">uni</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r3.t1.C">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r3.t1.C">
+                <textarea data-key="r3.t1.C" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r3.t1.D">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco D</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Side Clams</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">abduction</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Dead Bug</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-uni">uni</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r3.t1.D">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r3.t1.D">
+                <textarea data-key="r3.t1.D" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+            <div class="comment-treino">
+                <label for="text-r3.t1.geral">Considerações do Treino 1</label>
+                <textarea data-key="r3.t1.geral" id="text-r3.t1.geral" placeholder="Achados que cruzam blocos deste treino..."></textarea>
+            </div>
+        </div>
+    
+        <div class="treino">
+            <h3>Treino 2</h3>
+            <div class="blocos">
+        <div class="bloco" data-key="r3.t2.A">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco A</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Barra Fixa</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">puxadas</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> aberta</span><span class="dim"><span class="dim-key">eq</span> corporal</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Agachamento Livre</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> barra</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r3.t2.A">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r3.t2.A">
+                <textarea data-key="r3.t2.A" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r3.t2.B">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco B</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Hip Thrust</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">plano</span> deitado</span><span class="dim"><span class="dim-key">eq</span> barra</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Infra Roll-Up</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r3.t2.B">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r3.t2.B">
+                <textarea data-key="r3.t2.B" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r3.t2.C">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco C</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Elevação Frontal Halteres</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_isolado</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Cadeira Extensora</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">knee_extension</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r3.t2.C">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r3.t2.C">
+                <textarea data-key="r3.t2.C" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r3.t2.D">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco D</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Crossover</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Russian Twist</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">rotacao_tronco</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r3.t2.D">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r3.t2.D">
+                <textarea data-key="r3.t2.D" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+            <div class="comment-treino">
+                <label for="text-r3.t2.geral">Considerações do Treino 2</label>
+                <textarea data-key="r3.t2.geral" id="text-r3.t2.geral" placeholder="Achados que cruzam blocos deste treino..."></textarea>
+            </div>
+        </div>
+    
+            <div class="comment-rotina">
+                <label for="text-r3.geral">Considerações da Rotina 3</label>
+                <textarea data-key="r3.geral" id="text-r3.geral" placeholder="Achados que cruzam treinos desta rotina..."></textarea>
+            </div>
+        </section>
+    
+        <section class="rotina" id="rotina-4">
+            <h2>Rotina 4 <span class="seed">seed 53761357</span></h2>
+            
+        <div class="treino">
+            <h3>Treino 1</h3>
+            <div class="blocos">
+        <div class="bloco" data-key="r4.t1.A">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco A</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Puxada Supinada</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">puxadas</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> supinada</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Step Up</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">eq</span> caixa</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r4.t1.A">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r4.t1.A">
+                <textarea data-key="r4.t1.A" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r4.t1.B">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco B</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Supino Com Barra</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_compostos</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> barra</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Agachamento Livre</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> barra</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r4.t1.B">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r4.t1.B">
+                <textarea data-key="r4.t1.B" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r4.t1.C">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco C</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Desenvolvimento Smith</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Crunch Na Bola</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r4.t1.C">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r4.t1.C">
+                <textarea data-key="r4.t1.C" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r4.t1.D">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco D</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Kickback Polia</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> polia</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Russian Twist</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">rotacao_tronco</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r4.t1.D">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r4.t1.D">
+                <textarea data-key="r4.t1.D" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+            <div class="comment-treino">
+                <label for="text-r4.t1.geral">Considerações do Treino 1</label>
+                <textarea data-key="r4.t1.geral" id="text-r4.t1.geral" placeholder="Achados que cruzam blocos deste treino..."></textarea>
+            </div>
+        </div>
+    
+        <div class="treino">
+            <h3>Treino 2</h3>
+            <div class="blocos">
+        <div class="bloco" data-key="r4.t2.A">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco A</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Serrote</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">remadas</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> unilateral_apoiada</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Prancha Lateral</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">flexao_lateral</span>
+                <span class="chip lat-uni">uni</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r4.t2.A">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r4.t2.A">
+                <textarea data-key="r4.t2.A" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r4.t2.B">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco B</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Desloc. Lateral c/ Band</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">abduction</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Prancha Alternada</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r4.t2.B">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r4.t2.B">
+                <textarea data-key="r4.t2.B" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r4.t2.C">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco C</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Crucifixo Inclinado Halteres</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> inclinado</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Cadeira Extensora</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">knee_extension</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r4.t2.C">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r4.t2.C">
+                <textarea data-key="r4.t2.C" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r4.t2.D">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco D</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Elevação Frontal Anilha</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_isolado</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Cadeira Flexora</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">knee_flexion</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r4.t2.D">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r4.t2.D">
+                <textarea data-key="r4.t2.D" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+            <div class="comment-treino">
+                <label for="text-r4.t2.geral">Considerações do Treino 2</label>
+                <textarea data-key="r4.t2.geral" id="text-r4.t2.geral" placeholder="Achados que cruzam blocos deste treino..."></textarea>
+            </div>
+        </div>
+    
+            <div class="comment-rotina">
+                <label for="text-r4.geral">Considerações da Rotina 4</label>
+                <textarea data-key="r4.geral" id="text-r4.geral" placeholder="Achados que cruzam treinos desta rotina..."></textarea>
+            </div>
+        </section>
+    
+        <section class="rotina" id="rotina-5">
+            <h2>Rotina 5 <span class="seed">seed 1896999516</span></h2>
+            
+        <div class="treino">
+            <h3>Treino 1</h3>
+            <div class="blocos">
+        <div class="bloco" data-key="r5.t1.A">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco A</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Desenv. Halteres Sentado</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Stiff B-Stance</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">hinge</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">plano</span> em_pe</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r5.t1.A">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r5.t1.A">
+                <textarea data-key="r5.t1.A" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r5.t1.B">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco B</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Barra Aberta</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">puxadas</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> aberta</span><span class="dim"><span class="dim-key">eq</span> corporal</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Leg Press</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_bilateral</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> maquina</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r5.t1.B">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r5.t1.B">
+                <textarea data-key="r5.t1.B" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r5.t1.C">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco C</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Recuo C/ Barra</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">eq</span> barra</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Infra Suspenso</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r5.t1.C">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r5.t1.C">
+                <textarea data-key="r5.t1.C" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r5.t1.D">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco D</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Crucifixo Halteres</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_isolados</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">plano</span> reto</span><span class="dim"><span class="dim-key">eq</span> halter</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Prancha Bola</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_isometrico</span>
+                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r5.t1.D">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r5.t1.D">
+                <textarea data-key="r5.t1.D" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+            <div class="comment-treino">
+                <label for="text-r5.t1.geral">Considerações do Treino 1</label>
+                <textarea data-key="r5.t1.geral" id="text-r5.t1.geral" placeholder="Achados que cruzam blocos deste treino..."></textarea>
+            </div>
+        </div>
+    
+        <div class="treino">
+            <h3>Treino 2</h3>
+            <div class="blocos">
+        <div class="bloco" data-key="r5.t2.A">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco A</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Remada Curvada Smith</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">costas</span>
+                <span class="chip chip-pad">remadas</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> curvada</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Recuo do Estepe</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_anterior</span>
+                <span class="chip chip-pad">squat_unilateral</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">eq</span> caixa</span>
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r5.t2.A">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r5.t2.A">
+                <textarea data-key="r5.t2.A" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r5.t2.B">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco B</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Supino Smith Inclinado</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">peito</span>
+                <span class="chip chip-pad">empurrar_compostos</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">pegada</span> pronada</span><span class="dim"><span class="dim-key">plano</span> inclinado</span><span class="dim"><span class="dim-key">eq</span> barra_guiada</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Flexão Joelhos Feijão</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">knee_flexion</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r5.t2.B">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r5.t2.B">
+                <textarea data-key="r5.t2.B" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r5.t2.C">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco C</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Desenv. Landmine</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">ombro</span>
+                <span class="chip chip-pad">ombro_composto</span>
+                <span class="chip lat-uni">uni</span>
+                <span class="dim"><span class="dim-key">pegada</span> neutra</span><span class="dim"><span class="dim-key">eq</span> barra</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Canoinha</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_quadril</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r5.t2.C">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r5.t2.C">
+                <textarea data-key="r5.t2.C" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    
+        <div class="bloco" data-key="r5.t2.D">
+            <div class="bloco-header">
+                <span class="bloco-label">Bloco D</span>
+                <span class="bloco-tag">par</span>
+            </div>
+            <div class="bloco-exs">
+        <div class="ex">
+            <div class="ex-nome">Side Clams</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">perna_posterior</span>
+                <span class="chip chip-pad">abduction</span>
+                <span class="chip lat-bi">bi</span>
+                <span class="dim"><span class="dim-key">eq</span> banda_elastica</span>
+            </div>
+        </div>
+    
+
+        <div class="ex">
+            <div class="ex-nome">Crunch No Cabo</div>
+            <div class="ex-meta">
+                <span class="chip chip-sub">core_dinamico</span>
+                <span class="chip chip-pad">flexao_tronco</span>
+                <span class="chip lat-bi">bi</span>
+                
+            </div>
+        </div>
+    </div>
+            <button type="button" class="add-comment-btn" data-target="comment-r5.t2.D">+ comentário neste bloco</button>
+            <div class="comment-area collapsed" id="comment-r5.t2.D">
+                <textarea data-key="r5.t2.D" placeholder="Críticas/observações sobre este bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+            <div class="comment-treino">
+                <label for="text-r5.t2.geral">Considerações do Treino 2</label>
+                <textarea data-key="r5.t2.geral" id="text-r5.t2.geral" placeholder="Achados que cruzam blocos deste treino..."></textarea>
+            </div>
+        </div>
+    
+            <div class="comment-rotina">
+                <label for="text-r5.geral">Considerações da Rotina 5</label>
+                <textarea data-key="r5.geral" id="text-r5.geral" placeholder="Achados que cruzam treinos desta rotina..."></textarea>
+            </div>
+        </section>
+    
+    
+        <section class="cross-rotina">
+            <h2>Padrões cross-rotina</h2>
+            <label for="text-cross">Achados que aparecem em mais de uma rotina ou padrões agregados</label>
+            <textarea data-key="cross" id="text-cross" placeholder="Padrões repetidos, viéses sistemáticos..."></textarea>
+        </section>
+    
+</div>
+<script>
+const STORAGE_KEY = 'gate_clinico_2026-05-28';
+
+function coletarDados() {
+    const dados = { data_auditoria: '2026-05-28', textareas: {} };
+    document.querySelectorAll('textarea[data-key]').forEach(ta => {
+        if (ta.value.trim()) dados.textareas[ta.dataset.key] = ta.value;
+    });
+    return dados;
+}
+
+function salvarLocal() {
+    const dados = coletarDados();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dados));
+    const stamp = document.getElementById('autosave-stamp');
+    if (stamp) {
+        const h = new Date().toLocaleTimeString();
+        stamp.textContent = 'autosave ' + h;
+    }
+}
+
+function carregarLocal() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    try {
+        const dados = JSON.parse(raw);
+        const items = dados.textareas || {};
+        Object.entries(items).forEach(([key, val]) => {
+            const ta = document.querySelector(`textarea[data-key="${key}"]`);
+            if (!ta) return;
+            ta.value = val;
+            // Se for textarea de bloco e tem conteudo, expande
+            if (key.match(/^r\d+\.t\d+\.[A-Z]$/)) {
+                const area = ta.closest('.comment-area');
+                if (area) {
+                    area.classList.remove('collapsed');
+                    const bloco = area.closest('.bloco');
+                    const btn = bloco && bloco.querySelector('.add-comment-btn');
+                    if (btn) btn.classList.add('open');
+                }
+            }
+        });
+    } catch (e) { console.warn('Erro ao carregar localStorage:', e); }
+}
+
+function copiarJson() {
+    const dados = coletarDados();
+    const str = JSON.stringify(dados, null, 2);
+    navigator.clipboard.writeText(str).then(() => {
+        const stamp = document.getElementById('autosave-stamp');
+        if (stamp) stamp.textContent = 'copiado!';
+    }).catch(err => alert('Erro ao copiar: ' + err));
+}
+
+function baixarJson() {
+    const dados = coletarDados();
+    const str = JSON.stringify(dados, null, 2);
+    const blob = new Blob([str], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'gate_2026-05-28.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function limparTudo() {
+    if (!confirm('Limpar todos os comentários e localStorage? Não pode desfazer.')) return;
+    document.querySelectorAll('textarea[data-key]').forEach(ta => { ta.value = ''; });
+    document.querySelectorAll('.comment-area').forEach(a => a.classList.add('collapsed'));
+    document.querySelectorAll('.add-comment-btn').forEach(b => b.classList.remove('open'));
+    localStorage.removeItem(STORAGE_KEY);
+    const stamp = document.getElementById('autosave-stamp');
+    if (stamp) stamp.textContent = 'limpo';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    carregarLocal();
+
+    document.querySelectorAll('.add-comment-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = document.getElementById(btn.dataset.target);
+            if (!target) return;
+            target.classList.toggle('collapsed');
+            btn.classList.toggle('open');
+            if (!target.classList.contains('collapsed')) {
+                const ta = target.querySelector('textarea');
+                if (ta) ta.focus();
+            }
+        });
+    });
+
+    // autosave 1s após digitação
+    let timer = null;
+    document.addEventListener('input', e => {
+        if (e.target.matches('textarea[data-key]')) {
+            clearTimeout(timer);
+            timer = setTimeout(salvarLocal, 1000);
+        }
+    });
+});
+</script>
+</body>
+</html>

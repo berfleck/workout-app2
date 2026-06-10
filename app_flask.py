@@ -470,10 +470,23 @@ _NIVEL_ALUNO_PARA_CSP = {
 def _nivel_aluno_csp(aluno_obj):
     """Mapeia o `nivel` (string) do aluno pro int 1/2/3 esperado pelo CSP.
     Default 3 (sem teto) quando aluno desconhecido ou nivel não bate.
+
+    DECISÃO 2026-05-28: filtro H-P1 (complexidade por nível) DESLIGADO
+    globalmente até maturidade do vetor de perfil. Hoje a escala
+    iniciante/intermediario/avancado é decisão clínica pendente — não há
+    calibração suficiente pra justificar excluir exercícios do pool com
+    base só nessa label. Bernardo: "vamos testar com seleção mais livre
+    e futuramente ativar os filtros".
+
+    Override: retorna sempre 3 (avançado = sem teto efetivo), independente
+    do nível cadastrado do aluno. Quando reativar, restaurar o lookup
+    `_NIVEL_ALUNO_PARA_CSP.get(...)` abaixo do `if`.
     """
-    if not aluno_obj:
-        return 3
-    return _NIVEL_ALUNO_PARA_CSP.get((aluno_obj.get("nivel") or "").strip(), 3)
+    return 3  # H-P1 desativado — ver docstring
+    # Código preservado pra reativação futura:
+    # if not aluno_obj:
+    #     return 3
+    # return _NIVEL_ALUNO_PARA_CSP.get((aluno_obj.get("nivel") or "").strip(), 3)
 
 
 # Frente D Fatia 3 (2026-05-24) — vetor de perfil dim "Aderência ao Tier".
