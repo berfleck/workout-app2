@@ -1392,6 +1392,25 @@ def hub_rotina():
                            padroes_labels=PADROES_LABELS)
 
 
+@app.route("/hub/rotina/<int:aluno_id>/publicar", methods=["POST"])
+def hub_publicar_rotina(aluno_id):
+    """Publica a rotina ativa do aluno como página web (Cloudflare Pages) e
+    devolve o link pro trainer copiar. Feature de mídia (página do aluno)."""
+    import publicador
+    alunos = carregar_alunos()
+    aluno = next((a for a in alunos if a["id"] == aluno_id), None)
+    rotina_reg = carregar_rotina_ativa(aluno_id)
+    if not aluno or not rotina_reg:
+        return ('<div class="text-sm text-red-600 mt-2">Nenhuma rotina publicada '
+                'para este aluno. Salve uma rotina antes.</div>')
+    try:
+        url = publicador.publicar_rotina(rotina_reg["id"], aluno_nome=aluno["nome"])
+    except publicador.PublicacaoErro as e:
+        return (f'<div class="text-sm text-red-600 mt-2">Não consegui publicar: '
+                f'{str(e)[:300]}</div>')
+    return render_template("_publicar_link.html", url=url)
+
+
 @app.route("/hub/rotina/<int:aluno_id>/treino/<int:treino_idx>", methods=["DELETE"])
 def hub_remover_treino(aluno_id, treino_idx):
     sessoes = _obter_sessoes_trabalho(aluno_id)

@@ -87,6 +87,21 @@
         </div>
     </div>
 </div>
+
+{# Publicar página do aluno (link pro WhatsApp). Só quando há rotina salva (não rascunho). #}
+{% if rotina and not eh_rascunho %}
+<div class="mb-4">
+    <button type="button" class="btn btn-primary"
+            hx-post="/hub/rotina/{{ aluno_id }}/publicar"
+            hx-target="#publicar-resultado" hx-swap="innerHTML"
+            hx-disabled-elt="this">
+        <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        Publicar link do aluno
+        <span class="htmx-indicator text-xs opacity-80 ml-1">publicando…</span>
+    </button>
+    <div id="publicar-resultado"></div>
+</div>
+{% endif %}
 {% endif %}
 
 {% if not rotina %}

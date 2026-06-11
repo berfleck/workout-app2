@@ -8,5 +8,20 @@ server.pid
 
 sessoes_salvas.json
 
+# Feature de mídia / página do aluno
+# cloudflare_config.json = credenciais Cloudflare (SEGREDO — nunca commitar)
+cloudflare_config.json
+# publicado/ = páginas de aluno geradas localmente (fonte do deploy wrangler)
+publicado/
+.wrangler/
+mockup_pagina_aluno.html
+mapeamento_midia.html
+mapeamento_midia.xlsx
+escolhas_midia.json
+
+# Curadoria de vídeo YouTube (gerados em tools/, fora do controle de versão)
+tools/curadoria_video.html
+tools/escolhas_youtube.json
+
 # Claude Code agent worktrees (session state, embedded sub-repos)
 .claude/worktrees/
