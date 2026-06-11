@@ -11,6 +11,7 @@ Abrange todos os 148 exercícios do banco (não só os 97 com imagem).
 import json
 import os
 import sys
+import webbrowser
 
 import openpyxl
 
@@ -79,6 +80,7 @@ def gerar(saida=SAIDA):
     print(f"  {com_yt} já têm YouTube cadastrado")
     sem_img = sum(1 for e in exercicios if not e["tem_imagem"])
     print(f"  {sem_img} sem imagem (precisam de vídeo mais)")
+    webbrowser.open(saida)
 
 
 _TEMPLATE = r"""<!DOCTYPE html>
