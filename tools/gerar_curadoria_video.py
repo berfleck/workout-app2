@@ -124,14 +124,9 @@ _TEMPLATE = r"""<!DOCTYPE html>
   .url-input.ok { border-color:#16a34a; background:#f0fdf4; }
   .url-input.erro { border-color:#dc2626; background:#fef2f2; }
   .btn-limpar { padding:10px 12px; color:#6b7280; font-size:12px; white-space:nowrap; }
-  .preview-wrap { margin-top:12px; display:none; }
-  .preview-wrap.open { display:block; }
-  .video-container { position:relative; width:100%; max-width:340px;
-                     padding-bottom:calc(177.78% * 340px / 100%); }
-  .yt-preview { width:100%; max-width:340px; aspect-ratio:9/16;
-                border-radius:10px; border:none; display:block; }
-  .id-chip { display:inline-block; margin-top:6px; font-size:11px; font-weight:700;
-             color:#6b7280; background:#f3f4f6; padding:2px 10px; border-radius:99px; }
+  .id-chip { font-size:11px; font-weight:700; color:#166534; background:#dcfce7;
+             padding:2px 10px; border-radius:99px; white-space:nowrap; display:none; }
+  .id-chip.visible { display:inline-block; }
   .filtros { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .hint { font-size:12px; color:#6b7280; width:100%; }
 </style>
@@ -151,7 +146,7 @@ _TEMPLATE = r"""<!DOCTYPE html>
   </div>
   <div class="hint">
     Cole o link do YouTube em qualquer formato (<b>watch?v=</b>, <b>youtu.be/</b>, <b>/shorts/</b>).
-    O ID é extraído automaticamente e o vídeo aparece embedded. Salva automático.
+    O ID é extraído automaticamente. Campo verde = link válido. Salva automático.
     Ao terminar, clique <b>⬇ Baixar JSON</b> e salve como <code>tools/escolhas_youtube.json</code>.
     Depois rode <code>python tools/merge_youtube_catalogo.py</code> para atualizar o catálogo.
   </div>
@@ -205,23 +200,11 @@ function onInput(nome, input) {
     delete escolhas[nome];
   }
   salvar();
-  // Atualiza preview inline sem re-render total
-  atualizarPreview(nome, id);
-}
-
-function atualizarPreview(nome, id) {
-  const wrap = document.getElementById("prev_" + CSS.escape(nome));
-  if (!wrap) return;
-  if (id) {
-    wrap.classList.add("open");
-    let ifr = wrap.querySelector("iframe");
-    const chip = wrap.querySelector(".id-chip");
-    if (ifr) ifr.src = "https://www.youtube.com/embed/" + id + "?rel=0";
-    if (chip) chip.textContent = "ID: " + id;
-  } else {
-    wrap.classList.remove("open");
-    const ifr = wrap.querySelector("iframe");
-    if (ifr) ifr.src = "";
+  // Atualiza chip inline sem re-render total
+  const chip = document.getElementById("chip_" + CSS_ID(nome));
+  if (chip) {
+    if (id) { chip.textContent = "ID: " + id; chip.classList.add("visible"); }
+    else { chip.classList.remove("visible"); }
   }
 }
 
@@ -251,10 +234,6 @@ function render() {
       : '<span class="badge badge-noimg">Sem imagem</span>';
     const badgeYt = id ? '<span class="badge badge-yt">▶ Vídeo ✓</span>' : "";
 
-    const iframeHtml = id
-      ? `<iframe class="yt-preview" src="https://www.youtube.com/embed/${id}?rel=0" allow="encrypted-media" allowfullscreen></iframe><div class="id-chip">ID: ${id}</div>`
-      : `<iframe class="yt-preview" src="" allow="encrypted-media" allowfullscreen></iframe><div class="id-chip"></div>`;
-
     const card = document.createElement("div");
     card.className = classes;
     card.innerHTML = `
@@ -268,9 +247,9 @@ function render() {
                value="${id ? 'https://youtu.be/' + id : ''}"
                oninput="onInput('${esc(ex.nome)}', this)"
                onpaste="setTimeout(()=>onInput('${esc(ex.nome)}',this),50)">
+        <span class="id-chip${id ? ' visible' : ''}" id="chip_${CSS_ID(ex.nome)}">${id ? 'ID: ' + id : ''}</span>
         <button class="btn-limpar" onclick="limpar('${esc(ex.nome)}')">✕ Limpar</button>
-      </div>
-      <div class="preview-wrap${id ? ' open' : ''}" id="prev_${CSS_ID(ex.nome)}">${iframeHtml}</div>`;
+      </div>`;
     lista.appendChild(card);
   });
   document.getElementById("cnt").textContent = comVideo;
