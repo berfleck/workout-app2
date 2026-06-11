@@ -79,7 +79,7 @@ def _presc(ex):
 def _ex_html(ex, num, catalogo):
     nome = ex["nome"]
     m = catalogo.get(nome.strip()) or catalogo.get(nome)
-    yt = ex.get("yt")
+    yt = ex.get("yt") or (m.get("youtube") if m else None)
     expand, tem_midia = "", False
     if yt:
         tem_midia = True
