@@ -1,0 +1,30 @@
+
+=== Sondagem S-A1 (n_seeds=40, peso_sa1=0) ===
+
+--- ombro(2) ---
+Motor antigo:
+  ombro_composto+ombro_isolado: 40/40 (100%)
+Motor CSP:
+  ombro_composto+posterior_ombro: 40/40 (100%)
+
+--- perna_posterior(2) ---
+Motor antigo:
+  abduction+hinge: 21/40 (52%)
+  hinge+knee_flexion: 19/40 (48%)
+Motor CSP:
+  abduction+hinge: 40/40 (100%)
+
+--- peito(2) ---
+Motor antigo:
+  empurrar_compostos+empurrar_isolados: 40/40 (100%)
+Motor CSP:
+  empurrar_compostos+empurrar_isolados: 22/40 (55%)
+  empurrar_compostos+empurrar_compostos: 18/40 (45%)
+
+--- perna_anterior(2) ---
+Motor antigo:
+  squat_bilateral+squat_unilateral: 40/40 (100%)
+Motor CSP:
+  squat_bilateral+squat_unilateral: 40/40 (100%)
+
+Snapshot persistido em docs\refatoracao\logs\sa1_baseline_pre.json

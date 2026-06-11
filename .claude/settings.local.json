@@ -39,7 +39,8 @@
       "Skill(update-config)",
       "PowerShell(powershell -NoProfile -Command \"[System.Media.SystemSounds]::Asterisk.Play\\(\\); Start-Sleep -Milliseconds 300\"; echo \"exit: $LASTEXITCODE\")",
       "PowerShell($s = Get-Content C:\\\\Users\\\\berfl\\\\.claude\\\\settings.json -Raw | ConvertFrom-Json; $s.hooks.Stop.hooks.command)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "PowerShell($killed = $false; if \\(Test-Path \"server.pid\"\\) { $p = Get-Content \"server.pid\" -ErrorAction SilentlyContinue; if \\($p\\) { try { Stop-Process -Id $p -Force -ErrorAction Stop; Write-Output \"Matei PID $p \\(server.pid\\)\"; $killed = $true } catch {} } }; $c = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c.OwningProcess | Select-Object -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force -ErrorAction Stop; Write-Output \"Matei PID $_ \\(porta 5000\\)\"; $killed = $true } catch {} } }; if \\(-not $killed\\) { Write-Output \"Nenhum processo na porta 5000\" }; if \\(Test-Path \"server.pid\"\\) { Remove-Item \"server.pid\" -Force }; $check = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue; Write-Output \\(\"Porta 5000 agora: \" + $\\(if \\($check\\) { \"AINDA EM USO\" } else { \"livre\" }\\)\\))"
     ]
   }
 }
