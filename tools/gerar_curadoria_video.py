@@ -167,7 +167,7 @@ DADOS.forEach(ex => {
 
 function salvar() {
   localStorage.setItem(LS, JSON.stringify(escolhas));
-  render();
+  document.getElementById("cnt").textContent = Object.values(escolhas).filter(Boolean).length;
 }
 
 function extrairId(url) {
@@ -200,17 +200,42 @@ function onInput(nome, input) {
     delete escolhas[nome];
   }
   salvar();
-  // Atualiza chip inline sem re-render total
+  // Atualiza chip inline
   const chip = document.getElementById("chip_" + CSS_ID(nome));
   if (chip) {
     if (id) { chip.textContent = "ID: " + id; chip.classList.add("visible"); }
     else { chip.classList.remove("visible"); }
+  }
+  // Atualiza badge e classe do card inline
+  const card = input.closest(".ex");
+  if (card) {
+    card.classList.toggle("tem-video", !!id);
+    const badgeYt = card.querySelector(".badge-yt");
+    if (badgeYt) { badgeYt.style.display = id ? "" : "none"; }
+    else if (id) {
+      const badges = card.querySelector(".badges");
+      if (badges) { const b = document.createElement("span"); b.className = "badge badge-yt"; b.textContent = "▶ Vídeo ✓"; badges.appendChild(b); }
+    }
   }
 }
 
 function limpar(nome) {
   delete escolhas[nome];
   salvar();
+  // Limpa o campo e chip inline
+  const chip = document.getElementById("chip_" + CSS_ID(nome));
+  if (chip) chip.classList.remove("visible");
+  // Encontra o input pelo chip (mesmo pai url-row)
+  if (chip) {
+    const row = chip.closest(".url-row");
+    if (row) { const inp = row.querySelector("input"); if (inp) { inp.value = ""; inp.classList.remove("ok","erro"); } }
+    const card = chip.closest(".ex");
+    if (card) {
+      card.classList.remove("tem-video");
+      const badgeYt = card.querySelector(".badge-yt");
+      if (badgeYt) badgeYt.style.display = "none";
+    }
+  }
 }
 
 function render() {
