@@ -1,0 +1,6 @@
+{
+  "_instrucoes": "Copie este arquivo para 'cloudflare_config.json' (mesma pasta) e preencha os 3 campos abaixo com os dados do seu Cloudflare. O arquivo real (cloudflare_config.json) é gitignorado — nunca vai pro repositório. Veja o passo a passo que o Claude te passou.",
+  "account_id": "SEU_ACCOUNT_ID_AQUI",
+  "api_token": "SEU_API_TOKEN_AQUI",
+  "project_name": "bf-treinos"
+}
