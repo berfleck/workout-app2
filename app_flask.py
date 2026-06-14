@@ -31,6 +31,7 @@ from database import (
     carregar_historico, carregar_registro, salvar_historico_registro,
     atualizar_historico_registro, atualizar_etiqueta_historico, deletar_historico,
     buscar_historico_por_aluno, nomes_unicos_historico,
+    DATA_DIR,
 )
 
 app = Flask(__name__)
@@ -91,7 +92,7 @@ def _inject_topbar_aluno():
 
 banco = carregar_banco("banco_exercicios.xlsx")
 
-SESSOES_PATH = Path("sessoes_salvas.json")
+SESSOES_PATH = DATA_DIR / "sessoes_salvas.json"
 
 # Estado em memória
 sessoes_ativas: list[Sessao] = []

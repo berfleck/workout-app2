@@ -23,7 +23,7 @@ import pagina_aluno
 
 _RAIZ = os.path.dirname(os.path.abspath(__file__))
 _CONFIG_PATH = os.path.join(_RAIZ, "cloudflare_config.json")
-_PUBLICADO_DIR = os.path.join(_RAIZ, "publicado")
+_PUBLICADO_DIR = os.path.join(str(database.DATA_DIR), "publicado")
 _API = "https://api.cloudflare.com/client/v4"
 
 

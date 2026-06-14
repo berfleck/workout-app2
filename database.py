@@ -2,10 +2,17 @@
 BF Treinamento — Módulo de persistência SQLite
 """
 
-import sqlite3, json
+import sqlite3, json, os
 from pathlib import Path
 
-DB_PATH = Path("bf_treinamento.db")
+# DATA_DIR: diretório dos dados mutáveis (DB, JSONs de sessão, páginas publicadas).
+# Default = pasta do projeto → comportamento local inalterado. Em produção
+# (Railway), setar DATA_DIR=/data (volume persistente) pra os dados sobreviverem
+# a cada redeploy. Fonte única — app_flask e publicador referenciam este valor.
+DATA_DIR = Path(os.environ.get("DATA_DIR") or Path(__file__).resolve().parent)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+DB_PATH = DATA_DIR / "bf_treinamento.db"
 
 # Paths dos JSONs legados (para migração)
 _ALUNOS_JSON = Path("alunos.json")
