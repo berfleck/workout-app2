@@ -1220,6 +1220,13 @@ def carregar_sessoes_disco():
 def index():
     alunos = carregar_alunos()
     aluno_id = request.args.get("aluno_id", type=int)
+    # Abrir o HUB numa URL "pelada" (sem aluno_id na query) sempre começa sem
+    # aluno selecionado. Sem isso, o aluno guardado na session (cookie de uma
+    # visita anterior) reaparecia na topbar enquanto o corpo do HUB ficava vazio
+    # — estado inconsistente "selecionado, mas sem treino". Fluxos que precisam
+    # manter o aluno (ex: redirect do /gerar) passam ?aluno_id=X explicitamente.
+    if "aluno_id" not in request.args:
+        session.pop("aluno_id", None)
     avisos_por_treino = session.pop("avisos_pendentes", None)
     return render_template("hub.html",
         active_page="hub",
