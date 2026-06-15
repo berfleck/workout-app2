@@ -286,10 +286,23 @@
 
 {% include "_draft_banner.html" %}
 
-<div class="resultado-grid" data-n="{{ rotina.sessoes|length }}">
+{# Chip pager do swipe (mobile ≤768px) — afordância principal pra navegar entre treinos.
+   No desktop fica escondido (md:hidden); a navegação lá é a grade .resultado-grid. #}
+<nav class="hub-pager md:hidden" aria-label="Navegação entre treinos">
+{% for sessao in rotina.sessoes %}
+    {% set _tipo = sessao.tipo %}
+    {% set nome_custom = _tipo if _tipo and _tipo != 'manual' and ' + ' not in _tipo else None %}
+    {% set nome_pager = nome_custom or ('Treino ' ~ loop.index) %}
+    <button type="button" class="hub-pager-chip{% if loop.index0 == 0 %} active{% endif %}" data-target="{{ loop.index0 }}">
+        <span class="hub-pager-chip-badge">T{{ loop.index }}</span> {{ nome_pager }}
+    </button>
+{% endfor %}
+</nav>
+
+<div class="resultado-grid hub-swipe-track" id="hub-swipe-track" data-n="{{ rotina.sessoes|length }}">
 {% for sessao in rotina.sessoes %}
 {% set idx = loop.index0 %}
-<div id="treino-{{ idx }}">
+<div id="treino-{{ idx }}" class="hub-treino-page" data-idx="{{ idx }}">
     {% include "_hub_treino_card.html" with context %}
 </div>
 {% endfor %}

@@ -584,6 +584,144 @@
             main.app-main > div { padding-top: 16px !important; }
         }
 
+        /* ── HUB · Swipe horizontal entre treinos (Frente A · guia_swipe_edicao_direta §5) ──
+           Ativo só no HUB mobile e só quando há swipe-track (classe body.hub-swipe-on, posta por JS).
+           Modelo de altura sem número mágico: body vira coluna flex 100dvh — topbar-mobile (em fluxo)
+           é o 1º filho; main = flex:1; bottom bar e modais são position:fixed (fora do fluxo). */
+        @media (max-width: 768px) {
+            body[data-active-page="hub"].hub-swipe-on {
+                --hub-inset: 22px;        /* respiro lateral do TEXTO (fundos seguem full-bleed) */
+                height: 100vh; height: 100dvh;
+                overflow: hidden;
+                display: flex; flex-direction: column;
+            }
+            body[data-active-page="hub"].hub-swipe-on .topbar-mobile { flex-shrink: 0; }
+            body[data-active-page="hub"].hub-swipe-on main.app-main {
+                flex: 1; min-height: 0;
+                padding: 0 !important;
+                display: flex; flex-direction: column;
+                overflow: hidden;
+                background: var(--gray-50);
+            }
+            body[data-active-page="hub"].hub-swipe-on main.app-main > div {
+                flex: 1; min-height: 0;
+                display: flex; flex-direction: column;
+                padding: 0 !important;
+                max-width: none;
+                background: var(--gray-50);
+                box-shadow: none;
+            }
+            /* Nível intermediário (wrapper de conteúdo do hub.html) também precisa cascatear a altura */
+            .hub-swipe-on .hub-root {
+                flex: 1; min-height: 0;
+                display: flex; flex-direction: column;
+                max-width: none;
+            }
+            .hub-swipe-on #rotina-display {
+                flex: 1; min-height: 0;
+                display: flex; flex-direction: column;
+            }
+            /* Tudo que não é o track tem altura própria; só o track preenche o resto. */
+            .hub-swipe-on #rotina-display > *:not(.hub-swipe-track) { flex-shrink: 0; }
+            /* aluno-badge e banner colam no topo sem margem grande no swipe; respiro lateral consistente */
+            .hub-swipe-on #rotina-display > .aluno-badge { margin-bottom: 8px; padding-left: var(--hub-inset); padding-right: var(--hub-inset); }
+
+            /* Chip pager — afordância principal do swipe */
+            .hub-pager {
+                display: flex; gap: 6px;
+                padding: 8px var(--hub-inset, 22px) 10px;
+                overflow-x: auto;
+                background: white;
+                border-top: 1px solid var(--gray-200);
+                border-bottom: 1px solid var(--gray-200);
+                scrollbar-width: none;
+            }
+            .hub-pager::-webkit-scrollbar { display: none; }
+            .hub-pager-chip {
+                flex-shrink: 0;
+                padding: 8px 14px;
+                border-radius: 999px;
+                background: var(--gray-50);
+                border: 1px solid var(--gray-200);
+                font-size: 12.5px; font-weight: 600;
+                color: var(--gray-700);
+                cursor: pointer; white-space: nowrap;
+                display: inline-flex; align-items: center; gap: 7px;
+                line-height: 1; font-family: inherit;
+                transition: all 150ms;
+            }
+            .hub-pager-chip-badge {
+                font-size: 10px; font-weight: 800;
+                background: var(--gray-100); color: var(--gray-500);
+                padding: 2px 6px; border-radius: 4px; letter-spacing: 0.04em;
+            }
+            .hub-pager-chip.active { background: var(--brand-500); border-color: var(--brand-500); color: white; }
+            .hub-pager-chip.active .hub-pager-chip-badge { background: rgba(255,255,255,0.22); color: white; }
+
+            /* .resultado-grid vira flex row com scroll-snap horizontal (exceto em edição inline) */
+            .hub-swipe-on .resultado-grid.hub-swipe-track:not(.focando-edicao) {
+                display: flex !important;
+                grid-template-columns: none !important;
+                flex: 1; min-height: 0; gap: 0;
+                overflow-x: auto; overflow-y: hidden;
+                scroll-snap-type: x mandatory;
+                scroll-behavior: smooth;
+                overscroll-behavior-x: contain;
+                scrollbar-width: none;
+            }
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao)::-webkit-scrollbar { display: none; }
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) > .hub-treino-page {
+                flex: 0 0 100%;            /* largura travada em 100% da viewport (não cresce/encolhe) */
+                width: 100%; max-width: 100%;
+                min-width: 0;             /* mata o min-width:auto (min-content) que estourava a página */
+                height: 100%;
+                scroll-snap-align: start; scroll-snap-stop: always;
+                overflow-x: hidden;       /* nada vaza horizontalmente pra fora da página */
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                padding-bottom: calc(var(--bb-height) + 16px + env(safe-area-inset-bottom, 0px));
+            }
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) > .hub-treino-page::-webkit-scrollbar { display: none; }
+            /* Card full-bleed dentro da página de swipe (sem chrome de card) */
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .treino-card {
+                border: 0; border-radius: 0; padding: 0; background: transparent;
+            }
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .treino-header { padding: 14px var(--hub-inset) 8px; margin-bottom: 0; }
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .blocos-container { border-radius: 0; margin-bottom: 0; }
+            /* Fundo dos blocos segue full-bleed; o TEXTO ganha respiro lateral (--hub-inset) */
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-header,
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .exercicio { padding-left: var(--hub-inset); padding-right: var(--hub-inset); }
+            .hub-swipe-on .resultado-grid.hub-swipe-track.nudge { scroll-behavior: auto; }
+
+            /* período toggle migra pro kebab da topbar no mobile (§5.3) */
+            body[data-active-page="hub"] .aluno-badge .view-mode-switch { display: none; }
+
+            /* ── Ferramentas de swipe na topbar (counter + toggle período) ── */
+            .topbar-hub-tools { display: none; align-items: center; gap: 8px; flex-shrink: 0; }
+            body[data-active-page="hub"] .topbar-hub-tools:not([hidden]) { display: flex; }
+            .topbar-counter {
+                font-size: 11px; font-weight: 700; color: var(--gray-400);
+                font-variant-numeric: tabular-nums; background: var(--gray-100);
+                padding: 4px 9px; border-radius: 999px; letter-spacing: 0.02em; white-space: nowrap;
+            }
+            .topbar-counter strong { color: var(--brand-500); }
+            .topbar-anterior-badge {
+                font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+                color: var(--gray-600); background: var(--gray-200); padding: 3px 8px; border-radius: 999px;
+            }
+            .topbar-kebab {
+                width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+                background: var(--gray-100); border: 1px solid var(--gray-200); color: var(--gray-600);
+                display: grid; place-items: center; cursor: pointer;
+            }
+            .topbar-kebab:hover { background: var(--gray-200); color: var(--gray-900); }
+            .topbar-kebab .icon { width: 16px; height: 16px; }
+
+            /* Fundo levemente mais frio no modo anterior (§5.3) */
+            body[data-active-page="hub"].hub-periodo-anterior main.app-main > div { background: #eef1f4; }
+        }
+
         /* ── Bottom bar contextual (≤768px) ── redesign 02 ── */
         .bb { display: none; }
         @media (max-width: 768px) {
@@ -3028,6 +3166,14 @@
             {% endfor %}
         </select>
     </label>
+    {# HUB: counter do swipe + toggle de período (Atual/Anterior). Mostrado/escondido por initHubSwipe(). #}
+    <div class="topbar-hub-tools" data-hub-tools hidden>
+        <span class="topbar-counter" data-hub-counter hidden><strong data-hub-counter-cur>1</strong>/<span data-hub-counter-tot>1</span></span>
+        <span class="topbar-anterior-badge" data-hub-anterior-badge hidden>anterior</span>
+        <button type="button" class="topbar-kebab" data-hub-periodo-btn aria-label="Ver rotina anterior">
+            <svg class="icon"><use href="#i-clock"/></svg>
+        </button>
+    </div>
 </div>
 
 <!-- Main content -->

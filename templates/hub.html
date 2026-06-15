@@ -4,7 +4,7 @@
 
 {% block content %}
 
-<div class="max-w-5xl mx-auto">
+<div class="max-w-5xl mx-auto hub-root">
     <!-- Header (escondido no mobile real) -->
     <div class="mb-3 hidden md:block">
         <p class="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-1">Painel principal</p>
@@ -51,11 +51,116 @@ function hubTogglePeriodo(periodo) {
     });
 }
 
+// ── Swipe entre treinos (Frente A · §5) ──────────────────────────────────
+// Reconfigura pager + counter + IntersectionObserver sempre que a rotina é
+// (re)renderizada em #rotina-display. Idempotente: pode rodar a cada htmx swap.
+function initHubSwipe() {
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const display  = document.getElementById('rotina-display');
+    const tools    = document.querySelector('[data-hub-tools]');
+    const counter  = document.querySelector('[data-hub-counter]');
+    const antBadge = document.querySelector('[data-hub-anterior-badge]');
+    const periodoBtn = document.querySelector('[data-hub-periodo-btn]');
+    const track = document.getElementById('hub-swipe-track');
+
+    // Detecta estado pelo DOM: rotina presente? modo anterior (read-only)?
+    const temRotina    = !!(display && display.querySelector('.aluno-badge'));
+    const modoAnterior = !!(display && display.querySelector('.auto-ref-badge'));
+
+    document.body.classList.toggle('hub-periodo-anterior', isMobile && modoAnterior);
+    if (tools) tools.hidden = !(isMobile && temRotina);
+    if (antBadge) antBadge.hidden = !(isMobile && modoAnterior);
+
+    // Botão de período: alterna Atual ↔ Anterior (§5.3)
+    if (periodoBtn) {
+        const useEl = periodoBtn.querySelector('use');
+        if (modoAnterior) {
+            if (useEl) useEl.setAttribute('href', '#i-eye');
+            periodoBtn.setAttribute('aria-label', 'Voltar para rotina atual');
+            periodoBtn.onclick = function() { hubTogglePeriodo('atual'); };
+        } else {
+            if (useEl) useEl.setAttribute('href', '#i-clock');
+            periodoBtn.setAttribute('aria-label', 'Ver rotina anterior');
+            periodoBtn.onclick = function() { hubTogglePeriodo('anterior'); };
+        }
+    }
+
+    // Sem track ou desktop → desliga o modo swipe e sai
+    if (!track || !isMobile) {
+        document.body.classList.remove('hub-swipe-on');
+        if (counter) counter.hidden = true;
+        return;
+    }
+
+    document.body.classList.add('hub-swipe-on');
+    const pages = Array.from(track.querySelectorAll('.hub-treino-page'));
+    const chips = Array.from(document.querySelectorAll('.hub-pager-chip'));
+
+    if (counter) {
+        counter.hidden = false;
+        const tot = counter.querySelector('[data-hub-counter-tot]');
+        if (tot) tot.textContent = pages.length;
+    }
+
+    function setActive(i) {
+        chips.forEach(function(c) { c.classList.toggle('active', parseInt(c.dataset.target, 10) === i); });
+        if (counter) {
+            const cur = counter.querySelector('[data-hub-counter-cur]');
+            if (cur) cur.textContent = i + 1;
+        }
+        const ac = chips.find(function(c) { return c.classList.contains('active'); });
+        if (ac) ac.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    }
+
+    // IntersectionObserver sincroniza chip + counter com a página mais visível
+    if (track._hubIO) track._hubIO.disconnect();
+    const io = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.intersectionRatio > 0.6) setActive(parseInt(entry.target.dataset.idx, 10));
+        });
+    }, { root: track, threshold: [0.6, 0.9] });
+    pages.forEach(function(p) { io.observe(p); });
+    track._hubIO = io;
+
+    // Tap em chip → scroll pro treino
+    chips.forEach(function(chip) {
+        chip.onclick = function() {
+            const i = parseInt(chip.dataset.target, 10);
+            if (pages[i]) pages[i].scrollIntoView({ inline: 'start', behavior: 'smooth' });
+        };
+    });
+
+    // Nudge inicial (1x): peek de 36px e volta — ensina o gesto sem texto
+    if (!track._hubNudged) {
+        track._hubNudged = true;
+        let interacted = false;
+        track.addEventListener('scroll', function() { interacted = true; }, { once: true });
+        setTimeout(function() {
+            if (interacted || track.scrollLeft > 4) return;
+            track.classList.add('nudge');
+            track.scrollTo({ left: 36, behavior: 'auto' });
+            setTimeout(function() {
+                track.scrollTo({ left: 0, behavior: 'smooth' });
+                track.classList.remove('nudge');
+            }, 380);
+        }, 900);
+    }
+}
+
 // Auto-trigger on load if aluno is pre-selected
 document.addEventListener('DOMContentLoaded', function() {
     const sel = document.getElementById('sel-aluno-hub');
     if (sel.value) {
         sel.dispatchEvent(new Event('change'));
+    }
+    initHubSwipe();
+});
+
+// Re-inicializa o swipe sempre que a rotina (ou um card dentro dela) é trocada via HTMX
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    const t = evt.target;
+    if (t && (t.id === 'rotina-display' || (t.closest && t.closest('#rotina-display')))) {
+        initHubSwipe();
     }
 });
 </script>
