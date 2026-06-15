@@ -7,7 +7,8 @@ Continuação do `guia_swipe_edicao_direta.md`. Esta sessão fechou os Sub-PRs 1
 
 - Branch: **`feat-card-etiqueta-rascunho`** (pushed em `origin`), histórico **linear**
   sobre `main` (`60a43de`). Os Sub-PRs foram empilhados; o tip contém todos os commits.
-- **Não mergeado em `main`** ainda (decisão de merge é do Bernardo).
+- **Mergeado em `main` (fast-forward) e pushado em 2026-06-15.** A próxima sessão pode
+  branchar direto de `main` para o Sub-PR 5.
 
 | Commit | Conteúdo |
 |---|---|
