@@ -11,7 +11,7 @@ from datetime import datetime
 from gerador_treino import (
     carregar_banco, gerar_sessao, gerar_sessao_por_demandas, gerar_multiplos_treinos,
     substituir_exercicio, buscar_substitutos, substituir_exercicio_por,
-    expandir_para_padroes, selecionar_evitando_familia,
+    expandir_para_padroes, selecionar_evitando_familia, ordenar_compostos_primeiro,
     TEMPLATES, TEMPLATE_EPP, EXERCICIOS_POR_PADRAO,
     PADRAO_PARA_SUBREGIAO, SUBREGIAO_PARA_REGIAO,
     REGIAO_PARA_SUBREGIOES, SUBREGIAO_PARA_PADROES,
@@ -1922,7 +1922,9 @@ def hub_regerar_bloco(aluno_id, t, bi):
     sessoes_dicts[t]["blocos"][bi] = novo_bloco
     salvar_rascunho(aluno_id, sessoes_dicts)
 
-    return hub_rotina_render(aluno_id, "atual")
+    # Resposta no formato .swap-card-result (Frente C parte 2): aplica via
+    # applyStructuralResult no client → highlight + sem reload de página inteira.
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
 
 
 # ══════════════════════════════════════════════════════════════
@@ -3108,6 +3110,142 @@ def hub_substituir_aleatorio(aluno_id, t, bi, slot):
     # Formato unificado .swap-card-result (consumido pelo action sheet · Frente C).
     # sessao_render deriva de sessoes_dicts[t] em ambos os ramos acima, então _render_swap_cards
     # (que relê sessoes_dicts[t]) renderiza o mesmo conteúdo.
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
+
+
+# ── Operações estruturais nível BLOCO no HUB-viz (Frente C parte 2 · §7.2-7.4) ──
+# Todas operam no rascunho (sessoes_dicts) e respondem com .swap-card-result + banner
+# OOB via _render_swap_cards, SEM ativar edicao_hub. As rotas antigas
+# bloco_regerar/bloco_deletar/bloco_mover (/treino/...) ficam como fallback desktop.
+
+def _mover_bloco_dict(blocos, bi, pos):
+    """Reordena (in-place) o bloco bi para a posição-gap pos e re-rotula.
+    Convenção de 'pos': nº de blocos antes do ponto de inserção na lista ATUAL
+    (pos=0 = topo; pos=len = fim). Após pop(bi), índices à frente recuam 1, então
+    o destino real é pos-1 quando pos>bi (molde hub_ex_mover_bloco). pos==bi e
+    pos==bi+1 são no-ops (gaps adjacentes ocultos na UI). Retorna True se ok."""
+    n = len(blocos)
+    if not (0 <= bi < n) or not (0 <= pos <= n):
+        return False
+    bloco = blocos.pop(bi)
+    destino = pos if pos <= bi else pos - 1
+    blocos.insert(destino, bloco)
+    _relabel_blocos_dict(blocos)
+    return True
+
+
+def _ex_dict_do_banco(ex, *, series=3, reps="8-12", rir=2):
+    """Monta o ex-dict de um Exercicio do banco com prescrição default (exercícios
+    do banco vêm sem series/reps/rir). Usado por inserir/adicionar bloco via picker."""
+    d = _exercicio_to_dict(ex)
+    if d.get("series") is None:
+        d["series"] = series
+    if d.get("reps") is None:
+        d["reps"] = reps
+    if d.get("rir") is None:
+        d["rir"] = rir
+    return d
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/blocos/<int:bi>/remover", methods=["POST"])
+def hub_bloco_remover(aluno_id, t, bi):
+    """Remove um bloco inteiro (re-rotula). Irmã viz de bloco_deletar — grava
+    rascunho sem ativar edicao_hub. O undo (toast 5s) é responsabilidade do client,
+    que guarda o snapshot e reverte via blocos/inserir-existente (§10.7)."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts or not (0 <= t < len(sessoes_dicts)):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    blocos = sessoes_dicts[t]["blocos"]
+    if not (0 <= bi < len(blocos)):
+        return '<div class="erro">Bloco inválido.</div>', 400
+    blocos.pop(bi)
+    _relabel_blocos_dict(blocos)
+    salvar_rascunho(aluno_id, sessoes_dicts)
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/blocos/<int:bi>/mover-para/<int:pos>", methods=["POST"])
+def hub_bloco_mover_para(aluno_id, t, bi, pos):
+    """Reordena o bloco bi para a posição-gap pos (reorder via long-press + tap em gap, §7.2).
+    Convenção de 'pos': nº de blocos antes do ponto de inserção na lista ATUAL
+    (pos=0 = topo; pos=bi+1 = logo abaixo do próprio bloco). Os gaps adjacentes
+    (pos==bi e pos==bi+1) são no-ops e ficam ocultos na UI."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts or not (0 <= t < len(sessoes_dicts)):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    blocos = sessoes_dicts[t]["blocos"]
+    if not _mover_bloco_dict(blocos, bi, pos):
+        return '<div class="erro">Posição inválida.</div>', 400
+    salvar_rascunho(aluno_id, sessoes_dicts)
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/blocos/inserir/<int:pos>", methods=["POST"])
+def hub_bloco_inserir(aluno_id, t, pos):
+    """Insere um bloco NOVO na posição pos com 1-2 exercícios escolhidos no picker (§7.3).
+    'compostos primeiro' decide ex1/ex2. Body: exercicios=[nome1, nome2]."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts or not (0 <= t < len(sessoes_dicts)):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    blocos = sessoes_dicts[t]["blocos"]
+    if not (0 <= pos <= len(blocos)):
+        return '<div class="erro">Posição inválida.</div>', 400
+    nomes = request.form.getlist("exercicios")[:2]
+    exs = [next((e for e in banco if e.nome == nm), None) for nm in nomes]
+    exs = [e for e in exs if e is not None]
+    if not exs:
+        return '<div class="erro">Selecione ao menos 1 exercício.</div>', 400
+    exs = ordenar_compostos_primeiro(exs)   # composto vira ex1
+    novo = {"label": "?", "ex1": None, "ex2": None, "ex3": None}
+    for i, ex in enumerate(exs):
+        novo[f"ex{i+1}"] = _ex_dict_do_banco(ex)
+    blocos.insert(pos, novo)
+    _relabel_blocos_dict(blocos)
+    salvar_rascunho(aluno_id, sessoes_dicts)
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/blocos/<int:bi>/adicionar", methods=["POST"])
+def hub_bloco_adicionar(aluno_id, t, bi):
+    """Adiciona 1 exercício a um bloco existente (caso trio na semana, §7.4).
+    Body: exercicios=[nome]. Falha se o bloco já tem 3."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts or not (0 <= t < len(sessoes_dicts)):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    blocos = sessoes_dicts[t]["blocos"]
+    if not (0 <= bi < len(blocos)):
+        return '<div class="erro">Bloco inválido.</div>', 400
+    nomes = request.form.getlist("exercicios")
+    if not nomes:
+        return '<div class="erro">Selecione um exercício.</div>', 400
+    ex = next((e for e in banco if e.nome == nomes[0]), None)
+    if ex is None:
+        return '<div class="erro">Exercício não encontrado.</div>', 400
+    if not _add_ex_a_bloco_dict(blocos[bi], _ex_dict_do_banco(ex)):
+        return '<div class="erro">Bloco cheio (máx 3).</div>', 400
+    salvar_rascunho(aluno_id, sessoes_dicts)
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/blocos/inserir-existente", methods=["POST"])
+def hub_bloco_inserir_existente(aluno_id, t):
+    """Reverte a remoção de um bloco (undo do toast, §10.7). Body JSON:
+    {posicao: int, bloco: {label, ex1, ex2, ex3}}. Insere o dict CRU (preserva
+    séries/reps/RIR originais — ≠ inserir, que monta do zero) e re-rotula.
+    Só é chamado quando nada mudou na estrutura na janela de 5s (invalidação client)."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts or not (0 <= t < len(sessoes_dicts)):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    payload = request.get_json(silent=True) or {}
+    bloco = payload.get("bloco")
+    pos = payload.get("posicao")
+    if not isinstance(bloco, dict) or not isinstance(pos, int):
+        return '<div class="erro">Snapshot inválido.</div>', 400
+    blocos = sessoes_dicts[t]["blocos"]
+    pos = max(0, min(pos, len(blocos)))
+    blocos.insert(pos, bloco)
+    _relabel_blocos_dict(blocos)
+    salvar_rascunho(aluno_id, sessoes_dicts)
     return _render_swap_cards(aluno_id, sessoes_dicts, [t])
 
 
