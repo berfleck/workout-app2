@@ -25,3 +25,4 @@ tools/escolhas_youtube.json
 
 # Claude Code agent worktrees (session state, embedded sub-repos)
 .claude/worktrees/
+server*.log
