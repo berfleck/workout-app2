@@ -1,0 +1,68 @@
+{# Action sheet global do EXERCÍCIO (Frente C parte 1 · §7.1). Único elemento;
+   o tap curto num exercício popula o contexto (aluno/treino/bloco/ei/nome) via JS.
+   Tem 2 views: 'main' (ações) e 'sub' (lista de blocos/treinos de destino do "mover"). #}
+<div class="sheet-overlay" id="ex-action-sheet" data-ex-sheet aria-hidden="true">
+    <div class="sheet" role="dialog" aria-label="Ações do exercício">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Exercício</div>
+                <div class="sheet-title" data-ex-sheet-title>—</div>
+            </div>
+            <button type="button" class="sheet-close" data-ex-sheet-close aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+
+        {# View principal #}
+        <div class="sheet-list" data-ex-view="main">
+            <button type="button" class="sheet-item" data-ex-action="substituir">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-shuffle"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Substituir</div>
+                    <div class="sheet-item-sub">Sortear outro exercício do mesmo padrão</div>
+                </div>
+            </button>
+            <button type="button" class="sheet-item" data-ex-action="solo">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-arrow-up"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Tornar solo</div>
+                    <div class="sheet-item-sub">Bloco próprio, acima — sem super-série</div>
+                </div>
+            </button>
+            <button type="button" class="sheet-item" data-ex-action="mover-bloco">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-arrow-left-right"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Mover para outro bloco</div>
+                </div>
+                <svg class="sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+            </button>
+            <button type="button" class="sheet-item" data-ex-action="mover-treino">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-columns"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Mover para outro treino</div>
+                </div>
+                <svg class="sheet-item-arrow"><use href="#i-chevron-right"/></svg>
+            </button>
+            <div class="sheet-divider"></div>
+            <button type="button" class="sheet-item danger" data-ex-action="remover">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-trash"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Remover</div>
+                </div>
+            </button>
+        </div>
+
+        {# View submenu (destinos de "mover") — preenchida por JS #}
+        <div class="sheet-list" data-ex-view="sub" hidden>
+            <button type="button" class="sheet-item sheet-item--back" data-ex-sub-back>
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-arrow-left"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title" data-ex-sub-title>Voltar</div>
+                </div>
+            </button>
+            <div data-ex-sub-list></div>
+            <div class="sheet-empty" data-ex-sub-empty hidden>Nenhum destino disponível.</div>
+        </div>
+    </div>
+</div>

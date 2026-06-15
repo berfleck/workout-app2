@@ -3392,41 +3392,42 @@ document.addEventListener('click', async function(e) {
         cancelSwapMode();
         fetch(url, { method: 'POST', headers: { 'HX-Request': 'true' } })
             .then(r => r.text())
-            .then(html => {
-                const tmp = document.createElement('div');
-                tmp.innerHTML = html;
-                // Cada treino afetado vem em .swap-card-result[data-treino-idx] → roteia pro #treino-<t>
-                tmp.querySelectorAll('.swap-card-result').forEach(w => {
-                    const ti = w.dataset.treinoIdx;
-                    const cardEl = document.getElementById('treino-' + ti);
-                    if (cardEl) {
-                        cardEl.innerHTML = w.innerHTML;
-                        if (window.htmx) htmx.process(cardEl);
-                    }
-                });
-                // OOB restante (banner de rascunho)
-                tmp.querySelectorAll('[hx-swap-oob]').forEach(oob => {
-                    const id = oob.id;
-                    if (!id) return;
-                    oob.removeAttribute('hx-swap-oob');
-                    const existing = document.getElementById(id);
-                    if (existing) existing.replaceWith(oob);
-                    else document.body.appendChild(oob);
-                });
-                // Highlight pulsante (§4.3) nas 2 posições trocadas (ambos os treinos)
-                highlightSwapped([{ t: tA, bi: biA, ei: eiA }, { t: tB, bi: biB, ei: eiB }]);
-                // Refetch bb-actions mobile (rascunho pode ter sido ativado e bb precisa
-                // mostrar Descartar/Atualizar/Salvar). Replica a lógica do listener
-                // htmx:afterSwap, que não dispara aqui pois usamos fetch puro.
-                if (document.body.dataset.activePage === 'hub' && window.htmx) {
-                    const bbActions = document.querySelector('.bb-actions');
-                    if (bbActions) {
-                        htmx.ajax('GET', '/_mobile_bb_actions', { target: '.bb-actions', swap: 'innerHTML' });
-                    }
-                }
-            })
+            .then(html => applyStructuralResult(html, [{ t: tA, bi: biA, ei: eiA }, { t: tB, bi: biB, ei: eiB }]))
             .catch(err => console.error('Swap falhou:', err));
     }
+
+    // Aplica resposta de operação estrutural HUB-viz (.swap-card-result + OOB) + highlight
+    // + refetch da bb mobile. Exposto globalmente pra ser reusado pelo action sheet do exercício.
+    function applyStructuralResult(html, highlightPositions) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        // Cada treino afetado vem em .swap-card-result[data-treino-idx] → roteia pro #treino-<t>
+        tmp.querySelectorAll('.swap-card-result').forEach(w => {
+            const ti = w.dataset.treinoIdx;
+            const cardEl = document.getElementById('treino-' + ti);
+            if (cardEl) {
+                cardEl.innerHTML = w.innerHTML;
+                if (window.htmx) htmx.process(cardEl);
+            }
+        });
+        // OOB restante (banner de rascunho)
+        tmp.querySelectorAll('[hx-swap-oob]').forEach(oob => {
+            const id = oob.id;
+            if (!id) return;
+            oob.removeAttribute('hx-swap-oob');
+            const existing = document.getElementById(id);
+            if (existing) existing.replaceWith(oob);
+            else document.body.appendChild(oob);
+        });
+        if (highlightPositions && highlightPositions.length) highlightSwapped(highlightPositions);
+        // Refetch bb-actions mobile (rascunho pode ter sido ativado e bb precisa
+        // mostrar Descartar/Atualizar/Salvar). fetch puro não dispara htmx:afterSwap.
+        if (document.body.dataset.activePage === 'hub' && window.htmx) {
+            const bbActions = document.querySelector('.bb-actions');
+            if (bbActions) htmx.ajax('GET', '/_mobile_bb_actions', { target: '.bb-actions', swap: 'innerHTML' });
+        }
+    }
+    window.applyStructuralResult = applyStructuralResult;
 
     // Highlight pulsante (§4.3): glow laranja de ~600ms nas posições recém-trocadas
     function highlightSwapped(positions) {
@@ -3440,6 +3441,7 @@ document.addEventListener('click', async function(e) {
             setTimeout(() => el.classList.remove('just-changed'), 700);
         });
     }
+    window.highlightSwapped = highlightSwapped;
 
     function clearTimer() {
         if (pressTimer) clearTimeout(pressTimer);
@@ -3459,13 +3461,13 @@ document.addEventListener('click', async function(e) {
         pressStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         pressTargetEl = ex;
         pressTimer = setTimeout(function() {
-            // Long-press completou:
-            // - Se já em modo swap com outro target → faz swap (atalho).
-            // - Senão → abre popup de ações (Trocar / Substituir).
+            // Long-press completou (§7.1: long-press = modo carregando direto):
+            // - Já carregando → completa o swap (atalho).
+            // - Senão → entra em modo carregando (carry). O tap curto é que abre o menu.
             if (swapSource && pressTargetEl) {
                 performSwap(pressTargetEl);
             } else if (pressTargetEl) {
-                openExerciseActionPopup(pressTargetEl);
+                enterSwapMode(pressTargetEl);
             }
             clearTimer();
         }, LONG_PRESS_MS);
@@ -3481,20 +3483,30 @@ document.addEventListener('click', async function(e) {
     document.addEventListener('touchend', clearTimer, { passive: true });
     document.addEventListener('touchcancel', clearTimer, { passive: true });
 
-    // Tap simples num exercício durante swap mode → faz swap (dispensa segundo long-press)
     document.addEventListener('click', function(e) {
-        if (!swapSource) return;
-        // Ignora click sintético gerado pelo touchend logo após o long-press que entrou em modo swap
-        if (Date.now() - swapModeEnteredAt < 400) return;
-        const ex = e.target.closest('[data-swap-ex]');
-        if (!ex) {
-            // Clicou fora: cancela só se também fora do indicator (cancel já tem handler próprio)
-            if (!e.target.closest('.swap-indicator')) cancelSwapMode();
+        // ── Modo carregando ativo: tap completa ou cancela o swap ──
+        if (swapSource) {
+            // Ignora click sintético gerado pelo touchend logo após o long-press que entrou em carry
+            if (Date.now() - swapModeEnteredAt < 400) return;
+            const ex = e.target.closest('[data-swap-ex]');
+            if (!ex) {
+                // Clicou fora: cancela (o X da pill tem handler Alpine próprio)
+                if (!e.target.closest('.carry-pill')) cancelSwapMode();
+                return;
+            }
+            if (e.target.closest('button, a, input, textarea, select, .drag-handle')) return;
+            e.preventDefault();
+            performSwap(ex);
             return;
         }
+        // ── Fora de modo carregando: tap curto num exercício abre o action sheet (mobile) ──
+        if (!window.matchMedia('(max-width: 768px)').matches) return;
+        if (typeof window.openExSheet !== 'function') return;
+        const exTap = e.target.closest('[data-swap-ex]');
+        if (!exTap) return;
         if (e.target.closest('button, a, input, textarea, select, .drag-handle')) return;
         e.preventDefault();
-        performSwap(ex);
+        window.openExSheet(exTap);
     }, true);
 
     // ESC cancela (desktop)
@@ -4113,6 +4125,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% include "_mobile_nav_sheet.html" %}
 {% include "_mobile_treino_kebab_sheet.html" %}
+{% include "_mobile_ex_action_sheet.html" %}
 
 <!-- Toast global de autosave -->
 <div class="autosave-toast" id="autosave-toast"><svg class="icon"><use href="#i-check"/></svg> Prescrição salva</div>
@@ -4340,6 +4353,140 @@ document.addEventListener('keydown', function(e) {
         document.querySelectorAll('.split-btn.open').forEach(function(s) { s.classList.remove('open'); });
     }
 });
+</script>
+<script>
+// ── Action sheet do EXERCÍCIO (tap curto · Frente C parte 1 · §7.1) ──
+(function() {
+    const sheet = document.getElementById('ex-action-sheet');
+    if (!sheet) return;
+    const titleEl  = sheet.querySelector('[data-ex-sheet-title]');
+    const viewMain = sheet.querySelector('[data-ex-view="main"]');
+    const viewSub  = sheet.querySelector('[data-ex-view="sub"]');
+    const subTitle = sheet.querySelector('[data-ex-sub-title]');
+    const subList  = sheet.querySelector('[data-ex-sub-list]');
+    const subEmpty = sheet.querySelector('[data-ex-sub-empty]');
+    let ctx = null;
+
+    function open(exEl) {
+        const d = exEl.dataset;
+        ctx = {
+            alunoId: d.alunoId,
+            t: parseInt(d.treinoIdx, 10),
+            bi: parseInt(d.blocoIdx, 10),
+            ei: parseInt(d.ei, 10),
+            nome: d.exNome || '',
+        };
+        if (titleEl) titleEl.textContent = ctx.nome || 'Exercício';
+        showMain();
+        sheet.classList.add('is-open');
+        sheet.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('sheet-open');
+        if (navigator.vibrate) try { navigator.vibrate(20); } catch (e) {}
+    }
+    function close() {
+        sheet.classList.remove('is-open');
+        sheet.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('sheet-open');
+        ctx = null;
+    }
+    window.openExSheet = open;
+
+    function showMain() { if (viewMain) viewMain.hidden = false; if (viewSub) viewSub.hidden = true; }
+    function showSub(titulo) {
+        if (subTitle) subTitle.textContent = titulo;
+        if (viewMain) viewMain.hidden = true;
+        if (viewSub) viewSub.hidden = false;
+    }
+
+    function aplica(html, highlight) {
+        if (window.applyStructuralResult) window.applyStructuralResult(html, highlight);
+    }
+    function post(url, highlight, body) {
+        close();
+        const opts = { method: 'POST', headers: { 'HX-Request': 'true' } };
+        if (body) opts.body = body;
+        fetch(url, opts).then(r => r.text()).then(html => aplica(html, highlight))
+            .catch(err => console.error('Ação do exercício falhou:', err));
+    }
+
+    function makeSubItem(label, onClick) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sheet-item';
+        const txt = document.createElement('div');
+        txt.className = 'sheet-item-text';
+        const t = document.createElement('div');
+        t.className = 'sheet-item-title';
+        t.textContent = label;
+        txt.appendChild(t);
+        b.appendChild(txt);
+        b.addEventListener('click', onClick);
+        return b;
+    }
+
+    // Lista blocos de destino do MESMO treino (com vaga, != origem)
+    function buildBlocosDestino() {
+        subList.innerHTML = '';
+        const card = document.getElementById('treino-' + ctx.t);
+        let count = 0;
+        if (card) {
+            card.querySelectorAll('.bloco-wrap[data-bloco-idx]').forEach(function(bw) {
+                const bi = parseInt(bw.dataset.blocoIdx, 10);
+                if (bi === ctx.bi) return;
+                if (bw.querySelectorAll('.exercicio').length >= 3) return; // sem vaga
+                const label = bw.dataset.blocoLabel || ('' + (bi + 1));
+                subList.appendChild(makeSubItem('Bloco ' + label, function() {
+                    post('/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.t + '/exercicio/' + ctx.bi + '/' + ctx.ei + '/mover-bloco/' + bi, null);
+                }));
+                count++;
+            });
+        }
+        if (subEmpty) subEmpty.hidden = count > 0;
+    }
+
+    // Lista treinos de destino (!= atual), pelos chips do pager
+    function buildTreinosDestino() {
+        subList.innerHTML = '';
+        let count = 0;
+        document.querySelectorAll('.hub-pager-chip[data-target]').forEach(function(chip) {
+            const dt = parseInt(chip.dataset.target, 10);
+            if (dt === ctx.t) return;
+            const nome = chip.textContent.trim().replace(/\s+/g, ' ');
+            subList.appendChild(makeSubItem(nome, function() {
+                post('/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.t + '/exercicio/' + ctx.bi + '/' + ctx.ei + '/mover-treino/' + dt, null);
+            }));
+            count++;
+        });
+        if (subEmpty) subEmpty.hidden = count > 0;
+    }
+
+    sheet.addEventListener('click', function(e) {
+        if (e.target === sheet || e.target.closest('[data-ex-sheet-close]')) { close(); return; }
+        if (e.target.closest('[data-ex-sub-back]')) { showMain(); return; }
+        const actBtn = e.target.closest('[data-ex-action]');
+        if (!actBtn || !ctx) return;
+        const action = actBtn.dataset.exAction;
+        const base = '/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.t + '/exercicio/' + ctx.bi + '/' + ctx.ei;
+        if (action === 'substituir') {
+            const slot = ctx.ei === 0 ? 'ex1' : (ctx.ei === 1 ? 'ex2' : 'ex3');
+            const fd = new FormData(); fd.append('escopo', 'padrao');
+            post('/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.t + '/substituir-aleatorio/' + ctx.bi + '/' + slot,
+                 [{ t: ctx.t, bi: ctx.bi, ei: ctx.ei }], fd);
+        } else if (action === 'solo') {
+            post(base + '/tornar-solo', [{ t: ctx.t, bi: ctx.bi, ei: 0 }]);
+        } else if (action === 'mover-bloco') {
+            showSub('Mover para outro bloco'); buildBlocosDestino();
+        } else if (action === 'mover-treino') {
+            showSub('Mover para outro treino'); buildTreinosDestino();
+        } else if (action === 'remover') {
+            post(base + '/remover', null);
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sheet.classList.contains('is-open')) close();
+    });
+})();
 </script>
 {% block scripts %}{% endblock %}
 </body>

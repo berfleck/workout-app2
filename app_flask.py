@@ -2879,6 +2879,133 @@ def hub_swap_unificado(aluno_id, t_a, bi_a, ei_a, t_b, bi_b, ei_b):
     return _render_swap_cards(aluno_id, sessoes_dicts, indices)
 
 
+# ── Operações estruturais nível EXERCÍCIO no HUB-viz (Frente C parte 1 · §7.1) ──
+# Todas operam no rascunho (sessoes_dicts) e respondem com cards .swap-card-result
+# + banner OOB, SEM ativar edicao_hub (distinto das rotas /treino/* antigas).
+_LABELS_BLOCO = "ABCDEFGHIJKLMNOP"
+
+
+def _relabel_blocos_dict(blocos):
+    for j, b in enumerate(blocos):
+        b["label"] = _LABELS_BLOCO[j] if j < len(_LABELS_BLOCO) else str(j + 1)
+
+
+def _pop_ex_de_bloco_dict(bloco, ei):
+    """Remove o ex na posição ei do bloco-dict (shift dos demais), retorna o ex removido (ou None)."""
+    vals = [bloco.get("ex1"), bloco.get("ex2"), bloco.get("ex3")]
+    if ei not in (0, 1, 2):
+        return None
+    ex = vals[ei]
+    del vals[ei]
+    vals.append(None)
+    bloco["ex1"], bloco["ex2"], bloco["ex3"] = vals
+    return ex
+
+
+def _bloco_vazio_dict(bloco):
+    return not any(bloco.get(k) for k in ("ex1", "ex2", "ex3"))
+
+
+def _add_ex_a_bloco_dict(bloco, ex):
+    for k in ("ex1", "ex2", "ex3"):
+        if bloco.get(k) is None:
+            bloco[k] = ex
+            return True
+    return False
+
+
+def _novo_bloco_dict(ex):
+    return {"label": "?", "ex1": ex, "ex2": None, "ex3": None}
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/exercicio/<int:bi>/<int:ei>/tornar-solo", methods=["POST"])
+def hub_ex_tornar_solo(aluno_id, t, bi, ei):
+    """Extrai o exercício para um bloco solo NOVO, imediatamente ACIMA do bloco de origem (§10.2)."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts or not (0 <= t < len(sessoes_dicts)):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    blocos = sessoes_dicts[t]["blocos"]
+    if not (0 <= bi < len(blocos)):
+        return '<div class="erro">Bloco inválido.</div>', 400
+    ex = _pop_ex_de_bloco_dict(blocos[bi], ei)
+    if ex is None:
+        return '<div class="erro">Exercício não encontrado.</div>', 400
+    if _bloco_vazio_dict(blocos[bi]):
+        blocos.pop(bi)
+    blocos.insert(bi, _novo_bloco_dict(ex))   # acima da origem
+    _relabel_blocos_dict(blocos)
+    salvar_rascunho(aluno_id, sessoes_dicts)
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/exercicio/<int:bi>/<int:ei>/mover-bloco/<int:dest_bi>", methods=["POST"])
+def hub_ex_mover_bloco(aluno_id, t, bi, ei, dest_bi):
+    """Move o exercício para outro bloco do MESMO treino."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts or not (0 <= t < len(sessoes_dicts)):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    blocos = sessoes_dicts[t]["blocos"]
+    if not (0 <= bi < len(blocos)) or not (0 <= dest_bi < len(blocos)) or bi == dest_bi:
+        return '<div class="erro">Bloco inválido.</div>', 400
+    ex = _pop_ex_de_bloco_dict(blocos[bi], ei)
+    if ex is None:
+        return '<div class="erro">Exercício não encontrado.</div>', 400
+    origem_vazia = _bloco_vazio_dict(blocos[bi])
+    if origem_vazia:
+        blocos.pop(bi)
+        if dest_bi > bi:
+            dest_bi -= 1
+    if not _add_ex_a_bloco_dict(blocos[dest_bi], ex):
+        return '<div class="erro">Bloco de destino cheio.</div>', 400
+    _relabel_blocos_dict(blocos)
+    salvar_rascunho(aluno_id, sessoes_dicts)
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/exercicio/<int:bi>/<int:ei>/mover-treino/<int:dest_t>", methods=["POST"])
+def hub_ex_mover_treino(aluno_id, t, bi, ei, dest_t):
+    """Move o exercício para OUTRO treino, como bloco solo novo no fim do treino destino."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts:
+        return '<div class="erro">Nenhuma rotina ativa.</div>', 404
+    n = len(sessoes_dicts)
+    if not (0 <= t < n) or not (0 <= dest_t < n) or t == dest_t:
+        return '<div class="erro">Treino inválido.</div>', 400
+    blocos_src = sessoes_dicts[t]["blocos"]
+    if not (0 <= bi < len(blocos_src)):
+        return '<div class="erro">Bloco inválido.</div>', 400
+    ex = _pop_ex_de_bloco_dict(blocos_src[bi], ei)
+    if ex is None:
+        return '<div class="erro">Exercício não encontrado.</div>', 400
+    if _bloco_vazio_dict(blocos_src[bi]):
+        blocos_src.pop(bi)
+    _relabel_blocos_dict(blocos_src)
+    blocos_dst = sessoes_dicts[dest_t]["blocos"]
+    blocos_dst.append(_novo_bloco_dict(ex))
+    _relabel_blocos_dict(blocos_dst)
+    salvar_rascunho(aluno_id, sessoes_dicts)
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t, dest_t])
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/exercicio/<int:bi>/<int:ei>/remover", methods=["POST"])
+def hub_ex_remover(aluno_id, t, bi, ei):
+    """Remove o exercício do bloco; se o bloco esvaziar, remove o bloco e re-rotula."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts or not (0 <= t < len(sessoes_dicts)):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    blocos = sessoes_dicts[t]["blocos"]
+    if not (0 <= bi < len(blocos)):
+        return '<div class="erro">Bloco inválido.</div>', 400
+    ex = _pop_ex_de_bloco_dict(blocos[bi], ei)
+    if ex is None:
+        return '<div class="erro">Exercício não encontrado.</div>', 400
+    if _bloco_vazio_dict(blocos[bi]):
+        blocos.pop(bi)
+    _relabel_blocos_dict(blocos)
+    salvar_rascunho(aluno_id, sessoes_dicts)
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
+
+
 @app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/substituir-aleatorio/<int:bi>/<slot>", methods=["POST"])
 def hub_substituir_aleatorio(aluno_id, t, bi, slot):
     """Substitui um exercício por outro aleatório do mesmo padrão (ou da subregião,
@@ -2954,25 +3081,10 @@ def hub_substituir_aleatorio(aluno_id, t, bi, slot):
         historico_substituicoes[pos_key]["vistos"].add(novo_ex["nome"])
         sessao_render = nova_sessao
 
-    aluno = next((a for a in carregar_alunos() if a["id"] == aluno_id), None)
-    nomes_anteriores = set()
-    if aluno:
-        rot_ant = carregar_rotina_anterior(aluno["nome"], aluno.get("rotina_ativa_id"))
-        if rot_ant:
-            for s_dict in rot_ant["sessoes"]:
-                for b in s_dict["blocos"]:
-                    for key in ("ex1", "ex2", "ex3"):
-                        ex = b.get(key)
-                        if ex: nomes_anteriores.add(ex["nome"])
-    rotina_reg = carregar_rotina_ativa(aluno_id)
-    intent_atual = carregar_intent_rascunho(aluno_id)
-    publicada_para_diff = [] if intent_atual == "nova-rotina" else (rotina_reg["sessoes"] if rotina_reg else [])
-    estados_rascunho = _estados_rascunho_por_posicao(sessoes_dicts, publicada_para_diff)
-    card = render_template("_hub_treino_card.html", sessao=sessao_render, idx=t,
-                           aluno_id=aluno_id, nomes_anteriores=nomes_anteriores,
-                           estados_rascunho=estados_rascunho,
-                           padroes_labels=PADROES_LABELS)
-    return card + render_draft_banner_oob(aluno_id)
+    # Formato unificado .swap-card-result (consumido pelo action sheet · Frente C).
+    # sessao_render deriva de sessoes_dicts[t] em ambos os ramos acima, então _render_swap_cards
+    # (que relê sessoes_dicts[t]) renderiza o mesmo conteúdo.
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
 
 
 @app.route("/treino/<int:t>/exercicio/<int:bi>/<int:ei>/destacar", methods=["POST"])

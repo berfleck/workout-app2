@@ -52,7 +52,7 @@
     <div class="blocos-container">
     {% for bloco in sessao.blocos %}
     {% set bi = loop.index0 %}
-    <div class="bloco-wrap">
+    <div class="bloco-wrap" data-bloco-idx="{{ bi }}" data-bloco-label="{{ bloco.label }}">
     {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
     {% set ei = loop.index0 %}
     {% set estado = estados_rascunho.get((idx, bloco.label, ei)) if estados_rascunho is defined and estados_rascunho else None %}
