@@ -6,6 +6,61 @@
     <title>BF Treinamento</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23e85d04'/><text x='50%25' y='52%25' dominant-baseline='middle' text-anchor='middle' font-family='DM Sans, Arial, sans-serif' font-weight='800' font-size='30' fill='white'>BF</text></svg>">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <!-- Alpine.js: camada de estado reativo client-side (complementa HTMX, que segue dono da comunicação com o servidor).
+         Ordem importa: o plugin @alpinejs/morph precisa carregar ANTES do Alpine core.
+         A extensão htmx `alpine-morph` permite preservar estado Alpine através de swaps HTMX (hx-swap="morph"). -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/morph@3.14.1/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx-ext-alpine-morph@2.0.1/alpine-morph.js"></script>
+    <!-- Stores globais do Alpine: modo carregando (carry) + highlight pós-mudança. Registrados em alpine:init. -->
+    <script>
+    document.addEventListener('alpine:init', () => {
+        // ── Modo carregando (§4.2 do guia_swipe_edicao_direta) ──
+        // Estado de "pegar" um exercício/bloco e mantê-lo enquanto navega até o destino.
+        Alpine.store('carry', {
+            tipo: null,           // 'exercicio' | 'bloco' | null
+            refExercicio: null,   // { treinoIdx, blocoIdx, ei, nome }
+            refBloco: null,       // { treinoIdx, blocoIdx, label }
+            origemLabel: null,    // string mostrada no pill flutuante
+
+            pegar(tipo, ref, label) {
+                this.tipo = tipo;
+                this.refExercicio = tipo === 'exercicio' ? ref : null;
+                this.refBloco = tipo === 'bloco' ? ref : null;
+                this.origemLabel = label;
+            },
+
+            soltar() {
+                this.tipo = null;
+                this.refExercicio = null;
+                this.refBloco = null;
+                this.origemLabel = null;
+            },
+
+            estaCarregandoExercicio(treinoIdx, blocoIdx, ei) {
+                return this.tipo === 'exercicio' &&
+                       this.refExercicio?.treinoIdx === treinoIdx &&
+                       this.refExercicio?.blocoIdx === blocoIdx &&
+                       this.refExercicio?.ei === ei;
+            },
+
+            estaCarregandoBloco(treinoIdx, blocoIdx) {
+                return this.tipo === 'bloco' &&
+                       this.refBloco?.treinoIdx === treinoIdx &&
+                       this.refBloco?.blocoIdx === blocoIdx;
+            },
+        });
+
+        // ── Highlight pós-mudança (§4.3): glow laranja pulsante de ~600ms no elemento recém-modificado ──
+        Alpine.store('highlight', {
+            ref: null,
+            hl(ref) {
+                this.ref = ref;
+                setTimeout(() => { if (this.ref === ref) this.ref = null; }, 600);
+            },
+        });
+    });
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
@@ -70,6 +125,15 @@
         body.layout-zebra .bloco-wrap { border-bottom: none; padding-top: 6px; padding-bottom: 6px; }
         body.layout-zebra .bloco-wrap:nth-of-type(even) { background: #f3f4f6; }
         body.layout-zebra .bloco-wrap:nth-of-type(odd)  { background: #fafbfc; }
+
+        /* ── Highlight pós-mudança (§4.3 guia_swipe_edicao_direta) — glow laranja pulsante de ~600ms ──
+           Disparado pelo store Alpine 'highlight' via :class="$store.highlight.ref === '<id>' && 'just-changed'".
+           Confirma visualmente QUAL elemento mudou, sem texto/toast/custo vertical. */
+        @keyframes just-changed-pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(232, 93, 4, 0.5); }
+            100% { box-shadow: 0 0 0 8px rgba(232, 93, 4, 0); }
+        }
+        .just-changed { animation: just-changed-pulse 600ms ease-out; }
 
         /* ── Swap mode (long-press mobile) ── */
         body.swap-mode { user-select: none; -webkit-user-select: none; }
@@ -2877,7 +2941,7 @@
         }
     </style>
 </head>
-<body class="bg-brand-50 text-gray-900 antialiased font-sans" data-active-page="{{ active_page or '' }}" style="background-image: url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.91  0 0 0 0 0.36  0 0 0 0 0.02  0 0 0 0.20 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>&quot;);">
+<body class="bg-brand-50 text-gray-900 antialiased font-sans" data-active-page="{{ active_page or '' }}" hx-ext="alpine-morph" style="background-image: url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.91  0 0 0 0 0.36  0 0 0 0 0.02  0 0 0 0.20 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>&quot;);">
 
 <!-- Lucide-style icon sprite (referenced via <svg class="icon"><use href="#i-..."/></svg>) -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
