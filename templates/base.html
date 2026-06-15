@@ -135,6 +135,32 @@
         }
         .just-changed { animation: just-changed-pulse 600ms ease-out; }
 
+        /* ── Pill flutuante do modo carregando (Frente B · §4.1) — dirigida por $store.carry ── */
+        [x-cloak] { display: none !important; }
+        .carry-pill {
+            position: fixed;
+            top: calc(env(safe-area-inset-top, 0px) + 10px);
+            left: 50%; transform: translateX(-50%);
+            z-index: 70;                 /* acima de bottom bar (40) e drawer (60) */
+            display: inline-flex; align-items: center; gap: 10px;
+            max-width: calc(100vw - 24px);
+            padding: 8px 10px 8px 14px;
+            background: var(--brand-500); color: white;
+            border-radius: 999px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            font-size: 13px; font-weight: 600;
+        }
+        .carry-pill-ico { width: 16px; height: 16px; flex-shrink: 0; }
+        .carry-pill-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .carry-pill-text strong { font-weight: 800; }
+        .carry-pill-cancel {
+            flex-shrink: 0; width: 26px; height: 26px; border-radius: 999px;
+            background: rgba(255,255,255,0.2); border: 0; color: white;
+            display: grid; place-items: center; cursor: pointer;
+        }
+        .carry-pill-cancel:hover { background: rgba(255,255,255,0.35); }
+        .carry-pill-cancel .icon { width: 14px; height: 14px; }
+
         /* ── Swap mode (long-press mobile) ── */
         body.swap-mode { user-select: none; -webkit-user-select: none; }
         body.swap-mode [data-swap-ex] { cursor: pointer; }
@@ -3176,6 +3202,18 @@
     </div>
 </div>
 
+<!-- Pill flutuante do modo carregando (Frente B · §4.1) — componente Alpine lendo $store.carry -->
+<div class="carry-pill" x-cloak x-data
+     x-show="$store.carry.tipo === 'exercicio'"
+     x-transition.opacity.duration.150ms
+     role="status" aria-live="polite">
+    <svg class="icon carry-pill-ico"><use href="#i-arrow-left-right"/></svg>
+    <span class="carry-pill-text">Trocando: <strong x-text="$store.carry.origemLabel"></strong></span>
+    <button type="button" class="carry-pill-cancel" @click="cancelSwapMode()" aria-label="Cancelar troca">
+        <svg class="icon"><use href="#i-x"/></svg>
+    </button>
+</div>
+
 <!-- Main content -->
 <main class="app-main lg:ml-[60px] pt-14 lg:pt-0 min-h-screen">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-7 pb-5 bg-gray-50 min-h-screen shadow-[0_0_0_1px_rgba(0,0,0,0.03)]">
@@ -3301,20 +3339,9 @@ document.addEventListener('click', async function(e) {
         return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     }
 
-    function showIndicator(source) {
-        hideIndicator();
-        const ind = document.createElement('div');
-        ind.className = 'swap-indicator';
-        ind.id = 'swap-indicator';
-        ind.innerHTML = '<span class="swap-indicator-text">Trocar com...</span>'
-            + '<button type="button" class="swap-indicator-cancel" aria-label="Cancelar"><svg class="icon"><use href="#i-x"/></svg></button>';
-        ind.querySelector('.swap-indicator-cancel').addEventListener('click', cancelSwapMode);
-        document.body.appendChild(ind);
-    }
-    function hideIndicator() {
-        const ind = document.getElementById('swap-indicator');
-        if (ind) ind.remove();
-    }
+    // A pill flutuante "Trocando: X" agora é um componente Alpine (markup no body)
+    // que lê $store.carry. Aqui só espelhamos o estado do gesto no store.
+    function carryStore() { return (window.Alpine && Alpine.store('carry')) || null; }
 
     function enterSwapMode(exEl) {
         cancelSwapMode(); // limpa estado prévio
@@ -3330,7 +3357,10 @@ document.addEventListener('click', async function(e) {
         };
         exEl.classList.add('swap-selected');
         document.body.classList.add('swap-mode');
-        showIndicator(swapSource);
+        const cs = carryStore();
+        if (cs) cs.pegar('exercicio',
+            { treinoIdx: swapSource.t, blocoIdx: swapSource.bi, ei: swapSource.ei, nome: swapSource.nome },
+            swapSource.nome);
         swapModeEnteredAt = Date.now();
         if (navigator.vibrate) try { navigator.vibrate(40); } catch(e) {}
     }
@@ -3339,7 +3369,8 @@ document.addEventListener('click', async function(e) {
         if (swapSource && swapSource.el) swapSource.el.classList.remove('swap-selected');
         swapSource = null;
         document.body.classList.remove('swap-mode');
-        hideIndicator();
+        const cs = carryStore();
+        if (cs) cs.soltar();
     }
     window.cancelSwapMode = cancelSwapMode;
 
@@ -3347,31 +3378,33 @@ document.addEventListener('click', async function(e) {
         if (!swapSource) return;
         const d = targetEl.dataset;
         const alunoId = d.alunoId;
-        const t = parseInt(d.treinoIdx, 10);
-        const bi = parseInt(d.blocoIdx, 10);
-        const ei = parseInt(d.ei, 10);
-        // Mesmo treino e mesmo aluno
-        if (alunoId !== swapSource.alunoId || t !== swapSource.t) {
-            cancelSwapMode();
-            return;
-        }
-        // Mesmo exercício: cancela
-        if (bi === swapSource.bi && ei === swapSource.ei) {
-            cancelSwapMode();
-            return;
-        }
-        const url = '/hub/rotina/' + alunoId + '/treino/' + t
-            + '/swap/' + swapSource.bi + '/' + swapSource.ei + '/' + bi + '/' + ei;
-        const targetSel = '#treino-' + t;
+        const tB = parseInt(d.treinoIdx, 10);
+        const biB = parseInt(d.blocoIdx, 10);
+        const eiB = parseInt(d.ei, 10);
+        // Aluno diferente não faz sentido (cards de outra rotina)
+        if (alunoId !== swapSource.alunoId) { cancelSwapMode(); return; }
+        // Mesmo exercício exato: cancela
+        if (tB === swapSource.t && biB === swapSource.bi && eiB === swapSource.ei) { cancelSwapMode(); return; }
+        const tA = swapSource.t, biA = swapSource.bi, eiA = swapSource.ei;
+        // Rota unificada (§6.2): intra quando tA==tB, inter caso contrário
+        const url = '/hub/rotina/' + alunoId + '/swap/'
+            + tA + '/' + biA + '/' + eiA + '/' + tB + '/' + biB + '/' + eiB;
         cancelSwapMode();
         fetch(url, { method: 'POST', headers: { 'HX-Request': 'true' } })
             .then(r => r.text())
             .then(html => {
-                const cardEl = document.querySelector(targetSel);
-                if (!cardEl) return;
                 const tmp = document.createElement('div');
                 tmp.innerHTML = html;
-                // Aplica OOB elements (banner, etc)
+                // Cada treino afetado vem em .swap-card-result[data-treino-idx] → roteia pro #treino-<t>
+                tmp.querySelectorAll('.swap-card-result').forEach(w => {
+                    const ti = w.dataset.treinoIdx;
+                    const cardEl = document.getElementById('treino-' + ti);
+                    if (cardEl) {
+                        cardEl.innerHTML = w.innerHTML;
+                        if (window.htmx) htmx.process(cardEl);
+                    }
+                });
+                // OOB restante (banner de rascunho)
                 tmp.querySelectorAll('[hx-swap-oob]').forEach(oob => {
                     const id = oob.id;
                     if (!id) return;
@@ -3380,8 +3413,8 @@ document.addEventListener('click', async function(e) {
                     if (existing) existing.replaceWith(oob);
                     else document.body.appendChild(oob);
                 });
-                cardEl.innerHTML = tmp.innerHTML;
-                if (window.htmx) htmx.process(cardEl);
+                // Highlight pulsante (§4.3) nas 2 posições trocadas (ambos os treinos)
+                highlightSwapped([{ t: tA, bi: biA, ei: eiA }, { t: tB, bi: biB, ei: eiB }]);
                 // Refetch bb-actions mobile (rascunho pode ter sido ativado e bb precisa
                 // mostrar Descartar/Atualizar/Salvar). Replica a lógica do listener
                 // htmx:afterSwap, que não dispara aqui pois usamos fetch puro.
@@ -3393,6 +3426,19 @@ document.addEventListener('click', async function(e) {
                 }
             })
             .catch(err => console.error('Swap falhou:', err));
+    }
+
+    // Highlight pulsante (§4.3): glow laranja de ~600ms nas posições recém-trocadas
+    function highlightSwapped(positions) {
+        positions.forEach(p => {
+            const sel = '[data-swap-ex][data-treino-idx="' + p.t + '"][data-bloco-idx="' + p.bi + '"][data-ei="' + p.ei + '"]';
+            const el = document.querySelector(sel);
+            if (!el) return;
+            el.classList.remove('just-changed');
+            void el.offsetWidth; // reinicia a animação
+            el.classList.add('just-changed');
+            setTimeout(() => el.classList.remove('just-changed'), 700);
+        });
     }
 
     function clearTimer() {

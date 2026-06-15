@@ -2813,6 +2813,72 @@ def hub_swap_visualizar(aluno_id, t, bi_a, ei_a, bi_b, ei_b):
     return card + render_draft_banner_oob(aluno_id)
 
 
+def _nomes_da_rotina_anterior(aluno):
+    """Conjunto de nomes de exercícios da rotina anterior (pra badge 'mantido')."""
+    nomes = set()
+    if not aluno:
+        return nomes
+    rot_ant = carregar_rotina_anterior(aluno["nome"], aluno.get("rotina_ativa_id"))
+    if rot_ant:
+        for s_dict in rot_ant["sessoes"]:
+            for b in s_dict["blocos"]:
+                for key in ("ex1", "ex2", "ex3"):
+                    ex = b.get(key)
+                    if ex:
+                        nomes.add(ex["nome"])
+    return nomes
+
+
+def _render_swap_cards(aluno_id, sessoes_dicts, indices):
+    """Renderiza os cards dos treinos afetados por um swap, cada um embrulhado
+    em .swap-card-result[data-treino-idx] (o JS roteia pro #treino-<t> certo),
+    + banner de rascunho OOB. Usado pelo swap unificado (intra e inter-treino)."""
+    aluno = next((a for a in carregar_alunos() if a["id"] == aluno_id), None)
+    nomes_anteriores = _nomes_da_rotina_anterior(aluno)
+    rotina_reg = carregar_rotina_ativa(aluno_id)
+    intent_atual = carregar_intent_rascunho(aluno_id)
+    publicada = [] if intent_atual == "nova-rotina" else (rotina_reg["sessoes"] if rotina_reg else [])
+    estados_rascunho = _estados_rascunho_por_posicao(sessoes_dicts, publicada)
+    parts = []
+    for t in indices:
+        sessao = _dict_to_sessao(sessoes_dicts[t])
+        card = render_template("_hub_treino_card.html", sessao=sessao, idx=t,
+                               aluno_id=aluno_id, nomes_anteriores=nomes_anteriores,
+                               estados_rascunho=estados_rascunho,
+                               padroes_labels=PADROES_LABELS)
+        parts.append(f'<div class="swap-card-result" data-treino-idx="{t}">{card}</div>')
+    return "".join(parts) + render_draft_banner_oob(aluno_id)
+
+
+@app.route("/hub/rotina/<int:aluno_id>/swap/<int:t_a>/<int:bi_a>/<int:ei_a>/<int:t_b>/<int:bi_b>/<int:ei_b>", methods=["POST"])
+def hub_swap_unificado(aluno_id, t_a, bi_a, ei_a, t_b, bi_b, ei_b):
+    """Swap atômico entre 2 exercícios — MESMO treino (t_a == t_b) ou ENTRE treinos.
+    Persiste como rascunho SEM ativar modo edição. Retorna 1 (intra) ou 2 (inter)
+    cards roteáveis + banner OOB. Sucessor unificado de hub_swap_visualizar (§6.2)."""
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts:
+        return '<div class="erro">Nenhuma rotina ativa.</div>', 404
+    n = len(sessoes_dicts)
+    if not (0 <= t_a < n and 0 <= t_b < n):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    for (t, bi, ei) in ((t_a, bi_a, ei_a), (t_b, bi_b, ei_b)):
+        blocos = sessoes_dicts[t]["blocos"]
+        if not (0 <= bi < len(blocos)):
+            return '<div class="erro">Bloco inválido.</div>', 400
+        if ei not in (0, 1, 2):
+            return '<div class="erro">Posição inválida.</div>', 400
+    if (t_a, bi_a, ei_a) == (t_b, bi_b, ei_b):
+        return '<div class="erro">Selecione um exercício diferente.</div>', 400
+    attrs = ("ex1", "ex2", "ex3")
+    a_attr, b_attr = attrs[ei_a], attrs[ei_b]
+    bloco_a = sessoes_dicts[t_a]["blocos"][bi_a]
+    bloco_b = sessoes_dicts[t_b]["blocos"][bi_b]
+    bloco_a[a_attr], bloco_b[b_attr] = bloco_b[b_attr], bloco_a[a_attr]
+    salvar_rascunho(aluno_id, sessoes_dicts)
+    indices = [t_a] if t_a == t_b else [t_a, t_b]
+    return _render_swap_cards(aluno_id, sessoes_dicts, indices)
+
+
 @app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/substituir-aleatorio/<int:bi>/<slot>", methods=["POST"])
 def hub_substituir_aleatorio(aluno_id, t, bi, slot):
     """Substitui um exercício por outro aleatório do mesmo padrão (ou da subregião,
