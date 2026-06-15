@@ -3193,6 +3193,26 @@
         .autosave-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--green-600); color: white; padding: 10px 16px; border-radius: 999px; font-size: 13px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 6px; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 70; }
         .autosave-toast.show { opacity: 1; }
 
+        /* Toast undo de remoção de bloco (§10.7) — acima da bottom bar no mobile */
+        .undo-toast {
+            position: fixed; left: 50%; transform: translateX(-50%) translateY(8px);
+            bottom: calc(var(--bb-height, 64px) + 14px + env(safe-area-inset-bottom, 0px));
+            display: none; align-items: center; gap: 14px;
+            background: var(--gray-900); color: white;
+            padding: 11px 12px 11px 18px; border-radius: 12px;
+            font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            max-width: calc(100vw - 28px); z-index: var(--z-bottom-bar, 80);
+            opacity: 0; transition: opacity 0.2s, transform 0.2s;
+        }
+        .undo-toast.show { display: flex; opacity: 1; transform: translateX(-50%) translateY(0); }
+        .undo-toast-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .undo-toast-btn {
+            flex-shrink: 0; background: transparent; border: 0; cursor: pointer;
+            color: var(--brand-300); font-weight: 800; font-size: 13px;
+            padding: 4px 10px; border-radius: 8px; -webkit-tap-highlight-color: transparent;
+        }
+        .undo-toast-btn:hover, .undo-toast-btn:active { background: rgba(255,255,255,0.12); color: white; }
+
         /* Icons (Lucide-style SVG symbols) */
         .icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; display: inline-block; vertical-align: middle; }
         .icon-sm { width: 14px; height: 14px; }
@@ -3569,7 +3589,11 @@ document.addEventListener('click', async function(e) {
 
     // Aplica resposta de operação estrutural HUB-viz (.swap-card-result + OOB) + highlight
     // + refetch da bb mobile. Exposto globalmente pra ser reusado pelo action sheet do exercício.
-    function applyStructuralResult(html, highlightPositions) {
+    function applyStructuralResult(html, highlightPositions, opts) {
+        // Invalidação do toast undo (§10.7): qualquer mutação estrutural na rotina
+        // expira o toast — exceto a própria reversão (isUndo). Autosave de prescrição
+        // não passa por aqui (usa hx-swap nativo), então não invalida, por construção.
+        if (!(opts && opts.isUndo) && window.expireBlocoUndoToast) window.expireBlocoUndoToast();
         const tmp = document.createElement('div');
         tmp.innerHTML = html;
         // Cada treino afetado vem em .swap-card-result[data-treino-idx] → roteia pro #treino-<t>
@@ -4351,6 +4375,12 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Toast global de autosave -->
 <div class="autosave-toast" id="autosave-toast"><svg class="icon"><use href="#i-check"/></svg> Prescrição salva</div>
 
+<!-- Toast undo de remoção de bloco (§10.7) — infra client-side reusável -->
+<div class="undo-toast" id="bloco-undo-toast" aria-live="polite">
+    <span class="undo-toast-msg" data-undo-msg>Bloco removido</span>
+    <button type="button" class="undo-toast-btn" data-undo-btn>Desfazer</button>
+</div>
+
 <!-- Drawer global de substituição -->
 <div class="subst-drawer-overlay" id="subst-drawer-overlay" onclick="closeSubstDrawer()"></div>
 <aside class="subst-drawer" id="subst-drawer" aria-hidden="true">
@@ -4871,6 +4901,70 @@ document.addEventListener('keydown', function(e) {
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && sheet.classList.contains('is-open')) close();
     });
+})();
+
+// ── Toast undo de remoção de bloco (§7.4 item 5 / §10.7) ──
+// Infra client-side reusável: remove direto, toast 5s com "Desfazer". Qualquer
+// mutação estrutural na janela expira o toast (via applyStructuralResult); o
+// undo reverte via blocos/inserir-existente com o snapshot do bloco cru.
+(function() {
+    const toast = document.getElementById('bloco-undo-toast');
+    if (!toast) return;
+    const msgEl = toast.querySelector('[data-undo-msg]');
+    const btn = toast.querySelector('[data-undo-btn]');
+    let timer = null;
+    let pending = null; // snapshot {aluno_id, t, posicao, bloco}
+
+    function hide() {
+        toast.classList.remove('show');
+        if (timer) { clearTimeout(timer); timer = null; }
+        pending = null;
+    }
+    // Expira sem reverter (remoção persiste). Chamado no topo de applyStructuralResult.
+    window.expireBlocoUndoToast = hide;
+
+    function show(snap) {
+        pending = snap;
+        const lbl = snap && snap.bloco && snap.bloco.label ? snap.bloco.label : '';
+        if (msgEl) msgEl.textContent = lbl ? ('Bloco ' + lbl + ' removido') : 'Bloco removido';
+        toast.classList.add('show');
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(hide, 5000);
+    }
+
+    if (btn) btn.addEventListener('click', function() {
+        if (!pending) { hide(); return; }
+        const snap = pending;
+        hide();
+        fetch('/hub/rotina/' + snap.aluno_id + '/treino/' + snap.t + '/blocos/inserir-existente', {
+            method: 'POST',
+            headers: { 'HX-Request': 'true', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ posicao: snap.posicao, bloco: snap.bloco }),
+        })
+            .then(r => r.text())
+            .then(html => {
+                if (window.applyStructuralResult) window.applyStructuralResult(html, null, { isUndo: true });
+                if (window.highlightBloco) window.highlightBloco(snap.t, snap.posicao);
+            })
+            .catch(err => console.error('Undo de bloco falhou:', err));
+    });
+
+    // Fluxo real de remoção (substitui o fallback definido no action sheet do bloco).
+    window.removerBlocoFlow = function(c) {
+        fetch('/hub/rotina/' + c.alunoId + '/treino/' + c.t + '/blocos/' + c.bi + '/remover',
+              { method: 'POST', headers: { 'HX-Request': 'true' } })
+            .then(r => r.text())
+            .then(html => {
+                // Extrai o snapshot ANTES de aplicar (applyStructuralResult ignora o <script> island)
+                let snap = null;
+                const tmp = document.createElement('div'); tmp.innerHTML = html;
+                const el = tmp.querySelector('#removed-bloco-snapshot');
+                if (el) { try { snap = JSON.parse(el.textContent); } catch (e) {} }
+                if (window.applyStructuralResult) window.applyStructuralResult(html, null);
+                if (snap) show(snap);
+            })
+            .catch(err => console.error('Remover bloco falhou:', err));
+    };
 })();
 </script>
 {% block scripts %}{% endblock %}

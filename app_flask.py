@@ -3158,10 +3158,14 @@ def hub_bloco_remover(aluno_id, t, bi):
     blocos = sessoes_dicts[t]["blocos"]
     if not (0 <= bi < len(blocos)):
         return '<div class="erro">Bloco inválido.</div>', 400
-    blocos.pop(bi)
+    removido = blocos.pop(bi)
     _relabel_blocos_dict(blocos)
     salvar_rascunho(aluno_id, sessoes_dicts)
-    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
+    # Snapshot do bloco CRU + posição original anexado pro toast undo (§10.7):
+    # o client guarda e reverte via blocos/inserir-existente se "Desfazer" for tocado.
+    snap = json.dumps({"aluno_id": aluno_id, "t": t, "posicao": bi, "bloco": removido})
+    snap_el = f'<script type="application/json" id="removed-bloco-snapshot">{snap}</script>'
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t]) + snap_el
 
 
 @app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/blocos/<int:bi>/mover-para/<int:pos>", methods=["POST"])
