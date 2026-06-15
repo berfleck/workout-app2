@@ -3,7 +3,8 @@ BF Treinamento — Versão Flask + HTMX (completa)
 """
 
 from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify, session
-import os, random, json, copy, io, zipfile, unicodedata, secrets
+from werkzeug.middleware.proxy_fix import ProxyFix
+import os, random, json, copy, io, zipfile, unicodedata, secrets, hashlib
 from dataclasses import replace as _dc_replace
 from pathlib import Path
 from datetime import datetime
@@ -36,6 +37,22 @@ from database import (
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "bf-treinamento-dev")
+# Atrás do proxy do Railway: honra X-Forwarded-Proto/Host pra url_for(_external=True)
+# gerar https://<dominio> correto (e não http://localhost). No-op rodando local.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# ── Link público permanente do aluno (pro WhatsApp) ──
+# Slug inadivinhável por aluno = hash(salt + aluno_id). O salt é SEGREDO e vem de
+# env (PUBLISH_SALT) em produção. O fallback abaixo é só dev local (dados de teste):
+# em produção PUBLISH_SALT é OBRIGATÓRIO, senão os slugs viram adivinháveis
+# (aluno_id é um inteiro pequeno).
+_PUBLISH_SALT = os.environ.get("PUBLISH_SALT") or "bf-dev-salt-local-apenas"
+
+def _slug_aluno(aluno_id):
+    return hashlib.sha256(f"{_PUBLISH_SALT}:aluno:{aluno_id}".encode()).hexdigest()[:16]
+
+def _aluno_por_slug(slug):
+    return next((a for a in carregar_alunos() if _slug_aluno(a["id"]) == slug), None)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1402,21 +1419,47 @@ def hub_rotina():
 
 @app.route("/hub/rotina/<int:aluno_id>/publicar", methods=["POST"])
 def hub_publicar_rotina(aluno_id):
-    """Publica a rotina ativa do aluno como página web (Cloudflare Pages) e
-    devolve o link pro trainer copiar. Feature de mídia (página do aluno)."""
-    import publicador
+    """Devolve o link público PERMANENTE do aluno (pro WhatsApp). O link é vivo:
+    sempre mostra a rotina ativa atual — não precisa republicar ao atualizar.
+    A página é servida pelo próprio app em /p/<slug> (sem Cloudflare/wrangler)."""
     alunos = carregar_alunos()
     aluno = next((a for a in alunos if a["id"] == aluno_id), None)
     rotina_reg = carregar_rotina_ativa(aluno_id)
     if not aluno or not rotina_reg:
         return ('<div class="text-sm text-red-600 mt-2">Nenhuma rotina publicada '
                 'para este aluno. Salve uma rotina antes.</div>')
-    try:
-        url = publicador.publicar_rotina(rotina_reg["id"], aluno_nome=aluno["nome"])
-    except publicador.PublicacaoErro as e:
-        return (f'<div class="text-sm text-red-600 mt-2">Não consegui publicar: '
-                f'{str(e)[:300]}</div>')
+    url = url_for("pagina_aluno_publica", slug=_slug_aluno(aluno_id), _external=True)
     return render_template("_publicar_link.html", url=url)
+
+
+def _pagina_simples(titulo, msg):
+    """HTML mínimo (marca BF) pros estados de erro da página pública do aluno."""
+    return (f"<!doctype html><html lang=pt-br><head><meta charset=utf-8>"
+            f"<meta name=viewport content='width=device-width,initial-scale=1'>"
+            f"<title>{titulo} — BF Treinamento</title></head>"
+            f"<body style='font-family:system-ui,-apple-system,sans-serif;background:#f9fafb;"
+            f"color:#374151;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0'>"
+            f"<div style='text-align:center;padding:2rem;max-width:340px'>"
+            f"<div style='font-size:2rem;font-weight:800;color:#e85d04;margin-bottom:.5rem'>BF</div>"
+            f"<h1 style='font-size:1.1rem;margin:.5rem 0'>{titulo}</h1>"
+            f"<p style='font-size:.9rem;color:#6b7280;margin:0'>{msg}</p></div></body></html>")
+
+
+@app.route("/p/<slug>")
+def pagina_aluno_publica(slug):
+    """Página pública e PERMANENTE do aluno (link pro WhatsApp). O slug mapeia
+    pro aluno; a página sempre reflete a ROTINA ATIVA atual dele (link vivo).
+    Não expõe rascunhos — só a rotina publicada."""
+    aluno = _aluno_por_slug(slug)
+    if not aluno:
+        return _pagina_simples("Página não encontrada",
+                               "Esse link não corresponde a nenhum aluno."), 404
+    reg = carregar_rotina_ativa(aluno["id"])
+    if not reg:
+        return _pagina_simples("Rotina indisponível",
+                               f"{aluno['nome']} ainda não tem uma rotina publicada.")
+    import pagina_aluno
+    return pagina_aluno.gerar_html_de_sessoes(reg["sessoes"], aluno["nome"])
 
 
 @app.route("/hub/rotina/<int:aluno_id>/treino/<int:treino_idx>", methods=["DELETE"])

@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Publicação da PÁGINA DO ALUNO no Cloudflare Pages (feature de mídia, Fase 2).
+"""[DEPRECADO desde 2026-06-14] Publicação via Cloudflare Pages/wrangler.
+
+Substituído por servir a página do aluno direto do Flask em `/p/<slug>`
+(rota `pagina_aluno_publica` em app_flask.py) — link permanente e vivo por
+aluno, sem Node/wrangler/Cloudflare. Este módulo virou código morto (nada o
+importa). Mantido como referência histórica; remover em cleanup futuro.
+
+Publicação da PÁGINA DO ALUNO no Cloudflare Pages (feature de mídia, Fase 2).
 
 Fluxo de `publicar_rotina(rotina_id)`:
   1. carrega a rotina (historico) + gera o HTML (pagina_aluno)
