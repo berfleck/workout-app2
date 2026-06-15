@@ -2,18 +2,18 @@
    - Repouso (tipo != 'bloco'): botão "+" pra inserir bloco na 'posicao'.
    - Carregando bloco do MESMO treino: drop zone "Soltar aqui", exceto nos 2
      gaps adjacentes ao bloco carregado (posicao == b ou b+1 = no-op). #}
-{% macro bloco_gap(t_idx, posicao) %}
+{% macro bloco_gap(t_idx, posicao, aluno) %}
 <div class="bloco-gap md:hidden" x-data
      :class="$store.carry.tipo === 'bloco' && $store.carry.refBloco && $store.carry.refBloco.treinoIdx === {{ t_idx }} && !($store.carry.refBloco.blocoIdx === {{ posicao }} || $store.carry.refBloco.blocoIdx === {{ posicao - 1 }}) && 'bloco-gap--armado'">
     <button type="button" class="bloco-gap-add"
             x-show="$store.carry.tipo !== 'bloco'"
-            data-insert-gap data-treino-idx="{{ t_idx }}" data-posicao="{{ posicao }}"
+            data-insert-gap data-aluno-id="{{ aluno }}" data-treino-idx="{{ t_idx }}" data-posicao="{{ posicao }}"
             aria-label="Inserir bloco aqui">
         <svg class="icon"><use href="#i-plus"/></svg>
     </button>
     <button type="button" class="bloco-gap-drop"
             x-show="$store.carry.tipo === 'bloco' && $store.carry.refBloco && $store.carry.refBloco.treinoIdx === {{ t_idx }} && !($store.carry.refBloco.blocoIdx === {{ posicao }} || $store.carry.refBloco.blocoIdx === {{ posicao - 1 }})"
-            data-drop-gap data-treino-idx="{{ t_idx }}" data-posicao="{{ posicao }}">
+            data-drop-gap data-aluno-id="{{ aluno }}" data-treino-idx="{{ t_idx }}" data-posicao="{{ posicao }}">
         <svg class="icon"><use href="#i-arrow-down"/></svg> Soltar aqui
     </button>
 </div>
@@ -79,7 +79,7 @@
         </div>
     </div>
     <div class="blocos-container">
-    {{ bloco_gap(idx, 0) }}
+    {{ bloco_gap(idx, 0, aluno_id) }}
     {% for bloco in sessao.blocos %}
     {% set bi = loop.index0 %}
     <div class="bloco-wrap" data-bloco-idx="{{ bi }}" data-bloco-label="{{ bloco.label }}"
@@ -129,7 +129,7 @@
     </div>
     {% endfor %}
     </div>
-    {{ bloco_gap(idx, bi + 1) }}
+    {{ bloco_gap(idx, bi + 1, aluno_id) }}
     {% endfor %}
     </div>
 </div>

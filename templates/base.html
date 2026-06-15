@@ -3329,14 +3329,15 @@
     </div>
 </div>
 
-<!-- Pill flutuante do modo carregando (Frente B · §4.1) — componente Alpine lendo $store.carry -->
+<!-- Pill flutuante do modo carregando (Frente B/C · §4.1) — componente Alpine lendo $store.carry.
+     Cobre exercício ("Trocando:") e bloco ("Movendo:") — §7.2. -->
 <div class="carry-pill" x-cloak x-data
-     x-show="$store.carry.tipo === 'exercicio'"
+     x-show="$store.carry.tipo === 'exercicio' || $store.carry.tipo === 'bloco'"
      x-transition.opacity.duration.150ms
      role="status" aria-live="polite">
-    <svg class="icon carry-pill-ico"><use href="#i-arrow-left-right"/></svg>
-    <span class="carry-pill-text">Trocando: <strong x-text="$store.carry.origemLabel"></strong></span>
-    <button type="button" class="carry-pill-cancel" @click="cancelSwapMode()" aria-label="Cancelar troca">
+    <svg class="icon carry-pill-ico"><use :href="$store.carry.tipo === 'bloco' ? '#i-grip-vertical' : '#i-arrow-left-right'"/></svg>
+    <span class="carry-pill-text"><span x-text="$store.carry.tipo === 'bloco' ? 'Movendo: ' : 'Trocando: '"></span><strong x-text="$store.carry.origemLabel"></strong></span>
+    <button type="button" class="carry-pill-cancel" @click="cancelSwapMode()" aria-label="Cancelar">
         <svg class="icon"><use href="#i-x"/></svg>
     </button>
 </div>
@@ -3461,6 +3462,8 @@ document.addEventListener('click', async function(e) {
     let pressTargetEl = null;
     let swapSource = null; // {alunoId, t, bi, ei, label, nome, el}
     let swapModeEnteredAt = 0; // timestamp pra ignorar click sintético pós-long-press
+    let carryBloco = null; // {alunoId, t, bi, label, el} — modo carregando BLOCO (§7.2)
+    let pressKind = null;  // 'ex' | 'bloco' — o que o long-press atual está mirando
 
     function isTouchDevice() {
         return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -3495,11 +3498,52 @@ document.addEventListener('click', async function(e) {
     function cancelSwapMode() {
         if (swapSource && swapSource.el) swapSource.el.classList.remove('swap-selected');
         swapSource = null;
+        if (carryBloco && carryBloco.el) carryBloco.el.classList.remove('bloco-is-carried');
+        carryBloco = null;
         document.body.classList.remove('swap-mode');
+        document.body.classList.remove('carry-bloco-mode');
         const cs = carryStore();
         if (cs) cs.soltar();
     }
     window.cancelSwapMode = cancelSwapMode;
+
+    // Long-press no handle ⠿ de um bloco → modo carregando bloco (reorder, §7.2).
+    function enterCarryBloco(handleEl) {
+        cancelSwapMode();
+        const d = handleEl.dataset;
+        const wrap = handleEl.closest('.bloco-wrap');
+        carryBloco = {
+            alunoId: wrap ? wrap.dataset.alunoId : null,
+            t: parseInt(d.treinoIdx, 10),
+            bi: parseInt(d.blocoIdx, 10),
+            label: d.blocoLabel || '',
+            el: wrap,
+        };
+        if (wrap) wrap.classList.add('bloco-is-carried');
+        document.body.classList.add('carry-bloco-mode');
+        const cs = carryStore();
+        if (cs) cs.pegar('bloco',
+            { treinoIdx: carryBloco.t, blocoIdx: carryBloco.bi, label: carryBloco.label },
+            'Bloco ' + carryBloco.label);
+        swapModeEnteredAt = Date.now();
+        if (navigator.vibrate) try { navigator.vibrate(40); } catch (e) {}
+    }
+    window.enterCarryBloco = enterCarryBloco;
+
+    // Tap num gap "Soltar aqui" completa a reordenação (intra-treino).
+    function performReorder(gapEl) {
+        if (!carryBloco) return;
+        const pos = parseInt(gapEl.dataset.posicao, 10);
+        const { alunoId, t, bi } = carryBloco;
+        cancelSwapMode();
+        const destino = pos <= bi ? pos : pos - 1; // espelha _mover_bloco_dict
+        const url = '/hub/rotina/' + alunoId + '/treino/' + t + '/blocos/' + bi + '/mover-para/' + pos;
+        fetch(url, { method: 'POST', headers: { 'HX-Request': 'true' } })
+            .then(r => r.text())
+            .then(html => { applyStructuralResult(html, null); highlightBloco(t, destino); })
+            .catch(err => console.error('Reorder falhou:', err));
+    }
+    window.performReorder = performReorder;
 
     function performSwap(targetEl) {
         if (!swapSource) return;
@@ -3570,31 +3614,48 @@ document.addEventListener('click', async function(e) {
     }
     window.highlightSwapped = highlightSwapped;
 
+    // Highlight pulsante de um BLOCO inteiro (reorder/inserir/regerar/adicionar).
+    function highlightBloco(t, bi) {
+        const sel = '.bloco-wrap[data-treino-idx="' + t + '"][data-bloco-idx="' + bi + '"]';
+        const el = document.querySelector(sel);
+        if (!el) return;
+        el.classList.remove('just-changed');
+        void el.offsetWidth;
+        el.classList.add('just-changed');
+        setTimeout(() => el.classList.remove('just-changed'), 700);
+    }
+    window.highlightBloco = highlightBloco;
+
     function clearTimer() {
         if (pressTimer) clearTimeout(pressTimer);
         pressTimer = null;
         pressStart = null;
         pressTargetEl = null;
+        pressKind = null;
     }
 
     document.addEventListener('touchstart', function(e) {
         if (e.touches.length !== 1) { clearTimer(); return; }
         // Tap dentro do popup não dispara nada (e não entra como long-press)
         if (e.target.closest('.ex-action-popup')) { clearTimer(); return; }
-        const ex = e.target.closest('[data-swap-ex]');
-        if (!ex) return;
-        // Não dispara em cliques em controles internos (botões, links, inputs)
-        if (e.target.closest('button, a, input, textarea, select, .drag-handle')) return;
+        // O handle ⠿ do bloco tem PRECEDÊNCIA sobre o exercício (§9 caso f): se o
+        // toque pousa nele, mira o bloco; senão, mira o exercício como antes.
+        const blocoHandle = e.target.closest('[data-carry-bloco]');
+        const ex = blocoHandle ? null : e.target.closest('[data-swap-ex]');
+        if (!blocoHandle && !ex) return;
+        // Não dispara em controles internos — mas o handle (span) é um alvo válido.
+        if (!blocoHandle && e.target.closest('button, a, input, textarea, select, .drag-handle')) return;
         pressStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        pressTargetEl = ex;
+        pressTargetEl = blocoHandle || ex;
+        pressKind = blocoHandle ? 'bloco' : 'ex';
         pressTimer = setTimeout(function() {
-            // Long-press completou (§7.1: long-press = modo carregando direto):
-            // - Já carregando → completa o swap (atalho).
-            // - Senão → entra em modo carregando (carry). O tap curto é que abre o menu.
-            if (swapSource && pressTargetEl) {
-                performSwap(pressTargetEl);
+            // Long-press completou (§7.1/§7.2: long-press = modo carregando direto):
+            if (pressKind === 'bloco') {
+                enterCarryBloco(pressTargetEl);
+            } else if (swapSource && pressTargetEl) {
+                performSwap(pressTargetEl);          // já carregando ex → completa o swap
             } else if (pressTargetEl) {
-                enterSwapMode(pressTargetEl);
+                enterSwapMode(pressTargetEl);        // entra em modo carregando ex
             }
             clearTimer();
         }, LONG_PRESS_MS);
@@ -3611,7 +3672,15 @@ document.addEventListener('click', async function(e) {
     document.addEventListener('touchcancel', clearTimer, { passive: true });
 
     document.addEventListener('click', function(e) {
-        // ── Modo carregando ativo: tap completa ou cancela o swap ──
+        // ── Modo carregando BLOCO ativo: tap num gap reposiciona; fora cancela ──
+        if (carryBloco) {
+            if (Date.now() - swapModeEnteredAt < 400) return; // ignora click sintético pós-long-press
+            const drop = e.target.closest('[data-drop-gap]');
+            if (drop) { e.preventDefault(); performReorder(drop); return; }
+            if (!e.target.closest('.carry-pill')) cancelSwapMode();
+            return;
+        }
+        // ── Modo carregando EXERCÍCIO ativo: tap completa ou cancela o swap ──
         if (swapSource) {
             // Ignora click sintético gerado pelo touchend logo após o long-press que entrou em carry
             if (Date.now() - swapModeEnteredAt < 400) return;
@@ -3626,8 +3695,28 @@ document.addEventListener('click', async function(e) {
             performSwap(ex);
             return;
         }
-        // ── Fora de modo carregando: tap curto num exercício abre o action sheet (mobile) ──
+        // ── Fora de modo carregando (mobile) ──
         if (!window.matchMedia('(max-width: 768px)').matches) return;
+        // Tap no "+" de um gap → abre o picker pra inserir bloco naquela posição
+        const insGap = e.target.closest('[data-insert-gap]');
+        if (insGap && typeof window.openBlocoPicker === 'function') {
+            e.preventDefault();
+            window.openBlocoPicker({
+                modo: 'inserir',
+                alunoId: insGap.dataset.alunoId,
+                t: parseInt(insGap.dataset.treinoIdx, 10),
+                posicao: parseInt(insGap.dataset.posicao, 10),
+            });
+            return;
+        }
+        // Tap no mini-kebab do bloco → action sheet do bloco
+        const blocoKebab = e.target.closest('[data-open-bloco-kebab]');
+        if (blocoKebab && typeof window.openBlocoSheet === 'function') {
+            e.preventDefault();
+            window.openBlocoSheet(blocoKebab);
+            return;
+        }
+        // Tap curto num exercício abre o action sheet do exercício
         if (typeof window.openExSheet !== 'function') return;
         const exTap = e.target.closest('[data-swap-ex]');
         if (!exTap) return;
@@ -3638,12 +3727,15 @@ document.addEventListener('click', async function(e) {
 
     // ESC cancela (desktop)
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && swapSource) cancelSwapMode();
+        if (e.key === 'Escape' && (swapSource || carryBloco)) cancelSwapMode();
     });
 
     // Cancela ao trocar de página/HTMX swap que remove os elementos
     document.body.addEventListener('htmx:beforeSwap', function(evt) {
         if (swapSource && swapSource.el && !document.body.contains(swapSource.el)) {
+            cancelSwapMode();
+        }
+        if (carryBloco && carryBloco.el && !document.body.contains(carryBloco.el)) {
             cancelSwapMode();
         }
     });
@@ -4612,6 +4704,170 @@ document.addEventListener('keydown', function(e) {
         }
     });
 
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sheet.classList.contains('is-open')) close();
+    });
+})();
+</script>
+<script>
+// ── Action sheet do BLOCO (tap no mini-kebab · Frente C parte 2 · §7.4) ──
+(function() {
+    const sheet = document.getElementById('bloco-action-sheet');
+    if (!sheet) return;
+    const titleEl = sheet.querySelector('[data-bloco-sheet-title]');
+    let ctx = null;
+
+    function open(kebabEl) {
+        const d = kebabEl.dataset;
+        ctx = {
+            alunoId: d.alunoId,
+            t: parseInt(d.treinoIdx, 10),
+            bi: parseInt(d.blocoIdx, 10),
+            label: d.blocoLabel || '',
+        };
+        if (titleEl) titleEl.textContent = 'Bloco ' + ctx.label;
+        sheet.classList.add('is-open');
+        sheet.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('sheet-open');
+        if (navigator.vibrate) try { navigator.vibrate(20); } catch (e) {}
+    }
+    function close() {
+        sheet.classList.remove('is-open');
+        sheet.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('sheet-open');
+        ctx = null;
+    }
+    window.openBlocoSheet = open;
+
+    function postBloco(url, t, bi) {
+        close();
+        fetch(url, { method: 'POST', headers: { 'HX-Request': 'true' } })
+            .then(r => r.text())
+            .then(html => {
+                if (window.applyStructuralResult) window.applyStructuralResult(html, null);
+                if (window.highlightBloco) window.highlightBloco(t, bi);
+            })
+            .catch(err => console.error('Ação do bloco falhou:', err));
+    }
+    // Sobrescrito no Commit 4 (toast undo). Fallback: remoção direta sem undo.
+    window.removerBlocoFlow = window.removerBlocoFlow || function(c) {
+        postBloco('/hub/rotina/' + c.alunoId + '/treino/' + c.t + '/blocos/' + c.bi + '/remover', c.t, Math.max(0, c.bi - 1));
+    };
+
+    sheet.addEventListener('click', function(e) {
+        if (e.target === sheet || e.target.closest('[data-bloco-sheet-close]')) { close(); return; }
+        const actBtn = e.target.closest('[data-bloco-action]');
+        if (!actBtn || !ctx) return;
+        const action = actBtn.dataset.blocoAction;
+        const c = ctx;
+        if (action === 'adicionar') {
+            close();
+            if (window.openBlocoPicker) window.openBlocoPicker({ modo: 'adicionar', alunoId: c.alunoId, t: c.t, bi: c.bi });
+        } else if (action === 'mover') {
+            close();
+            // Entra em modo carregando bloco via o handle do próprio bloco
+            const handle = document.querySelector('.bloco-wrap[data-treino-idx="' + c.t + '"][data-bloco-idx="' + c.bi + '"] [data-carry-bloco]');
+            if (handle && window.enterCarryBloco) window.enterCarryBloco(handle);
+        } else if (action === 'regerar') {
+            postBloco('/hub/rotina/' + c.alunoId + '/treino/' + c.t + '/bloco/' + c.bi + '/regerar', c.t, c.bi);
+        } else if (action === 'remover') {
+            close();
+            window.removerBlocoFlow(c);
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sheet.classList.contains('is-open')) close();
+    });
+})();
+
+// ── Picker de inserir/adicionar bloco (multi-select 1-2 · §7.3/§10.3) ──
+(function() {
+    const sheet = document.getElementById('bloco-picker-sheet');
+    if (!sheet) return;
+    const eyebrow = sheet.querySelector('[data-picker-eyebrow]');
+    const title   = sheet.querySelector('[data-picker-title]');
+    const rows    = sheet.querySelector('[data-picker-rows]');
+    const search  = sheet.querySelector('[data-picker-search]');
+    const hint    = sheet.querySelector('[data-picker-hint]');
+    const confirm = sheet.querySelector('[data-picker-confirm]');
+    let ctx = null;     // {modo, alunoId, t, posicao?, bi?}
+    let maxSel = 2;
+
+    function open(c) {
+        ctx = c;
+        maxSel = c.modo === 'inserir' ? 2 : 1;
+        if (eyebrow) eyebrow.textContent = c.modo === 'inserir' ? 'Novo bloco' : 'Adicionar ao bloco';
+        if (title) title.textContent = c.modo === 'inserir' ? 'Escolher 1 ou 2 exercícios' : 'Escolher exercício';
+        if (search) search.value = '';
+        if (rows) rows.innerHTML = '<div class="drawer-count" style="text-align:center; padding:24px; color:var(--gray-500); text-transform:none; letter-spacing:0">Digite pra buscar.</div>';
+        updateState();
+        sheet.classList.add('is-open');
+        sheet.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('sheet-open');
+        setTimeout(() => { if (search) search.focus(); }, 120);
+    }
+    function close() {
+        sheet.classList.remove('is-open');
+        sheet.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('sheet-open');
+        ctx = null;
+    }
+    window.openBlocoPicker = open;
+
+    function selecionados() {
+        return Array.from(rows.querySelectorAll('.cand-row.selected'));
+    }
+    function updateState() {
+        const n = selecionados().length;
+        if (confirm) {
+            confirm.disabled = n < 1;
+            confirm.textContent = n > 1 ? 'Adicionar (' + n + ')' : 'Adicionar';
+        }
+        if (hint) hint.textContent = maxSel > 1 ? (n + '/' + maxSel + ' selecionado' + (n === 1 ? '' : 's')) : (n ? '1 selecionado' : '');
+    }
+
+    // Seleção multi por delegação (até maxSel; em maxSel=1 substitui)
+    rows.addEventListener('click', function(e) {
+        const row = e.target.closest('.cand-row[data-picker-row]');
+        if (!row) return;
+        if (row.classList.contains('selected')) {
+            row.classList.remove('selected');
+        } else if (selecionados().length < maxSel) {
+            row.classList.add('selected');
+        } else if (maxSel === 1) {
+            selecionados().forEach(r => r.classList.remove('selected'));
+            row.classList.add('selected');
+        }
+        updateState();
+    });
+    // Cada busca repinta as linhas → zera seleção/estado
+    rows.addEventListener('htmx:afterSwap', updateState);
+
+    if (confirm) confirm.addEventListener('click', function() {
+        if (!ctx) return;
+        const nomes = selecionados().map(r => r.dataset.nome);
+        if (!nomes.length) return;
+        const url = ctx.modo === 'inserir'
+            ? '/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.t + '/blocos/inserir/' + ctx.posicao
+            : '/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.t + '/blocos/' + ctx.bi + '/adicionar';
+        const alvoBi = ctx.modo === 'inserir' ? ctx.posicao : ctx.bi;
+        const t = ctx.t;
+        const fd = new FormData();
+        nomes.forEach(nm => fd.append('exercicios', nm));
+        close();
+        fetch(url, { method: 'POST', headers: { 'HX-Request': 'true' }, body: fd })
+            .then(r => r.text())
+            .then(html => {
+                if (window.applyStructuralResult) window.applyStructuralResult(html, null);
+                if (window.highlightBloco) window.highlightBloco(t, alvoBi);
+            })
+            .catch(err => console.error('Inserir/adicionar bloco falhou:', err));
+    });
+
+    sheet.addEventListener('click', function(e) {
+        if (e.target === sheet || e.target.closest('[data-picker-close]')) close();
+    });
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && sheet.classList.contains('is-open')) close();
     });
