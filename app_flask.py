@@ -3354,6 +3354,19 @@ def buscar_exercicios():
         html += "<p class='meta-count'>Nenhum encontrado.</p>"
     return html
 
+
+@app.route("/buscar-exercicios-picker")
+def buscar_exercicios_picker():
+    """Linhas multi-select pro picker de inserir/adicionar bloco (Frente C parte 2).
+    Mesma busca de /buscar-exercicios, mas renderiza _bloco_picker_rows.html
+    (seleção é client-side). Limita a 60 resultados pra não estourar o sheet."""
+    texto = request.args.get("texto", "").strip()
+    if not texto:
+        return '<div class="drawer-count" style="text-align:center; padding:24px; color:var(--gray-500); text-transform:none; letter-spacing:0">Digite pra buscar.</div>'
+    cands = filtrar_banco(texto=texto)[:60]
+    return render_template("_bloco_picker_rows.html", cands=cands)
+
+
 # ══════════════════════════════════════════════════════════════
 # ROTAS — PNG / ZIP DOWNLOAD
 # ══════════════════════════════════════════════════════════════

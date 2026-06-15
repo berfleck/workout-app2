@@ -1,3 +1,23 @@
+{# Gap entre blocos (Sub-PR 5 · §7.2/§7.3): dupla função via $store.carry.
+   - Repouso (tipo != 'bloco'): botão "+" pra inserir bloco na 'posicao'.
+   - Carregando bloco do MESMO treino: drop zone "Soltar aqui", exceto nos 2
+     gaps adjacentes ao bloco carregado (posicao == b ou b+1 = no-op). #}
+{% macro bloco_gap(t_idx, posicao) %}
+<div class="bloco-gap md:hidden" x-data
+     :class="$store.carry.tipo === 'bloco' && $store.carry.refBloco && $store.carry.refBloco.treinoIdx === {{ t_idx }} && !($store.carry.refBloco.blocoIdx === {{ posicao }} || $store.carry.refBloco.blocoIdx === {{ posicao - 1 }}) && 'bloco-gap--armado'">
+    <button type="button" class="bloco-gap-add"
+            x-show="$store.carry.tipo !== 'bloco'"
+            data-insert-gap data-treino-idx="{{ t_idx }}" data-posicao="{{ posicao }}"
+            aria-label="Inserir bloco aqui">
+        <svg class="icon"><use href="#i-plus"/></svg>
+    </button>
+    <button type="button" class="bloco-gap-drop"
+            x-show="$store.carry.tipo === 'bloco' && $store.carry.refBloco && $store.carry.refBloco.treinoIdx === {{ t_idx }} && !($store.carry.refBloco.blocoIdx === {{ posicao }} || $store.carry.refBloco.blocoIdx === {{ posicao - 1 }})"
+            data-drop-gap data-treino-idx="{{ t_idx }}" data-posicao="{{ posicao }}">
+        <svg class="icon"><use href="#i-arrow-down"/></svg> Soltar aqui
+    </button>
+</div>
+{% endmacro %}
 {# Nome customizado existe quando o usuário digitou um label proprio (sessao.tipo
    sem ' + ' e diferente de 'manual'); senão exibimos "Treino N". #}
 {% set _tipo = sessao.tipo if sessao else None %}
@@ -59,9 +79,22 @@
         </div>
     </div>
     <div class="blocos-container">
+    {{ bloco_gap(idx, 0) }}
     {% for bloco in sessao.blocos %}
     {% set bi = loop.index0 %}
-    <div class="bloco-wrap" data-bloco-idx="{{ bi }}" data-bloco-label="{{ bloco.label }}">
+    <div class="bloco-wrap" data-bloco-idx="{{ bi }}" data-bloco-label="{{ bloco.label }}"
+         data-aluno-id="{{ aluno_id }}" data-treino-idx="{{ idx }}">
+        {# Overlay de ferramentas do bloco (§3.3: zero pixel vertical — absoluto no
+           canto sup. direito). Handle ⠿ = long-press pra reordenar; kebab … = menu. #}
+        <div class="bloco-tools md:hidden">
+            <span class="bloco-handle" data-carry-bloco
+                  data-treino-idx="{{ idx }}" data-bloco-idx="{{ bi }}" data-bloco-label="{{ bloco.label }}"
+                  aria-label="Mover bloco (segure)"><svg class="icon"><use href="#i-grip-vertical"/></svg></span>
+            <button type="button" class="bloco-kebab" data-open-bloco-kebab
+                    data-aluno-id="{{ aluno_id }}" data-treino-idx="{{ idx }}"
+                    data-bloco-idx="{{ bi }}" data-bloco-label="{{ bloco.label }}"
+                    aria-label="Ações do bloco"><svg class="icon"><use href="#i-more-vertical"/></svg></button>
+        </div>
     {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
     {% set ei = loop.index0 %}
     {% set estado = estados_rascunho.get((idx, bloco.label, ei)) if estados_rascunho is defined and estados_rascunho else None %}
@@ -96,6 +129,7 @@
     </div>
     {% endfor %}
     </div>
+    {{ bloco_gap(idx, bi + 1) }}
     {% endfor %}
     </div>
 </div>

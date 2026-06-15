@@ -750,7 +750,64 @@
 
             /* Fundo levemente mais frio no modo anterior (§5.3) */
             body[data-active-page="hub"].hub-periodo-anterior main.app-main > div { background: #eef1f4; }
+
+            /* ── Ferramentas do bloco (Sub-PR 5 · §3.3 zero pixel vertical) ──
+               Overlay absoluto no canto sup. direito do .bloco-wrap. */
+            .hub-swipe-on .hub-swipe-track .bloco-wrap { position: relative; }
+            .bloco-tools {
+                position: absolute; top: 1px; right: calc(var(--hub-inset) - 6px);
+                display: flex; align-items: center; gap: 2px; z-index: 3;
+            }
+            .bloco-handle, .bloco-kebab {
+                width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+                color: var(--gray-400); background: transparent; border: 0; cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .bloco-handle .icon, .bloco-kebab .icon { width: 15px; height: 15px; }
+            .bloco-handle { touch-action: none; cursor: grab; }
+            .bloco-handle:active { color: var(--brand-500); }
+            .bloco-kebab:active { background: var(--gray-100); color: var(--gray-700); }
+            /* Bloco sendo carregado pra reorder: esmaecido + borda tracejada */
+            body.carry-bloco-mode .bloco-wrap.bloco-is-carried { opacity: 0.5; outline: 1.5px dashed var(--brand-500); outline-offset: -2px; }
+
+            /* ── Gaps entre blocos (dual-mode: inserir "+" / drop "Soltar aqui") ── */
+            .bloco-gap {
+                position: relative; height: 0;
+                display: flex; align-items: center; justify-content: center;
+            }
+            /* Faixa de toque do "+": ~18px sobre a borda, sem empurrar layout (margem negativa) */
+            .bloco-gap-add {
+                margin: -9px 0; height: 18px; min-width: 44px;
+                display: inline-flex; align-items: center; justify-content: center;
+                background: transparent; border: 0; color: var(--gray-300); cursor: pointer;
+                z-index: 4; -webkit-tap-highlight-color: transparent;
+            }
+            .bloco-gap-add .icon { width: 15px; height: 15px; }
+            .bloco-gap-add:active { color: var(--brand-500); }
+            /* Drop zone: ocupa pixel (não é repouso) — linha + chip "Soltar aqui" */
+            .bloco-gap--armado { height: 40px; margin: 4px 0; }
+            .bloco-gap-drop {
+                display: inline-flex; align-items: center; gap: 6px;
+                font-size: 12px; font-weight: 700; color: var(--brand-600);
+                background: var(--brand-50); border: 1.5px dashed var(--brand-500);
+                border-radius: 999px; padding: 5px 14px; cursor: pointer;
+                animation: bbSheetFade 0.18s ease; -webkit-tap-highlight-color: transparent;
+            }
+            .bloco-gap-drop .icon { width: 14px; height: 14px; }
+            .bloco-gap-drop:active { background: var(--brand-100); }
         }
+
+        /* ── Picker de inserir/adicionar bloco (sheet mobile) ── */
+        .sheet-overlay--tall .sheet { max-height: 86vh; }
+        .picker-search { padding: 4px 14px 8px; border-bottom: 1px solid var(--gray-100); }
+        .picker-search .input-field { width: 100%; }
+        .picker-footer {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+            border-top: 1px solid var(--gray-100); background: white;
+        }
+        .picker-hint { font-size: 12px; color: var(--gray-500); }
+        .picker-footer .btn-primary:disabled { opacity: 0.45; cursor: default; }
 
         /* ── Bottom bar contextual (≤768px) ── redesign 02 ── */
         .bb { display: none; }
@@ -4196,6 +4253,8 @@ document.addEventListener('DOMContentLoaded', function() {
 {% include "_mobile_nav_sheet.html" %}
 {% include "_mobile_treino_kebab_sheet.html" %}
 {% include "_mobile_ex_action_sheet.html" %}
+{% include "_mobile_bloco_action_sheet.html" %}
+{% include "_mobile_bloco_picker.html" %}
 
 <!-- Toast global de autosave -->
 <div class="autosave-toast" id="autosave-toast"><svg class="icon"><use href="#i-check"/></svg> Prescrição salva</div>

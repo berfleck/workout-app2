@@ -1,0 +1,47 @@
+{# Action sheet global do BLOCO (Frente C parte 2 · §7.4). Único elemento; o tap
+   no mini-kebab … popula o contexto (aluno/treino/bi/label) via JS. Ações:
+   Adicionar exercício / Mover bloco (entra em carry) / Regerar / Remover (toast undo). #}
+<div class="sheet-overlay" id="bloco-action-sheet" data-bloco-sheet aria-hidden="true">
+    <div class="sheet" role="dialog" aria-label="Ações do bloco">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Bloco</div>
+                <div class="sheet-title" data-bloco-sheet-title>—</div>
+            </div>
+            <button type="button" class="sheet-close" data-bloco-sheet-close aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <div class="sheet-list">
+            <button type="button" class="sheet-item" data-bloco-action="adicionar">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-plus"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Adicionar exercício</div>
+                    <div class="sheet-item-sub">Expandir o bloco (até 3)</div>
+                </div>
+            </button>
+            <button type="button" class="sheet-item" data-bloco-action="mover">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-grip-vertical"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Mover bloco</div>
+                    <div class="sheet-item-sub">Toque entre dois blocos pra reposicionar</div>
+                </div>
+            </button>
+            <button type="button" class="sheet-item" data-bloco-action="regerar">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-refresh-cw"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Regerar bloco</div>
+                    <div class="sheet-item-sub">Sortear novos exercícios dos mesmos padrões</div>
+                </div>
+            </button>
+            <div class="sheet-divider"></div>
+            <button type="button" class="sheet-item danger" data-bloco-action="remover">
+                <div class="sheet-item-icon"><svg class="icon"><use href="#i-trash"/></svg></div>
+                <div class="sheet-item-text">
+                    <div class="sheet-item-title">Remover bloco</div>
+                </div>
+            </button>
+        </div>
+    </div>
+</div>

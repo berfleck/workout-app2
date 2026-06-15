@@ -1,0 +1,31 @@
+{# Picker bottom-sheet de exercícios pra inserir/adicionar bloco (§7.3/§10.3).
+   Multi-seleção 1-2 (inserir) ou 1 (adicionar). O JS do picker (base.html) abre
+   com contexto, define o cap de seleção e o URL de destino, e ao confirmar posta
+   exercicios[] → applyStructuralResult. A busca usa HTMX (GET /buscar-exercicios-picker). #}
+<div class="sheet-overlay sheet-overlay--tall" id="bloco-picker-sheet" data-bloco-picker aria-hidden="true">
+    <div class="sheet" role="dialog" aria-label="Escolher exercícios">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow" data-picker-eyebrow>Novo bloco</div>
+                <div class="sheet-title" data-picker-title>Escolher exercícios</div>
+            </div>
+            <button type="button" class="sheet-close" data-picker-close aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <div class="picker-search">
+            <input type="search" class="input-field" name="texto" placeholder="Buscar exercício pelo nome…"
+                   data-picker-search autocomplete="off"
+                   hx-get="/buscar-exercicios-picker" hx-target="#bloco-picker-rows" hx-swap="innerHTML"
+                   hx-trigger="input changed delay:300ms, search">
+        </div>
+        <div class="sheet-list" id="bloco-picker-rows" data-picker-rows>
+            <div class="drawer-count" style="text-align:center; padding:24px; color:var(--gray-500); text-transform:none; letter-spacing:0">Digite pra buscar.</div>
+        </div>
+        <div class="picker-footer">
+            <span class="picker-hint" data-picker-hint></span>
+            <button type="button" class="btn btn-primary" data-picker-confirm disabled>Adicionar</button>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,24 @@
+{# Linhas do picker de inserir/adicionar bloco (Frente C parte 2 · §7.3/§10.3).
+   Multi-seleção (até 2 no inserir, 1 no adicionar) é client-side: o JS do picker
+   alterna .selected por delegação em #bloco-picker-rows. Visual reusa .cand-row. #}
+{% set purpose_pt = {'compound':'composto','isolation':'isolado','stability':'estabilidade','explosive':'explosivo'} %}
+<div class="drawer-count">{{ cands|length }} candidato{{ '' if cands|length == 1 else 's' }}</div>
+{% for e in cands %}
+{% set equip = e.eq_primario or '' %}
+{% if e.eq_secundario %}{% set equip = (equip ~ ' + ' ~ e.eq_secundario) if equip else e.eq_secundario %}{% endif %}
+<div class="cand-row" data-picker-row data-nome="{{ e.nome }}">
+    <div class="cand-radio"></div>
+    <div class="cand-info">
+        <div class="cand-nome">{{ e.nome }}</div>
+        <div class="cand-meta">
+            {% if e.purpose %}<span class="meta-chip purpose">{{ purpose_pt.get(e.purpose, e.purpose) }}</span>{% endif %}
+            {% if equip %}<span class="meta-chip equip">{{ equip }}</span>{% endif %}
+            {% if e.unilateral %}<span class="meta-chip lateralidade">{{ e.unilateral }}</span>{% endif %}
+            {% if e.fadiga and e.fadiga >= 4 %}<span class="meta-chip fadiga">{{ e.fadiga }}</span>{% endif %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% if not cands %}
+<div class="drawer-count" style="text-align:center; padding:24px; color:var(--gray-500); text-transform:none; letter-spacing:0">Nenhum exercício encontrado.</div>
+{% endif %}
