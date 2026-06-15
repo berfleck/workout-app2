@@ -4,5 +4,4 @@ openpyxl
 pillow
 gunicorn
 pyyaml
-requests
 ortools==9.15.6755

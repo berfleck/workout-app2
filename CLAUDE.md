@@ -507,10 +507,8 @@ gerar_imagem.py           — Exportação PNG (Pillow + DejaVu)
 banco_exercicios.xlsx     — Banco de exercícios (aba "Exercícios")
 
 # Página do aluno (feature de mídia)
-pagina_aluno.py                — Gerador de página HTML standalone mobile-first (tap-to-play)
-publicador.py                  — Deploy via wrangler → Cloudflare Pages (slug inadivinhável)
+pagina_aluno.py                — Gerador de página HTML standalone mobile-first (tap-to-play); servida em GET /p/<slug>
 midia_exercicios.json          — Catálogo de mídia: nome→{img0,img1,youtube?} (runtime, commitado)
-cloudflare_config.example.json — Exemplo de config (cloudflare_config.json é gitignorado — SEGREDO)
 
 tools/
   gerar_mapeamento_midia.py    — Curadoria de imagens: HTML interativo (Trilha 1, concluída)
@@ -549,7 +547,7 @@ templates/
   _mobile_treino_kebab_sheet.html — Action sheet do kebab do treino card (Editar/Substituir/PNG/Remover)
   _mobile_bb_actions_hub.html   — Slot direito da bb no HUB (estados: vazio/visualizando/rascunho/edição)
 
-Gerados (gitignored): bf_treinamento.db, sessoes_salvas.json, publicado/, cloudflare_config.json,
+Gerados (gitignored): bf_treinamento.db, sessoes_salvas.json,
   tools/curadoria_video.html, tools/escolhas_youtube.json
 ```
 
@@ -661,8 +659,9 @@ servido pelo próprio app** (`/p/<slug>`, no Railway). Botão "Ver" por exercíc
 - `POST /hub/rotina/<aluno_id>/publicar` agora só devolve o link permanente (`url_for(..., _external=True)`,
   `ProxyFix` garante https atrás do proxy do Railway). Botão "Link do aluno" em `_rotina_hub.html`
   (só quando `rotina and not eh_rascunho`). Partial `_publicar_link.html` (link + Copiar + Abrir).
-- `publicador.py` (deploy via wrangler→Cloudflare Pages) está **DEPRECADO** — código morto, nada
-  o importa. Mantido só como referência histórica; remover em cleanup futuro.
+- `publicador.py` (deploy via wrangler→Cloudflare Pages) foi **REMOVIDO** no cleanup de 2026-06-14,
+  junto de `cloudflare_config.example.json` e da dependência `requests`. Servir pelo Flask tornou
+  a hospedagem externa desnecessária. Histórico do fluxo Cloudflare fica no git.
 
 ### Workflow de curadoria de YouTube (Trilha 3A)
 ```

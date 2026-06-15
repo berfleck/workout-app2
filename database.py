@@ -8,7 +8,7 @@ from pathlib import Path
 # DATA_DIR: diretório dos dados mutáveis (DB, JSONs de sessão, páginas publicadas).
 # Default = pasta do projeto → comportamento local inalterado. Em produção
 # (Railway), setar DATA_DIR=/data (volume persistente) pra os dados sobreviverem
-# a cada redeploy. Fonte única — app_flask e publicador referenciam este valor.
+# a cada redeploy. Fonte única — app_flask e pagina_aluno referenciam este valor.
 DATA_DIR = Path(os.environ.get("DATA_DIR") or Path(__file__).resolve().parent)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
