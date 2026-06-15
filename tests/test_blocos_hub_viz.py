@@ -95,9 +95,10 @@ def _ex_banco(nome, purpose="isolation"):
     )
 
 
-def test_ex_dict_do_banco_aplica_prescricao_default():
+def test_ex_dict_do_banco_sem_prescricao():
+    # Exercício novo entra SEM prescrição (não injeta default) — evita badge fantasma.
     d = _ex_dict_do_banco(_ex_banco("Crucifixo"))
-    assert d["series"] == 3 and d["reps"] == "8-12" and d["rir"] == 2
+    assert d["series"] is None and d["reps"] is None and d["rir"] is None
     assert d["nome"] == "Crucifixo"
 
 

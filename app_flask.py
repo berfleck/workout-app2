@@ -3134,17 +3134,11 @@ def _mover_bloco_dict(blocos, bi, pos):
     return True
 
 
-def _ex_dict_do_banco(ex, *, series=3, reps="8-12", rir=2):
-    """Monta o ex-dict de um Exercicio do banco com prescrição default (exercícios
-    do banco vêm sem series/reps/rir). Usado por inserir/adicionar bloco via picker."""
-    d = _exercicio_to_dict(ex)
-    if d.get("series") is None:
-        d["series"] = series
-    if d.get("reps") is None:
-        d["reps"] = reps
-    if d.get("rir") is None:
-        d["rir"] = rir
-    return d
+def _ex_dict_do_banco(ex):
+    """Monta o ex-dict de um Exercicio do banco para inserir/adicionar bloco.
+    NÃO injeta prescrição — exercícios novos entram SEM séries/reps/RIR (igual ao
+    add manual legado); o personal prescreve depois. Evita badge fantasma na UI."""
+    return _exercicio_to_dict(ex)
 
 
 @app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/blocos/<int:bi>/remover", methods=["POST"])

@@ -714,7 +714,12 @@
                 border: 0; border-radius: 0; padding: 0; background: transparent;
             }
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .treino-header { padding: 14px var(--hub-inset) 8px; margin-bottom: 0; }
-            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .blocos-container { border-radius: 0; margin-bottom: 0; }
+            /* overflow:visible no swipe (border-radius já é 0 → nada a cortar) pra o "+"
+               dos gaps das pontas não ser clipado pelo overflow:hidden do container. */
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .blocos-container { border-radius: 0; margin-bottom: 0; overflow: visible; }
+            /* 1ª linha do bloco reserva espaço à direita pro overlay de ferramentas
+               (handle ⠿ + kebab …) — senão o badge de prescrição invade os botões. */
+            .hub-swipe-on .hub-swipe-track .bloco-tools + .exercicio { padding-right: calc(var(--hub-inset) + 56px); }
             /* Fundo dos blocos segue full-bleed; o TEXTO ganha respiro lateral (--hub-inset) */
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-header,
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .exercicio { padding-left: var(--hub-inset); padding-right: var(--hub-inset); }
@@ -770,20 +775,24 @@
             /* Bloco sendo carregado pra reorder: esmaecido + borda tracejada */
             body.carry-bloco-mode .bloco-wrap.bloco-is-carried { opacity: 0.5; outline: 1.5px dashed var(--brand-500); outline-offset: -2px; }
 
-            /* ── Gaps entre blocos (dual-mode: inserir "+" / drop "Soltar aqui") ── */
+            /* ── Gaps entre blocos (dual-mode: inserir "+" / drop "Soltar aqui") ──
+               z-index lifta o gap acima dos .bloco-wrap (que são position:relative);
+               sem isso o bloco seguinte cobre metade do "+" (desenho incompleto). */
             .bloco-gap {
-                position: relative; height: 0;
+                position: relative; height: 0; z-index: 5;
                 display: flex; align-items: center; justify-content: center;
             }
-            /* Faixa de toque do "+": ~18px sobre a borda, sem empurrar layout (margem negativa) */
+            /* "+" = círculo claro centrado na borda; margem negativa = zero pixel de
+               layout em repouso (§3.3), mas visível e completo (container overflow:visible). */
             .bloco-gap-add {
-                margin: -9px 0; height: 18px; min-width: 44px;
+                margin: -12px 0; width: 24px; height: 24px; border-radius: 999px;
                 display: inline-flex; align-items: center; justify-content: center;
-                background: transparent; border: 0; color: var(--gray-300); cursor: pointer;
-                z-index: 4; -webkit-tap-highlight-color: transparent;
+                background: white; border: 1px solid var(--gray-300); color: var(--gray-500);
+                box-shadow: 0 1px 2px rgba(0,0,0,0.07); cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
             }
-            .bloco-gap-add .icon { width: 15px; height: 15px; }
-            .bloco-gap-add:active { color: var(--brand-500); }
+            .bloco-gap-add .icon { width: 14px; height: 14px; }
+            .bloco-gap-add:active { background: var(--brand-50); border-color: var(--brand-500); color: var(--brand-600); }
             /* Drop zone: ocupa pixel (não é repouso) — linha + chip "Soltar aqui" */
             .bloco-gap--armado { height: 40px; margin: 4px 0; }
             .bloco-gap-drop {
