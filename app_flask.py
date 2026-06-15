@@ -345,7 +345,8 @@ def _sessao_to_dict(s):
             "ex3": _exercicio_to_dict(b.ex3) if b.ex3 else None})
     return {"tipo": s.tipo, "blocos": blocos,
             "relaxados": list(getattr(s, "relaxados", []) or []),
-            "avisos": list(getattr(s, "avisos", []) or [])}
+            "avisos": list(getattr(s, "avisos", []) or []),
+            "etiqueta": getattr(s, "etiqueta", "") or ""}
 
 def _dict_to_sessao(d):
     blocos = []
@@ -357,6 +358,7 @@ def _dict_to_sessao(d):
     s = Sessao(tipo=d["tipo"], blocos=blocos)
     s.relaxados = list(d.get("relaxados") or [])
     s.avisos = list(d.get("avisos") or [])
+    s.etiqueta = d.get("etiqueta", "") or ""
     return s
 
 
@@ -1688,6 +1690,27 @@ def hub_etiqueta_rotina(aluno_id):
     return ("", 204)
 
 
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/etiqueta", methods=["POST"])
+def hub_etiqueta_treino(aluno_id, t):
+    """Nota livre por treino (edição inline, autosave on-blur). Edita in-place,
+    espelhando a etiqueta da rotina: salva no rascunho se houver, senão direto
+    no registro publicado (sem forçar um novo rascunho). Não re-renderiza nada."""
+    etiqueta = (request.form.get("etiqueta", "") or "").strip()
+    rascunho = carregar_rascunho(aluno_id)
+    if rascunho is not None:
+        if 0 <= t < len(rascunho):
+            rascunho[t]["etiqueta"] = etiqueta
+            salvar_rascunho(aluno_id, rascunho)
+    else:
+        reg = carregar_rotina_ativa(aluno_id)
+        if reg and 0 <= t < len(reg["sessoes"]):
+            reg["sessoes"][t]["etiqueta"] = etiqueta
+            atualizar_historico_registro(reg["id"], reg.get("data_atualizada"),
+                                         reg.get("etiqueta"), reg.get("n_treinos") or len(reg["sessoes"]),
+                                         reg["sessoes"], reg.get("configs"))
+    return ("", 204)
+
+
 @app.route("/hub/rotina/<int:aluno_id>/descartar-rascunho", methods=["POST"])
 def hub_descartar_rascunho(aluno_id):
     """Descarta o rascunho e volta para a última rotina salva. Encerra edição se ativa."""
@@ -2845,6 +2868,7 @@ def _render_swap_cards(aluno_id, sessoes_dicts, indices):
         card = render_template("_hub_treino_card.html", sessao=sessao, idx=t,
                                aluno_id=aluno_id, nomes_anteriores=nomes_anteriores,
                                estados_rascunho=estados_rascunho,
+                               eh_rascunho=True,
                                padroes_labels=PADROES_LABELS)
         parts.append(f'<div class="swap-card-result" data-treino-idx="{t}">{card}</div>')
     return "".join(parts) + render_draft_banner_oob(aluno_id)

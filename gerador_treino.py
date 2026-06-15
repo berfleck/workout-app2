@@ -938,6 +938,7 @@ class Sessao:
     blocos: list[SuperSerie] = field(default_factory=list)
     avisos: list[dict] = field(default_factory=list)
     relaxados: list[str] = field(default_factory=list)  # nomes de exercícios escolhidos via relaxamento de família
+    etiqueta: str = ""  # nota livre do treino (edição inline no card, autosave on-blur)
 
 
 # ---------------------------------------------------------------------------

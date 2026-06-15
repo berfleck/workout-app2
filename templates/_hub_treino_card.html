@@ -7,21 +7,30 @@
     <div class="treino-header">
         <div class="treino-titulo-linha">
             <div class="treino-title-row">
-                <span class="treino-num-badge">T{{ idx + 1 }}</span>
+                <span class="treino-nome-display">{{ nome_exibir }}</span>
                 <a href="/hub/rotina/{{ aluno_id }}/treino/{{ idx }}/decisoes"
                    class="treino-decisoes-btn"
                    title="Relatório de decisões do gerador (dev)"
                    aria-label="Decisões do gerador">
                     <svg class="icon"><use href="#i-search"/></svg>
                 </a>
-                <span class="treino-nome-display">{{ nome_exibir }}</span>
+                {% if eh_rascunho %}<span class="treino-rascunho-chip">Rascunho</span>{% endif %}
             </div>
-            {% set chips = sessao_chips(sessao) %}
-            {% if chips %}
-            <div class="regiao-chips mt-1">
-                {% for label, slug in chips %}<span class="reg-chip reg-chip-{{ slug }}">{{ label }}</span>{% endfor %}
-            </div>
-            {% endif %}
+            {# Nota livre do treino — cresce horizontal conforme digita e quebra linha
+               perto da borda do card (autogrow via inline-grid + ::after espelho).
+               Autosave on-blur, in-place (espelha a etiqueta da rotina). #}
+            <span class="treino-etiqueta-wrap" data-value="{{ sessao.etiqueta or '+ descrição' }}">
+                <textarea name="etiqueta" rows="1" cols="1"
+                          placeholder="+ descrição"
+                          class="treino-etiqueta-input"
+                          maxlength="160"
+                          oninput="this.parentNode.dataset.value = this.value || this.placeholder"
+                          hx-post="/hub/rotina/{{ aluno_id }}/treino/{{ idx }}/etiqueta"
+                          hx-trigger="blur changed delay:200ms, keydown[key=='Enter'] consume"
+                          hx-swap="none"
+                          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                          aria-label="Nota do treino">{{ sessao.etiqueta or '' }}</textarea>
+            </span>
         </div>
         <div class="treino-acoes">
             {# Mobile: kebab que abre action sheet #}
