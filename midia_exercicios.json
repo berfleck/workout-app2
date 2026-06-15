@@ -272,7 +272,7 @@
     "img1": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Front_Dumbbell_Raise/1.jpg",
     "youtube": "ho8gQ8SdhJY"
   },
-  "Elevação Lateral ": {
+  "Elevação Lateral": {
     "media_id": "Side_Lateral_Raise",
     "media_name": "Side Lateral Raise",
     "img0": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Side_Lateral_Raise/0.jpg",
@@ -455,7 +455,8 @@
     "media_id": "Dumbbell_Rear_Lunge",
     "media_name": "Dumbbell Rear Lunge",
     "img0": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Rear_Lunge/0.jpg",
-    "img1": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Rear_Lunge/1.jpg"
+    "img1": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Rear_Lunge/1.jpg",
+    "youtube": "Zc4CNHExc0A"
   },
   "Recuo do Estepe": {
     "media_id": "Elevated_Back_Lunge",
@@ -571,7 +572,8 @@
     "media_id": "Barbell_Bench_Press_-_Medium_Grip",
     "media_name": "Barbell Bench Press - Medium Grip",
     "img0": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/0.jpg",
-    "img1": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/1.jpg"
+    "img1": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/1.jpg",
+    "youtube": "kFsNojaJA8A"
   },
   "Supino Com Halteres": {
     "media_id": "Dumbbell_Bench_Press",
@@ -705,5 +707,14 @@
   },
   "Remada Apoiado Ab.": {
     "youtube": "4csS_e4Sy7A"
+  },
+  "Prancha Alternada": {
+    "youtube": "s_8PheAKUYk"
+  },
+  "Remada Baixa Aberta": {
+    "youtube": "wK2tctxKMvs"
+  },
+  "Side Clams": {
+    "youtube": "NC1rVOaeEvM"
   }
 }
