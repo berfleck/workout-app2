@@ -1,9 +1,6 @@
 {% if aluno %}
-{% set partes = aluno.nome.split() %}
-{% set iniciais = (partes[0][0] ~ (partes[-1][0] if partes|length > 1 else '')) | upper %}
 <div class="aluno-badge bg-white border border-gray-200 rounded-xl px-4 py-3.5 mb-4 max-md:px-3 max-md:py-2.5">
     <div class="aluno-badge-row">
-        <div class="w-11 h-11 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white grid place-items-center font-bold text-sm shrink-0 max-md:w-[38px] max-md:h-[38px] max-md:text-[13px]">{{ iniciais }}</div>
         <div class="flex-1 min-w-0">
             <div class="text-base font-semibold text-gray-900 max-md:text-[14.5px] truncate">{{ aluno.nome }}</div>
             {# Etiqueta editável inline (autosave on-blur). Quando ha rascunho,
@@ -24,16 +21,28 @@
             {% endif %}
         </div>
         {% if rotina %}
-        <div class="view-mode-switch aluno-toggle aluno-toggle-mobile">
-            <button type="button" class="{% if periodo == 'atual' %}active{% endif %}" onclick="hubTogglePeriodo('atual')" title="Atual" aria-label="Atual">
-                <svg class="icon icon-xs"><use href="#i-eye"/></svg><span class="max-md:hidden"> Atual</span>
+        <div class="aluno-badge-actions">
+            <div class="view-mode-switch aluno-toggle aluno-toggle-mobile">
+                <button type="button" class="{% if periodo == 'atual' %}active{% endif %}" onclick="hubTogglePeriodo('atual')" title="Atual" aria-label="Atual">
+                    <svg class="icon icon-xs"><use href="#i-eye"/></svg><span class="max-md:hidden"> Atual</span>
+                </button>
+                <button type="button" class="{% if periodo == 'anterior' %}active{% endif %}" onclick="hubTogglePeriodo('anterior')" title="Anterior" aria-label="Anterior">
+                    <svg class="icon icon-xs"><use href="#i-clock"/></svg><span class="max-md:hidden"> Anterior</span>
+                </button>
+                <button type="button" class="{% if periodo == 'comparar' %}active{% endif %}" onclick="hubTogglePeriodo('comparar')" title="Lado a lado" aria-label="Lado a lado">
+                    <svg class="icon icon-xs"><use href="#i-columns"/></svg><span class="max-md:hidden"> Lado a lado</span>
+                </button>
+            </div>
+            {# Botão Link do aluno — separado do toggle (função distinta: compartilhar, não visualizar) #}
+            {% if not eh_rascunho %}
+            <span class="aluno-actions-divider" aria-hidden="true"></span>
+            <button type="button" class="aluno-share-btn"
+                    title="Link do aluno" aria-label="Link do aluno"
+                    hx-post="/hub/rotina/{{ aluno_id }}/publicar"
+                    hx-target="#link-modal" hx-swap="innerHTML">
+                <svg class="icon"><use href="#i-share"/></svg>
             </button>
-            <button type="button" class="{% if periodo == 'anterior' %}active{% endif %}" onclick="hubTogglePeriodo('anterior')" title="Anterior" aria-label="Anterior">
-                <svg class="icon icon-xs"><use href="#i-clock"/></svg><span class="max-md:hidden"> Anterior</span>
-            </button>
-            <button type="button" class="{% if periodo == 'comparar' %}active{% endif %}" onclick="hubTogglePeriodo('comparar')" title="Lado a lado" aria-label="Lado a lado">
-                <svg class="icon icon-xs"><use href="#i-columns"/></svg><span class="max-md:hidden"> Lado a lado</span>
-            </button>
+            {% endif %}
         </div>
         {% endif %}
     </div>
@@ -88,19 +97,8 @@
     </div>
 </div>
 
-{# Publicar página do aluno (link pro WhatsApp). Só quando há rotina salva (não rascunho). #}
-{% if rotina and not eh_rascunho %}
-<div class="mb-4">
-    <button type="button" class="btn btn-primary"
-            hx-post="/hub/rotina/{{ aluno_id }}/publicar"
-            hx-target="#publicar-resultado" hx-swap="innerHTML"
-            hx-disabled-elt="this">
-        <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-        Link do aluno
-    </button>
-    <div id="publicar-resultado"></div>
-</div>
-{% endif %}
+{# O botão "Link do aluno" agora vive no header do card (.aluno-badge-actions).
+   O popup é renderizado em #link-modal (definido em hub.html). #}
 {% endif %}
 
 {% if not rotina %}

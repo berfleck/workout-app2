@@ -2859,6 +2859,22 @@
         .app-modal-btn-primary:hover { background: var(--brand-600); border-color: var(--brand-600); }
         .app-modal-btn-danger { background: #dc2626; color: white; border-color: #dc2626; }
         .app-modal-btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+        .app-modal-close { width: 30px; height: 30px; border-radius: 8px; background: var(--gray-100); color: var(--gray-600); border: none; cursor: pointer; display: grid; place-items: center; flex-shrink: 0; transition: background 0.15s, color 0.15s; }
+        .app-modal-close:hover { background: var(--gray-200); color: var(--gray-800); }
+        .app-modal-close .icon { width: 15px; height: 15px; }
+
+        /* Grupo de ações à direita do card do aluno: toggle | (divisor) | share */
+        .aluno-badge-actions { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .aluno-actions-divider { width: 1px; height: 22px; background: var(--gray-200); flex-shrink: 0; }
+        .aluno-share-btn { width: 36px; height: 36px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: var(--brand-50); color: var(--brand-600); border: 1px solid var(--brand-100); cursor: pointer; transition: background 0.15s, color 0.15s; flex-shrink: 0; }
+        .aluno-share-btn:hover { background: var(--brand-100); }
+        .aluno-share-btn .icon { width: 16px; height: 16px; }
+        @media (max-width: 768px) {
+            .aluno-badge-actions { gap: 8px; }
+            .aluno-actions-divider { height: 18px; }
+            .aluno-share-btn { width: 32px; height: 32px; }
+            .aluno-share-btn .icon { width: 14px; height: 14px; }
+        }
     </style>
 </head>
 <body class="bg-brand-50 text-gray-900 antialiased font-sans" data-active-page="{{ active_page or '' }}" style="background-image: url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.91  0 0 0 0 0.36  0 0 0 0 0.02  0 0 0 0.20 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>&quot;);">
@@ -2873,6 +2889,7 @@
     <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></symbol>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
     <symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol>
     <symbol id="i-more-vertical" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
