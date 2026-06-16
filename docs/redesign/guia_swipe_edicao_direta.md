@@ -945,3 +945,21 @@ commits e (pros últimos) nas notas abaixo.
 desktop (modo editar, `sessoes_ativas`) com a do mobile viz (`hub_substituir_por`,
 rascunho); itens não marcados do §12 (mockup commitado / snapshot) são pré-Sub-PR-1,
 históricos.
+
+### Polish pós-conclusão (2026-06-16)
+
+Ajustes no layout swipe descobertos em uso real (commits `508d110`, `026d199`,
+`e30baed` em `main`):
+
+- **Overflow horizontal do card/aluno-badge no mobile** (`508d110`): 3 causas
+  somadas — `.treino-card.modo-visualizar` com `margin -16px` (full-bleed antigo)
+  não resetado no swipe (card 32px > página); wrapper com `max-width:none` crescendo
+  pro min-content (~529px); flexbox blowout (cadeia + input de etiqueta sem
+  `min-width:0`) + string ISO sem espaço no rodapé. Fix: reset de margem, `max-width:100%`
+  na cadeia, `min-width:0` + `overflow-wrap:anywhere`. Tudo escopado em `.hub-swipe-on`.
+- **Chip pager → toggle no card** (`026d199` + `e30baed`): o pager full-width virou
+  um toggle compacto DENTRO do `.aluno-badge` (abaixo da etiqueta) — ativo laranja,
+  demais apagados (on/off). Rótulo adapta ao nº de treinos: **≤3 = "Treino N"**,
+  **>3 = "T{n}"** (compacto, 1 linha). Nav `.hub-pager` removida; `data-nome` na chip
+  preserva o nome completo pro submenu "mover para outro treino". JS de navegação
+  intocado (mesmo contrato `.hub-pager-chip` + `data-target` + `.active`).
