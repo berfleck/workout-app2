@@ -520,7 +520,10 @@
                 flex: 1; min-height: 0;
                 display: flex; flex-direction: column;
                 padding: 0 !important;
-                max-width: none;
+                /* 100% (não 'none'): tira o cap do max-w-7xl mas fica preso na viewport.
+                   'none' deixava o wrapper crescer pro min-content do conteúdo (~529px),
+                   estourando a tela em telas estreitas. */
+                max-width: 100%;
                 background: var(--gray-50);
                 box-shadow: none;
             }
@@ -528,16 +531,28 @@
             .hub-swipe-on .hub-root {
                 flex: 1; min-height: 0;
                 display: flex; flex-direction: column;
-                max-width: none;
+                max-width: 100%;
             }
             .hub-swipe-on #rotina-display {
                 flex: 1; min-height: 0;
                 display: flex; flex-direction: column;
+                /* Strings sem espaço (ex: data ISO crua no rodapé) não podem esticar
+                   a coluna além da viewport. 'anywhere' reduz o min-content (≠ break-word). */
+                overflow-wrap: anywhere;
             }
             /* Tudo que não é o track tem altura própria; só o track preenche o resto. */
             .hub-swipe-on #rotina-display > *:not(.hub-swipe-track) { flex-shrink: 0; }
+            /* min-width:0 na cadeia de flex — sem isso o min-content do conteúdo (card,
+               input de etiqueta) "estoura" a coluna além da viewport (flexbox blowout
+               clássico). O track scrolla internamente; o resto fica preso na viewport. */
+            .hub-swipe-on main.app-main,
+            .hub-swipe-on main.app-main > div,
+            .hub-swipe-on .hub-root,
+            .hub-swipe-on #rotina-display,
+            .hub-swipe-on .hub-swipe-track { min-width: 0; max-width: 100%; }
             /* aluno-badge e banner colam no topo sem margem grande no swipe; respiro lateral consistente */
-            .hub-swipe-on #rotina-display > .aluno-badge { margin-bottom: 8px; padding-left: var(--hub-inset); padding-right: var(--hub-inset); }
+            .hub-swipe-on #rotina-display > .aluno-badge { margin-bottom: 8px; padding-left: var(--hub-inset); padding-right: var(--hub-inset); min-width: 0; max-width: 100%; }
+            .hub-swipe-on .aluno-badge-row { min-width: 0; }
 
             /* Chip pager — afordância principal do swipe */
             .hub-pager {
@@ -596,9 +611,13 @@
                 padding-bottom: calc(var(--bb-height) + 16px + env(safe-area-inset-bottom, 0px));
             }
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) > .hub-treino-page::-webkit-scrollbar { display: none; }
-            /* Card full-bleed dentro da página de swipe (sem chrome de card) */
+            /* Card full-bleed dentro da página de swipe (sem chrome de card).
+               margin 0: anula o -16px do full-bleed antigo (regra @media 768) — no
+               swipe o wrapper já tem padding 0, então o -16px estourava o card
+               32px além da página (clipado pelo overflow-x:hidden da .hub-treino-page). */
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .treino-card {
                 border: 0; border-radius: 0; padding: 0; background: transparent;
+                margin-left: 0; margin-right: 0;
             }
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .treino-header { padding: 14px var(--hub-inset) 8px; margin-bottom: 0; }
             /* overflow:visible no swipe (border-radius já é 0 → nada a cortar) pra o "+"
@@ -1065,6 +1084,7 @@
         .etiqueta-inline-input {
             display: block;
             width: 100%;
+            min-width: 0;   /* input não impõe seu min-content intrínseco no flex pai */
             background: transparent;
             border: 0;
             padding: 3px 7px;
