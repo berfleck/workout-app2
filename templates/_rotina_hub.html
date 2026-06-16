@@ -56,7 +56,7 @@
         {% set _nc = _tp if _tp and _tp != 'manual' and ' + ' not in _tp else None %}
         <button type="button" class="hub-pager-chip{% if loop.index0 == 0 %} active{% endif %}"
                 data-target="{{ loop.index0 }}" data-nome="{{ _nc or ('Treino ' ~ loop.index) }}"
-                role="tab" aria-label="Treino {{ loop.index }}">T{{ loop.index }}</button>
+                role="tab" aria-label="Treino {{ loop.index }}">{% if rotina.sessoes|length > 3 %}T{{ loop.index }}{% else %}Treino {{ loop.index }}{% endif %}</button>
     {% endfor %}
     </div>
     {% endif %}
