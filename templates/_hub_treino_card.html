@@ -84,12 +84,9 @@
     {% set bi = loop.index0 %}
     <div class="bloco-wrap" data-bloco-idx="{{ bi }}" data-bloco-label="{{ bloco.label }}"
          data-aluno-id="{{ aluno_id }}" data-treino-idx="{{ idx }}">
-        {# Overlay de ferramentas do bloco (§3.3: zero pixel vertical — absoluto no
-           canto sup. direito). Handle ⠿ = long-press pra reordenar; kebab … = menu. #}
+        {# Ferramentas do bloco: kebab … no gutter direito (cobre a altura do bloco).
+           Reorder fica DENTRO do kebab ("Mover bloco") — sem handle de long-press. #}
         <div class="bloco-tools md:hidden">
-            <span class="bloco-handle" data-carry-bloco
-                  data-treino-idx="{{ idx }}" data-bloco-idx="{{ bi }}" data-bloco-label="{{ bloco.label }}"
-                  aria-label="Mover bloco (segure)"><svg class="icon"><use href="#i-grip-vertical"/></svg></span>
             <button type="button" class="bloco-kebab" data-open-bloco-kebab
                     data-aluno-id="{{ aluno_id }}" data-treino-idx="{{ idx }}"
                     data-bloco-idx="{{ bi }}" data-bloco-label="{{ bloco.label }}"

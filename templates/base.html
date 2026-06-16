@@ -616,7 +616,7 @@
            é o 1º filho; main = flex:1; bottom bar e modais são position:fixed (fora do fluxo). */
         @media (max-width: 768px) {
             body[data-active-page="hub"].hub-swipe-on {
-                --hub-inset: 22px;        /* respiro lateral do TEXTO (fundos seguem full-bleed) */
+                --hub-inset: 28px;        /* respiro lateral do TEXTO (fundos seguem full-bleed) */
                 height: 100vh; height: 100dvh;
                 overflow: hidden;
                 display: flex; flex-direction: column;
@@ -759,30 +759,27 @@
                Os separadores entre exercícios param antes dela (ver .exercicio::before),
                então o gutter lê como uma faixa unificada do bloco. */
             .hub-swipe-on .hub-swipe-track .bloco-wrap { position: relative; }
-            /* Largura automática (hugs os botões) ancorada à direita com margem segura —
-               caixa de largura fixa fazia os botões transbordarem e o kebab sair da tela. */
+            /* Largura automática (hugs o kebab) ancorada à direita com respiro da borda. */
             .bloco-tools {
-                position: absolute; top: 0; bottom: 0; right: 10px;
+                position: absolute; top: 0; bottom: 0; right: var(--hub-inset);
                 display: flex; align-items: center; gap: 2px; z-index: 3;
             }
-            .bloco-handle, .bloco-kebab {
-                width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center;
+            .bloco-kebab {
+                width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
                 color: var(--gray-400); background: transparent; border: 0; cursor: pointer;
                 -webkit-tap-highlight-color: transparent;
             }
-            .bloco-handle .icon, .bloco-kebab .icon { width: 14px; height: 14px; }
-            .bloco-handle { touch-action: none; cursor: grab; }
-            .bloco-handle:active { color: var(--brand-500); }
+            .bloco-kebab .icon { width: 16px; height: 16px; }
             .bloco-kebab:active { background: var(--gray-100); color: var(--gray-700); }
             /* Conteúdo do exercício reserva o gutter à direita em TODAS as linhas. */
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-wrap .exercicio {
-                position: relative; padding-left: var(--hub-inset); padding-right: 66px;
+                position: relative; padding-left: var(--hub-inset); padding-right: calc(var(--hub-inset) + 34px);
             }
             /* Separador entre exercícios para antes do gutter (vira ::before com inset
                à direita, em vez do border-top full-width herdado). */
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-wrap .exercicio + .exercicio { border-top: 0; }
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-wrap .exercicio + .exercicio::before {
-                content: ''; position: absolute; top: 0; left: var(--hub-inset); right: 62px;
+                content: ''; position: absolute; top: 0; left: var(--hub-inset); right: calc(var(--hub-inset) + 30px);
                 border-top: 1px solid rgba(0,0,0,0.06);
             }
             /* Bloco sendo carregado pra reorder: esmaecido + borda tracejada */
@@ -3505,7 +3502,6 @@ document.addEventListener('click', async function(e) {
     let swapSource = null; // {alunoId, t, bi, ei, label, nome, el}
     let swapModeEnteredAt = 0; // timestamp pra ignorar click sintético pós-long-press
     let carryBloco = null; // {alunoId, t, bi, label, el} — modo carregando BLOCO (§7.2)
-    let pressKind = null;  // 'ex' | 'bloco' — o que o long-press atual está mirando
 
     function isTouchDevice() {
         return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -3549,18 +3545,12 @@ document.addEventListener('click', async function(e) {
     }
     window.cancelSwapMode = cancelSwapMode;
 
-    // Long-press no handle ⠿ de um bloco → modo carregando bloco (reorder, §7.2).
-    function enterCarryBloco(handleEl) {
+    // "Mover bloco" (no kebab) → modo carregando bloco (reorder, §7.2). Recebe
+    // contexto {alunoId, t, bi, label}; acha o .bloco-wrap pra esmaecer.
+    function enterCarryBloco(c) {
         cancelSwapMode();
-        const d = handleEl.dataset;
-        const wrap = handleEl.closest('.bloco-wrap');
-        carryBloco = {
-            alunoId: wrap ? wrap.dataset.alunoId : null,
-            t: parseInt(d.treinoIdx, 10),
-            bi: parseInt(d.blocoIdx, 10),
-            label: d.blocoLabel || '',
-            el: wrap,
-        };
+        const wrap = document.querySelector('.bloco-wrap[data-treino-idx="' + c.t + '"][data-bloco-idx="' + c.bi + '"]');
+        carryBloco = { alunoId: c.alunoId, t: c.t, bi: c.bi, label: c.label || '', el: wrap };
         if (wrap) wrap.classList.add('bloco-is-carried');
         document.body.classList.add('carry-bloco-mode');
         const cs = carryStore();
@@ -3677,28 +3667,22 @@ document.addEventListener('click', async function(e) {
         pressTimer = null;
         pressStart = null;
         pressTargetEl = null;
-        pressKind = null;
     }
 
     document.addEventListener('touchstart', function(e) {
         if (e.touches.length !== 1) { clearTimer(); return; }
         // Tap dentro do popup não dispara nada (e não entra como long-press)
         if (e.target.closest('.ex-action-popup')) { clearTimer(); return; }
-        // O handle ⠿ do bloco tem PRECEDÊNCIA sobre o exercício (§9 caso f): se o
-        // toque pousa nele, mira o bloco; senão, mira o exercício como antes.
-        const blocoHandle = e.target.closest('[data-carry-bloco]');
-        const ex = blocoHandle ? null : e.target.closest('[data-swap-ex]');
-        if (!blocoHandle && !ex) return;
-        // Não dispara em controles internos — mas o handle (span) é um alvo válido.
-        if (!blocoHandle && e.target.closest('button, a, input, textarea, select, .drag-handle')) return;
+        // Reorder de bloco é via kebab ("Mover bloco"), não long-press — aqui só exercício.
+        const ex = e.target.closest('[data-swap-ex]');
+        if (!ex) return;
+        // Não dispara em controles internos (botões, links, inputs)
+        if (e.target.closest('button, a, input, textarea, select, .drag-handle')) return;
         pressStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        pressTargetEl = blocoHandle || ex;
-        pressKind = blocoHandle ? 'bloco' : 'ex';
+        pressTargetEl = ex;
         pressTimer = setTimeout(function() {
-            // Long-press completou (§7.1/§7.2: long-press = modo carregando direto):
-            if (pressKind === 'bloco') {
-                enterCarryBloco(pressTargetEl);
-            } else if (swapSource && pressTargetEl) {
+            // Long-press completou (§7.1: long-press no exercício = modo carregando):
+            if (swapSource && pressTargetEl) {
                 performSwap(pressTargetEl);          // já carregando ex → completa o swap
             } else if (pressTargetEl) {
                 enterSwapMode(pressTargetEl);        // entra em modo carregando ex
@@ -4817,9 +4801,7 @@ document.addEventListener('keydown', function(e) {
             if (window.openBlocoPicker) window.openBlocoPicker({ modo: 'adicionar', alunoId: c.alunoId, t: c.t, bi: c.bi });
         } else if (action === 'mover') {
             close();
-            // Entra em modo carregando bloco via o handle do próprio bloco
-            const handle = document.querySelector('.bloco-wrap[data-treino-idx="' + c.t + '"][data-bloco-idx="' + c.bi + '"] [data-carry-bloco]');
-            if (handle && window.enterCarryBloco) window.enterCarryBloco(handle);
+            if (window.enterCarryBloco) window.enterCarryBloco({ alunoId: c.alunoId, t: c.t, bi: c.bi, label: c.label });
         } else if (action === 'regerar') {
             postBloco('/hub/rotina/' + c.alunoId + '/treino/' + c.t + '/bloco/' + c.bi + '/regerar', c.t, c.bi);
         } else if (action === 'remover') {
