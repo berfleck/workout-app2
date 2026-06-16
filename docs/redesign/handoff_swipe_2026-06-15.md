@@ -246,8 +246,57 @@ acumulado nos Sub-PRs 3-6 — **net −375 linhas**. Sem mudança funcional.
 
 ---
 
-# 🎉 Iniciativa swipe + edição direta — COMPLETA (Sub-PRs 1-7)
+# Sub-PR 8 — CONCLUÍDO (2026-06-16 · restaura substituição no mobile viz)
 
-Todos os 7 sub-PRs mergeados em `main`. Frente A (swipe), Frente B (swap
-inter-treino), Frente C (edição estrutural viz + drawer de prescrição) e o
-saneamento final concluídos. Modo editar clássico sobrevive só no desktop.
+Branch **`feat-sub-pr8-substituicao`** (de `feat-sub-pr7-saneamento`) — validado
+no mobile real. **Regressão** descoberta em uso: o action sheet do Sub-PR 4
+substituiu o popup antigo de exercício e **não carregou** dois recursos que
+existiam antes — o seletor de escopo da substituição aleatória (padrão/subregião)
+e a substituição manual (escolha da biblioteca). Ambos só sobreviviam no desktop.
+(O Sub-PR 7 removeu o popup morto que ainda tinha os chips de escopo, mas ele já
+era inalcançável desde o Sub-PR 4 — a perda não foi do saneamento.)
+
+| Commit | Conteúdo |
+|---|---|
+| `8be0a03` | Submenu de substituir (2 escopos + biblioteca) + picker manual + 2 rotas HUB-viz |
+
+## UX
+Action sheet do exercício → **"Substituir"** vira submenu (sub-view, igual aos "Mover…"):
+- **Sortear · mesmo padrão** → `substituir-aleatorio` `escopo=padrao`
+- **Sortear · mesma subregião** → `substituir-aleatorio` `escopo=subregiao`
+- **Escolher da biblioteca…** → fecha o sheet e abre o **picker** (`_mobile_subst_picker.html`,
+  tall sheet com busca + selects categoria/tipo), seleção única → aplica.
+
+## Backend (2 rotas HUB-viz novas — rascunho, sem `edicao_hub`, `_render_swap_cards`)
+- `GET  .../treino/<t>/buscar-substitutos/<bi>/<slot>` — candidatos filtrados
+  (texto/padrao/purpose/unilateral/equipamento/musculo), exclui nomes em uso; reusa
+  `_substituicao.html` (linhas `.cand-row`).
+- `POST .../treino/<t>/substituir-por/<bi>/<slot>` — aplica `nome_novo` via
+  `substituir_exercicio_por`, grava rascunho.
+- `substituir-aleatorio` já aceitava `escopo` — só faltava a UI passar.
+- Desktop (`openSubstDrawer` + `treino_substituir_por` + `_treino_card.html`) intocado.
+
+## Cliente (base.html)
+- `makeSubItem` ganha subtítulo opcional; `buildSubstituirMenu()` no IIFE do ex action sheet.
+- Picker IIFE `window.openSubstPicker(ctx)` — busca debounced, selects, seleção via
+  delegação em `.cand-row`, confirm → `fetch` POST → `applyStructuralResult`.
+- Nota: as `.cand-row` de `_substituicao.html` têm `onclick="selectCandRow(this)"`
+  (função desktop); como o `subst-drawer`/`#drawer-confirm` desktop existem sempre no
+  `base.html`, isso não quebra — só alterna o confirm escondido. A seleção real do
+  mobile é a delegação do picker IIFE.
+
+## Verificação
+- **pytest 386** passed, 2 skips · `py_compile` OK · braces `<style>` 650/396 ·
+  `node --check` (ex-sheet + picker IIFEs) OK.
+- **Smoke curl (aluno 18)**: busca 50 candidatos; `escopo=subregiao` 200;
+  `substituir-por` aplica e grava no rascunho (verificado); slot inválido → 400.
+- **Mobile real** (Bernardo): submenu, 2 sorteios por escopo e escolha da biblioteca OK.
+
+---
+
+# 🎉 Iniciativa swipe + edição direta — COMPLETA (Sub-PRs 1-8)
+
+Todos os sub-PRs mergeados em `main`. Frente A (swipe), Frente B (swap
+inter-treino), Frente C (edição estrutural viz + drawer de prescrição),
+saneamento (Sub-PR 7) e restauração da substituição mobile (Sub-PR 8)
+concluídos. Modo editar clássico sobrevive só no desktop.
