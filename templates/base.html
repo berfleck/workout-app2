@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BF Treinamento</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23e85d04'/><text x='50%25' y='52%25' dominant-baseline='middle' text-anchor='middle' font-family='DM Sans, Arial, sans-serif' font-weight='800' font-size='30' fill='white'>BF</text></svg>">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon-192.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <!-- Alpine.js: camada de estado reativo client-side (complementa HTMX, que segue dono da comunicação com o servidor).
          Ordem importa: o plugin @alpinejs/morph precisa carregar ANTES do Alpine core.

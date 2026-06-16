@@ -41,6 +41,12 @@ app.secret_key = os.environ.get("SECRET_KEY", "bf-treinamento-dev")
 # gerar https://<dominio> correto (e não http://localhost). No-op rodando local.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
+
+@app.route("/favicon.ico")
+def favicon():
+    # Navegadores/crawlers pedem /favicon.ico na raiz (fora de /static/).
+    return app.send_static_file("favicon.ico")
+
 # ── Link público permanente do aluno (pro WhatsApp) ──
 # Slug inadivinhável por aluno = hash(salt + aluno_id). O salt é SEGREDO e vem de
 # env (PUBLISH_SALT) em produção. O fallback abaixo é só dev local (dados de teste):
