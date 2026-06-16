@@ -1,0 +1,24 @@
+{# Drawer de prescrição (Sub-PR 6 · §7.5 / §10.8). Sucessor do modo edição
+   clássico no mobile: sobe do bottom (~72%) sobre a visualização, sem poluir
+   o swipe atrás (não renderiza card modo-editar → body--em-edicao fica off).
+   Shell estático; o corpo (#prescr-drawer-body) é carregado via HTMX ao abrir
+   (GET .../treino/<t>/prescrever). JS em base.html (window.openPrescricaoDrawer).
+   Fechar = "Concluir": re-renderiza o card de viz (badges atualizados) e zera
+   edicao_hub via visualizar-inline. #}
+<div class="sheet-overlay sheet-overlay--prescr" id="prescr-drawer" data-prescr-drawer aria-hidden="true">
+    <div class="sheet prescr-sheet" role="dialog" aria-label="Prescrever séries, reps e RIR">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Prescrição</div>
+                <div class="sheet-title" data-prescr-title>Treino</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary prescr-concluir" data-prescr-close aria-label="Concluir">
+                <svg class="icon"><use href="#i-check"/></svg> Concluir
+            </button>
+        </div>
+        <div class="sheet-list prescr-drawer-body" id="prescr-drawer-body">
+            <div class="prescr-drawer-vazio">Carregando…</div>
+        </div>
+    </div>
+</div>

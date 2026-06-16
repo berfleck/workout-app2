@@ -1,0 +1,55 @@
+{# Conteúdo do drawer de prescrição (Sub-PR 6 · §7.5). Lista os exercícios do
+   treino com inputs grandes de séries/reps/RIR. Autosave por focusout (reusa a
+   rota existente /treino/<t>/prescricao/<bi>/<ei>, hx-swap="none" → só OOB do
+   banner). "Limpar" reusa a rota /limpar e re-busca este drawer
+   (refreshPrescricaoDrawer) pra refletir os valores zerados.
+   Renderizado por GET /hub/rotina/<aluno_id>/treino/<t>/prescrever com idx=t. #}
+{% if not sessao.blocos %}
+<div class="prescr-drawer-vazio">Este treino ainda não tem exercícios.</div>
+{% else %}
+{% for bloco in sessao.blocos %}
+{% set bi = loop.index0 %}
+<div class="prescr-bloco">
+    <div class="prescr-bloco-label">Bloco {{ bloco.label }}</div>
+    {% for ex in [bloco.ex1, bloco.ex2, bloco.ex3] if ex %}
+    {% set ei = loop.index0 %}
+    <div class="prescr-row">
+        <div class="prescr-row-nome">
+            <span class="ex-label">{{ bloco.label }}{{ loop.index }}</span>{{ ex.nome }}
+        </div>
+        <form class="prescr-row-form"
+              hx-post="/treino/{{ idx }}/prescricao/{{ bi }}/{{ ei }}"
+              hx-trigger="focusout delay:300ms"
+              hx-swap="none">
+            <label class="prescr-field">
+                <span class="prescr-field-label">Séries</span>
+                <input type="number" name="series" value="{{ ex.series or 3 }}"
+                       min="1" max="10" inputmode="numeric" aria-label="Séries">
+            </label>
+            <span class="prescr-field-sep">×</span>
+            <label class="prescr-field prescr-field--reps">
+                <span class="prescr-field-label">Reps</span>
+                <input type="text" name="reps" class="reps" value="{{ ex.reps or '8-12' }}"
+                       aria-label="Repetições">
+            </label>
+            <span class="prescr-field-sep">·</span>
+            <label class="prescr-field">
+                <span class="prescr-field-label">RIR</span>
+                <input type="number" name="rir" value="{{ ex.rir if ex.rir is not none else 2 }}"
+                       min="0" max="4" inputmode="numeric" aria-label="RIR">
+            </label>
+            {% if ex.series is not none or ex.reps or ex.rir is not none %}
+            <button type="button" class="prescr-row-limpar" title="Limpar prescrição"
+                    aria-label="Limpar prescrição"
+                    hx-post="/treino/{{ idx }}/prescricao/{{ bi }}/{{ ei }}/limpar"
+                    hx-swap="none"
+                    hx-on::after-request="if(event.detail.successful && window.refreshPrescricaoDrawer) window.refreshPrescricaoDrawer()">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+            {% endif %}
+        </form>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+{% endif %}

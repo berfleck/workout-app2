@@ -1557,6 +1557,22 @@ def hub_visualizar_inline(aluno_id, t):
                            padroes_labels=PADROES_LABELS)
 
 
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/prescrever")
+def hub_prescrever_drawer(aluno_id, t):
+    """Conteúdo do drawer de prescrição (Sub-PR 6 · §7.5).
+
+    Carrega sessoes_ativas + ativa edicao_hub (autosave de prescrição depende da
+    flag pra sincronizar o rascunho via salvar_sessoes_disco). NÃO grava nada por
+    si só — só abrir o drawer não cria rascunho; só os focusout de prescrição é
+    que persistem. Renderiza a lista; as rotas de save/limpar são as existentes.
+    """
+    if not _carregar_hub_edicao(aluno_id):
+        return '<div class="prescr-drawer-vazio">Nenhuma rotina ativa.</div>'
+    if t < 0 or t >= len(sessoes_ativas):
+        return '<div class="prescr-drawer-vazio">Treino não encontrado.</div>'
+    return render_template("_prescricao_lista.html", sessao=sessoes_ativas[t], idx=t)
+
+
 @app.route("/hub/rotina/<int:aluno_id>/editar", methods=["POST"])
 def hub_editar_rotina(aluno_id):
     """Carrega a rotina do aluno em sessoes_ativas para edição."""
