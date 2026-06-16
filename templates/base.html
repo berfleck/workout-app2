@@ -759,28 +759,30 @@
                Os separadores entre exercícios param antes dela (ver .exercicio::before),
                então o gutter lê como uma faixa unificada do bloco. */
             .hub-swipe-on .hub-swipe-track .bloco-wrap { position: relative; }
+            /* Largura automática (hugs os botões) ancorada à direita com margem segura —
+               caixa de largura fixa fazia os botões transbordarem e o kebab sair da tela. */
             .bloco-tools {
-                position: absolute; top: 0; bottom: 0; right: 8px; width: 46px;
-                display: flex; align-items: center; justify-content: center; gap: 2px; z-index: 3;
+                position: absolute; top: 0; bottom: 0; right: 10px;
+                display: flex; align-items: center; gap: 2px; z-index: 3;
             }
             .bloco-handle, .bloco-kebab {
-                width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+                width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center;
                 color: var(--gray-400); background: transparent; border: 0; cursor: pointer;
                 -webkit-tap-highlight-color: transparent;
             }
-            .bloco-handle .icon, .bloco-kebab .icon { width: 15px; height: 15px; }
+            .bloco-handle .icon, .bloco-kebab .icon { width: 14px; height: 14px; }
             .bloco-handle { touch-action: none; cursor: grab; }
             .bloco-handle:active { color: var(--brand-500); }
             .bloco-kebab:active { background: var(--gray-100); color: var(--gray-700); }
             /* Conteúdo do exercício reserva o gutter à direita em TODAS as linhas. */
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-wrap .exercicio {
-                position: relative; padding-left: var(--hub-inset); padding-right: 62px;
+                position: relative; padding-left: var(--hub-inset); padding-right: 66px;
             }
             /* Separador entre exercícios para antes do gutter (vira ::before com inset
                à direita, em vez do border-top full-width herdado). */
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-wrap .exercicio + .exercicio { border-top: 0; }
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-wrap .exercicio + .exercicio::before {
-                content: ''; position: absolute; top: 0; left: var(--hub-inset); right: 58px;
+                content: ''; position: absolute; top: 0; left: var(--hub-inset); right: 62px;
                 border-top: 1px solid rgba(0,0,0,0.06);
             }
             /* Bloco sendo carregado pra reorder: esmaecido + borda tracejada */
