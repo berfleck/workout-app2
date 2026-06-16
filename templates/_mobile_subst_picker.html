@@ -1,0 +1,43 @@
+{# Picker bottom-sheet de substituição MANUAL (Sub-PR 8 · restaura escolha da
+   biblioteca no mobile viz). Busca + filtros (categoria/tipo), seleção única →
+   POST .../substituir-por/<bi>/<slot> → applyStructuralResult. As linhas são as
+   de `_substituicao.html` (GET .../buscar-substitutos/<bi>/<slot>). JS em base.html
+   (window.openSubstPicker). #}
+<div class="sheet-overlay sheet-overlay--tall" id="subst-picker-sheet" data-subst-picker aria-hidden="true">
+    <div class="sheet" role="dialog" aria-label="Escolher substituto">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-head">
+            <div class="sheet-head-info">
+                <div class="sheet-eyebrow">Substituir</div>
+                <div class="sheet-title" data-subst-title>Escolher da biblioteca</div>
+            </div>
+            <button type="button" class="sheet-close" data-subst-close aria-label="Fechar">
+                <svg class="icon"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <div class="picker-search">
+            <input type="search" class="input-field" name="texto" placeholder="Buscar exercício pelo nome…"
+                   data-subst-search autocomplete="off">
+            <div class="subst-filters">
+                <select class="subst-filter-sel" data-subst-padrao aria-label="Categoria">
+                    <option value="">Categoria</option>
+                    {% for p in todos_padroes_drawer %}<option value="{{ p }}">{{ padroes_labels_drawer.get(p, p) }}</option>{% endfor %}
+                </select>
+                <select class="subst-filter-sel" data-subst-purpose aria-label="Tipo">
+                    <option value="">Tipo</option>
+                    <option value="compound">composto</option>
+                    <option value="isolation">isolado</option>
+                    <option value="stability">estabilidade</option>
+                    <option value="explosive">explosivo</option>
+                </select>
+            </div>
+        </div>
+        <div class="sheet-list" id="subst-picker-rows" data-subst-rows>
+            <div class="drawer-count" style="text-align:center; padding:24px; color:var(--gray-500); text-transform:none; letter-spacing:0">Carregando…</div>
+        </div>
+        <div class="picker-footer">
+            <span class="picker-hint" data-subst-hint></span>
+            <button type="button" class="btn btn-primary" data-subst-confirm disabled>Substituir</button>
+        </div>
+    </div>
+</div>

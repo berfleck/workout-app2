@@ -712,8 +712,16 @@
             padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px));
             border-top: 1px solid var(--gray-100); background: white;
         }
-        .picker-hint { font-size: 12px; color: var(--gray-500); }
+        .picker-hint { font-size: 12px; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .picker-footer .btn-primary:disabled { opacity: 0.45; cursor: default; }
+        /* Filtros do picker de substituição manual (Sub-PR 8) */
+        .subst-filters { display: flex; gap: 6px; margin-top: 6px; }
+        .subst-filter-sel {
+            flex: 1; min-width: 0; font-size: 12px; padding: 7px 8px;
+            border: 1px solid var(--gray-200); border-radius: 8px; background: white;
+            color: var(--gray-700); font-family: inherit;
+        }
+        .subst-filter-sel:focus { outline: none; border-color: var(--brand-500); box-shadow: 0 0 0 2px rgba(232,93,4,0.10); }
 
         /* ── Drawer de prescrição (Sub-PR 6 · §7.5) ── */
         .sheet-overlay--prescr .sheet { max-height: 72vh; }
@@ -4090,6 +4098,91 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// ── Picker de substituição manual (Sub-PR 8 · "Escolher da biblioteca") ──
+document.addEventListener('DOMContentLoaded', function() {
+    const overlay = document.getElementById('subst-picker-sheet');
+    if (!overlay) return;
+    const titleEl = overlay.querySelector('[data-subst-title]');
+    const search = overlay.querySelector('[data-subst-search]');
+    const padSel = overlay.querySelector('[data-subst-padrao]');
+    const purSel = overlay.querySelector('[data-subst-purpose]');
+    const rows = document.getElementById('subst-picker-rows');
+    const hintEl = overlay.querySelector('[data-subst-hint]');
+    const confirmBtn = overlay.querySelector('[data-subst-confirm]');
+    let ctx = null, selected = null;
+    function slotOf(ei) { return ei === 0 ? 'ex1' : (ei === 1 ? 'ex2' : 'ex3'); }
+
+    function load() {
+        if (!ctx) return;
+        const params = new URLSearchParams({
+            texto: search ? search.value : '',
+            padrao: padSel ? padSel.value : '',
+            purpose: purSel ? purSel.value : '',
+        });
+        const url = '/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.t + '/buscar-substitutos/'
+            + ctx.bi + '/' + slotOf(ctx.ei) + '?' + params.toString();
+        htmx.ajax('GET', url, { target: '#subst-picker-rows', swap: 'innerHTML' });
+    }
+
+    window.openSubstPicker = function(c) {
+        ctx = { alunoId: c.alunoId, t: c.t, bi: c.bi, ei: c.ei, nome: c.nome || '' };
+        selected = null;
+        if (titleEl) titleEl.textContent = ctx.nome || 'Escolher da biblioteca';
+        if (search) search.value = '';
+        if (padSel) padSel.value = '';
+        if (purSel) purSel.value = '';
+        if (confirmBtn) confirmBtn.disabled = true;
+        if (hintEl) hintEl.textContent = '';
+        rows.innerHTML = '<div class="drawer-count" style="text-align:center;padding:24px;color:var(--gray-500);text-transform:none;letter-spacing:0">Carregando…</div>';
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('sheet-open');
+        load();
+    };
+
+    function close() {
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('sheet-open');
+        ctx = null; selected = null;
+    }
+
+    let tmr = null;
+    if (search) search.addEventListener('input', function() { clearTimeout(tmr); tmr = setTimeout(load, 250); });
+    if (padSel) padSel.addEventListener('change', load);
+    if (purSel) purSel.addEventListener('change', load);
+
+    // Seleção de linha (delegação). As linhas vêm de _substituicao.html (.cand-row).
+    rows.addEventListener('click', function(e) {
+        const row = e.target.closest('.cand-row');
+        if (!row) return;
+        rows.querySelectorAll('.cand-row.selected').forEach(r => r.classList.remove('selected'));
+        row.classList.add('selected');
+        selected = row.dataset.nome;
+        if (confirmBtn) confirmBtn.disabled = false;
+        if (hintEl) hintEl.textContent = selected;
+    });
+
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay || e.target.closest('[data-subst-close]')) close();
+    });
+    if (confirmBtn) confirmBtn.addEventListener('click', function() {
+        if (!ctx || !selected) return;
+        const c = ctx, novo = selected;
+        const hl = [{ t: c.t, bi: c.bi, ei: c.ei }];
+        const fd = new FormData(); fd.append('nome_novo', novo);
+        close();
+        fetch('/hub/rotina/' + c.alunoId + '/treino/' + c.t + '/substituir-por/' + c.bi + '/' + slotOf(c.ei),
+              { method: 'POST', headers: { 'HX-Request': 'true' }, body: fd })
+            .then(r => r.text())
+            .then(html => { if (window.applyStructuralResult) window.applyStructuralResult(html, hl); })
+            .catch(err => console.error('Substituir manual falhou:', err));
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && overlay.classList.contains('is-open')) close();
+    });
+});
+
 // ── Bottom sheet de navegação (mobile) ──
 document.addEventListener('DOMContentLoaded', function() {
     const sheet = document.getElementById('nav-sheet');
@@ -4182,6 +4275,7 @@ document.addEventListener('DOMContentLoaded', function() {
 {% include "_mobile_ex_action_sheet.html" %}
 {% include "_mobile_bloco_action_sheet.html" %}
 {% include "_mobile_bloco_picker.html" %}
+{% include "_mobile_subst_picker.html" %}
 {% include "_mobile_prescricao_drawer.html" %}
 
 <!-- Toast global de autosave -->
@@ -4472,7 +4566,7 @@ document.addEventListener('keydown', function(e) {
             .catch(err => console.error('Ação do exercício falhou:', err));
     }
 
-    function makeSubItem(label, onClick) {
+    function makeSubItem(label, onClick, sub) {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'sheet-item';
@@ -4482,9 +4576,37 @@ document.addEventListener('keydown', function(e) {
         t.className = 'sheet-item-title';
         t.textContent = label;
         txt.appendChild(t);
+        if (sub) {
+            const s = document.createElement('div');
+            s.className = 'sheet-item-sub';
+            s.textContent = sub;
+            txt.appendChild(s);
+        }
         b.appendChild(txt);
         b.addEventListener('click', onClick);
         return b;
+    }
+
+    // Submenu de substituição: 2 sorteios por escopo (padrão/subregião) + escolha manual.
+    function buildSubstituirMenu() {
+        subList.innerHTML = '';
+        const slot = ctx.ei === 0 ? 'ex1' : (ctx.ei === 1 ? 'ex2' : 'ex3');
+        const hl = [{ t: ctx.t, bi: ctx.bi, ei: ctx.ei }];
+        const aluno = ctx.alunoId, t = ctx.t, bi = ctx.bi;
+        function sortear(escopo) {
+            const fd = new FormData(); fd.append('escopo', escopo);
+            post('/hub/rotina/' + aluno + '/treino/' + t + '/substituir-aleatorio/' + bi + '/' + slot, hl, fd);
+        }
+        subList.appendChild(makeSubItem('Sortear · mesmo padrão', function() { sortear('padrao'); },
+            'Outro exercício do mesmo padrão de movimento'));
+        subList.appendChild(makeSubItem('Sortear · mesma subregião', function() { sortear('subregiao'); },
+            'Qualquer exercício da mesma subregião'));
+        subList.appendChild(makeSubItem('Escolher da biblioteca…', function() {
+            const c = ctx;          // captura antes do close() zerar ctx
+            close();
+            if (window.openSubstPicker) window.openSubstPicker(c);
+        }, 'Buscar e filtrar manualmente'));
+        if (subEmpty) subEmpty.hidden = true;
     }
 
     // Lista blocos de destino do MESMO treino (com vaga, != origem)
@@ -4531,10 +4653,7 @@ document.addEventListener('keydown', function(e) {
         const action = actBtn.dataset.exAction;
         const base = '/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.t + '/exercicio/' + ctx.bi + '/' + ctx.ei;
         if (action === 'substituir') {
-            const slot = ctx.ei === 0 ? 'ex1' : (ctx.ei === 1 ? 'ex2' : 'ex3');
-            const fd = new FormData(); fd.append('escopo', 'padrao');
-            post('/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.t + '/substituir-aleatorio/' + ctx.bi + '/' + slot,
-                 [{ t: ctx.t, bi: ctx.bi, ei: ctx.ei }], fd);
+            showSub('Substituir'); buildSubstituirMenu();
         } else if (action === 'solo') {
             post(base + '/tornar-solo', [{ t: ctx.t, bi: ctx.bi, ei: 0 }]);
         } else if (action === 'mover-bloco') {

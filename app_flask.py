@@ -3082,6 +3082,71 @@ def hub_substituir_aleatorio(aluno_id, t, bi, slot):
     return _render_swap_cards(aluno_id, sessoes_dicts, [t])
 
 
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/buscar-substitutos/<int:bi>/<slot>")
+def hub_buscar_substitutos(aluno_id, t, bi, slot):
+    """Lista candidatos pra substituição MANUAL (HUB-viz). Filtros via query
+    (texto/padrao/purpose/unilateral/equipamento/musculo), exclui nomes em uso na
+    rotina e o próprio ex. Renderiza as linhas de `_substituicao.html`."""
+    if slot not in ("ex1", "ex2", "ex3"):
+        return '<div class="drawer-count">Slot inválido.</div>', 400
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts or t < 0 or t >= len(sessoes_dicts):
+        return '<div class="drawer-count">Treino não encontrado.</div>', 404
+    blocos = sessoes_dicts[t]["blocos"]
+    if bi < 0 or bi >= len(blocos) or not blocos[bi].get(slot):
+        return '<div class="drawer-count">Exercício não encontrado.</div>', 404
+    nome_ex = blocos[bi][slot]["nome"]
+
+    # Exclui nomes em uso na rotina inteira (menos o próprio, que pode reaparecer na busca)
+    nomes_em_uso = set()
+    for s in sessoes_dicts:
+        for b in s["blocos"]:
+            for k in ("ex1", "ex2", "ex3"):
+                ex = b.get(k)
+                if ex:
+                    nomes_em_uso.add(ex["nome"])
+    nomes_em_uso.discard(nome_ex)
+
+    cands = filtrar_banco(
+        texto=request.args.get("texto", ""),
+        padrao=request.args.get("padrao") or None,
+        purpose=request.args.get("purpose") or None,
+        unilateral=request.args.get("unilateral") or None,
+        equipamento=request.args.get("equipamento") or None,
+        musculo=request.args.get("musculo") or None,
+        max_cx=5,
+    )
+    cands = [e for e in cands if e.nome not in nomes_em_uso and e.nome != nome_ex]
+    return render_template("_substituicao.html", cands=cands[:50], nome_ex=nome_ex, idx=t,
+                           padroes_labels=PADROES_LABELS,
+                           todos_padroes=sorted(PADROES_LABELS.keys()),
+                           todos_equipamentos=todos_equipamentos,
+                           todos_musculos=todos_musculos)
+
+
+@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/substituir-por/<int:bi>/<slot>", methods=["POST"])
+def hub_substituir_por(aluno_id, t, bi, slot):
+    """Aplica substituição MANUAL (HUB-viz): troca o ex do slot pelo `nome_novo`
+    escolhido na biblioteca, grava rascunho e devolve .swap-card-result. Sem edicao_hub."""
+    if slot not in ("ex1", "ex2", "ex3"):
+        return '<div class="erro">Slot inválido.</div>', 400
+    nome_novo = (request.form.get("nome_novo") or "").strip()
+    if not nome_novo:
+        return '<div class="erro">Nenhum exercício escolhido.</div>', 400
+    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
+    if not sessoes_dicts or t < 0 or t >= len(sessoes_dicts):
+        return '<div class="erro">Treino não encontrado.</div>', 404
+    blocos = sessoes_dicts[t]["blocos"]
+    if bi < 0 or bi >= len(blocos) or not blocos[bi].get(slot):
+        return '<div class="erro">Exercício não encontrado.</div>', 404
+    nome_atual = blocos[bi][slot]["nome"]
+    if nome_novo != nome_atual:
+        sessao_obj = substituir_exercicio_por(_dict_to_sessao(sessoes_dicts[t]), nome_atual, nome_novo, banco)
+        sessoes_dicts[t] = _sessao_to_dict(sessao_obj)
+        salvar_rascunho(aluno_id, sessoes_dicts)
+    return _render_swap_cards(aluno_id, sessoes_dicts, [t])
+
+
 # ── Operações estruturais nível BLOCO no HUB-viz (Frente C parte 2 · §7.2-7.4) ──
 # Todas operam no rascunho (sessoes_dicts) e respondem com .swap-card-result + banner
 # OOB via _render_swap_cards, SEM ativar edicao_hub. As rotas antigas
