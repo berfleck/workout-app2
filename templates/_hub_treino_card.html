@@ -6,7 +6,8 @@
 <div class="bloco-gap md:hidden" x-data
      :class="$store.carry.tipo === 'bloco' && $store.carry.refBloco && $store.carry.refBloco.treinoIdx === {{ t_idx }} && !($store.carry.refBloco.blocoIdx === {{ posicao }} || $store.carry.refBloco.blocoIdx === {{ posicao - 1 }}) && 'bloco-gap--armado'">
     <button type="button" class="bloco-gap-add"
-            x-show="$store.carry.tipo !== 'bloco'"
+            x-show="$store.insertBloco.treino === {{ t_idx }}"
+            x-transition.opacity.duration.150ms
             data-insert-gap data-aluno-id="{{ aluno }}" data-treino-idx="{{ t_idx }}" data-posicao="{{ posicao }}"
             aria-label="Inserir bloco aqui">
         <svg class="icon"><use href="#i-plus"/></svg>

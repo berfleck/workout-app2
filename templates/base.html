@@ -51,6 +51,15 @@
             },
         });
 
+        // ── Modo "Novo bloco" (Sub-PR 5): os "+" entre blocos só aparecem quando
+        // o usuário escolhe "Novo bloco" no kebab do treino. `treino` = idx do treino
+        // cujos gaps mostram o "+", ou null (modo desligado, "+" escondidos). ──
+        Alpine.store('insertBloco', {
+            treino: null,
+            ligar(t) { this.treino = t; },
+            desligar() { this.treino = null; },
+        });
+
         // ── Highlight pós-mudança (§4.3): glow laranja pulsante de ~600ms no elemento recém-modificado ──
         Alpine.store('highlight', {
             ref: null,
@@ -3549,6 +3558,8 @@ document.addEventListener('click', async function(e) {
     // contexto {alunoId, t, bi, label}; acha o .bloco-wrap pra esmaecer.
     function enterCarryBloco(c) {
         cancelSwapMode();
+        const ins = carryStore() && Alpine.store('insertBloco');
+        if (ins) ins.desligar();   // "Mover" e "Novo bloco" são mutuamente exclusivos
         const wrap = document.querySelector('.bloco-wrap[data-treino-idx="' + c.t + '"][data-bloco-idx="' + c.bi + '"]');
         carryBloco = { alunoId: c.alunoId, t: c.t, bi: c.bi, label: c.label || '', el: wrap };
         if (wrap) wrap.classList.add('bloco-is-carried');
@@ -3727,7 +3738,8 @@ document.addEventListener('click', async function(e) {
         }
         // ── Fora de modo carregando (mobile) ──
         if (!window.matchMedia('(max-width: 768px)').matches) return;
-        // Tap no "+" de um gap → abre o picker pra inserir bloco naquela posição
+        const insertStore = window.Alpine && Alpine.store('insertBloco');
+        // Tap no "+" de um gap → abre o picker e sai do modo "Novo bloco"
         const insGap = e.target.closest('[data-insert-gap]');
         if (insGap && typeof window.openBlocoPicker === 'function') {
             e.preventDefault();
@@ -3737,6 +3749,13 @@ document.addEventListener('click', async function(e) {
                 t: parseInt(insGap.dataset.treinoIdx, 10),
                 posicao: parseInt(insGap.dataset.posicao, 10),
             });
+            if (insertStore) insertStore.desligar();
+            return;
+        }
+        // Em modo "Novo bloco" e tocou fora de um "+" → cancela o modo (esconde os +)
+        if (insertStore && insertStore.treino !== null) {
+            e.preventDefault();
+            insertStore.desligar();
             return;
         }
         // Tap no mini-kebab do bloco → action sheet do bloco
@@ -4214,6 +4233,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const pngLink = sheet.querySelector('[data-kebab-png]');
     const substituirLink = sheet.querySelector('[data-kebab-substituir]');
     const editarBtn = sheet.querySelector('[data-kebab-editar]');
+    const novoBlocoBtn = sheet.querySelector('[data-kebab-novo-bloco]');
     const removerBtn = sheet.querySelector('[data-kebab-remover]');
     let currentBtn = null;
     let currentCtx = null;
@@ -4261,6 +4281,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 target: '#treino-' + ctx.idx,
                 swap: 'innerHTML'
             });
+        });
+    }
+    if (novoBlocoBtn) {
+        novoBlocoBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (!currentCtx) return;
+            const t = parseInt(currentCtx.idx, 10);
+            close();
+            if (window.cancelSwapMode) window.cancelSwapMode();   // sai de qualquer carry
+            const store = window.Alpine && Alpine.store('insertBloco');
+            if (store) store.ligar(t);   // mostra os "+" nos gaps deste treino
         });
     }
     if (removerBtn) {
