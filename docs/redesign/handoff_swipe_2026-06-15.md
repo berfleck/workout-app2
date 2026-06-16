@@ -151,3 +151,64 @@ Core (C1-C4) + refino de UI no mobile real do Bernardo (C5-C9). Plano em
 - **Smoke de servidor (curl, aluno 18)**: reorder, remover+snapshot, inserir 1/2 ex (compostos
   primeiro), adicionar, undo round-trip, regerar — todas OK. Rascunho descartado.
 - **Validação no mobile real** (Bernardo, durante a sessão) guiou os refinos C5-C9.
+
+---
+
+# Sub-PR 6 — CONCLUÍDO (2026-06-16 · Frente C parte 3 · §7.5, §10.8)
+
+Branch **`feat-sub-pr6-prescricao-drawer`** (de `main`) — validado no mobile real
+do Bernardo. Modo edição clássico vira **drawer de prescrição** no mobile.
+
+| Commit | Conteúdo |
+|---|---|
+| `ff91d47` | Drawer (séries/reps/RIR) via kebab → "Prescrever"; rota GET .../prescrever; templates + IIFE + CSS |
+| `5328463` | fix — IIFE em DOMContentLoaded (shell #prescr-drawer é incluído depois no body) |
+| `318bb8b` | fix — race do autosave com o fechamento (backdrop não fecha + visualizar-inline atrasado 500ms) |
+
+## Arquitetura
+- **Acesso:** kebab do treino card → **"Prescrever"** (`data-kebab-prescrever`,
+  ícone `i-clipboard-list`). Substituiu "Editar treino" no mobile — substituir/
+  mover/remover/regerar já migraram pra viz nos Sub-PRs 4-5. Desktop mantém o
+  lápis → `editar-inline` (modo edição clássico) intocado.
+- **Drawer** (`_mobile_prescricao_drawer.html` shell + `_prescricao_lista.html`
+  conteúdo): sobe ~72%, overlay sobre a viz. NÃO renderiza card `modo-editar` →
+  `body--em-edicao`/`focando-edicao` ficam off → swipe atrás intacto.
+- **Backend reusado:** save por focusout usa `/treino/<t>/prescricao/<bi>/<ei>`
+  existente (`hx-swap="none"` → só OOB do banner; toast de autosave dispara
+  sozinho). Limpar reusa `/limpar` + re-busca o drawer (`refreshPrescricaoDrawer`).
+- **Rota nova (única):** `GET .../treino/<t>/prescrever` — ativa `edicao_hub`
+  (autosave depende) e renderiza a lista. **NÃO grava** — abrir o drawer sozinho
+  não cria rascunho (≠ `editar-inline`, que chamava `salvar_sessoes_disco`).
+- **Concluir** (botão / ESC): `visualizar-inline` re-renderiza o card de viz
+  (badges atualizados) e zera `edicao_hub`; bb refetcha via listener de `#treino-*`.
+
+## Decisões / armadilhas (não reabrir sem motivo)
+- **IIFE em DOMContentLoaded** (não parse-time): o include do shell vem DEPOIS do
+  `<script>` no body. (Mesma classe de bug do CLAUDE.md "script no meio do body".)
+- **Backdrop NÃO fecha o drawer** — só "Concluir"/ESC. No mobile, o tap que
+  dispensa o teclado vaza pro overlay e fechava sem querer.
+- **Autosave × fechamento (race crítico):** focusout tem `delay:300ms`; fechar
+  chamava `visualizar-inline` na hora, zerando `edicao_hub` antes do POST atrasado
+  → `salvar_sessoes_disco` pulava o rascunho → prescrição perdida (a pré-existente,
+  vinda da publicada, sobrevivia). Fix: `close()` faz blur do input ativo (dispara
+  o autosave) e atrasa o `visualizar-inline` em **500ms** (> 300ms do debounce).
+  Servidor single-thread serializa requests → o POST persiste antes do clear.
+
+## Verificação
+- **pytest 386** passed, 2 skips (sem teste novo — rota é wrapper fino, lógica
+  pura toda reusada; cobertura via smoke).
+- **`node --check`** OK no IIFE; braces dos `<style>` balanceados (682/396).
+- **Smoke curl (aluno 18)**: open → save B2 → save C2 → reopen mostra ambos;
+  limpar zera + esconde botão; visualizar-inline reflete badge. Rascunho descartado.
+- **Mobile real** (Bernardo): drawer abre, edita múltiplos exercícios numa
+  abertura, Concluir persiste tudo. Os 2 fixes saíram dessa validação.
+
+## Resta (Sub-PR 7 — Saneamento, guia §9 item 7)
+- Remover código morto: popup `openExerciseActionPopup`/`_renderPopupContent`/
+  `_doPopupSubstituir` + listeners; rota `hub_swap_visualizar`; CSS `.swap-indicator*`,
+  `.treino-num-badge`; var `sessao_render` morta em `hub_substituir_aleatorio`.
+- Auditar `_responder_card_com_banner` (ativa `edicao_hub`) vs `_render_swap_cards`
+  (viz, sem edicao_hub) — documentar a divisão no CLAUDE.md.
+- Decisão pendente: a rota `editar-inline` + `_treino_card.html` modo editar só
+  servem o **desktop** agora. No mobile o único acesso era a antiga "Editar treino"
+  (substituída). Manter pro desktop; manter `bloco_mover` (setas) como fallback a11y.
