@@ -4399,17 +4399,30 @@ document.addEventListener('DOMContentLoaded', function() {
     function close() {
         if (!overlay.classList.contains('is-open')) return;
         const c = ctx;
+        ctx = null;
+        // Dispara o autosave pendente do input ativo (focusout) ANTES de fechar —
+        // senão a prescrição em edição se perde no race com o visualizar-inline.
+        if (document.activeElement && overlay.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
         overlay.classList.remove('is-open');
         overlay.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('sheet-open');
-        ctx = null;
         if (c) {
-            htmx.ajax('GET', '/hub/rotina/' + c.alunoId + '/treino/' + c.t + '/visualizar-inline',
-                      { target: '#treino-' + c.t, swap: 'innerHTML' });
+            // visualizar-inline zera edicao_hub; o autosave depende dessa flag pra
+            // persistir no rascunho. O servidor é single-thread (serializa requests),
+            // então basta atrasar o visualizar-inline além do debounce (300ms) do
+            // focusout pra garantir que o POST de prescrição rode primeiro.
+            setTimeout(function() {
+                htmx.ajax('GET', '/hub/rotina/' + c.alunoId + '/treino/' + c.t + '/visualizar-inline',
+                          { target: '#treino-' + c.t, swap: 'innerHTML' });
+            }, 500);
         }
     }
+    // Só fecha no botão "Concluir" (ou ESC) — NÃO no tap no backdrop: no mobile, o
+    // tap que dispensa o teclado vaza pro overlay e fecharia o drawer sem querer.
     overlay.addEventListener('click', function(e) {
-        if (e.target === overlay || e.target.closest('[data-prescr-close]')) close();
+        if (e.target.closest('[data-prescr-close]')) close();
     });
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && overlay.classList.contains('is-open')) close();
