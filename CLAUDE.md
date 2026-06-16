@@ -721,6 +721,17 @@ corrigido = {k.encode('latin-1').decode('utf-8'): v for k, v in raw.items()}
 - **`hidden md:inline-flex` do Tailwind CDN às vezes perde** pra `.btn { @apply ... inline-flex }` por ordem de CSS. Se botões desktop "voltarem a aparecer" no mobile, adicionar `display: none !important` defensivo dentro de `@media (max-width: 768px)`.
 - **`_responder_card_com_banner` ativa `edicao_hub`** — não usar pra ações que devem só salvar rascunho sem entrar em modo edição (ex: swap por long-press). Pra esses casos, escrever rascunho direto via `salvar_rascunho()` e renderizar `_hub_treino_card.html` (visualizar) + `render_draft_banner_oob()`.
 
+### Dois helpers de resposta (iniciativa swipe · ver `docs/redesign/guia_swipe_edicao_direta.md` §3.2)
+
+Duas famílias de resposta convivem **por design** — a divisão é viz-estrutural vs prescrição:
+
+| Helper | Renderiza | `edicao_hub` | Usado por |
+|---|---|---|---|
+| `_render_swap_cards(aluno_id, sessoes_dicts, idxs)` | `_hub_treino_card.html` modo **visualizar** como `.swap-card-result[data-treino-idx]` + banner OOB | **NÃO ativa** (grava rascunho direto via `salvar_rascunho`) | Todas as ops estruturais HUB-viz (swap, tornar-solo, mover, remover, regerar/remover/inserir/adicionar bloco, reorder). Cliente aplica via `applyStructuralResult(html, hl, opts)` |
+| `_responder_card_com_banner(t)` | `_treino_card.html` modo **editar** + banner OOB | **lê** `edicao_hub` (a rota é quem seta); persiste rascunho via `salvar_sessoes_disco` | **Desktop**: edição inline (`editar-inline` + lápis no card). **Prescrição** (Sub-PR 6): rotas `/treino/<t>/prescricao/...` chamadas pelo drawer com `hx-swap="none"` (só o OOB do banner é aplicado) |
+
+Regra: **op estrutural atômica → viz (`_render_swap_cards`, sem `edicao_hub`); revisão de conjunto (prescrição em lote) → drawer/inline (`_responder_card_com_banner`, com `edicao_hub`).** No mobile, o único acesso ao modo editar clássico (`editar-inline` + `_treino_card.html`) era a "Editar treino" no kebab — substituída pelo drawer de prescrição no Sub-PR 6. O modo editar inline sobrevive **só no desktop**. `bloco_mover` (setas, `/treino/<t>/bloco/<bi>/mover/<dir>`) fica como fallback de acessibilidade desktop.
+
 ## Como rodar
 
 ```bash

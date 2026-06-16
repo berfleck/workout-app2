@@ -2809,50 +2809,6 @@ def _swap_ex_in_sessao(sessao, bi_a, ei_a, bi_b, ei_b):
     setattr(bloco_b, attr_b, ex_a)
 
 
-@app.route("/hub/rotina/<int:aluno_id>/treino/<int:t>/swap/<int:bi_a>/<int:ei_a>/<int:bi_b>/<int:ei_b>", methods=["POST"])
-def hub_swap_visualizar(aluno_id, t, bi_a, ei_a, bi_b, ei_b):
-    """Swap atômico entre 2 exercícios do mesmo treino, em modo visualização do HUB.
-    Persiste como rascunho SEM ativar modo edição (edicao_hub fica intacto).
-    Retorna card visualizar + banner OOB."""
-    sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
-    if not sessoes_dicts:
-        return '<div class="erro">Nenhuma rotina ativa.</div>', 404
-    if t < 0 or t >= len(sessoes_dicts):
-        return '<div class="erro">Treino não encontrado.</div>', 404
-    sessao_dict = sessoes_dicts[t]
-    blocos = sessao_dict["blocos"]
-    if bi_a < 0 or bi_a >= len(blocos) or bi_b < 0 or bi_b >= len(blocos):
-        return '<div class="erro">Bloco inválido.</div>', 400
-    if ei_a not in (0, 1, 2) or ei_b not in (0, 1, 2):
-        return '<div class="erro">Posição inválida.</div>', 400
-    if (bi_a, ei_a) == (bi_b, ei_b):
-        return '<div class="erro">Selecione um exercício diferente.</div>', 400
-    attrs = ("ex1", "ex2", "ex3")
-    attr_a, attr_b = attrs[ei_a], attrs[ei_b]
-    blocos[bi_a][attr_a], blocos[bi_b][attr_b] = blocos[bi_b][attr_b], blocos[bi_a][attr_a]
-    salvar_rascunho(aluno_id, sessoes_dicts)
-
-    sessao = _dict_to_sessao(sessao_dict)
-    aluno = next((a for a in carregar_alunos() if a["id"] == aluno_id), None)
-    nomes_anteriores = set()
-    if aluno:
-        rot_ant = carregar_rotina_anterior(aluno["nome"], aluno.get("rotina_ativa_id"))
-        if rot_ant:
-            for s_dict in rot_ant["sessoes"]:
-                for b in s_dict["blocos"]:
-                    for key in ("ex1", "ex2", "ex3"):
-                        ex = b.get(key)
-                        if ex: nomes_anteriores.add(ex["nome"])
-    rotina_reg = carregar_rotina_ativa(aluno_id)
-    intent_atual = carregar_intent_rascunho(aluno_id)
-    publicada_para_diff = [] if intent_atual == "nova-rotina" else (rotina_reg["sessoes"] if rotina_reg else [])
-    estados_rascunho = _estados_rascunho_por_posicao(sessoes_dicts, publicada_para_diff)
-    card = render_template("_hub_treino_card.html", sessao=sessao, idx=t,
-                           aluno_id=aluno_id, nomes_anteriores=nomes_anteriores,
-                           estados_rascunho=estados_rascunho,
-                           padroes_labels=PADROES_LABELS)
-    return card + render_draft_banner_oob(aluno_id)
-
 
 def _nomes_da_rotina_anterior(aluno):
     """Conjunto de nomes de exercícios da rotina anterior (pra badge 'mantido')."""
@@ -2896,7 +2852,7 @@ def _render_swap_cards(aluno_id, sessoes_dicts, indices):
 def hub_swap_unificado(aluno_id, t_a, bi_a, ei_a, t_b, bi_b, ei_b):
     """Swap atômico entre 2 exercícios — MESMO treino (t_a == t_b) ou ENTRE treinos.
     Persiste como rascunho SEM ativar modo edição. Retorna 1 (intra) ou 2 (inter)
-    cards roteáveis + banner OOB. Sucessor unificado de hub_swap_visualizar (§6.2)."""
+    cards roteáveis + banner OOB. Rota unificada intra+inter-treino (§6.2)."""
     sessoes_dicts = _obter_sessoes_trabalho(aluno_id)
     if not sessoes_dicts:
         return '<div class="erro">Nenhuma rotina ativa.</div>', 404
@@ -3114,18 +3070,15 @@ def hub_substituir_aleatorio(aluno_id, t, bi, slot):
     # Verificar se realmente mudou (caso não haja candidatos)
     novo_dict = _sessao_to_dict(nova_sessao)
     novo_ex = novo_dict["blocos"][bi].get(slot)
-    if not novo_ex or novo_ex["nome"] == nome_ex:
-        # Nada substituído — devolve card atual sem mexer no rascunho
-        sessao_render = _dict_to_sessao(sessoes_dicts[t])
-    else:
+    if novo_ex and novo_ex["nome"] != nome_ex:
         sessoes_dicts[t] = novo_dict
         salvar_rascunho(aluno_id, sessoes_dicts)
         historico_substituicoes[pos_key]["vistos"].add(novo_ex["nome"])
-        sessao_render = nova_sessao
+    # else: nada substituído — devolve o card atual sem mexer no rascunho.
 
     # Formato unificado .swap-card-result (consumido pelo action sheet · Frente C).
-    # sessao_render deriva de sessoes_dicts[t] em ambos os ramos acima, então _render_swap_cards
-    # (que relê sessoes_dicts[t]) renderiza o mesmo conteúdo.
+    # _render_swap_cards relê sessoes_dicts[t], então renderiza o estado correto
+    # em ambos os ramos.
     return _render_swap_cards(aluno_id, sessoes_dicts, [t])
 
 
