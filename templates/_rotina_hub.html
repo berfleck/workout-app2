@@ -46,6 +46,20 @@
         </div>
         {% endif %}
     </div>
+    {# Chips de treino (mobile): toggle T1/T2/... dentro do card, abaixo da etiqueta.
+       Só o nome reduzido; o ativo fica laranja e os outros apagados (on/off).
+       data-nome guarda o nome completo pro submenu "mover para outro treino". #}
+    {% if rotina and rotina.sessoes|length > 1 and periodo != 'anterior' and periodo != 'comparar' %}
+    <div class="hub-pager-chips md:hidden" role="tablist" aria-label="Treinos da rotina">
+    {% for sessao in rotina.sessoes %}
+        {% set _tp = sessao.tipo %}
+        {% set _nc = _tp if _tp and _tp != 'manual' and ' + ' not in _tp else None %}
+        <button type="button" class="hub-pager-chip{% if loop.index0 == 0 %} active{% endif %}"
+                data-target="{{ loop.index0 }}" data-nome="{{ _nc or ('Treino ' ~ loop.index) }}"
+                role="tab" aria-label="Treino {{ loop.index }}">T{{ loop.index }}</button>
+    {% endfor %}
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 
@@ -286,19 +300,8 @@
 
 {% include "_draft_banner.html" %}
 
-{# Chip pager do swipe (mobile ≤768px) — afordância principal pra navegar entre treinos.
-   No desktop fica escondido (md:hidden); a navegação lá é a grade .resultado-grid. #}
-<nav class="hub-pager md:hidden" aria-label="Navegação entre treinos">
-{% for sessao in rotina.sessoes %}
-    {% set _tipo = sessao.tipo %}
-    {% set nome_custom = _tipo if _tipo and _tipo != 'manual' and ' + ' not in _tipo else None %}
-    {% set nome_pager = nome_custom or ('Treino ' ~ loop.index) %}
-    <button type="button" class="hub-pager-chip{% if loop.index0 == 0 %} active{% endif %}" data-target="{{ loop.index0 }}">
-        <span class="hub-pager-chip-badge">T{{ loop.index }}</span> {{ nome_pager }}
-    </button>
-{% endfor %}
-</nav>
-
+{# O chip pager do swipe agora vive DENTRO do card do aluno (.hub-pager-chips,
+   acima neste template) — toggle T1/T2 compacto. Aqui sobra só o track. #}
 <div class="resultado-grid hub-swipe-track" id="hub-swipe-track" data-n="{{ rotina.sessoes|length }}">
 {% for sessao in rotina.sessoes %}
 {% set idx = loop.index0 %}

@@ -554,37 +554,32 @@
             .hub-swipe-on #rotina-display > .aluno-badge { margin-bottom: 8px; padding-left: var(--hub-inset); padding-right: var(--hub-inset); min-width: 0; max-width: 100%; }
             .hub-swipe-on .aluno-badge-row { min-width: 0; }
 
-            /* Chip pager — afordância principal do swipe */
-            .hub-pager {
-                display: flex; gap: 6px;
-                padding: 8px var(--hub-inset, 22px) 10px;
-                overflow-x: auto;
-                background: white;
-                border-top: 1px solid var(--gray-200);
-                border-bottom: 1px solid var(--gray-200);
-                scrollbar-width: none;
+            /* Chips de treino — toggle T1/T2 compacto DENTRO do card do aluno
+               (abaixo da etiqueta). On/off: ativo laranja, demais apagados. */
+            .hub-pager-chips {
+                display: flex; flex-wrap: wrap; gap: 6px;
+                margin-top: 10px;
             }
-            .hub-pager::-webkit-scrollbar { display: none; }
             .hub-pager-chip {
-                flex-shrink: 0;
-                padding: 8px 14px;
-                border-radius: 999px;
-                background: var(--gray-50);
+                flex: 0 0 auto;
+                min-width: 40px;
+                padding: 6px 12px;
+                border-radius: 8px;
                 border: 1px solid var(--gray-200);
-                font-size: 12.5px; font-weight: 600;
-                color: var(--gray-700);
-                cursor: pointer; white-space: nowrap;
-                display: inline-flex; align-items: center; gap: 7px;
-                line-height: 1; font-family: inherit;
-                transition: all 150ms;
+                background: var(--gray-100);
+                color: var(--gray-400);
+                font-family: var(--font-mono);
+                font-size: 12px; font-weight: 700;
+                letter-spacing: 0.04em; line-height: 1;
+                text-align: center; cursor: pointer;
+                transition: background 150ms, color 150ms, border-color 150ms;
+                -webkit-tap-highlight-color: transparent;
             }
-            .hub-pager-chip-badge {
-                font-size: 10px; font-weight: 800;
-                background: var(--gray-100); color: var(--gray-500);
-                padding: 2px 6px; border-radius: 4px; letter-spacing: 0.04em;
+            .hub-pager-chip.active {
+                background: var(--brand-500);
+                border-color: var(--brand-500);
+                color: white;
             }
-            .hub-pager-chip.active { background: var(--brand-500); border-color: var(--brand-500); color: white; }
-            .hub-pager-chip.active .hub-pager-chip-badge { background: rgba(255,255,255,0.22); color: white; }
 
             /* .resultado-grid vira flex row com scroll-snap horizontal (exceto em edição inline) */
             .hub-swipe-on .resultado-grid.hub-swipe-track:not(.focando-edicao) {
@@ -4656,7 +4651,8 @@ document.addEventListener('keydown', function(e) {
         document.querySelectorAll('.hub-pager-chip[data-target]').forEach(function(chip) {
             const dt = parseInt(chip.dataset.target, 10);
             if (dt === ctx.t) return;
-            const nome = chip.textContent.trim().replace(/\s+/g, ' ');
+            // chip mostra só "T1"/"T2"; o nome completo vem do data-nome.
+            const nome = (chip.dataset.nome || chip.textContent).trim().replace(/\s+/g, ' ');
             subList.appendChild(makeSubItem(nome, function() {
                 post('/hub/rotina/' + ctx.alunoId + '/treino/' + ctx.t + '/exercicio/' + ctx.bi + '/' + ctx.ei + '/mover-treino/' + dt, null);
             }));
