@@ -4370,7 +4370,9 @@ document.addEventListener('DOMContentLoaded', function() {
 // "Prescrever". Conteúdo carregado por HTMX (GET .../prescrever); autosave por
 // focusout reusa as rotas existentes. "Concluir" re-renderiza o card de viz
 // (badges atualizados) e zera edicao_hub via visualizar-inline.
-(function() {
+// DOMContentLoaded: o include do shell (#prescr-drawer) vem DEPOIS deste script
+// no body, então querySelector em parse-time pegaria null.
+document.addEventListener('DOMContentLoaded', function() {
     const overlay = document.getElementById('prescr-drawer');
     if (!overlay) return;
     const titleEl = overlay.querySelector('[data-prescr-title]');
@@ -4412,7 +4414,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && overlay.classList.contains('is-open')) close();
     });
-})();
+});
 
 // ── Bottom sheet de navegação (mobile) ──
 document.addEventListener('DOMContentLoaded', function() {
