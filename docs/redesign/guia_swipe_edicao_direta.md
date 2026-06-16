@@ -667,20 +667,25 @@ assinatura. Decisão técnica do Code durante `/plan`.
 
 ## 9. Ordem sugerida de implementação
 
+> **Status (2026-06-16): TODOS concluídos e mergeados em `main`.** Os Sub-PRs 1-7
+> abaixo saíram conforme o plano; surgiu um **Sub-PR 8** não previsto (restaurar a
+> substituição manual + seletor de escopo no mobile, regressão descoberta em uso).
+> Detalhe de cada entrega + ponteiros de commit na seção **"13. Estado final"** no fim.
+
 Sequência pra `/plan` no Code:
 
-1. **Sub-PR 1 — Adoção do Alpine.** Adicionar Alpine + morph ao
+1. **✅ Sub-PR 1 — Adoção do Alpine.** Adicionar Alpine + morph ao
    `base.html`. Criar `Alpine.store('carry', ...)` e
    `Alpine.store('highlight', ...)`. Mudar `hx-swap` pra `morph` nas
    rotas que vão precisar preservar estado. Validar que nada quebra no
    app existente. **Não introduz feature nova** — só plataforma.
 
-2. **Sub-PR 2 — Swipe entre treinos (Frente A).** Reescrever o template
+2. **✅ Sub-PR 2 — Swipe entre treinos (Frente A).** Reescrever o template
    da rotina no mobile como swipe-track + chip pager, conforme mockup.
    Backend não muda. Validar em mobile real. Mover toggle Atual/Anterior
    pro kebab da topbar.
 
-3. **Sub-PR 3 — Pill de modo carregando + swap inter-treino (Frente B).**
+3. **✅ Sub-PR 3 — Pill de modo carregando + swap inter-treino (Frente B).**
    Implementar o pill flutuante e o estado visual de origem/alvos.
    Migrar a rota de swap pra assinatura unificada (intra + inter).
    Migrar long-press intra-treino atual pra usar o novo `$store.carry`.
@@ -722,23 +727,23 @@ Sequência pra `/plan` no Code:
    (cancela carry se o dedo se mover mais de N px antes do timer
    disparar).
 
-4. **Sub-PR 4 — Edição estrutural nível exercício (Frente C parte 1).**
+4. **✅ Sub-PR 4 — Edição estrutural nível exercício (Frente C parte 1).**
    Action sheet do tap curto. "Tornar solo" com regra "acima do bloco
    de origem". Helper `_responder_card_viz_com_banner` no backend.
    Submenu de mover exercício pra outro bloco/treino.
 
-5. **Sub-PR 5 — Edição estrutural nível bloco (Frente C parte 2).**
+5. **✅ Sub-PR 5 — Edição estrutural nível bloco (Frente C parte 2).**
    Mini-kebab no header do bloco (adicionar/regerar/remover). Toast de
    undo pra remover bloco (infra reusável). Reorder de bloco via
    long-press + tap em gap. Inserção de bloco via "+" entre blocos com
    picker permitindo 1 ou 2 exercícios.
 
-6. **Sub-PR 6 — Modo prescrição como drawer (Frente C parte 3).**
+6. **✅ Sub-PR 6 — Modo prescrição como drawer (Frente C parte 3).**
    Refatorar o modo edição clássico como drawer dedicado. Adicionar
    "Prescrever" ao kebab do treino card. Garantir que autosave de
    prescrição funciona idêntico ao atual.
 
-7. **Sub-PR 7 — Saneamento.** Remover modo edição genérico das
+7. **✅ Sub-PR 7 — Saneamento.** Remover modo edição genérico das
    operações que migraram. Auditar `_responder_card_com_banner` —
    quais rotas ainda precisam dele, quais podem ir pro variante viz.
    Documentar a divisão no `CLAUDE.md`. Garantir que `bloco_mover` por
@@ -897,3 +902,46 @@ inline (visão de conjunto, inputs grandes, sem risco de toque acidental).
       Sub-PR 1.
 - [ ] Confirmar com Code a granularidade dos sub-PRs (este guia sugere
       7; podem ser mais ou menos a critério dele).
+
+---
+
+## 13. Estado final (2026-06-16) — iniciativa CONCLUÍDA
+
+Todos os sub-PRs mergeados em `main`. Esta é a fonte de verdade do progresso —
+o handoff datado (`handoff_swipe_2026-06-15.md`) foi só o prompt de abertura de
+sessão e não acumula mais estado. Detalhe técnico de cada entrega vive nos
+commits e (pros últimos) nas notas abaixo.
+
+| Sub-PR | Entrega | Commits |
+|---|---|---|
+| 1 | Plataforma Alpine.js + morph + stores `carry`/`highlight` | `8f85924` |
+| 2 | Swipe entre treinos (Frente A): swipe-track + chip pager + counter/kebab topbar | `de7a022` |
+| 3 | Pill de modo carregando + swap inter-treino unificado (Frente B) + highlight | `994f39a` |
+| 4 | Edição estrutural nível exercício (Frente C p1): tap→action sheet, long-press→carry, rotas viz | `948d7b0` + `6821d42` (card) |
+| 5 | Edição estrutural nível bloco (Frente C p2): mini-kebab, toast undo, reorder, inserir bloco | `13e101b`→`692dfd1` (C1-C9) |
+| 6 | Modo prescrição como drawer (Frente C p3) + 2 fixes (IIFE DOMContentLoaded, race autosave×fechar) | `ff91d47` `5328463` `318bb8b` |
+| 7 | Saneamento: −375 linhas mortas (popup inerte, CSS órfã, rota 4-param, var morta) + doc CLAUDE.md | `bb793a0` |
+| **8** | **Restaura substituição no mobile viz** (manual + escopo padrão/subregião) — regressão do Sub-PR 4 | `8be0a03` |
+
+**Notas das últimas entregas (as que não estavam no plano original):**
+
+- **Sub-PR 6 — armadilhas:** IIFE do drawer DEVE rodar em `DOMContentLoaded` (o
+  include do shell vem depois no body); backdrop NÃO fecha o drawer (tap de
+  dispensar teclado vaza); `close()` faz blur + atrasa o `visualizar-inline` em
+  500ms (> debounce 300ms do autosave) — senão a prescrição em edição se perde no
+  race com o clear de `edicao_hub`.
+- **Sub-PR 7 — divisão de helpers** (documentada no `CLAUDE.md`): `_render_swap_cards`
+  (viz, **sem** `edicao_hub`) pra ops estruturais; `_responder_card_com_banner`
+  (editar/prescrição, **com** `edicao_hub`). Modo editar inline agora é **desktop-only**;
+  `bloco_mover` (setas) = fallback a11y.
+- **Sub-PR 8 — substituição:** action sheet do exercício → "Substituir" vira submenu
+  (Sortear · mesmo padrão / Sortear · mesma subregião / Escolher da biblioteca…).
+  Rotas HUB-viz novas `buscar-substitutos/<bi>/<slot>` (GET) e `substituir-por/<bi>/<slot>`
+  (POST); `substituir-aleatorio` já aceitava `escopo`. Picker `_mobile_subst_picker.html`.
+  Desktop (`openSubstDrawer`) intocado — substituição manual existe em 2 caminhos
+  independentes (possível unificação futura, não urgente).
+
+**Dívidas/limpezas futuras (não bloqueiam):** unificar a substituição manual
+desktop (modo editar, `sessoes_ativas`) com a do mobile viz (`hub_substituir_por`,
+rascunho); itens não marcados do §12 (mockup commitado / snapshot) são pré-Sub-PR-1,
+históricos.
