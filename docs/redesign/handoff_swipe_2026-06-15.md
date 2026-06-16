@@ -203,12 +203,51 @@ do Bernardo. Modo edição clássico vira **drawer de prescrição** no mobile.
 - **Mobile real** (Bernardo): drawer abre, edita múltiplos exercícios numa
   abertura, Concluir persiste tudo. Os 2 fixes saíram dessa validação.
 
-## Resta (Sub-PR 7 — Saneamento, guia §9 item 7)
-- Remover código morto: popup `openExerciseActionPopup`/`_renderPopupContent`/
-  `_doPopupSubstituir` + listeners; rota `hub_swap_visualizar`; CSS `.swap-indicator*`,
-  `.treino-num-badge`; var `sessao_render` morta em `hub_substituir_aleatorio`.
-- Auditar `_responder_card_com_banner` (ativa `edicao_hub`) vs `_render_swap_cards`
-  (viz, sem edicao_hub) — documentar a divisão no CLAUDE.md.
-- Decisão pendente: a rota `editar-inline` + `_treino_card.html` modo editar só
-  servem o **desktop** agora. No mobile o único acesso era a antiga "Editar treino"
-  (substituída). Manter pro desktop; manter `bloco_mover` (setas) como fallback a11y.
+## Resta (Sub-PR 7 — Saneamento, guia §9 item 7) — ✅ CONCLUÍDO abaixo
+
+---
+
+# Sub-PR 7 — CONCLUÍDO (2026-06-16 · Saneamento · guia §9 item 7)
+
+Branch **`feat-sub-pr7-saneamento`** (de `main`). Remoção de código morto
+acumulado nos Sub-PRs 3-6 — **net −375 linhas**. Sem mudança funcional.
+
+| Commit | Conteúdo |
+|---|---|
+| `bb793a0` | Remove popup inerte + CSS órfã + rota 4-param + var morta; doc da divisão no CLAUDE.md |
+
+## Removido
+- **Mini-popup de ações por exercício** (`base.html`): `openExerciseActionPopup`
+  (nunca chamado — substituído pelo action sheet do Sub-PR 4) + `_renderPopupContent`
+  + `_doPopupSubstituir` + `_positionPopup` + `_reanchorPopup` + `closeExerciseActionPopup`
+  + `popupState` + `_slotFromEi` + os 4 listeners (click/ESC/scroll/beforeSwap) +
+  o guard `.ex-action-popup` no `touchstart` live.
+- **CSS órfã** (`base.html`): `.ex-action-popup*`, `body.action-popup-open`,
+  `.exercicio.action-popup-target` (popup); `.swap-indicator*` (virou a `.carry-pill`
+  Alpine); `.treino-num-badge` (badge T1 saiu do card).
+  **Preservados:** `.exercicio.swap-selected` + `@keyframes swapPulse` (live).
+- **Rota `hub_swap_visualizar`** (`app_flask.py`, 4-param `/swap/`) — substituída
+  pela unificada de 6 params (intra+inter) no Sub-PR 3; sem caller.
+- **Var morta `sessao_render`** em `hub_substituir_aleatorio` (o return relê
+  `sessoes_dicts`, então a var não fazia nada).
+
+## Documentado (CLAUDE.md)
+- Tabela da divisão `_render_swap_cards` (viz, **sem** `edicao_hub`) vs
+  `_responder_card_com_banner` (editar/prescrição, **com** `edicao_hub`).
+- Modo editar inline (`editar-inline` + `_treino_card.html`) agora é **desktop-only**.
+- `bloco_mover` (setas) = fallback de acessibilidade desktop.
+
+## Verificação
+- **pytest 386** passed, 2 skips · `py_compile` OK.
+- **Sem refs pendentes** aos símbolos removidos (grep limpo).
+- **braces `<style>`** 647/396 · **`node --check`** no swap IIFE OK.
+- **Smoke curl (aluno 18)**: page 200, swap unificado 200, substituir-aleatorio 200,
+  prescrever 200; **rota antiga 4-param → 404** (confirma remoção). Rascunho descartado.
+
+---
+
+# 🎉 Iniciativa swipe + edição direta — COMPLETA (Sub-PRs 1-7)
+
+Todos os 7 sub-PRs mergeados em `main`. Frente A (swipe), Frente B (swap
+inter-treino), Frente C (edição estrutural viz + drawer de prescrição) e o
+saneamento final concluídos. Modo editar clássico sobrevive só no desktop.
