@@ -3,10 +3,10 @@
 Continuação do `guia_swipe_edicao_direta.md`. Esta sessão fechou os Sub-PRs 1–4
 + um follow-up de redesign do card. Tudo validado no **mobile real** pelo Bernardo.
 
-> **Atualização 2026-06-15 (parte 2): Sub-PR 5 implementado** no branch
-> `feat-sub-pr5-bloco` (a partir de `main`), commits 1–4 abaixo. **Pendente:
-> smoke mobile real do Bernardo + merge.** Pytest 386 + smoke de servidor (curl)
-> de todas as 6 rotas OK. Ver seção "Sub-PR 5 — implementado" no fim.
+> **Atualização 2026-06-15 (parte 2): Sub-PR 5 CONCLUÍDO e mergeado FF em `main`.**
+> Core (C1-C4) + refino de UI no mobile real (C5-C9, kebab-only + "+" sob demanda).
+> Pytest 386 OK. Ver seção "Sub-PR 5 — CONCLUÍDO" no fim. Próximo: Sub-PR 6 (modo
+> prescrição como drawer).
 
 ## Estado do branch
 
@@ -92,28 +92,38 @@ Continuação do `guia_swipe_edicao_direta.md`. Esta sessão fechou os Sub-PRs 1
 
 ---
 
-# Sub-PR 5 — implementado (2026-06-15 parte 2 · Frente C parte 2 · §7.2-7.4, §10.7)
+# Sub-PR 5 — CONCLUÍDO (2026-06-15 parte 2 · Frente C parte 2 · §7.2-7.4, §10.7)
 
-Branch **`feat-sub-pr5-bloco`** (de `main`). **Falta:** smoke mobile real (§9, agora
-inclui handle ⠿ de bloco) + merge FF. Plano em `.claude/plans/swift-discovering-twilight.md`.
+Branch **`feat-sub-pr5-bloco`** (de `main`) → **mergeado FF em `main` + pushado**.
+Core (C1-C4) + refino de UI no mobile real do Bernardo (C5-C9). Plano em
+`.claude/plans/swift-discovering-twilight.md`.
 
 | Commit | Conteúdo |
 |---|---|
 | `13e101b` | C1 — rotas de bloco HUB-viz (backend) + refactor `hub_regerar_bloco` + 11 pytest |
-| `c5d4f2e` | C2 — mini-kebab + handle ⠿ + gaps dual-mode + partials + CSS (templates) |
+| `c5d4f2e` | C2 — mini-kebab + gaps dual-mode + partials + CSS (templates) |
 | `5af9b53` | C3 — gesto de bloco + sheet + picker + carry-pill generalizada + `highlightBloco` (JS) |
 | `a5dd784` | C4 — toast undo de remover bloco (§10.7) |
+| `34b1b3c` | C5 — fix "+" (overflow:visible/z-index) + tirar prescrição default + folga badge |
+| `3d7bb31` | C6 — gutter do bloco (ferramentas = bloco inteiro; separadores param antes da direita) |
+| `864e3ca` | C7 — fix kebab vazando pra fora da tela (largura auto, sem caixa fixa) |
+| `15ce1b8` | C8 — **handle ⠿ removido** (reorder só via kebab) + mais respiro (`--hub-inset` 28) |
+| `692dfd1` | C9 — **"+" sob demanda** via "Novo bloco" no kebab do TREINO (store `insertBloco`) |
 
-## Decisões desta parte
-- **Pegar bloco = AMBOS** (Bernardo): handle ⠿ (long-press) **E** "Mover bloco" no
-  kebab. O card de viz **não tem header de bloco** ("BLOCO A" é `display:none` no
-  modo-visualizar; o rótulo é "A1/A2" dentro do exercício) — então a premissa §3.3
-  "kebab ao lado de BLOCO A" não existe. Solução: **overlay absoluto** (handle ⠿ +
-  kebab …) no canto sup. dir. do `.bloco-wrap`, custo vertical zero.
-- **NÃO consolidei** na mega-rota `inserir_bloco` da §7.6 (reuso fica nos helpers dict,
-  não nas rotas — `hub_ex_tornar_solo`/`mover_treino` já funcionam e têm testes).
-- **Reorder = `mover-para/<pos>`** (não `ordem=[...]`): 1 origem na URL + 1 destino,
-  off-by-one `dest = pos<=bi?pos:pos-1` no helper puro `_mover_bloco_dict`.
+## Decisões finais (algumas revisadas no mobile real)
+- **Pegar bloco = KEBAB-ONLY** (revisado em C8; antes era handle+kebab). O handle ⠿ de
+  long-press foi **removido**; reorder vive só no kebab do bloco → "Mover bloco" → entra
+  em carry → gaps viram "Soltar aqui". Menos colisão de gesto, mais limpo.
+- **"+" de inserir = SOB DEMANDA** (revisado em C9; antes sempre visível). Escondidos por
+  padrão; aparecem só após "Novo bloco" no kebab do TREINO (store Alpine `insertBloco.treino`).
+  Tap num "+" abre picker e desliga o modo; tap fora cancela.
+- **Card de viz não tem header de bloco** → ferramentas num **gutter à direita** que cobre a
+  altura do bloco (não a 1ª linha). Separadores entre exercícios param antes do gutter (`::before`
+  com inset à direita). `--hub-inset` 22→28 (respiro esq/dir simétrico).
+- **Sem prescrição default** em exercício novo (C5) — entra sem séries/reps/RIR (igual add manual).
+- **NÃO consolidei** na mega-rota `inserir_bloco` da §7.6 (reuso nos helpers dict).
+- **Reorder = `mover-para/<pos>`** (não `ordem=[...]`): off-by-one `dest = pos<=bi?pos:pos-1`
+  no helper puro `_mover_bloco_dict`.
 
 ## Rotas novas (app_flask.py, todas HUB-viz → `_render_swap_cards`, sem `edicao_hub`)
 - `POST .../treino/<t>/blocos/<bi>/remover` — devolve cards + `<script id="removed-bloco-snapshot">` (JSON do bloco cru) pro toast undo.
@@ -122,35 +132,22 @@ inclui handle ⠿ de bloco) + merge FF. Plano em `.claude/plans/swift-discoverin
 - `POST .../treino/<t>/blocos/<bi>/adicionar` — body `exercicios[]` (1); falha se bloco cheio.
 - `POST .../treino/<t>/blocos/inserir-existente` — undo (JSON `{posicao, bloco}`, preserva prescrição).
 - `GET /buscar-exercicios-picker?texto=` — linhas multi-select (`_bloco_picker_rows.html`).
-- Refactor: `hub_regerar_bloco` agora devolve `_render_swap_cards` (highlight, sem reload).
+- Refactor: `hub_regerar_bloco` devolve `_render_swap_cards` (highlight, sem reload).
 
-## Client (base.html)
-- Gesto: `touchstart` testa `[data-carry-bloco]` ANTES de `[data-swap-ex]` (precedência
-  §9 caso f). Estado `carryBloco` + `pressKind`. `cancelSwapMode` limpa ex E bloco.
-  `enterCarryBloco`, `performReorder`, `highlightBloco`.
-- `applyStructuralResult(html, hl, opts)` ganha 3º arg; chama `expireBlocoUndoToast()`
-  no topo exceto `opts.isUndo` (§10.7 — autosave de prescrição não passa aqui, então
-  não invalida, por construção). Sem heurística de path.
-- 2 IIFEs novas: action sheet do bloco + picker (delegação multi-select). Toast IIFE
-  redefine `window.removerBlocoFlow` (extrai snapshot → applyStructuralResult → show).
-- carry-pill generalizada (ex "Trocando:" / bloco "Movendo:").
-- `.bloco-gap` macro (`_hub_treino_card.html`): "+" inserir em repouso / "Soltar aqui"
-  só carregando bloco do MESMO treino, ocultando os 2 gaps adjacentes (no-op). `md:hidden`.
+## Client (base.html) — estado final
+- Stores Alpine: `carry` (ex/bloco), `highlight`, **`insertBloco { treino }`** (modo "Novo bloco").
+- Reorder de bloco: kebab "Mover bloco" → `enterCarryBloco({alunoId,t,bi,label})` (recebe contexto,
+  não elemento). `touchstart` voltou a mirar só exercício (sem handle de bloco).
+- `applyStructuralResult(html, hl, opts)`: chama `expireBlocoUndoToast()` no topo exceto
+  `opts.isUndo` (§10.7 — autosave de prescrição não passa aqui → não invalida).
+- IIFEs: action sheet do bloco + picker (multi-select por delegação) + toast undo (redefine
+  `window.removerBlocoFlow`). carry-pill generalizada (ex "Trocando:" / bloco "Movendo:").
+- `.bloco-gap` macro: "+" x-show `$store.insertBloco.treino === t_idx`; "Soltar aqui" só
+  carregando bloco do MESMO treino, ocultando os 2 gaps adjacentes. `md:hidden`.
 
-## Verificação feita
-- **pytest 386** (375 base + 11 novos em `tests/test_blocos_hub_viz.py`), 2 skips. Cobre
-  off-by-one do `_mover_bloco_dict` nos 2 sentidos + no-ops + prescrição default.
-- **`node --check`** OK nos IIFEs novos; braces dos 2 `<style>` balanceados.
-- **Smoke de servidor (curl, aluno 18)**: reorder+relabel, remover+snapshot island,
-  inserir 1/2 ex (compostos primeiro), adicionar, undo round-trip (bloco volta na posição
-  com prescrição), regerar — todas → `.swap-card-result` + banner OOB. Rascunho descartado.
-
-## Smoke mobile pendente (Bernardo · `http://192.168.1.15:5001`, aluno 18)
-Servidor já rodando em background (PID em `server.pid`). Casos críticos:
-- (handle) long-press no ⠿ pega o bloco; pill "Movendo: Bloco X"; gaps viram "Soltar aqui".
-- (precedência §9-f) long-press no ⠿ NÃO dispara carry de exercício adjacente.
-- reorder via handle **e** via kebab → "Mover bloco"; gaps de drop só no MESMO treino;
-  gaps adjacentes ao bloco carregado ocultos.
-- "+" entre blocos abre picker; selecionar 1-2 → "Adicionar (N)" → bloco novo + highlight.
-- kebab do bloco: Adicionar/Regerar/Remover; remover → toast 5s; Desfazer reverte;
-  fazer outra mutação na janela → toast expira; prescrição (focusout) NÃO expira.
+## Verificação
+- **pytest 386** (375 base + 11 em `tests/test_blocos_hub_viz.py`), 2 skips.
+- **`node --check`** OK; braces dos 2 `<style>` balanceados (661/661, 396/396).
+- **Smoke de servidor (curl, aluno 18)**: reorder, remover+snapshot, inserir 1/2 ex (compostos
+  primeiro), adicionar, undo round-trip, regerar — todas OK. Rascunho descartado.
+- **Validação no mobile real** (Bernardo, durante a sessão) guiou os refinos C5-C9.
