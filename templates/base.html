@@ -717,9 +717,6 @@
             /* overflow:visible no swipe (border-radius já é 0 → nada a cortar) pra o "+"
                dos gaps das pontas não ser clipado pelo overflow:hidden do container. */
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .blocos-container { border-radius: 0; margin-bottom: 0; overflow: visible; }
-            /* 1ª linha do bloco reserva espaço à direita pro overlay de ferramentas
-               (handle ⠿ + kebab …) — senão o badge de prescrição invade os botões. */
-            .hub-swipe-on .hub-swipe-track .bloco-tools + .exercicio { padding-right: calc(var(--hub-inset) + 56px); }
             /* Fundo dos blocos segue full-bleed; o TEXTO ganha respiro lateral (--hub-inset) */
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-header,
             .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .exercicio { padding-left: var(--hub-inset); padding-right: var(--hub-inset); }
@@ -756,12 +753,15 @@
             /* Fundo levemente mais frio no modo anterior (§5.3) */
             body[data-active-page="hub"].hub-periodo-anterior main.app-main > div { background: #eef1f4; }
 
-            /* ── Ferramentas do bloco (Sub-PR 5 · §3.3 zero pixel vertical) ──
-               Overlay absoluto no canto sup. direito do .bloco-wrap. */
+            /* ── Ferramentas do bloco (Sub-PR 5) — GUTTER do bloco ──
+               Zona à direita que representa o BLOCO INTEIRO (não o 1º exercício):
+               cobre a altura toda do .bloco-wrap, botões centrados verticalmente.
+               Os separadores entre exercícios param antes dela (ver .exercicio::before),
+               então o gutter lê como uma faixa unificada do bloco. */
             .hub-swipe-on .hub-swipe-track .bloco-wrap { position: relative; }
             .bloco-tools {
-                position: absolute; top: 1px; right: calc(var(--hub-inset) - 6px);
-                display: flex; align-items: center; gap: 2px; z-index: 3;
+                position: absolute; top: 0; bottom: 0; right: 8px; width: 46px;
+                display: flex; align-items: center; justify-content: center; gap: 2px; z-index: 3;
             }
             .bloco-handle, .bloco-kebab {
                 width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
@@ -772,6 +772,17 @@
             .bloco-handle { touch-action: none; cursor: grab; }
             .bloco-handle:active { color: var(--brand-500); }
             .bloco-kebab:active { background: var(--gray-100); color: var(--gray-700); }
+            /* Conteúdo do exercício reserva o gutter à direita em TODAS as linhas. */
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-wrap .exercicio {
+                position: relative; padding-left: var(--hub-inset); padding-right: 62px;
+            }
+            /* Separador entre exercícios para antes do gutter (vira ::before com inset
+               à direita, em vez do border-top full-width herdado). */
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-wrap .exercicio + .exercicio { border-top: 0; }
+            .hub-swipe-on .hub-swipe-track:not(.focando-edicao) .bloco-wrap .exercicio + .exercicio::before {
+                content: ''; position: absolute; top: 0; left: var(--hub-inset); right: 58px;
+                border-top: 1px solid rgba(0,0,0,0.06);
+            }
             /* Bloco sendo carregado pra reorder: esmaecido + borda tracejada */
             body.carry-bloco-mode .bloco-wrap.bloco-is-carried { opacity: 0.5; outline: 1.5px dashed var(--brand-500); outline-offset: -2px; }
 
