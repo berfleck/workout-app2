@@ -513,6 +513,7 @@ def _construir_modelo(
     peso_st4_pegada: int = 0,
     peso_st4_plano: int = 0,
     peso_st4_eq: int = 0,
+    max_complexidade: int = 5,
 ) -> dict:
     """Constrói o CpModel completo (constraints H-T1/T2/T3/T4 + H-R1 +
     penalidades de S-T1, Aderência ao Tier, S-B1 distância funcional
@@ -664,6 +665,14 @@ def _construir_modelo(
     """
     # H-P1: filtra o pool global por complexidade ANTES de montar o modelo.
     banco_nivel = filtrar_pool_por_nivel(banco, nivel_aluno)
+
+    # Teto de complexidade da UI (slider "complexidade máxima"). Filtro hard de
+    # pool análogo ao H-P1 — teto efetivo = min(teto_nível, max_complexidade).
+    # Roda antes do solver: exercício acima do teto não vira variável. Travados
+    # bypassam naturalmente (pool do slot travado é [ex_travado], independente
+    # de banco_nivel — decisão do personal supera a regra automática, igual 4.D).
+    if max_complexidade < 5:
+        banco_nivel = [e for e in banco_nivel if e.complexidade <= max_complexidade]
 
     model = cp_model.CpModel()
 
@@ -2351,6 +2360,7 @@ def gerar_rotina_csp(
     peso_st4_pegada: int = 0,
     peso_st4_plano: int = 0,
     peso_st4_eq: int = 0,
+    max_complexidade: int = 5,
 ) -> dict:
     """Resolve uma ROTINA (N treinos) via CP-SAT. Slots dos N treinos
     negociam no mesmo modelo — necessário pra H-R1 cross-treino.
@@ -2430,6 +2440,7 @@ def gerar_rotina_csp(
                 peso_st4_pegada=peso_st4_pegada,
                 peso_st4_plano=peso_st4_plano,
                 peso_st4_eq=peso_st4_eq,
+                max_complexidade=max_complexidade,
             )
         return _resolver_com_variedade(
             demandas_por_treino, banco, nivel_aluno, seed, variedade,
@@ -2449,6 +2460,7 @@ def gerar_rotina_csp(
             peso_st4_pegada=peso_st4_pegada,
             peso_st4_plano=peso_st4_plano,
             peso_st4_eq=peso_st4_eq,
+            max_complexidade=max_complexidade,
         )
 
     fams_originais = set(familias_proibidas or [])
@@ -2504,6 +2516,7 @@ def _resolver_legacy(
     peso_st4_pegada: int = 0,
     peso_st4_plano: int = 0,
     peso_st4_eq: int = 0,
+    max_complexidade: int = 5,
 ) -> dict:
     """Branch legado: 1 solve com Minimize → 1 solução determinística por
     seed. Preserva byte-a-byte o comportamento da Fatia 2 P2 quando
@@ -2527,6 +2540,7 @@ def _resolver_legacy(
         peso_st4_pegada=peso_st4_pegada,
         peso_st4_plano=peso_st4_plano,
         peso_st4_eq=peso_st4_eq,
+        max_complexidade=max_complexidade,
     )
     if md["penalidades"]:
         md["model"].Minimize(sum(md["penalidades"]))
@@ -2610,6 +2624,7 @@ def _resolver_com_variedade(
     peso_st4_pegada: int = 0,
     peso_st4_plano: int = 0,
     peso_st4_eq: int = 0,
+    max_complexidade: int = 5,
 ) -> dict:
     """Branch variedade (Frente B Fatia 3): 2 fases.
 
@@ -2650,6 +2665,7 @@ def _resolver_com_variedade(
         peso_st4_pegada=peso_st4_pegada,
         peso_st4_plano=peso_st4_plano,
         peso_st4_eq=peso_st4_eq,
+        max_complexidade=max_complexidade,
     )
     if md1["penalidades"]:
         md1["model"].Minimize(sum(md1["penalidades"]))
@@ -2705,6 +2721,7 @@ def _resolver_com_variedade(
         peso_st4_pegada=peso_st4_pegada,
         peso_st4_plano=peso_st4_plano,
         peso_st4_eq=peso_st4_eq,
+        max_complexidade=max_complexidade,
     )
     var_total: Optional[cp_model.IntVar] = None
     if md2["penalidades"]:
@@ -2922,6 +2939,7 @@ def gerar_treino_csp(
     peso_st4_pegada: int = 0,
     peso_st4_plano: int = 0,
     peso_st4_eq: int = 0,
+    max_complexidade: int = 5,
 ) -> dict:
     """Wrapper retrocompatível — resolve 1 treino via `gerar_rotina_csp`.
 
@@ -2986,6 +3004,7 @@ def gerar_treino_csp(
         peso_st4_pegada=peso_st4_pegada,
         peso_st4_plano=peso_st4_plano,
         peso_st4_eq=peso_st4_eq,
+        max_complexidade=max_complexidade,
     )
     if not rotina["viavel"]:
         out = {

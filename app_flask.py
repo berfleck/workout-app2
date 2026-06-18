@@ -2199,6 +2199,7 @@ def gerar():
         peso_st4_pegada=_PESO_ST4_PEGADA_DEFAULT,
         peso_st4_plano=_PESO_ST4_PLANO_DEFAULT,
         peso_st4_eq=_PESO_ST4_EQ_DEFAULT,
+        max_complexidade=max_cx,
     )
 
     if resultado_csp.get("viavel"):
@@ -2574,6 +2575,7 @@ def treino_regerar(t):
             peso_st4_pegada=_PESO_ST4_PEGADA_DEFAULT,
             peso_st4_plano=_PESO_ST4_PLANO_DEFAULT,
             peso_st4_eq=_PESO_ST4_EQ_DEFAULT,
+            max_complexidade=cfg_r.get("max_complexidade", 5),
         )
         nome_custom = cfg_r.get("nome_custom", "")
         tipo_label = nome_custom or sessoes_ativas[t].tipo
